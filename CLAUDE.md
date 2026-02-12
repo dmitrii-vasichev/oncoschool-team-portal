@@ -95,10 +95,10 @@ npm run dev
 - [x] Фаза 6: Голосовые задачи (Whisper STT → AI → превью → задача)
 - [x] Фаза 7: Подписки + напоминания (/subscribe, /reminders, дайджесты)
 - [x] Фаза 8: REST API (все endpoints, auth, CORS)
-- [ ] Фаза 9: Frontend каркас (layout, sidebar, dashboard, роли)
-- [ ] Фаза 10: Kanban + task updates (доска, timeline, фильтры)
-- [ ] Фаза 11: Встречи, summary, настройки (AI-модель, напоминания)
-- [ ] Фаза 12: Аналитика + деплой (графики, Docker, Vercel/Railway)
+- [x] Фаза 9: Frontend каркас (layout, sidebar, dashboard, роли)
+- [x] Фаза 10: Kanban + task updates (доска, timeline, фильтры)
+- [x] Фаза 11: Встречи, summary, настройки (AI-модель, напоминания)
+- [x] Фаза 12: Аналитика + деплой (графики, Docker, Vercel/Railway)
 
 ## Чеклист тестирования
 

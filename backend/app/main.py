@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.bot.handlers.common import router as common_router
+from app.bot.handlers.meetings import router as meetings_router
 from app.bot.handlers.settings import router as settings_router
 from app.bot.handlers.summary import router as summary_router
 from app.bot.handlers.task_updates import router as task_updates_router
@@ -26,10 +27,7 @@ app = FastAPI(title="Oncoschool Task Manager", version="0.1.0")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -52,6 +50,7 @@ dp.include_router(task_updates_router)
 dp.include_router(summary_router)
 dp.include_router(voice_router)
 dp.include_router(settings_router)
+dp.include_router(meetings_router)
 
 # Scheduler
 reminder_service = ReminderService(bot=bot, session_maker=async_session)
