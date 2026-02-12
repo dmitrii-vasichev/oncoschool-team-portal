@@ -3,7 +3,7 @@ import logging
 from aiogram import Bot
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Task, TaskUpdate, TeamMember
+from app.db.models import Meeting, Task, TaskUpdate, TeamMember
 from app.db.repositories import NotificationSubscriptionRepository, TeamMemberRepository
 
 logger = logging.getLogger(__name__)
@@ -161,6 +161,25 @@ class NotificationService:
                     f"#{task.short_id} · {task.title}\n"
                     f"👤 {added_by.full_name}: {task_update.content}"
                     f"{progress_str}"
+                )
+                await self._send_safe(member.telegram_id, text)
+
+    async def notify_meeting_created(
+        self, session: AsyncSession, meeting: Meeting, creator: TeamMember,
+        tasks_count: int
+    ) -> None:
+        """Notify subscribers of meeting_created."""
+        subs = await self.sub_repo.get_active_by_event(session, "meeting_created")
+        for sub in subs:
+            if sub.member_id == creator.id:
+                continue
+            member = sub.member
+            if member and member.telegram_id:
+                text = (
+                    f"📋 Новая встреча обработана:\n\n"
+                    f"📌 {meeting.title or 'Без названия'}\n"
+                    f"📝 Создал: {creator.full_name}\n"
+                    f"📊 Задач создано: {tasks_count}"
                 )
                 await self._send_safe(member.telegram_id, text)
 

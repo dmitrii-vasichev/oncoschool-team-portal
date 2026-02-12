@@ -21,8 +21,15 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str  # Required for Whisper STT
     GOOGLE_API_KEY: str | None = None
 
+    # Auth
+    JWT_SECRET: str = ""  # If empty, derived from BOT_TOKEN
+
     # General
     TIMEZONE: str = "Europe/Moscow"
+
+    @property
+    def jwt_secret_key(self) -> str:
+        return self.JWT_SECRET or f"oncoschool-{self.BOT_TOKEN[:16]}"
 
 
 settings = Settings()

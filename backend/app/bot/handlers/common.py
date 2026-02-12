@@ -32,7 +32,8 @@ async def cmd_help(message: Message, member: TeamMember) -> None:
         "/done &lt;id&gt; — завершить задачу\n"
         "/update &lt;id&gt; &lt;текст&gt; — промежуточный апдейт\n"
         "/status &lt;id&gt; &lt;статус&gt; — изменить статус\n"
-        "\U0001f3a4 Голосовое сообщение — создать задачу голосом"
+        "\U0001f3a4 Голосовое сообщение — создать задачу голосом\n"
+        "/myreminder — мои настройки напоминаний"
     )
 
     if is_mod:
