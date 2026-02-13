@@ -1,8 +1,9 @@
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.config import settings
 from app.db.models import TeamMember
 from app.db.repositories import TeamMemberRepository
 from app.services.permission_service import PermissionService
@@ -21,11 +22,37 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
     else:
         role_emoji, role_text = "\U0001f464", "Участник"
 
-    await message.answer(
+    text = (
         f"Привет, {member.full_name}! Я бот-задачник Онкошколы.\n"
         f"Твоя роль: {role_emoji} {role_text}\n\n"
         f"/help — список команд"
     )
+
+    reply_markup = None
+    if settings.MINI_APP_URL:
+        reply_markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="\U0001f4cb Открыть задачи",
+                web_app=WebAppInfo(url=settings.MINI_APP_URL),
+            )]
+        ])
+
+    await message.answer(text, reply_markup=reply_markup)
+
+
+@router.message(Command("app"))
+async def cmd_app(message: Message, member: TeamMember) -> None:
+    if not settings.MINI_APP_URL:
+        await message.answer("Mini App не настроен")
+        return
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="\U0001f4cb Открыть задачи",
+            web_app=WebAppInfo(url=settings.MINI_APP_URL),
+        )]
+    ])
+    await message.answer("\U0001f4f1 Откройте Mini App:", reply_markup=keyboard)
 
 
 @router.message(Command("help"))
@@ -43,7 +70,8 @@ async def cmd_help(message: Message, member: TeamMember) -> None:
         "/status &lt;id&gt; &lt;статус&gt; — изменить статус\n"
         "\U0001f3a4 Голосовое сообщение — создать задачу голосом\n"
         "/nextmeeting — следующая встреча\n"
-        "/myreminder — мои настройки напоминаний"
+        "/myreminder — мои настройки напоминаний\n"
+        "/app — открыть Mini App"
     )
 
     text = common_commands

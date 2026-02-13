@@ -2,11 +2,13 @@ import logging
 from datetime import date, datetime, timedelta
 
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from app.config import settings
 from app.db.models import ReminderSettings, Task, TeamMember
 from app.db.repositories import (
     NotificationSubscriptionRepository,
@@ -130,12 +132,22 @@ class ReminderService:
         all_tasks = await self.task_repo.get_by_assignee(session, member.id)
         active_tasks = [t for t in all_tasks if t.status not in ("done", "cancelled")]
 
+        # Build webapp button for digest
+        digest_markup = None
+        if settings.MINI_APP_URL:
+            digest_markup = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="📋 Открыть задачи",
+                    web_app=WebAppInfo(url=f"{settings.MINI_APP_URL}/tasks")
+                )
+            ]])
+
         if not active_tasks:
             text = (
                 f"📊 Ежедневный дайджест — {today.strftime('%d.%m.%Y')}\n\n"
                 "У тебя нет активных задач. Отличная работа! 🎉"
             )
-            await self._send_safe(member.telegram_id, text)
+            await self._send_safe(member.telegram_id, text, digest_markup)
             return
 
         sections = []
@@ -199,7 +211,7 @@ class ReminderService:
         sections.append(f"\nВсего активных: {total} | Завершено вчера: {done_count} 💪")
 
         text = "\n".join(sections)
-        await self._send_safe(member.telegram_id, text)
+        await self._send_safe(member.telegram_id, text, digest_markup)
 
     async def _check_overdue_tasks(self) -> None:
         """Notify subscribers about overdue tasks (hourly check)."""
@@ -248,9 +260,11 @@ class ReminderService:
         except Exception as e:
             logger.error(f"Error in _check_overdue_tasks: {e}")
 
-    async def _send_safe(self, chat_id: int, text: str) -> None:
+    async def _send_safe(
+        self, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None
+    ) -> None:
         """Send message, suppress errors."""
         try:
-            await self.bot.send_message(chat_id, text)
+            await self.bot.send_message(chat_id, text, reply_markup=reply_markup)
         except Exception as e:
             logger.warning(f"Failed to send reminder to {chat_id}: {e}")

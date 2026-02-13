@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Frontend URL (for bot inline buttons linking to web UI)
     NEXT_PUBLIC_FRONTEND_URL: str = "http://localhost:3000"
 
+    # Telegram Mini App
+    MINI_APP_URL: str = ""
+
     @property
     def database_url_async(self) -> str:
         url = self.DATABASE_URL

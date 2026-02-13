@@ -9,6 +9,7 @@ from pathlib import Path
 
 import httpx
 import jwt
+from aiogram.utils.web_app import safe_parse_webapp_init_data
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
@@ -42,6 +43,10 @@ class TelegramAuthData(BaseModel):
     photo_url: str | None = None
     auth_date: int
     hash: str
+
+
+class MiniAppAuthData(BaseModel):
+    init_data: str
 
 
 class TokenResponse(BaseModel):
@@ -253,6 +258,57 @@ async def dev_login(
             detail="Пользователь не найден. Сначала напишите /start боту в Telegram",
         )
 
+    token = create_access_token(member.id)
+    return TokenResponse(
+        access_token=token,
+        member_id=str(member.id),
+        role=member.role,
+    )
+
+
+@router.post("/mini-app", response_model=TokenResponse)
+async def login_mini_app(
+    data: MiniAppAuthData,
+    session: AsyncSession = Depends(get_session),
+):
+    """Authenticate via Telegram Mini App initData."""
+    # 1. Validate initData signature using aiogram utility
+    try:
+        web_app_data = safe_parse_webapp_init_data(
+            token=settings.BOT_TOKEN,
+            init_data=data.init_data,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Невалидная подпись initData",
+        )
+
+    # 2. Extract telegram user
+    if not web_app_data.user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Данные пользователя отсутствуют в initData",
+        )
+
+    telegram_id = web_app_data.user.id
+
+    # 3. Find member
+    member = await member_repo.get_by_telegram_id(session, telegram_id)
+    if not member or not member.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ запрещён. Обратитесь к модератору для добавления в команду",
+        )
+
+    # 4. Update telegram_username if changed
+    tg_username = web_app_data.user.username
+    if tg_username and tg_username != member.telegram_username:
+        async with session.begin():
+            member.telegram_username = tg_username
+            session.add(member)
+
+    # 5. Issue JWT
     token = create_access_token(member.id)
     return TokenResponse(
         access_token=token,

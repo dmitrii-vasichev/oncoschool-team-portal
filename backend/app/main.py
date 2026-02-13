@@ -4,6 +4,7 @@ from pathlib import Path
 
 import uvicorn
 from aiogram import Bot, Dispatcher
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -29,9 +30,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="Oncoschool Task Manager", version="0.1.0")
 
 # CORS
+cors_origins = list(settings.CORS_ORIGINS)
+if settings.MINI_APP_URL:
+    cors_origins.append(settings.MINI_APP_URL)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -115,6 +119,16 @@ async def main():
     logger.info("Reminder scheduler started")
     meeting_scheduler.start()
     logger.info("Meeting scheduler started")
+
+    # Set Menu Button for Mini App
+    if settings.MINI_APP_URL:
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="\U0001f4cb Задачи",
+                web_app=WebAppInfo(url=settings.MINI_APP_URL),
+            )
+        )
+        logger.info("Mini App menu button set: %s", settings.MINI_APP_URL)
 
     try:
         await asyncio.gather(
