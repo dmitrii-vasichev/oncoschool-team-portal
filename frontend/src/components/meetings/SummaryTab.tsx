@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
 import type {
@@ -469,13 +470,12 @@ export function SummaryTab({
                       <Label className="text-2xs text-muted-foreground/70 uppercase tracking-wider">
                         Дедлайн
                       </Label>
-                      <Input
-                        type="date"
+                      <DatePicker
                         value={task.deadline || ""}
-                        onChange={(e) =>
-                          updateTask(i, "deadline", e.target.value || null)
-                        }
-                        className="mt-1.5 h-8 text-sm rounded-lg border-border/40"
+                        onChange={(v) => updateTask(i, "deadline", v || null)}
+                        placeholder="Дата"
+                        clearable
+                        className="w-full mt-1.5 h-8 text-sm rounded-lg"
                       />
                     </div>
                   </div>

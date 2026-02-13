@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { DatePicker } from "@/components/shared/DatePicker";
 import {
   AlertTriangle,
   ArrowUp,
@@ -213,16 +214,16 @@ export function CreateTaskDialog({
           {/* Deadline + Assignee row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="create-deadline" className="text-sm font-medium">
+              <Label className="text-sm font-medium">
                 <CalendarDays className="inline h-3.5 w-3.5 mr-1 -mt-0.5" />
                 Дедлайн
               </Label>
-              <Input
-                id="create-deadline"
-                type="date"
+              <DatePicker
                 value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="h-10 bg-muted/30 border-border/60 focus:bg-card"
+                onChange={setDeadline}
+                placeholder="Выбрать"
+                clearable
+                className="w-full h-10 bg-muted/30 border-border/60"
               />
             </div>
 

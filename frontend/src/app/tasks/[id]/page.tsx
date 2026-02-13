@@ -43,6 +43,7 @@ import {
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { TaskUpdates } from "@/components/tasks/TaskUpdates";
 import { useTask } from "@/hooks/useTasks";
 import { useTeam } from "@/hooks/useTeam";
@@ -214,6 +215,19 @@ export default function TaskDetailPage() {
       await refetch();
     } catch {
       toastError("Не удалось изменить приоритет");
+    }
+  }
+
+  async function handleDeadlineChange(value: string) {
+    if (!shortId) return;
+    try {
+      await api.updateTask(shortId, {
+        deadline: value || null,
+      });
+      await refetch();
+      toastSuccess(value ? "Дедлайн обновлён" : "Дедлайн снят");
+    } catch {
+      toastError("Не удалось изменить дедлайн");
     }
   }
 
@@ -452,7 +466,16 @@ export default function TaskDetailPage() {
               Дедлайн
             </dt>
             <dd>
-              {task.deadline ? (
+              {isModerator ? (
+                <DatePicker
+                  value={task.deadline ? task.deadline.slice(0, 10) : ""}
+                  onChange={handleDeadlineChange}
+                  placeholder="Не задан"
+                  clearable
+                  inline
+                  overdue={overdue}
+                />
+              ) : task.deadline ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span

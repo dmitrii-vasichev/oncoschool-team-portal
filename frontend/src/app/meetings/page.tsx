@@ -30,6 +30,7 @@ import { useTeam } from "@/hooks/useTeam";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ScheduleCard } from "@/components/meetings/ScheduleCard";
 import { ScheduleForm } from "@/components/meetings/ScheduleForm";
@@ -488,11 +489,11 @@ function CreateMeetingDialog({
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Дата
               </Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-1.5 rounded-xl"
+                onChange={setDate}
+                placeholder="Выбрать"
+                className="w-full mt-1.5 rounded-xl"
               />
             </div>
             <div>

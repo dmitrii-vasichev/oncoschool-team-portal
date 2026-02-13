@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AvatarUpload } from "./AvatarUpload";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import type { TeamMember, Department, MemberRole } from "@/lib/types";
@@ -283,11 +284,12 @@ export function MemberEditModal({ member, departments, currentUser, onSave, onCl
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 День рождения
               </Label>
-              <Input
-                type="date"
+              <DatePicker
                 value={birthday}
-                onChange={(e) => setBirthday(e.target.value)}
-                className="mt-1.5 rounded-xl"
+                onChange={setBirthday}
+                placeholder="Не указан"
+                clearable
+                className="w-full mt-1.5 rounded-xl"
               />
             </div>
           </div>
