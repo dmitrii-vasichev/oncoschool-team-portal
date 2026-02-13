@@ -9,12 +9,13 @@ import {
   type ReactNode,
 } from "react";
 import { api } from "@/lib/api";
-import type { TeamMember } from "@/lib/types";
+import type { TeamMember, TelegramAuthData } from "@/lib/types";
 
 interface AuthContextValue {
   user: TeamMember | null;
   loading: boolean;
-  login: (telegramId: number) => Promise<void>;
+  loginWithTelegram: (data: TelegramAuthData) => Promise<void>;
+  loginWithTelegramId: (telegramId: number) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -57,11 +58,16 @@ export function useAuthProvider(): AuthContextValue {
     refreshUser();
   }, [refreshUser]);
 
-  const login = useCallback(async (telegramId: number) => {
-    const resp = await api.login({ telegram_id: telegramId });
+  const loginWithTelegram = useCallback(async (data: TelegramAuthData) => {
+    await api.loginWithTelegram(data);
     const me = await api.getMe();
     setUser(me);
-    return void resp;
+  }, []);
+
+  const loginWithTelegramId = useCallback(async (telegramId: number) => {
+    await api.devLogin(telegramId);
+    const me = await api.getMe();
+    setUser(me);
   }, []);
 
   const logout = useCallback(() => {
@@ -69,7 +75,7 @@ export function useAuthProvider(): AuthContextValue {
     setUser(null);
   }, []);
 
-  return { user, loading, login, logout, refreshUser };
+  return { user, loading, loginWithTelegram, loginWithTelegramId, logout, refreshUser };
 }
 
 export function createAuthProvider(children: ReactNode, value: AuthContextValue) {

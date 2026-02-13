@@ -23,8 +23,10 @@ class Settings(BaseSettings):
 
     # Auth
     JWT_SECRET: str = ""  # If empty, derived from BOT_TOKEN
+    TELEGRAM_BOT_USERNAME: str = ""
 
     # General
+    DEBUG: bool = False
     TIMEZONE: str = "Europe/Moscow"
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3002", "http://127.0.0.1:3002"]
 

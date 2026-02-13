@@ -1,5 +1,5 @@
 import type {
-  LoginRequest,
+  TelegramAuthData,
   LoginResponse,
   Task,
   TaskCreateRequest,
@@ -83,10 +83,23 @@ class ApiClient {
 
   // ==================== Auth ====================
 
-  async login(data: LoginRequest): Promise<LoginResponse> {
-    const resp = await this.request<LoginResponse>("/api/auth/login", {
+  async loginWithTelegram(data: TelegramAuthData): Promise<LoginResponse> {
+    const resp = await this.request<LoginResponse>("/api/auth/telegram", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+    this.setToken(resp.access_token);
+    return resp;
+  }
+
+  async getAuthConfig(): Promise<{ bot_username: string; debug?: boolean }> {
+    return this.request<{ bot_username: string; debug?: boolean }>("/api/auth/config");
+  }
+
+  async devLogin(telegramId: number): Promise<LoginResponse> {
+    const resp = await this.request<LoginResponse>("/api/auth/dev-login", {
+      method: "POST",
+      body: JSON.stringify({ telegram_id: telegramId }),
     });
     this.setToken(resp.access_token);
     return resp;

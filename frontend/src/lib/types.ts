@@ -165,8 +165,14 @@ export interface MeetingWithTasksResponse {
 // API Request/Response types
 // ============================================
 
-export interface LoginRequest {
-  telegram_id: number;
+export interface TelegramAuthData {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
 }
 
 export interface LoginResponse {

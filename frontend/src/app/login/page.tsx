@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { api } from "@/lib/api";
+import type { TelegramAuthData } from "@/lib/types";
+import { Loader2, MessageCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Loader2, MessageCircle } from "lucide-react";
 
 /* ─── Cross pattern for the decorative panel ─── */
 function CrossPattern() {
@@ -37,33 +37,196 @@ function CrossPattern() {
   );
 }
 
+/* ─── Telegram Login Widget ─── */
+declare global {
+  interface Window {
+    onTelegramAuth: (user: TelegramAuthData) => void;
+  }
+}
+
+function TelegramLoginButton({
+  botUsername,
+  onAuth,
+  onError,
+}: {
+  botUsername: string;
+  onAuth: (data: TelegramAuthData) => void;
+  onError: (msg: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [widgetLoading, setWidgetLoading] = useState(true);
+  const [widgetKey, setWidgetKey] = useState(0);
+
+  const handleAuth = useCallback(
+    (user: TelegramAuthData) => {
+      onAuth(user);
+    },
+    [onAuth]
+  );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !botUsername) return;
+
+    // Register global callback
+    window.onTelegramAuth = handleAuth;
+
+    // Clear previous widget
+    container.innerHTML = "";
+    setWidgetLoading(true);
+
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.async = true;
+    script.setAttribute("data-telegram-login", botUsername);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "12");
+    script.setAttribute("data-request-access", "write");
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    script.setAttribute("data-lang", "ru");
+
+    script.onload = () => {
+      setWidgetLoading(false);
+    };
+
+    script.onerror = () => {
+      setWidgetLoading(false);
+      onError("Не удалось загрузить Telegram Widget. Проверьте подключение к интернету");
+    };
+
+    container.appendChild(script);
+
+    return () => {
+      delete (window as Partial<typeof window>).onTelegramAuth;
+    };
+  }, [botUsername, handleAuth, onError, widgetKey]);
+
+  const reload = useCallback(() => {
+    setWidgetKey((k) => k + 1);
+  }, []);
+
+  if (!botUsername) {
+    return (
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-4 text-center">
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          Telegram Login не настроен. Обратитесь к администратору.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div
+        ref={containerRef}
+        className="flex min-h-[48px] items-center justify-center"
+      />
+      {widgetLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">Загрузка виджета...</span>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground/70">
+        Нажмите кнопку для авторизации через Telegram
+      </p>
+      <button
+        type="button"
+        onClick={reload}
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <RefreshCw className="h-3 w-3" />
+        Перезагрузить виджет
+      </button>
+    </div>
+  );
+}
+
 export default function LoginPage() {
-  const [telegramId, setTelegramId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useCurrentUser();
+  const [botUsername, setBotUsername] = useState<string>(
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || ""
+  );
+  const [configLoading, setConfigLoading] = useState(true);
+  const [debugMode, setDebugMode] = useState(false);
+  const [telegramId, setTelegramId] = useState("");
+  const { loginWithTelegram, loginWithTelegramId } = useCurrentUser();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  // Fetch config from backend
+  useEffect(() => {
+    api
+      .getAuthConfig()
+      .then((cfg) => {
+        if (cfg.bot_username) setBotUsername(cfg.bot_username);
+        setDebugMode(!!cfg.debug);
+      })
+      .catch(() => {
+        // silently fail
+      })
+      .finally(() => setConfigLoading(false));
+  }, []);
 
-    const id = parseInt(telegramId, 10);
-    if (!id || isNaN(id)) {
-      setError("Введите корректный Telegram ID");
-      return;
-    }
-
-    try {
+  const handleTelegramAuth = useCallback(
+    async (data: TelegramAuthData) => {
+      setError(null);
       setLoading(true);
-      await login(id);
-      router.push("/");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка авторизации");
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        await loginWithTelegram(data);
+        router.push("/");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Ошибка авторизации";
+
+        if (message.includes("подпись") || message.includes("устарела")) {
+          setError("Ошибка авторизации. Попробуйте ещё раз");
+        } else if (message.includes("запрещён") || message.includes("403")) {
+          setError(
+            `У вас нет доступа. Сначала напишите /start боту @${botUsername} в Telegram, или обратитесь к модератору`
+          );
+        } else if (
+          message.includes("Failed to fetch") ||
+          message.includes("NetworkError")
+        ) {
+          setError("Не удалось подключиться к серверу");
+        } else {
+          setError(message);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loginWithTelegram, router, botUsername]
+  );
+
+  const handleDevLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      const id = parseInt(telegramId.trim(), 10);
+      if (!id || isNaN(id)) {
+        setError("Введите корректный Telegram ID (число)");
+        return;
+      }
+      setLoading(true);
+      try {
+        await loginWithTelegramId(id);
+        router.push("/");
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Ошибка авторизации";
+        setError(message);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [telegramId, loginWithTelegramId, router]
+  );
+
+  const handleWidgetError = useCallback((msg: string) => {
+    setError(msg);
+  }, []);
 
   return (
     <div className="flex min-h-screen">
@@ -140,62 +303,86 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Form card */}
+        {/* Auth card */}
         <div className="w-full max-w-sm animate-login-slide-up" style={{ animationDelay: "0.2s" }}>
           <div className="mb-8">
             <h1 className="text-2xl font-heading font-bold text-foreground tracking-tight">
               Войти в систему
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Введите Telegram ID для авторизации
+              Авторизуйтесь через Telegram для входа
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label
-                htmlFor="telegram_id"
-                className="text-xs font-medium text-muted-foreground uppercase tracking-wider"
-              >
-                Telegram ID
-              </Label>
-              <Input
-                id="telegram_id"
-                type="text"
-                inputMode="numeric"
-                placeholder="123456789"
-                value={telegramId}
-                onChange={(e) => setTelegramId(e.target.value)}
-                disabled={loading}
-                className="h-12 rounded-xl text-center text-lg font-mono tracking-wider border-border focus:border-primary focus:ring-ring/20"
-              />
-              <p className="text-xs text-muted-foreground/70 text-center">
-                Узнать свой ID можно у бота{" "}
-                <span className="font-medium text-muted-foreground">@userinfobot</span>
-              </p>
-            </div>
+          <div className="space-y-5">
+            {/* Loading overlay during auth request */}
+            {loading && (
+              <div className="flex items-center justify-center gap-2 py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Авторизация...</span>
+              </div>
+            )}
 
+            {/* Error block */}
             {error && (
               <div className="rounded-xl bg-destructive/5 border border-destructive/15 px-4 py-3">
                 <p className="text-sm text-destructive text-center">{error}</p>
               </div>
             )}
 
-            <Button
-              type="submit"
-              className="w-full h-12 rounded-xl text-base font-medium shadow-lg transition-all duration-200"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Вход...
-                </>
+            {/* Telegram Login Widget or Dev Login */}
+            {!loading && (
+              configLoading ? (
+                <div className="flex items-center justify-center gap-2 py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Загрузка...</span>
+                </div>
+              ) : debugMode ? (
+                <form onSubmit={handleDevLogin} className="space-y-3">
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      Dev-режим — вход по Telegram ID
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Telegram ID"
+                    value={telegramId}
+                    onChange={(e) => setTelegramId(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                  <Button type="submit" className="w-full rounded-xl">
+                    Войти
+                  </Button>
+                </form>
               ) : (
-                "Войти"
-              )}
-            </Button>
-          </form>
+                <TelegramLoginButton
+                  botUsername={botUsername}
+                  onAuth={handleTelegramAuth}
+                  onError={handleWidgetError}
+                />
+              )
+            )}
+
+            {/* Retry button on error */}
+            {error && !loading && (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setError(null);
+                    window.location.reload();
+                  }}
+                  className="rounded-xl"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                  Попробовать снова
+                </Button>
+              </div>
+            )}
+          </div>
 
           {/* Telegram hint */}
           <div className="mt-8 flex items-center gap-3 rounded-xl border border-border bg-secondary/50 px-4 py-3">
@@ -205,7 +392,7 @@ export default function LoginPage() {
             <p className="text-xs text-muted-foreground leading-relaxed">
               Первый раз?{" "}
               <span className="font-medium text-foreground">
-                Начните с Telegram-бота
+                Напишите /start боту{botUsername ? ` @${botUsername}` : ""} в Telegram
               </span>{" "}
               — он зарегистрирует вас в системе.
             </p>
