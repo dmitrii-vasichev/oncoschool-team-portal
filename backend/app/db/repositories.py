@@ -1,8 +1,12 @@
+import logging
 import uuid
 
 from sqlalchemy import select, update, delete, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
 
 from app.db.models import (
     AppSettings,
@@ -86,14 +90,28 @@ class TaskRepository:
         return list(result.scalars().all())
 
     async def create(self, session: AsyncSession, **kwargs) -> Task:
-        # Get next short_id
-        stmt = select(func.coalesce(func.max(Task.short_id), 0) + 1)
-        result = await session.execute(stmt)
-        next_short_id = result.scalar_one()
+        # Retry loop: max(short_id)+1 can race under concurrent inserts.
+        # The UNIQUE constraint on short_id guarantees no duplicates;
+        # on conflict we simply re-read max and retry.
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            stmt = select(func.coalesce(func.max(Task.short_id), 0) + 1)
+            result = await session.execute(stmt)
+            next_short_id = result.scalar_one()
 
-        task = Task(short_id=next_short_id, **kwargs)
-        session.add(task)
-        await session.flush()
+            task = Task(short_id=next_short_id, **kwargs)
+            session.add(task)
+            try:
+                await session.flush()
+                break
+            except IntegrityError:
+                await session.rollback()
+                if attempt == max_attempts - 1:
+                    raise
+                logger.warning(
+                    "short_id collision (%d), retrying (%d/%d)",
+                    next_short_id, attempt + 1, max_attempts,
+                )
         # Reload with relationships
         return await self.get_by_id(session, task.id)
 

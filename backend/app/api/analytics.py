@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
@@ -114,60 +114,56 @@ async def analytics_members(
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Get per-member analytics."""
+    """Get per-member analytics (single aggregation query instead of N+1)."""
     today = date.today()
     all_members = await member_repo.get_all_active(session)
 
+    # Single query: task counts per assignee with conditional aggregation
+    task_stats_stmt = (
+        select(
+            Task.assignee_id,
+            func.count(Task.id).label("total"),
+            func.count(case((Task.status == "done", Task.id))).label("done"),
+            func.count(case((Task.status == "in_progress", Task.id))).label("in_progress"),
+            func.count(
+                case((
+                    (Task.deadline < today) & Task.status.notin_(["done", "cancelled"]),
+                    Task.id,
+                ))
+            ).label("overdue"),
+        )
+        .group_by(Task.assignee_id)
+    )
+    task_stats_result = await session.execute(task_stats_stmt)
+    stats_by_assignee = {
+        row.assignee_id: row
+        for row in task_stats_result.all()
+    }
+
+    # Single query: last update per author
+    last_update_stmt = (
+        select(
+            TaskUpdate.author_id,
+            func.max(TaskUpdate.created_at).label("last_update"),
+        )
+        .group_by(TaskUpdate.author_id)
+    )
+    last_update_result = await session.execute(last_update_stmt)
+    last_updates = {row.author_id: row.last_update for row in last_update_result.all()}
+
     member_stats = []
     for m in all_members:
-        # Total tasks assigned
-        total_stmt = select(func.count(Task.id)).where(Task.assignee_id == m.id)
-        total_result = await session.execute(total_stmt)
-        total = total_result.scalar_one()
-
-        # Done tasks
-        done_stmt = select(func.count(Task.id)).where(
-            Task.assignee_id == m.id, Task.status == "done"
-        )
-        done_result = await session.execute(done_stmt)
-        done = done_result.scalar_one()
-
-        # In progress
-        ip_stmt = select(func.count(Task.id)).where(
-            Task.assignee_id == m.id, Task.status == "in_progress"
-        )
-        ip_result = await session.execute(ip_stmt)
-        in_progress = ip_result.scalar_one()
-
-        # Overdue
-        overdue_stmt = select(func.count(Task.id)).where(
-            Task.assignee_id == m.id,
-            Task.deadline < today,
-            Task.status.notin_(["done", "cancelled"]),
-        )
-        overdue_result = await session.execute(overdue_stmt)
-        overdue = overdue_result.scalar_one()
-
-        # Last update
-        last_update_stmt = (
-            select(TaskUpdate.created_at)
-            .where(TaskUpdate.author_id == m.id)
-            .order_by(TaskUpdate.created_at.desc())
-            .limit(1)
-        )
-        last_update_result = await session.execute(last_update_stmt)
-        last_update = last_update_result.scalar_one_or_none()
-
+        row = stats_by_assignee.get(m.id)
         member_stats.append(
             MemberStats(
                 id=str(m.id),
                 full_name=m.full_name,
                 role=m.role,
-                total_tasks=total,
-                tasks_done=done,
-                tasks_in_progress=in_progress,
-                tasks_overdue=overdue,
-                last_update=last_update,
+                total_tasks=row.total if row else 0,
+                tasks_done=row.done if row else 0,
+                tasks_in_progress=row.in_progress if row else 0,
+                tasks_overdue=row.overdue if row else 0,
+                last_update=last_updates.get(m.id),
             )
         )
 
@@ -191,7 +187,7 @@ async def analytics_meetings(
     tasks_from = tasks_result.scalar_one()
 
     # Meetings this month
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     month_stmt = select(func.count(Meeting.id)).where(Meeting.created_at >= month_start)
     month_result = await session.execute(month_stmt)

@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
@@ -375,6 +376,7 @@ function MeetingCard({
 
 export default function DashboardPage() {
   const { user } = useCurrentUser();
+  const { toastError } = useToast();
   const [loading, setLoading] = useState(true);
 
   // Data
@@ -390,25 +392,31 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
 
     async function fetchData() {
       try {
+        const catchLog = (label: string) => (err: unknown) => {
+          console.error(`[Dashboard] ${label} failed:`, err);
+          return null;
+        };
+
         // Parallel fetch — shared data
         const promises: Promise<unknown>[] = [
-          api.getOverview(),
-          api.getMeetingsAnalytics(),
+          api.getOverview().catch(catchLog("getOverview")),
+          api.getMeetingsAnalytics().catch(catchLog("getMeetingsAnalytics")),
           api.getTasks({
-            assignee: user!.id,
+            assignee_id: user!.id,
             status: "new,in_progress,review",
             per_page: "50",
-            sort: "-updated_at",
-          }),
+            sort: "created_at_desc",
+          }).catch(catchLog("getMyTasks")),
           api.getTasks({
             status: "done",
             per_page: "50",
-            sort: "-updated_at",
-          }),
-          api.getMeetings(),
+            sort: "created_at_desc",
+          }).catch(catchLog("getDoneTasks")),
+          api.getMeetings().catch(catchLog("getMeetings")),
         ];
 
         // Moderator-only data
@@ -418,65 +426,77 @@ export default function DashboardPage() {
             api.getTasks({
               status: "new",
               per_page: "20",
-              sort: "-created_at",
-            })
+              sort: "created_at_desc",
+            }).catch(catchLog("getUnassignedTasks"))
           );
           promises.push(
             api.getTasks({
               status: "in_progress,review",
               per_page: "50",
-              sort: "updated_at",
-            })
+              sort: "created_at_asc",
+            }).catch(catchLog("getStaleTasks"))
           );
         }
 
         const results = await Promise.all(promises);
+        if (cancelled) return;
 
-        const overviewData = results[0] as OverviewAnalytics;
-        const meetingData = results[1] as MeetingAnalytics;
-        const myTasksData = results[2] as { items: Task[] };
-        const doneTasksData = results[3] as { items: Task[] };
-        const meetingsData = results[4] as Meeting[];
+        const overviewData = results[0] as OverviewAnalytics | null;
+        const meetingData = results[1] as MeetingAnalytics | null;
+        const myTasksData = results[2] as { items: Task[] } | null;
+        const doneTasksData = results[3] as { items: Task[] } | null;
+        const meetingsData = results[4] as Meeting[] | null;
 
-        setOverview(overviewData);
-        setMeetingAnalytics(meetingData);
+        const hasError = results.some((r) => r === null);
+
+        if (overviewData) setOverview(overviewData);
+        if (meetingData) setMeetingAnalytics(meetingData);
 
         // My tasks — first 5 for display
-        setMyTasks(myTasksData.items.slice(0, 5));
-
-        // Overdue from my tasks
-        setOverdueTasks(myTasksData.items.filter(isOverdue));
+        if (myTasksData) {
+          setMyTasks(myTasksData.items.slice(0, 5));
+          setOverdueTasks(myTasksData.items.filter(isOverdue));
+        }
 
         // Completed this week
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const thisWeekCount = doneTasksData.items.filter(
-          (t) => t.completed_at && new Date(t.completed_at) > weekAgo
-        ).length;
-        setCompletedThisWeek(thisWeekCount);
+        if (doneTasksData) {
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          const thisWeekCount = doneTasksData.items.filter(
+            (t) => t.completed_at && new Date(t.completed_at) > weekAgo
+          ).length;
+          setCompletedThisWeek(thisWeekCount);
+        }
 
         // Recent meetings (last 3)
-        setMeetings(meetingsData.slice(0, 3));
+        if (meetingsData) setMeetings(meetingsData.slice(0, 3));
 
         // Moderator data
         if (isMod) {
-          const unassignedData = results[5] as { items: Task[] };
-          const staleData = results[6] as { items: Task[] };
+          const unassignedData = results[5] as { items: Task[] } | null;
+          const staleData = results[6] as { items: Task[] } | null;
 
-          setUnassignedTasks(
-            unassignedData.items.filter((t) => !t.assignee_id).slice(0, 5)
-          );
-          setStaleTasks(staleData.items.filter(isStale).slice(0, 5));
+          if (unassignedData) {
+            setUnassignedTasks(
+              unassignedData.items.filter((t) => !t.assignee_id).slice(0, 5)
+            );
+          }
+          if (staleData) {
+            setStaleTasks(staleData.items.filter(isStale).slice(0, 5));
+          }
         }
+
+        if (hasError) toastError("Не удалось загрузить часть данных");
       } catch {
-        // Data will be empty on failure
+        if (!cancelled) toastError("Не удалось загрузить данные");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchData();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   if (!user) return null;
 

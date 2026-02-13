@@ -200,7 +200,14 @@ class AIService:
             )
 
     async def _get_current_provider(self, session: AsyncSession) -> AIProvider:
-        """Read current provider from app_settings and instantiate."""
+        """Read current provider from app_settings and instantiate.
+
+        Falls back to first available provider when the configured one
+        has no API key (e.g. seed defaults to anthropic but only openai key is set).
+        """
+        if not self.provider_factories:
+            raise ValueError("Нет доступных AI-провайдеров (не заданы API ключи)")
+
         settings_repo = AppSettingsRepository()
         setting = await settings_repo.get(session, "ai_provider")
         if not setting:
@@ -210,9 +217,22 @@ class AIService:
         model = setting.value["model"]
 
         if provider_name not in self.provider_factories:
-            raise ValueError(
-                f"Провайдер {provider_name} не настроен (нет API ключа)"
+            fallback_name = next(iter(self.provider_factories))
+            config_setting = await settings_repo.get(session, "ai_providers_config")
+            fallback_model = model
+            if config_setting and fallback_name in config_setting.value:
+                fallback_model = config_setting.value[fallback_name].get("default", model)
+
+            logger.warning(
+                "Провайдер %s недоступен (нет API ключа), переключаюсь на %s/%s",
+                provider_name, fallback_name, fallback_model,
             )
+            await settings_repo.set(
+                session, "ai_provider",
+                {"provider": fallback_name, "model": fallback_model},
+            )
+            provider_name, model = fallback_name, fallback_model
+
         return self.provider_factories[provider_name](model)
 
     async def get_current_provider_info(self, session: AsyncSession) -> dict:

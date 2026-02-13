@@ -1,6 +1,9 @@
+import math
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,11 +19,15 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 task_service = TaskService()
 
 
-class PaginatedTasksResponse:
-    pass  # Using dict for simplicity
+class PaginatedTasksResponse(BaseModel):
+    items: list[TaskResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int
 
 
-@router.get("", response_model=list[TaskResponse])
+@router.get("", response_model=PaginatedTasksResponse)
 async def list_tasks(
     assignee_id: uuid.UUID | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
@@ -31,35 +38,35 @@ async def list_tasks(
     has_overdue: bool | None = Query(None),
     sort: str = Query("created_at_desc"),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=100),
+    per_page: int = Query(50, ge=1, le=200),
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """List tasks with filters, pagination, and sorting."""
-    stmt = (
-        select(Task)
-        .options(selectinload(Task.assignee), selectinload(Task.created_by))
-    )
+    base_stmt = select(Task)
 
     # Filters
     if assignee_id:
-        stmt = stmt.where(Task.assignee_id == assignee_id)
+        base_stmt = base_stmt.where(Task.assignee_id == assignee_id)
     if status_filter:
         statuses = [s.strip() for s in status_filter.split(",")]
-        stmt = stmt.where(Task.status.in_(statuses))
+        base_stmt = base_stmt.where(Task.status.in_(statuses))
     if priority:
-        stmt = stmt.where(Task.priority == priority)
+        base_stmt = base_stmt.where(Task.priority == priority)
     if meeting_id:
-        stmt = stmt.where(Task.meeting_id == meeting_id)
+        base_stmt = base_stmt.where(Task.meeting_id == meeting_id)
     if source:
-        stmt = stmt.where(Task.source == source)
+        base_stmt = base_stmt.where(Task.source == source)
     if search:
-        stmt = stmt.where(
+        base_stmt = base_stmt.where(
             Task.title.ilike(f"%{search}%") | Task.description.ilike(f"%{search}%")
         )
     if has_overdue:
-        from datetime import date
-        stmt = stmt.where(Task.deadline < date.today(), Task.status.notin_(["done", "cancelled"]))
+        base_stmt = base_stmt.where(Task.deadline < date.today(), Task.status.notin_(["done", "cancelled"]))
+
+    # Total count (before pagination)
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = (await session.execute(count_stmt)).scalar_one()
 
     # Sorting
     sort_map = {
@@ -72,14 +79,25 @@ async def list_tasks(
         "short_id_asc": Task.short_id.asc(),
     }
     order = sort_map.get(sort, Task.created_at.desc())
-    stmt = stmt.order_by(order)
 
-    # Pagination
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    items_stmt = (
+        base_stmt
+        .options(selectinload(Task.assignee), selectinload(Task.created_by))
+        .order_by(order)
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
 
-    result = await session.execute(stmt)
+    result = await session.execute(items_stmt)
     tasks = list(result.scalars().all())
-    return tasks
+
+    return PaginatedTasksResponse(
+        items=tasks,
+        total=total,
+        page=page,
+        per_page=per_page,
+        pages=max(1, math.ceil(total / per_page)),
+    )
 
 
 @router.get("/{short_id}", response_model=TaskResponse)
@@ -103,19 +121,19 @@ async def create_task(
 ):
     """Create a new task. If assignee != self, requires moderator role."""
     try:
-        async with session.begin():
-            task = await task_service.create_task(
-                session,
-                title=data.title,
-                creator=member,
-                assignee_id=data.assignee_id,
-                description=data.description,
-                priority=data.priority,
-                deadline=data.deadline,
-                source=data.source or "web",
-                meeting_id=data.meeting_id,
-            )
-            return task
+        task = await task_service.create_task(
+            session,
+            title=data.title,
+            creator=member,
+            assignee_id=data.assignee_id,
+            description=data.description,
+            priority=data.priority,
+            deadline=data.deadline,
+            source=data.source or "web",
+            meeting_id=data.meeting_id,
+        )
+        await session.commit()
+        return task
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -137,21 +155,21 @@ async def update_task(
         raise HTTPException(status_code=403, detail="Нет прав на редактирование этой задачи")
 
     try:
-        async with session.begin():
-            # Handle status change separately (creates TaskUpdate)
-            if data.status and data.status != task.status:
-                task = await task_service.update_status(
-                    session, task, member, data.status
-                )
+        # Handle status change separately (creates TaskUpdate)
+        if data.status and data.status != task.status:
+            task = await task_service.update_status(
+                session, task, member, data.status
+            )
 
-            # Handle other field updates
-            update_fields = data.model_dump(exclude_unset=True, exclude={"status"})
-            if update_fields:
-                from app.db.repositories import TaskRepository
-                task_repo = TaskRepository()
-                task = await task_repo.update(session, task.id, **update_fields)
+        # Handle other field updates
+        update_fields = data.model_dump(exclude_unset=True, exclude={"status"})
+        if update_fields:
+            from app.db.repositories import TaskRepository
+            task_repo = TaskRepository()
+            task = await task_repo.update(session, task.id, **update_fields)
 
-            return task
+        await session.commit()
+        return task
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -169,5 +187,5 @@ async def delete_task(
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
 
-    async with session.begin():
-        await task_service.delete_task(session, task, member)
+    await task_service.delete_task(session, task, member)
+    await session.commit()

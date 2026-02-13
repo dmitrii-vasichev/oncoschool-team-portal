@@ -107,7 +107,7 @@ class ReminderService:
         if not member or not member.telegram_id:
             return
 
-        await self._send_daily_digest(session, member, rs)
+        await self._send_daily_digest(session, member, rs, today)
         self._sent_today[key] = today
 
         # Cleanup old entries
@@ -120,9 +120,11 @@ class ReminderService:
         session: AsyncSession,
         member: TeamMember,
         rs: ReminderSettings,
+        today: date | None = None,
     ) -> None:
         """Build and send formatted daily digest."""
-        today = date.today()
+        if today is None:
+            today = date.today()
 
         # Get all tasks for this member
         all_tasks = await self.task_repo.get_by_assignee(session, member.id)

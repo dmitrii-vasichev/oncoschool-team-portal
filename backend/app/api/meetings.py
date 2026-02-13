@@ -123,30 +123,30 @@ async def create_meeting(
 ):
     """Create a meeting with tasks from parsed summary. Moderator only."""
     try:
-        async with session.begin():
-            meeting = await meeting_service.create_meeting_from_parsed(
-                session,
-                raw_summary=data.raw_summary,
-                parsed_title=data.title,
-                parsed_summary=data.parsed_summary,
-                decisions=data.decisions,
-                participant_names=data.participants,
-                creator=member,
-            )
+        meeting = await meeting_service.create_meeting_from_parsed(
+            session,
+            raw_summary=data.raw_summary,
+            parsed_title=data.title,
+            parsed_summary=data.parsed_summary,
+            decisions=data.decisions,
+            participant_names=data.participants,
+            creator=member,
+        )
 
-            team_members = await member_repo.get_all_active(session)
-            tasks = await meeting_service.create_tasks_from_parsed(
-                session,
-                meeting=meeting,
-                parsed_tasks=data.tasks,
-                creator=member,
-                team_members=team_members,
-            )
+        team_members = await member_repo.get_all_active(session)
+        tasks = await meeting_service.create_tasks_from_parsed(
+            session,
+            meeting=meeting,
+            parsed_tasks=data.tasks,
+            creator=member,
+            team_members=team_members,
+        )
+        await session.commit()
 
-            return MeetingWithTasksResponse(
-                meeting=MeetingResponse.model_validate(meeting),
-                tasks_created=len(tasks),
-            )
+        return MeetingWithTasksResponse(
+            meeting=MeetingResponse.model_validate(meeting),
+            tasks_created=len(tasks),
+        )
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
@@ -165,5 +165,5 @@ async def delete_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
 
-    async with session.begin():
-        await meeting_repo.delete(session, meeting_id)
+    await meeting_repo.delete(session, meeting_id)
+    await session.commit()

@@ -52,6 +52,6 @@ async def update_team_member(
     if not update_data:
         raise HTTPException(status_code=400, detail="Нет данных для обновления")
 
-    async with session.begin():
-        updated = await member_repo.update(session, member_id, **update_data)
+    updated = await member_repo.update(session, member_id, **update_data)
+    await session.commit()
     return updated

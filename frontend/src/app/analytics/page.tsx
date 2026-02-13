@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { RoleBadge } from "@/components/shared/RoleBadge";
+import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { api } from "@/lib/api";
 import type {
@@ -216,6 +217,7 @@ function AnalyticsSkeleton() {
 
 export default function AnalyticsPage() {
   const { user } = useCurrentUser();
+  const { toastError } = useToast();
   const [overview, setOverview] = useState<OverviewAnalytics | null>(null);
   const [members, setMembers] = useState<MemberStats[]>([]);
   const [meetingStats, setMeetingStats] = useState<MeetingAnalytics | null>(
@@ -236,7 +238,7 @@ export default function AnalyticsPage() {
         setMembers(membersData.members);
         setMeetingStats(meetingsData);
       } catch {
-        // handle error
+        toastError("Не удалось загрузить аналитику");
       } finally {
         setLoading(false);
       }

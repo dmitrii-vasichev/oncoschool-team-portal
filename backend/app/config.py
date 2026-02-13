@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # General
     TIMEZONE: str = "Europe/Moscow"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3002", "http://127.0.0.1:3002"]
 
     @property
     def database_url_async(self) -> str:

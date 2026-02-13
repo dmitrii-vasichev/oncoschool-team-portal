@@ -11,6 +11,7 @@ import {
   type TaskFilterValues,
 } from "@/components/tasks/TaskFilters";
 import { CreateTaskDialog } from "@/components/tasks/CreateTaskDialog";
+import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { api } from "@/lib/api";
 import type { Task, TaskStatus, TeamMember } from "@/lib/types";
@@ -35,6 +36,7 @@ const COLUMN_BG: Record<string, string> = {
 
 export default function TasksPage() {
   const { user } = useCurrentUser();
+  const { toastError } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function TasksPage() {
       setTasks(tasksRes.items);
       setMembers(membersRes);
     } catch {
-      // silent
+      toastError("Не удалось загрузить задачи");
     } finally {
       setLoading(false);
     }

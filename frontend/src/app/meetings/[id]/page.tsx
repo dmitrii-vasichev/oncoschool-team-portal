@@ -21,6 +21,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
 import type { Meeting, Task } from "@/lib/types";
 
@@ -29,6 +30,7 @@ type TabId = "summary" | "tasks" | "original";
 export default function MeetingDetailPage() {
   const params = useParams();
   const id = params.id as string;
+  const { toastError } = useToast();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +47,7 @@ export default function MeetingDetailPage() {
         setMeeting(meetingData);
         setTasks(tasksData);
       } catch {
-        // handle error
+        toastError("Не удалось загрузить встречу");
       } finally {
         setLoading(false);
       }

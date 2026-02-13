@@ -522,6 +522,65 @@ input[type="range"].progress-slider::-moz-range-thumb {
 }
 
 /* ============================================
+   Login page animations (scoped via class)
+   ============================================ */
+@keyframes login-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes login-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes login-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes login-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-login-fade-in {
+  animation: login-fade-in 0.8s ease-out both;
+}
+
+.animate-login-slide-up {
+  animation: login-slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-login-scale-in {
+  animation: login-scale-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-login-float {
+  animation: login-float 6s ease-in-out infinite;
+}
+
+/* ============================================
    Print Styles
    ============================================ */
 @media print {

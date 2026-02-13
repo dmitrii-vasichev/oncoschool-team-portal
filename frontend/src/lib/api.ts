@@ -104,12 +104,7 @@ class ApiClient {
 
   async getTasks(params?: Record<string, string>): Promise<PaginatedResponse<Task>> {
     const query = params ? "?" + new URLSearchParams(params).toString() : "";
-    const data = await this.request<Task[] | PaginatedResponse<Task>>(`/api/tasks${query}`);
-    // Backend returns plain array, wrap into PaginatedResponse
-    if (Array.isArray(data)) {
-      return { items: data, total: data.length, page: 1, per_page: data.length, pages: 1 };
-    }
-    return data;
+    return this.request<PaginatedResponse<Task>>(`/api/tasks${query}`);
   }
 
   async getTask(shortId: number): Promise<Task> {

@@ -67,13 +67,13 @@ async def update_notifications(
     session: AsyncSession = Depends(get_session),
 ):
     """Update notification subscriptions. Moderator only."""
-    async with session.begin():
-        for event_type, is_active in data.subscriptions.items():
-            if event_type not in EVENT_TYPES:
-                raise HTTPException(
-                    status_code=400, detail=f"Неизвестный тип события: {event_type}"
-                )
-            await sub_repo.upsert(session, member.id, event_type, is_active)
+    for event_type, is_active in data.subscriptions.items():
+        if event_type not in EVENT_TYPES:
+            raise HTTPException(
+                status_code=400, detail=f"Неизвестный тип события: {event_type}"
+            )
+        await sub_repo.upsert(session, member.id, event_type, is_active)
+    await session.commit()
 
     # Return updated state
     subs = await sub_repo.get_by_member(session, member.id)
@@ -107,8 +107,8 @@ async def update_reminder_settings(
     update_data = data.model_dump(exclude_unset=True)
     update_data["configured_by_id"] = member.id
 
-    async with session.begin():
-        rs = await reminder_repo.upsert(session, member_id, **update_data)
+    rs = await reminder_repo.upsert(session, member_id, **update_data)
+    await session.commit()
     return rs
 
 
@@ -132,20 +132,20 @@ async def bulk_update_reminders(
     all_members = await member_repo.get_all_active(session)
 
     updated_count = 0
-    async with session.begin():
-        for m in all_members:
-            kwargs = {
-                "is_enabled": data.is_enabled,
-                "configured_by_id": member.id,
-            }
-            if data.reminder_time:
-                parts = data.reminder_time.split(":")
-                kwargs["reminder_time"] = time_type(int(parts[0]), int(parts[1]))
-            if data.days_of_week:
-                kwargs["days_of_week"] = data.days_of_week
+    for m in all_members:
+        kwargs = {
+            "is_enabled": data.is_enabled,
+            "configured_by_id": member.id,
+        }
+        if data.reminder_time:
+            parts = data.reminder_time.split(":")
+            kwargs["reminder_time"] = time_type(int(parts[0]), int(parts[1]))
+        if data.days_of_week:
+            kwargs["days_of_week"] = data.days_of_week
 
-            await reminder_repo.upsert(session, m.id, **kwargs)
-            updated_count += 1
+        await reminder_repo.upsert(session, m.id, **kwargs)
+        updated_count += 1
+    await session.commit()
 
     return {"updated": updated_count}
 
@@ -208,13 +208,13 @@ async def update_ai_settings(
                        f"Доступные: {', '.join(valid_models)}",
             )
 
-    async with session.begin():
-        await app_settings_repo.set(
-            session,
-            "ai_provider",
-            {"provider": data.provider, "model": data.model},
-            updated_by_id=member.id,
-        )
+    await app_settings_repo.set(
+        session,
+        "ai_provider",
+        {"provider": data.provider, "model": data.model},
+        updated_by_id=member.id,
+    )
+    await session.commit()
 
     # Return updated state
     providers_config = config_setting.value if config_setting else None

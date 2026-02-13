@@ -5,11 +5,9 @@ import {
   Mic,
   CalendarDays,
   FileText,
-  MessageSquare,
 } from "lucide-react";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
-import { Progress } from "@/components/ui/progress";
 import type { Task, TaskPriority } from "@/lib/types";
 
 function formatDate(dateStr: string): string {
@@ -40,7 +38,6 @@ export function TaskCard({
   style?: React.CSSProperties;
 }) {
   const overdue = isOverdue(task);
-  const updatesCount = (task as unknown as Record<string, unknown>).updates_count as number | undefined;
 
   return (
     <Link
@@ -104,14 +101,7 @@ export function TaskCard({
           )}
         </div>
 
-        {/* Progress bar (if there's a last progress_percent) */}
-        {typeof updatesCount === "number" && updatesCount > 0 && (
-          <div className="space-y-1">
-            <Progress value={50} className="h-1.5" />
-          </div>
-        )}
-
-        {/* Footer: assignee + updates count */}
+        {/* Footer: assignee */}
         <div className="flex items-center justify-between pt-0.5">
           {task.assignee ? (
             <div className="flex items-center gap-1.5 min-w-0">
@@ -123,13 +113,6 @@ export function TaskCard({
           ) : (
             <span className="text-xs text-muted-foreground/50 italic">
               Не назначен
-            </span>
-          )}
-
-          {typeof updatesCount === "number" && updatesCount > 0 && (
-            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <MessageSquare className="h-3 w-3" />
-              {updatesCount}
             </span>
           )}
         </div>

@@ -39,17 +39,17 @@ async def create_task_update(
         raise HTTPException(status_code=404, detail="Задача не найдена")
 
     try:
-        async with session.begin():
-            update = await task_service.add_task_update(
-                session,
-                task=task,
-                member=member,
-                content=data.content,
-                update_type=data.update_type,
-                progress_percent=data.progress_percent,
-                source="web",
-            )
-            return update
+        update = await task_service.add_task_update(
+            session,
+            task=task,
+            member=member,
+            content=data.content,
+            update_type=data.update_type,
+            progress_percent=data.progress_percent,
+            source="web",
+        )
+        await session.commit()
+        return update
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
