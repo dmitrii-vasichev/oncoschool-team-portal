@@ -36,6 +36,11 @@ class SupabaseStorageService:
 
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.put(url, content=data, headers=headers)
+            if resp.status_code >= 400:
+                logger.warning(
+                    "Supabase upload failed: %s %s — %s",
+                    resp.status_code, resp.reason_phrase, resp.text,
+                )
             resp.raise_for_status()
 
         public_url = self.get_public_url(file_path)
