@@ -49,6 +49,7 @@ class AuthMiddleware(BaseMiddleware):
         try:
             photos = await bot.get_user_profile_photos(telegram_id, limit=1)
             if not photos.photos:
+                logger.info("No profile photo for tg_id=%s", telegram_id)
                 return None
 
             # Largest size is last in the list
@@ -72,16 +73,20 @@ class AuthMiddleware(BaseMiddleware):
             image_bytes = buf.getvalue()
 
             if self.storage_service:
-                return await self.storage_service.upload(
+                url = await self.storage_service.upload(
                     f"{member_id}_tg.webp", image_bytes
                 )
+                logger.info("Avatar uploaded to Supabase for tg_id=%s: %s", telegram_id, url)
+                return url
             else:
                 AVATARS_DIR.mkdir(parents=True, exist_ok=True)
                 save_path = AVATARS_DIR / f"{member_id}_tg.webp"
                 save_path.write_bytes(image_bytes)
-                return f"/static/avatars/{member_id}_tg.webp"
+                local_url = f"/static/avatars/{member_id}_tg.webp"
+                logger.info("Avatar saved locally for tg_id=%s: %s", telegram_id, local_url)
+                return local_url
         except Exception:
-            logger.debug("Failed to fetch avatar for tg_id=%s", telegram_id, exc_info=True)
+            logger.warning("Failed to fetch avatar for tg_id=%s", telegram_id, exc_info=True)
             return None
 
     @staticmethod
@@ -114,7 +119,7 @@ class AuthMiddleware(BaseMiddleware):
                     if member and self._should_update_avatar(member.avatar_url):
                         member.avatar_url = avatar_url
         except Exception:
-            logger.debug("Failed to save avatar for tg_id=%s", telegram_id, exc_info=True)
+            logger.warning("Failed to save avatar to DB for tg_id=%s", telegram_id, exc_info=True)
 
     async def __call__(
         self,
@@ -171,9 +176,13 @@ class AuthMiddleware(BaseMiddleware):
         # Fetch Telegram avatar in background (non-blocking)
         if self._needs_avatar_check(user.id, member.avatar_url):
             self._avatar_last_checked[user.id] = time.time()
-            bot: Bot = data["bot"]
+            bot_instance: Bot = data["bot"]
+            logger.info(
+                "Starting avatar fetch for tg_id=%s (current=%s)",
+                user.id, member.avatar_url,
+            )
             asyncio.create_task(
-                self._update_avatar_bg(bot, user.id, str(member.id), member.avatar_url)
+                self._update_avatar_bg(bot_instance, user.id, str(member.id), member.avatar_url)
             )
 
         return await handler(event, data)
