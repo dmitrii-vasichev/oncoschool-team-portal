@@ -47,6 +47,16 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS (must be added BEFORE other middleware — last added = first executed)
 cors_origins = list(settings.cors_origins_list)
+
+# Production origins (hardcoded as Railway shared vars are unreliable)
+_PRODUCTION_ORIGINS = [
+    "https://task-manager-oncoschool.vercel.app",
+    "https://oncoschool-mini-app.vercel.app",
+]
+for _origin in _PRODUCTION_ORIGINS:
+    if _origin not in cors_origins:
+        cors_origins.append(_origin)
+
 if settings.MINI_APP_URL:
     mini_app_origin = settings.MINI_APP_URL.rstrip("/")
     if mini_app_origin not in cors_origins:
@@ -56,8 +66,6 @@ if settings.NEXT_PUBLIC_FRONTEND_URL:
     if frontend_origin not in cors_origins:
         cors_origins.append(frontend_origin)
 
-logger.info("CORS_ORIGINS raw: %r", settings.CORS_ORIGINS)
-logger.info("MINI_APP_URL: %r", settings.MINI_APP_URL)
 logger.info("CORS origins final: %s", cors_origins)
 
 app.add_middleware(
