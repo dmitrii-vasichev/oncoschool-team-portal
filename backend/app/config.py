@@ -42,7 +42,19 @@ class Settings(BaseSettings):
     # General
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Moscow"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3002", "http://127.0.0.1:3002"]
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS_ORIGINS from comma-separated string or JSON array."""
+        import json
+        raw = self.CORS_ORIGINS.strip()
+        if raw.startswith("["):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                pass
+        return [o.strip() for o in raw.split(",") if o.strip()]
 
     # Frontend URL (for bot inline buttons linking to web UI)
     NEXT_PUBLIC_FRONTEND_URL: str = "http://localhost:3000"

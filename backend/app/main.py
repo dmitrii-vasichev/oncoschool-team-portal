@@ -46,7 +46,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # CORS (must be added BEFORE other middleware — last added = first executed)
-cors_origins = list(settings.CORS_ORIGINS)
+cors_origins = list(settings.cors_origins_list)
 if settings.MINI_APP_URL:
     mini_app_origin = settings.MINI_APP_URL.rstrip("/")
     if mini_app_origin not in cors_origins:
