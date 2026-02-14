@@ -15,6 +15,7 @@ class SupabaseStorageService:
     def __init__(self, supabase_url: str, service_key: str):
         self.base_url = f"{supabase_url.rstrip('/')}/storage/v1"
         self.service_key = service_key
+        self._bucket_ensured = False
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -24,6 +25,28 @@ class SupabaseStorageService:
 
     def get_public_url(self, file_path: str) -> str:
         return f"{self.base_url}/object/public/{self.BUCKET}/{file_path}"
+
+    async def _ensure_bucket(self, client: httpx.AsyncClient) -> None:
+        """Create the bucket if it doesn't exist (once per process)."""
+        if self._bucket_ensured:
+            return
+        headers = self._headers()
+        headers["Content-Type"] = "application/json"
+        resp = await client.post(
+            f"{self.base_url}/bucket",
+            json={"id": self.BUCKET, "name": self.BUCKET, "public": True},
+            headers=headers,
+        )
+        if resp.status_code == 200:
+            logger.info("Created Supabase bucket '%s'", self.BUCKET)
+        elif resp.status_code == 409:
+            # Already exists
+            pass
+        else:
+            logger.warning(
+                "Bucket creation returned %s: %s", resp.status_code, resp.text
+            )
+        self._bucket_ensured = True
 
     async def upload(
         self, file_path: str, data: bytes, content_type: str = "image/webp"
@@ -35,6 +58,7 @@ class SupabaseStorageService:
         headers["x-upsert"] = "true"
 
         async with httpx.AsyncClient(timeout=30) as client:
+            await self._ensure_bucket(client)
             resp = await client.put(url, content=data, headers=headers)
             if resp.status_code >= 400:
                 logger.warning(
