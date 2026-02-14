@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 
 import uvicorn
 from aiogram import Bot, Dispatcher
@@ -48,23 +49,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # CORS (must be added BEFORE other middleware — last added = first executed)
 cors_origins = list(settings.cors_origins_list)
 
-# Production origins (hardcoded as Railway shared vars are unreliable)
-_PRODUCTION_ORIGINS = [
-    "https://task-manager-oncoschool.vercel.app",
-    "https://oncoschool-mini-app.vercel.app",
-]
-for _origin in _PRODUCTION_ORIGINS:
-    if _origin not in cors_origins:
-        cors_origins.append(_origin)
+def _origin_from_url(value: str) -> str | None:
+    value = value.strip()
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return f"{parsed.scheme}://{parsed.netloc}"
+    return value.rstrip("/")
 
-if settings.MINI_APP_URL:
-    mini_app_origin = settings.MINI_APP_URL.rstrip("/")
-    if mini_app_origin not in cors_origins:
-        cors_origins.append(mini_app_origin)
-if settings.NEXT_PUBLIC_FRONTEND_URL:
-    frontend_origin = settings.NEXT_PUBLIC_FRONTEND_URL.rstrip("/")
-    if frontend_origin not in cors_origins:
-        cors_origins.append(frontend_origin)
+
+for _value in (settings.MINI_APP_URL, settings.NEXT_PUBLIC_FRONTEND_URL):
+    _origin = _origin_from_url(_value)
+    if _origin and _origin not in cors_origins:
+        cors_origins.append(_origin)
 
 logger.info("CORS origins final: %s", cors_origins)
 
@@ -86,7 +84,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         # Allow Telegram to embed Mini App in iframe
         if settings.MINI_APP_URL:
-            from urllib.parse import urlparse
             mini_app_host = urlparse(settings.MINI_APP_URL).netloc
             response.headers["X-Frame-Options"] = f"ALLOW-FROM https://{mini_app_host}"
         else:
