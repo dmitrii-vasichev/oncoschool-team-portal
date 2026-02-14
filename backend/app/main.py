@@ -56,7 +56,9 @@ if settings.NEXT_PUBLIC_FRONTEND_URL:
     if frontend_origin not in cors_origins:
         cors_origins.append(frontend_origin)
 
-logger.info("CORS origins: %s", cors_origins)
+logger.info("CORS_ORIGINS raw: %r", settings.CORS_ORIGINS)
+logger.info("MINI_APP_URL: %r", settings.MINI_APP_URL)
+logger.info("CORS origins final: %s", cors_origins)
 
 app.add_middleware(
     CORSMiddleware,
