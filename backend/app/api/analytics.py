@@ -67,9 +67,9 @@ async def analytics_overview(
 
     total_tasks = sum(status_counts.values())
 
-    # Overdue tasks
+    # Overdue tasks (deadline today or earlier)
     overdue_stmt = select(func.count(Task.id)).where(
-        Task.deadline < today,
+        Task.deadline <= today,
         Task.status.notin_(["done", "cancelled"]),
     )
     overdue_result = await session.execute(overdue_stmt)
@@ -128,7 +128,7 @@ async def analytics_members(
             func.count(case((Task.status == "in_progress", Task.id))).label("in_progress"),
             func.count(
                 case((
-                    (Task.deadline < today) & Task.status.notin_(["done", "cancelled"]),
+                    (Task.deadline <= today) & Task.status.notin_(["done", "cancelled"]),
                     Task.id,
                 ))
             ).label("overdue"),
