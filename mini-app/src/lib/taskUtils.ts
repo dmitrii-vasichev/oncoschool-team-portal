@@ -1,4 +1,5 @@
 import type { Task } from "./types";
+import { parseLocalDate } from "./dateUtils";
 
 export interface GroupedTasks {
   overdue: Task[];
@@ -22,7 +23,7 @@ export function groupTasksByDeadline(tasks: Task[]): GroupedTasks {
       continue;
     }
 
-    const deadlineDate = new Date(task.deadline);
+    const deadlineDate = parseLocalDate(task.deadline);
     deadlineDate.setHours(0, 0, 0, 0);
 
     if (

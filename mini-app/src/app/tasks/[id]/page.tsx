@@ -13,6 +13,7 @@ import { FullScreenLoader } from "@/components/FullScreenLoader";
 import { FullScreenError } from "@/components/FullScreenError";
 import { PageTransition } from "@/components/PageTransition";
 import type { TaskStatus, TaskPriority } from "@/lib/types";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 const STATUS_CONFIG: Record<
   TaskStatus,
@@ -33,7 +34,7 @@ const PRIORITY_CONFIG: Record<TaskPriority, { icon: string; label: string }> = {
 };
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
@@ -41,7 +42,7 @@ function formatDate(dateStr: string): string {
 }
 
 function formatDateTime(dateStr: string): string {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
@@ -54,7 +55,7 @@ function isOverdue(deadline: string, status: TaskStatus): boolean {
   if (status === "done" || status === "cancelled") return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const d = new Date(deadline);
+  const d = parseLocalDate(deadline);
   d.setHours(0, 0, 0, 0);
   return d < today;
 }

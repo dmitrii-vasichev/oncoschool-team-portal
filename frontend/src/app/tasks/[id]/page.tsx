@@ -53,6 +53,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
 import type { TaskStatus, TaskPriority } from "@/lib/types";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 /* ============================================
    Constants
@@ -88,11 +89,11 @@ const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
 function isOverdue(deadline: string | null, status: string): boolean {
   if (!deadline) return false;
   if (status === "done" || status === "cancelled") return false;
-  return new Date(deadline) < new Date(new Date().toDateString());
+  return parseLocalDate(deadline) < new Date(new Date().toDateString());
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
+  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -100,7 +101,7 @@ function formatDate(dateStr: string): string {
 }
 
 function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
+  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "short",
   });

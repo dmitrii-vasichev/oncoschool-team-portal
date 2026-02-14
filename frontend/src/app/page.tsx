@@ -31,13 +31,14 @@ import type {
   Task,
   Meeting,
 } from "@/lib/types";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 // ────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
+  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
   });
@@ -54,7 +55,7 @@ function formatFullDate(date: Date): string {
 function isOverdue(task: Task): boolean {
   if (!task.deadline || task.status === "done" || task.status === "cancelled")
     return false;
-  return new Date(task.deadline) < new Date();
+  return parseLocalDate(task.deadline) < new Date();
 }
 
 function isStale(task: Task): boolean {

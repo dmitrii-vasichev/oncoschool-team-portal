@@ -9,9 +9,10 @@ import {
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import type { Task, TaskPriority } from "@/lib/types";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("ru-RU", {
+  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
   });
@@ -20,7 +21,7 @@ function formatDate(dateStr: string): string {
 function isOverdue(task: Task): boolean {
   if (!task.deadline) return false;
   if (task.status === "done" || task.status === "cancelled") return false;
-  return new Date(task.deadline) < new Date(new Date().toDateString());
+  return parseLocalDate(task.deadline) < new Date(new Date().toDateString());
 }
 
 const PRIORITY_STRIP_COLORS: Record<TaskPriority, string> = {

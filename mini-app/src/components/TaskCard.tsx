@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { Task, TaskStatus, TaskPriority } from "@/lib/types";
+import { parseLocalDate } from "@/lib/dateUtils";
 
 const PRIORITY_ICONS: Record<TaskPriority, string> = {
   urgent: "🔴",
@@ -19,7 +20,7 @@ const STATUS_CONFIG: Record<TaskStatus, { className: string; label: string }> = 
 };
 
 function formatDeadline(deadline: string): string {
-  const d = new Date(deadline);
+  const d = parseLocalDate(deadline);
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   return `${day}.${month}`;
@@ -29,7 +30,7 @@ function isOverdue(deadline: string, status: TaskStatus): boolean {
   if (status === "done" || status === "cancelled") return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const d = new Date(deadline);
+  const d = parseLocalDate(deadline);
   d.setHours(0, 0, 0, 0);
   return d < today;
 }
