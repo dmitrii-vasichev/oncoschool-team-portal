@@ -45,14 +45,42 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# CORS (must be added BEFORE other middleware — last added = first executed)
+cors_origins = list(settings.CORS_ORIGINS)
+if settings.MINI_APP_URL:
+    mini_app_origin = settings.MINI_APP_URL.rstrip("/")
+    if mini_app_origin not in cors_origins:
+        cors_origins.append(mini_app_origin)
+if settings.NEXT_PUBLIC_FRONTEND_URL:
+    frontend_origin = settings.NEXT_PUBLIC_FRONTEND_URL.rstrip("/")
+    if frontend_origin not in cors_origins:
+        cors_origins.append(frontend_origin)
+
+logger.info("CORS origins: %s", cors_origins)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
 # Security headers middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Allow Telegram to embed Mini App in iframe
+        if settings.MINI_APP_URL:
+            from urllib.parse import urlparse
+            mini_app_host = urlparse(settings.MINI_APP_URL).netloc
+            response.headers["X-Frame-Options"] = f"ALLOW-FROM https://{mini_app_host}"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
         if not settings.DEBUG:
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains"
@@ -61,20 +89,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecurityHeadersMiddleware)
-
-# CORS
-cors_origins = list(settings.CORS_ORIGINS)
-if settings.MINI_APP_URL:
-    cors_origins.append(settings.MINI_APP_URL)
-if settings.NEXT_PUBLIC_FRONTEND_URL and settings.NEXT_PUBLIC_FRONTEND_URL not in cors_origins:
-    cors_origins.append(settings.NEXT_PUBLIC_FRONTEND_URL)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
 
 # REST API
 app.include_router(api_router)
