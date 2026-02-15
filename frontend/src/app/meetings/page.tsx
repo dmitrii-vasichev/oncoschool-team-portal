@@ -35,6 +35,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ScheduleCard } from "@/components/meetings/ScheduleCard";
 import { ScheduleForm } from "@/components/meetings/ScheduleForm";
 import { MeetingCard } from "@/components/meetings/MeetingCard";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type {
   MeetingSchedule,
   MeetingScheduleCreateRequest,
@@ -66,6 +67,9 @@ export default function MeetingsPage() {
 
   // Create meeting dialog
   const [showCreateMeeting, setShowCreateMeeting] = useState(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<MeetingSchedule | null>(null);
 
   // Search + pagination for past meetings
   const [search, setSearch] = useState("");
@@ -120,13 +124,14 @@ export default function MeetingsPage() {
 
   const handleDeleteSchedule = useCallback(
     async (schedule: MeetingSchedule) => {
-      if (!confirm(`Удалить расписание "${schedule.title}"?`)) return;
       try {
         await api.deleteMeetingSchedule(schedule.id);
         toastSuccess("Расписание удалено");
         refetchSchedules();
       } catch (e) {
         toastError(e instanceof Error ? e.message : "Ошибка удаления");
+      } finally {
+        setDeleteTarget(null);
       }
     },
     [refetchSchedules, toastSuccess, toastError]
@@ -226,7 +231,7 @@ export default function MeetingsPage() {
                     setEditSchedule(s);
                     setShowScheduleForm(true);
                   }}
-                  onDelete={handleDeleteSchedule}
+                  onDelete={setDeleteTarget}
                 />
               </div>
             ))}
@@ -399,6 +404,15 @@ export default function MeetingsPage() {
           }}
         />
       )}
+
+      {/* Delete schedule confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Удалить расписание «${deleteTarget?.title}»?`}
+        description="Расписание будет удалено. Уже созданные встречи останутся."
+        onConfirm={() => deleteTarget && handleDeleteSchedule(deleteTarget)}
+      />
 
       {/* Create meeting manually */}
       {showCreateMeeting && (

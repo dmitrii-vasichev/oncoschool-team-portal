@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useToast } from "@/components/shared/Toast";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { api } from "@/lib/api";
 import { useTeam } from "@/hooks/useTeam";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -321,6 +322,7 @@ function TelegramTargetsSection() {
   const [loading, setLoading] = useState(true);
   const [editTarget, setEditTarget] = useState<TelegramNotificationTarget | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<TelegramNotificationTarget | null>(null);
 
   const fetchTargets = useCallback(async () => {
     try {
@@ -339,13 +341,14 @@ function TelegramTargetsSection() {
   }, [fetchTargets]);
 
   const handleDelete = async (target: TelegramNotificationTarget) => {
-    if (!confirm(`Удалить "${target.label || `Chat ${target.chat_id}`}"?`)) return;
     try {
       await api.deleteTelegramTarget(target.id);
       toastSuccess("Группа удалена");
       fetchTargets();
     } catch (e) {
       toastError(e instanceof Error ? e.message : "Ошибка удаления");
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -458,7 +461,7 @@ function TelegramTargetsSection() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(target)}
+                      onClick={() => setDeleteTarget(target)}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -494,6 +497,15 @@ function TelegramTargetsSection() {
           }}
         />
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={`Удалить «${deleteTarget?.label || `Chat ${deleteTarget?.chat_id}`}»?`}
+        description="Telegram-группа будет удалена из списка целей для уведомлений."
+        onConfirm={() => deleteTarget && handleDelete(deleteTarget)}
+      />
     </>
   );
 }
