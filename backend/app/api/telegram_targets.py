@@ -30,13 +30,13 @@ async def create_target(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new telegram notification target (moderator only)."""
-    async with session.begin():
-        target = await target_repo.create(
-            session,
-            chat_id=data.chat_id,
-            thread_id=data.thread_id,
-            label=data.label,
-        )
+    target = await target_repo.create(
+        session,
+        chat_id=data.chat_id,
+        thread_id=data.thread_id,
+        label=data.label,
+    )
+    await session.commit()
     return target
 
 
@@ -53,8 +53,8 @@ async def update_target(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Цель не найдена")
 
     update_data = data.model_dump(exclude_unset=True)
-    async with session.begin():
-        target = await target_repo.update(session, target_id, **update_data)
+    target = await target_repo.update(session, target_id, **update_data)
+    await session.commit()
     return target
 
 
@@ -69,5 +69,5 @@ async def delete_target(
     if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Цель не найдена")
 
-    async with session.begin():
-        await target_repo.delete(session, target_id)
+    await target_repo.delete(session, target_id)
+    await session.commit()

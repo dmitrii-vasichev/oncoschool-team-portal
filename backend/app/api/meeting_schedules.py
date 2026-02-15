@@ -93,24 +93,23 @@ async def create_schedule(
             for t in active_targets
         ]
 
-    async with session.begin():
-        schedule = await schedule_repo.create(
-            session,
-            title=data.title,
-            day_of_week=data.day_of_week,
-            time_utc=time_utc,
-            timezone=data.timezone,
-            duration_minutes=data.duration_minutes,
-            recurrence=data.recurrence,
-            reminder_enabled=data.reminder_enabled,
-            reminder_minutes_before=data.reminder_minutes_before,
-            reminder_text=data.reminder_text,
-            telegram_targets=telegram_targets,
-            participant_ids=data.participant_ids,
-            zoom_enabled=data.zoom_enabled,
-            created_by_id=member.id,
-        )
-
+    schedule = await schedule_repo.create(
+        session,
+        title=data.title,
+        day_of_week=data.day_of_week,
+        time_utc=time_utc,
+        timezone=data.timezone,
+        duration_minutes=data.duration_minutes,
+        recurrence=data.recurrence,
+        reminder_enabled=data.reminder_enabled,
+        reminder_minutes_before=data.reminder_minutes_before,
+        reminder_text=data.reminder_text,
+        telegram_targets=telegram_targets,
+        participant_ids=data.participant_ids,
+        zoom_enabled=data.zoom_enabled,
+        created_by_id=member.id,
+    )
+    await session.commit()
     return schedule
 
 
@@ -155,9 +154,8 @@ async def update_schedule(
     # Remove time_local from update_data if not already removed
     update_data.pop("time_local", None)
 
-    async with session.begin():
-        schedule = await schedule_repo.update(session, schedule_id, **update_data)
-
+    schedule = await schedule_repo.update(session, schedule_id, **update_data)
+    await session.commit()
     return schedule
 
 
@@ -172,5 +170,5 @@ async def delete_schedule(
     if not schedule:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Расписание не найдено")
 
-    async with session.begin():
-        await schedule_repo.delete(session, schedule_id)
+    await schedule_repo.delete(session, schedule_id)
+    await session.commit()

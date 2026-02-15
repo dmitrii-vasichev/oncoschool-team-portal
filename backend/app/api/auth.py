@@ -262,8 +262,8 @@ async def login_telegram(
                 needs_commit = True
 
     if needs_commit:
-        async with session.begin():
-            session.add(member)
+        session.add(member)
+        await session.commit()
 
     # 6. Issue JWT
     auth_logger.info("telegram_login OK: member_id=%s, telegram_id=%s, ip=%s", member.id, data.id, client_ip)
@@ -362,9 +362,9 @@ async def login_mini_app(
     # 5. Update telegram_username if changed
     tg_username = web_app_data.user.username
     if tg_username and tg_username != member.telegram_username:
-        async with session.begin():
-            member.telegram_username = tg_username
-            session.add(member)
+        member.telegram_username = tg_username
+        session.add(member)
+        await session.commit()
 
     # 6. Issue JWT
     logger.info("Mini-app login: telegram_id=%s", telegram_id)
