@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from sqlalchemy import select, update, delete, func
+from sqlalchemy import select, update, delete, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -259,9 +259,19 @@ class MeetingRepository:
         return list(result.scalars().all())
 
     async def get_past(self, session: AsyncSession, limit: int = 20) -> list[Meeting]:
+        now_utc_naive = datetime.utcnow()
         stmt = (
             select(Meeting)
-            .where(Meeting.status.in_(["completed", "cancelled"]))
+            .where(
+                or_(
+                    Meeting.status.in_(["completed", "cancelled"]),
+                    and_(
+                        Meeting.status == "scheduled",
+                        Meeting.meeting_date.is_not(None),
+                        Meeting.meeting_date <= now_utc_naive,
+                    ),
+                )
+            )
             .order_by(Meeting.meeting_date.desc().nullslast())
             .limit(limit)
         )
