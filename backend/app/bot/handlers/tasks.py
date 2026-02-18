@@ -5,6 +5,8 @@ from datetime import date
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -55,6 +57,143 @@ STATUS_EMOJI = {
     "done": "✅",
     "cancelled": "❌",
 }
+
+
+STATUS_USAGE_TEXT = (
+    "Использование: /status <id> <статус>\n\n"
+    "Статусы: new, in_progress, review, done, cancelled\n"
+    "Пример: /status 42 in_progress"
+)
+
+
+class TaskCommandFSM(StatesGroup):
+    waiting_new_text = State()
+    waiting_done_id = State()
+    waiting_status_payload = State()
+
+
+def _parse_short_id(raw_value: str) -> int | None:
+    try:
+        return int(raw_value.strip().lstrip("#"))
+    except ValueError:
+        return None
+
+
+async def _create_task_for_member(
+    *,
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    raw_text: str,
+) -> bool:
+    parsed = TaskService.parse_task_text(raw_text)
+    if not parsed["title"]:
+        await message.answer("❌ Текст задачи не может быть пустым")
+        return False
+
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.create_task(
+                session,
+                title=parsed["title"],
+                creator=member,
+                priority=parsed["priority"],
+                deadline=parsed["deadline"],
+                source="text",
+            )
+
+            notification_service = NotificationService(bot)
+            await notification_service.notify_task_created(session, task, member)
+
+    is_mod = PermissionService.is_moderator(member)
+    prio = PRIORITY_EMOJI.get(task.priority, "")
+    deadline_str = f"\n📅 Дедлайн: {task.deadline.strftime('%d.%m.%Y')}" if task.deadline else ""
+
+    await message.answer(
+        "✅ Задача создана:\n\n"
+        f"#{task.short_id} · {task.title}\n"
+        f"{prio} {task.priority}{deadline_str}",
+        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+    )
+    return True
+
+
+async def _complete_task_by_short_id(
+    *,
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    short_id: int,
+) -> bool:
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.get_task_by_short_id(session, short_id)
+            if not task:
+                await message.answer(f"❌ Задача #{short_id} не найдена")
+                return False
+
+            if task.status == "done":
+                await message.answer(f"Задача #{short_id} уже завершена")
+                return False
+
+            try:
+                old_status = task.status
+                task = await task_service.complete_task(session, task, member)
+            except PermissionError as e:
+                await message.answer(f"❌ {e}")
+                return False
+
+            notification_service = NotificationService(bot)
+            await notification_service.notify_task_completed(session, task, member)
+            await notification_service.notify_status_changed(
+                session, task, member, old_status, "done"
+            )
+
+    await message.answer(f"✅ Задача #{task.short_id} завершена!\n{task.title}")
+    return True
+
+
+async def _update_task_status(
+    *,
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    short_id: int,
+    new_status: str,
+) -> bool:
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.get_task_by_short_id(session, short_id)
+            if not task:
+                await message.answer(f"❌ Задача #{short_id} не найдена")
+                return False
+
+            old_status = task.status
+
+            try:
+                task = await task_service.update_status(session, task, member, new_status)
+            except (PermissionError, ValueError) as e:
+                await message.answer(f"❌ {e}")
+                return False
+
+            notification_service = NotificationService(bot)
+            await notification_service.notify_status_changed(
+                session, task, member, old_status, new_status
+            )
+            if new_status == "done":
+                await notification_service.notify_task_completed(session, task, member)
+
+    status_em = STATUS_EMOJI.get(new_status, "🔄")
+    await message.answer(
+        f"{status_em} Статус задачи #{task.short_id} изменён:\n"
+        f"{old_status} → {new_status}\n"
+        f"{task.title}"
+    )
+    return True
+
 
 def _format_task_detail(task) -> str:
     """Format task details."""
@@ -427,44 +566,60 @@ async def cb_task_back_to_list(
 
 
 @router.message(Command("new"))
-async def cmd_new(message: Message, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
-    args = message.text.split(maxsplit=1)
+async def cmd_new(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    args = (message.text or "").split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Использование: /new <текст задачи>\n\nМодификаторы: !urgent !high !low @ДД.ММ")
+        await state.set_state(TaskCommandFSM.waiting_new_text)
+        await message.answer(
+            "📝 Введите текст новой задачи.\n"
+            "Модификаторы: !urgent !high !low @ДД.ММ\n"
+            "Для отмены отправьте /cancel"
+        )
         return
 
-    raw_text = args[1].strip()
-    parsed = TaskService.parse_task_text(raw_text)
-
-    if not parsed["title"]:
-        await message.answer("❌ Текст задачи не может быть пустым")
-        return
-
-    async with session_maker() as session:
-        async with session.begin():
-            task = await task_service.create_task(
-                session,
-                title=parsed["title"],
-                creator=member,
-                priority=parsed["priority"],
-                deadline=parsed["deadline"],
-                source="text",
-            )
-
-            # Notify subscribers
-            notification_service = NotificationService(bot)
-            await notification_service.notify_task_created(session, task, member)
-
-    is_mod = PermissionService.is_moderator(member)
-    prio = PRIORITY_EMOJI.get(task.priority, "")
-    deadline_str = f"\n📅 Дедлайн: {task.deadline.strftime('%d.%m.%Y')}" if task.deadline else ""
-
-    await message.answer(
-        f"✅ Задача создана:\n\n"
-        f"#{task.short_id} · {task.title}\n"
-        f"{prio} {task.priority}{deadline_str}",
-        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+    await state.clear()
+    await _create_task_for_member(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        raw_text=args[1].strip(),
     )
+
+
+@router.message(TaskCommandFSM.waiting_new_text, Command("cancel"))
+async def fsm_cancel_new(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("❌ Создание задачи отменено")
+
+
+@router.message(TaskCommandFSM.waiting_new_text)
+async def fsm_new_text(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    raw_text = message.text.strip() if message.text else ""
+    if not raw_text:
+        await message.answer("❌ Текст задачи не может быть пустым. Попробуйте ещё раз или /cancel")
+        return
+
+    if await _create_task_for_member(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        raw_text=raw_text,
+    ):
+        await state.clear()
 
 
 # ── /assign @username <текст> — Назначить задачу (МОДЕРАТОР) ──
@@ -536,97 +691,148 @@ async def cmd_assign(message: Message, member: TeamMember, session_maker: async_
 
 
 @router.message(Command("done"))
-async def cmd_done(message: Message, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
-    args = message.text.split(maxsplit=1)
+async def cmd_done(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    args = (message.text or "").split(maxsplit=1)
     if len(args) < 2:
-        await message.answer("Использование: /done <id задачи>\nПример: /done 42")
+        await state.set_state(TaskCommandFSM.waiting_done_id)
+        await message.answer(
+            "✅ Введите ID задачи для завершения.\n"
+            "Пример: 42\n"
+            "Для отмены отправьте /cancel"
+        )
         return
 
-    try:
-        short_id = int(args[1].strip().lstrip("#"))
-    except ValueError:
+    await state.clear()
+
+    short_id = _parse_short_id(args[1])
+    if short_id is None:
         await message.answer("❌ ID задачи должен быть числом")
         return
 
-    async with session_maker() as session:
-        async with session.begin():
-            task = await task_service.get_task_by_short_id(session, short_id)
-            if not task:
-                await message.answer(f"❌ Задача #{short_id} не найдена")
-                return
+    await _complete_task_by_short_id(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        short_id=short_id,
+    )
 
-            if task.status == "done":
-                await message.answer(f"Задача #{short_id} уже завершена")
-                return
 
-            try:
-                old_status = task.status
-                task = await task_service.complete_task(session, task, member)
-            except PermissionError as e:
-                await message.answer(f"❌ {e}")
-                return
+@router.message(TaskCommandFSM.waiting_done_id, Command("cancel"))
+async def fsm_cancel_done(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("❌ Завершение задачи отменено")
 
-            # Notify
-            notification_service = NotificationService(bot)
-            await notification_service.notify_task_completed(session, task, member)
-            await notification_service.notify_status_changed(
-                session, task, member, old_status, "done"
-            )
 
-    await message.answer(f"✅ Задача #{task.short_id} завершена!\n{task.title}")
+@router.message(TaskCommandFSM.waiting_done_id)
+async def fsm_done_id(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    raw_id = message.text.strip() if message.text else ""
+    short_id = _parse_short_id(raw_id)
+    if short_id is None:
+        await message.answer("❌ ID задачи должен быть числом. Попробуйте ещё раз или /cancel")
+        return
+
+    if await _complete_task_by_short_id(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        short_id=short_id,
+    ):
+        await state.clear()
 
 
 # ── /status <id> <статус> — Изменить статус ──
 
 
 @router.message(Command("status"))
-async def cmd_status(message: Message, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
-    args = message.text.split(maxsplit=2)
+async def cmd_status(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    args = (message.text or "").split(maxsplit=2)
     if len(args) < 3:
-        await message.answer(
-            "Использование: /status <id> <статус>\n\n"
-            "Статусы: new, in_progress, review, done, cancelled\n"
-            "Пример: /status 42 in_progress"
-        )
+        await state.set_state(TaskCommandFSM.waiting_status_payload)
+        await message.answer(f"{STATUS_USAGE_TEXT}\n\nДля отмены отправьте /cancel")
         return
 
-    try:
-        short_id = int(args[1].strip().lstrip("#"))
-    except ValueError:
+    await state.clear()
+
+    short_id = _parse_short_id(args[1])
+    if short_id is None:
         await message.answer("❌ ID задачи должен быть числом")
         return
 
     new_status = args[2].strip().lower()
-
-    async with session_maker() as session:
-        async with session.begin():
-            task = await task_service.get_task_by_short_id(session, short_id)
-            if not task:
-                await message.answer(f"❌ Задача #{short_id} не найдена")
-                return
-
-            old_status = task.status
-
-            try:
-                task = await task_service.update_status(session, task, member, new_status)
-            except (PermissionError, ValueError) as e:
-                await message.answer(f"❌ {e}")
-                return
-
-            # Notify
-            notification_service = NotificationService(bot)
-            await notification_service.notify_status_changed(
-                session, task, member, old_status, new_status
-            )
-            if new_status == "done":
-                await notification_service.notify_task_completed(session, task, member)
-
-    status_em = STATUS_EMOJI.get(new_status, "🔄")
-    await message.answer(
-        f"{status_em} Статус задачи #{task.short_id} изменён:\n"
-        f"{old_status} → {new_status}\n"
-        f"{task.title}"
+    await _update_task_status(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        short_id=short_id,
+        new_status=new_status,
     )
+
+
+@router.message(TaskCommandFSM.waiting_status_payload, Command("cancel"))
+async def fsm_cancel_status(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("❌ Смена статуса отменена")
+
+
+@router.message(TaskCommandFSM.waiting_status_payload)
+async def fsm_status_payload(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    bot: Bot,
+    state: FSMContext,
+) -> None:
+    raw_payload = message.text.strip() if message.text else ""
+    parts = raw_payload.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer(
+            "❌ Нужны ID и статус.\n"
+            "Пример: 42 in_progress\n"
+            "Допустимые статусы: new, in_progress, review, done, cancelled\n"
+            "Для отмены: /cancel"
+        )
+        return
+
+    short_id = _parse_short_id(parts[0])
+    if short_id is None:
+        await message.answer("❌ ID задачи должен быть числом. Попробуйте ещё раз или /cancel")
+        return
+
+    new_status = parts[1].strip().lower()
+    if not new_status:
+        await message.answer("❌ Укажите статус после ID. Попробуйте ещё раз или /cancel")
+        return
+
+    if await _update_task_status(
+        message=message,
+        member=member,
+        session_maker=session_maker,
+        bot=bot,
+        short_id=short_id,
+        new_status=new_status,
+    ):
+        await state.clear()
 
 
 # ── Callback handlers для inline кнопок ──

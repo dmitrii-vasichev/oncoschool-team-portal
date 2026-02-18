@@ -7,9 +7,10 @@ from aiogram.types import (
 )
 
 
+HELP_PRIVATE_COMMAND = BotCommand(command="help", description="Хелп и список команд")
+
 COMMON_PRIVATE_COMMANDS: list[BotCommand] = [
     BotCommand(command="tasks", description="Мои задачи"),
-    BotCommand(command="help", description="Хелп и список команд"),
     BotCommand(command="all", description="Все задачи команды"),
     BotCommand(command="new", description="Создать задачу: /new <текст>"),
     BotCommand(command="done", description="Завершить задачу: /done <id>"),
@@ -47,6 +48,7 @@ def build_private_commands(
         commands.extend(MODERATOR_EXTRA_COMMANDS)
     if is_admin:
         commands.extend(ADMIN_EXTRA_COMMANDS)
+    commands.append(HELP_PRIVATE_COMMAND)
     return commands
 
 
