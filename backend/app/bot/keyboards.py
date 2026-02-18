@@ -1,7 +1,12 @@
 from datetime import date
 from typing import Protocol, Sequence
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 from app.bot.callbacks import (
     TaskBackToListCallback,
@@ -30,6 +35,64 @@ TASK_FILTER_LABELS: dict[TaskListFilter, str] = {
     TaskListFilter.DONE: "Готово",
     TaskListFilter.CANCELLED: "Отменено",
 }
+
+MENU_BTN_MY_TASKS = "📋 Мои задачи"
+MENU_BTN_HELP = "❓ Хелп"
+MENU_BTN_ALL_TASKS = "📊 Все задачи"
+MENU_BTN_NEXT_MEETING = "📅 Следующая встреча"
+MENU_BTN_MY_REMINDER = "⏰ Мои напоминания"
+MENU_BTN_MEETINGS = "🗓 Встречи"
+MENU_BTN_STATS = "📈 Статистика"
+MENU_BTN_SUBSCRIBE = "🔔 Подписки"
+MENU_BTN_SUMMARY = "🧠 Summary"
+MENU_BTN_AI_MODEL = "🤖 AI-модель"
+MENU_BTN_TEAM_REMINDERS = "⚙️ Напоминания команды"
+
+
+def main_menu_reply_keyboard(
+    *,
+    is_moderator: bool,
+    is_admin: bool,
+) -> ReplyKeyboardMarkup:
+    """Persistent bottom keyboard for quick navigation in private chat."""
+    rows = [
+        [
+            KeyboardButton(text=MENU_BTN_MY_TASKS),
+            KeyboardButton(text=MENU_BTN_HELP),
+        ],
+        [
+            KeyboardButton(text=MENU_BTN_ALL_TASKS),
+            KeyboardButton(text=MENU_BTN_NEXT_MEETING),
+        ],
+        [
+            KeyboardButton(text=MENU_BTN_MY_REMINDER),
+        ],
+    ]
+
+    if is_moderator:
+        rows.extend([
+            [
+                KeyboardButton(text=MENU_BTN_MEETINGS),
+                KeyboardButton(text=MENU_BTN_STATS),
+            ],
+            [
+                KeyboardButton(text=MENU_BTN_SUBSCRIBE),
+                KeyboardButton(text=MENU_BTN_SUMMARY),
+            ],
+            [
+                KeyboardButton(text=MENU_BTN_AI_MODEL),
+            ],
+        ])
+
+    if is_admin:
+        rows.append([KeyboardButton(text=MENU_BTN_TEAM_REMINDERS)])
+
+    return ReplyKeyboardMarkup(
+        keyboard=rows,
+        resize_keyboard=True,
+        is_persistent=True,
+        input_field_placeholder="Выбери действие",
+    )
 
 
 def task_actions_keyboard(task_id: int, is_moderator: bool) -> InlineKeyboardMarkup:

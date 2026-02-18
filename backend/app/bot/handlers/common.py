@@ -1,11 +1,25 @@
 import logging
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.bot.callbacks import TaskListCallback, TaskListFilter, TaskListScope
+from app.bot.keyboards import (
+    MENU_BTN_AI_MODEL,
+    MENU_BTN_ALL_TASKS,
+    MENU_BTN_HELP,
+    MENU_BTN_MEETINGS,
+    MENU_BTN_MY_REMINDER,
+    MENU_BTN_MY_TASKS,
+    MENU_BTN_NEXT_MEETING,
+    MENU_BTN_STATS,
+    MENU_BTN_SUBSCRIBE,
+    MENU_BTN_SUMMARY,
+    MENU_BTN_TEAM_REMINDERS,
+    main_menu_reply_keyboard,
+)
 from app.bot.menu import configure_chat_menu
 from app.db.models import TeamMember
 from app.db.repositories import TeamMemberRepository
@@ -49,32 +63,23 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
     text = (
         f"Привет, {member.full_name}! Я бот-задачник Онкошколы.\n"
         f"Твоя роль: {role_emoji} {role_text}\n\n"
-        "Нажми кнопку «Меню» внизу чата: там быстрые команды\n"
-        "«Мои задачи», «Хелп» и остальные действия."
+        "Ниже закреплена постоянная клавиатура с быстрыми действиями.\n"
+        "Кнопки «Мои задачи», «Хелп» и другие доступны сразу."
     )
-
-    buttons = [[InlineKeyboardButton(
-        text="\U0001f4cb Мои задачи",
-        callback_data=TaskListCallback(
-            scope=TaskListScope.MY,
-            task_filter=TaskListFilter.ALL,
-            page=1,
-        ).pack(),
-    )]]
-
-    if is_moderator:
-        buttons.append([InlineKeyboardButton(
-            text="\U0001f4ca Все задачи",
-            callback_data=TaskListCallback(
-                scope=TaskListScope.TEAM,
-                task_filter=TaskListFilter.ALL,
-                page=1,
-            ).pack(),
-        )])
-
-    reply_markup = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    await message.answer(text, reply_markup=reply_markup)
+    if message.chat.type == "private":
+        await message.answer(
+            text,
+            reply_markup=main_menu_reply_keyboard(
+                is_moderator=is_moderator,
+                is_admin=is_admin,
+            ),
+        )
+    else:
+        await message.answer(
+            f"Привет, {member.full_name}! Я бот-задачник Онкошколы.\n"
+            f"Твоя роль: {role_emoji} {role_text}\n\n"
+            "Используй /help для списка команд."
+        )
 
 
 @router.message(Command("help"))
@@ -122,6 +127,145 @@ async def cmd_help(message: Message, member: TeamMember) -> None:
         text += admin_commands
 
     await message.answer(text, parse_mode="HTML")
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_MY_TASKS)
+async def menu_btn_my_tasks(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    from app.bot.handlers.tasks import cmd_tasks
+
+    await cmd_tasks(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_HELP)
+async def menu_btn_help(message: Message, member: TeamMember) -> None:
+    await cmd_help(message, member)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_ALL_TASKS)
+async def menu_btn_all_tasks(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    from app.bot.handlers.tasks import cmd_all
+
+    await cmd_all(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_NEXT_MEETING)
+async def menu_btn_next_meeting(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    from app.bot.handlers.meetings import cmd_nextmeeting
+
+    await cmd_nextmeeting(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_MY_REMINDER)
+async def menu_btn_my_reminder(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    from app.bot.handlers.settings import cmd_myreminder
+
+    await cmd_myreminder(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_MEETINGS)
+async def menu_btn_meetings(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not PermissionService.is_moderator(member):
+        await message.answer("⛔ Эта кнопка доступна только модератору.")
+        return
+
+    from app.bot.handlers.meetings import cmd_meetings
+
+    await cmd_meetings(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_STATS)
+async def menu_btn_stats(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not PermissionService.is_moderator(member):
+        await message.answer("⛔ Эта кнопка доступна только модератору.")
+        return
+
+    from app.bot.handlers.meetings import cmd_stats
+
+    await cmd_stats(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_SUBSCRIBE)
+async def menu_btn_subscribe(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not PermissionService.is_moderator(member):
+        await message.answer("⛔ Эта кнопка доступна только модератору.")
+        return
+
+    from app.bot.handlers.settings import cmd_subscribe
+
+    await cmd_subscribe(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_SUMMARY)
+async def menu_btn_summary(
+    message: Message,
+    member: TeamMember,
+    state: FSMContext,
+) -> None:
+    if not PermissionService.is_moderator(member):
+        await message.answer("⛔ Эта кнопка доступна только модератору.")
+        return
+
+    from app.bot.handlers.summary import cmd_summary
+
+    await cmd_summary(message, state)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_AI_MODEL)
+async def menu_btn_ai_model(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not PermissionService.is_moderator(member):
+        await message.answer("⛔ Эта кнопка доступна только модератору.")
+        return
+
+    from app.bot.handlers.settings import cmd_aimodel
+
+    await cmd_aimodel(message, member, session_maker)
+
+
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_TEAM_REMINDERS)
+async def menu_btn_team_reminders(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not PermissionService.is_admin(member):
+        await message.answer("⛔ Эта кнопка доступна только администратору.")
+        return
+
+    from app.bot.handlers.settings import cmd_reminders
+
+    await cmd_reminders(message, member, session_maker)
 
 
 @router.message(Command("setrole"))
