@@ -109,8 +109,9 @@ export default function MeetingsPage() {
       await api.createMeetingSchedule(data);
       toastSuccess("Расписание создано");
       refetchSchedules();
+      refetchUpcoming();
     },
-    [refetchSchedules, toastSuccess]
+    [refetchSchedules, refetchUpcoming, toastSuccess]
   );
 
   const handleUpdateSchedule = useCallback(
@@ -119,8 +120,9 @@ export default function MeetingsPage() {
       await api.updateMeetingSchedule(editSchedule.id, data);
       toastSuccess("Расписание обновлено");
       refetchSchedules();
+      refetchUpcoming();
     },
-    [editSchedule, refetchSchedules, toastSuccess]
+    [editSchedule, refetchSchedules, refetchUpcoming, toastSuccess]
   );
 
   const handleDeleteSchedule = useCallback(

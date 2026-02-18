@@ -1,7 +1,8 @@
 import logging
 import uuid
 
-from sqlalchemy import select, update, delete, func, or_, and_
+from sqlalchemy import select, update, delete, func, or_, and_, cast
+from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -245,12 +246,16 @@ class MeetingRepository:
     async def get_upcoming(self, session: AsyncSession, limit: int = 10) -> list[Meeting]:
         # Keep UTC timestamp naive to match DB columns stored without tz info.
         now_utc_naive = datetime.utcnow()
+        # Use end time (start + duration) so in-progress meetings still appear
+        end_time = Meeting.meeting_date + cast(
+            func.concat(Meeting.duration_minutes, ' minutes'), INTERVAL
+        )
         stmt = (
             select(Meeting)
             .where(
                 Meeting.status == "scheduled",
                 Meeting.meeting_date.is_not(None),
-                Meeting.meeting_date > now_utc_naive,
+                end_time > now_utc_naive,
             )
             .order_by(Meeting.meeting_date.asc())
             .limit(limit)
@@ -260,6 +265,10 @@ class MeetingRepository:
 
     async def get_past(self, session: AsyncSession, limit: int = 20) -> list[Meeting]:
         now_utc_naive = datetime.utcnow()
+        # Use end time (start + duration) so in-progress meetings don't appear here
+        end_time = Meeting.meeting_date + cast(
+            func.concat(Meeting.duration_minutes, ' minutes'), INTERVAL
+        )
         stmt = (
             select(Meeting)
             .where(
@@ -268,7 +277,7 @@ class MeetingRepository:
                     and_(
                         Meeting.status == "scheduled",
                         Meeting.meeting_date.is_not(None),
-                        Meeting.meeting_date <= now_utc_naive,
+                        end_time <= now_utc_naive,
                     ),
                 )
             )
