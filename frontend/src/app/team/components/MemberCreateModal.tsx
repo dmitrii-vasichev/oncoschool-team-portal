@@ -266,6 +266,7 @@ export function MemberCreateModal({ open, departments, currentUser, onCreated, o
                 onChange={setBirthday}
                 placeholder="Не указан"
                 clearable
+                yearRange={[1930, new Date().getFullYear()]}
                 className="w-full mt-1.5 rounded-xl"
               />
             </div>

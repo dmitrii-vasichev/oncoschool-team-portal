@@ -38,6 +38,26 @@ function Calendar({
           "text-sm font-medium select-none",
           defaultClassNames.caption_label
         ),
+        dropdowns: cn(
+          "flex items-center gap-2",
+          defaultClassNames.dropdowns
+        ),
+        dropdown: cn(
+          "cursor-pointer appearance-none bg-background border border-input rounded-md px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring",
+          defaultClassNames.dropdown
+        ),
+        dropdown_root: cn(
+          "relative",
+          defaultClassNames.dropdown_root
+        ),
+        months_dropdown: cn(
+          "cursor-pointer",
+          defaultClassNames.months_dropdown
+        ),
+        years_dropdown: cn(
+          "cursor-pointer",
+          defaultClassNames.years_dropdown
+        ),
         nav: cn(
           "flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between",
           defaultClassNames.nav

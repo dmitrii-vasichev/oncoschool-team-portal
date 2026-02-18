@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { format, parse } from "date-fns";
+import { format, parse, isValid } from "date-fns";
 import { ru } from "date-fns/locale";
 import { CalendarDays, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -29,6 +30,8 @@ interface DatePickerProps {
   inline?: boolean;
   /** Highlight as overdue */
   overdue?: boolean;
+  /** Enable year/month dropdowns with specified range [fromYear, toYear] */
+  yearRange?: [number, number];
 }
 
 export function DatePicker({
@@ -39,8 +42,10 @@ export function DatePicker({
   className,
   inline = false,
   overdue = false,
+  yearRange,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const [inputValue, setInputValue] = React.useState("");
 
   const date = value
     ? parse(value, "yyyy-MM-dd", new Date())
@@ -49,6 +54,14 @@ export function DatePicker({
   const displayText = date
     ? format(date, "d MMM yyyy", { locale: ru })
     : null;
+
+  // Sync input field when popover opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (open) {
+      setInputValue(date ? format(date, "dd.MM.yyyy") : "");
+    }
+  }, [open]);
 
   function handleSelect(day: Date | undefined) {
     if (day) {
@@ -61,6 +74,70 @@ export function DatePicker({
     e.stopPropagation();
     onChange("");
   }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let v = e.target.value;
+
+    // Auto-insert dots: "01" -> "01.", "01.12" -> "01.12."
+    const digits = v.replace(/\D/g, "");
+    if (digits.length >= 2 && !v.includes(".")) {
+      v = digits.slice(0, 2) + "." + digits.slice(2);
+    } else if (digits.length >= 4 && v.split(".").length < 3) {
+      v = digits.slice(0, 2) + "." + digits.slice(2, 4) + "." + digits.slice(4);
+    }
+
+    // Limit to DD.MM.YYYY
+    if (v.replace(/\D/g, "").length > 8) return;
+    setInputValue(v);
+  }
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      tryApplyInput();
+    }
+  }
+
+  function handleInputBlur() {
+    tryApplyInput();
+  }
+
+  function tryApplyInput() {
+    if (!inputValue.trim()) return;
+    const parsed = parse(inputValue, "dd.MM.yyyy", new Date());
+    if (isValid(parsed) && parsed.getFullYear() >= 1900 && parsed.getFullYear() <= 2100) {
+      onChange(format(parsed, "yyyy-MM-dd"));
+      setOpen(false);
+    }
+  }
+
+  const calendarProps: React.ComponentProps<typeof Calendar> = {
+    mode: "single" as const,
+    selected: date,
+    onSelect: handleSelect,
+    defaultMonth: date,
+  };
+
+  if (yearRange) {
+    calendarProps.captionLayout = "dropdown";
+    calendarProps.startMonth = new Date(yearRange[0], 0);
+    calendarProps.endMonth = new Date(yearRange[1], 11);
+  }
+
+  const calendarContent = (
+    <div>
+      <div className="px-3 pt-3 pb-1">
+        <Input
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
+          onBlur={handleInputBlur}
+          placeholder="ДД.ММ.ГГГГ"
+          className="h-8 text-sm"
+        />
+      </div>
+      <Calendar {...calendarProps} />
+    </div>
+  );
 
   if (inline) {
     return (
@@ -79,13 +156,7 @@ export function DatePicker({
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={handleSelect}
-              defaultMonth={date}
-              autoFocus
-            />
+            {calendarContent}
           </PopoverContent>
         </Popover>
         {clearable && value && (
@@ -127,13 +198,7 @@ export function DatePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={handleSelect}
-          defaultMonth={date}
-          initialFocus
-        />
+        {calendarContent}
       </PopoverContent>
     </Popover>
   );
