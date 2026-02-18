@@ -715,6 +715,27 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      {/* ═══════════ Moderator: Stale Tasks ═══════════ */}
+      {isModerator && staleTasks.length > 0 && (
+        <section className="animate-fade-in-up stagger-8">
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-6">
+            <SectionHeader
+              title="Не обновлялись >3 дней"
+              icon={AlertOctagon}
+              iconColor="hsl(38, 80%, 52%)"
+              count={staleTasks.length}
+              linkHref="/tasks"
+              linkLabel="Все задачи"
+            />
+            <div className="space-y-2">
+              {staleTasks.map((task) => (
+                <TaskListItem key={task.id} task={task} variant="stale" />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ═══════════ Upcoming Meetings ═══════════ */}
       {upcomingMeetings.length > 0 && (
         <section className="animate-fade-in-up stagger-7">
@@ -783,26 +804,6 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* ═══════════ Moderator: Stale Tasks ═══════════ */}
-      {isModerator && staleTasks.length > 0 && (
-        <section className="animate-fade-in-up stagger-8">
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-6">
-            <SectionHeader
-              title="Не обновлялись >3 дней"
-              icon={AlertOctagon}
-              iconColor="hsl(38, 80%, 52%)"
-              count={staleTasks.length}
-              linkHref="/tasks"
-              linkLabel="Все задачи"
-            />
-            <div className="space-y-2">
-              {staleTasks.map((task) => (
-                <TaskListItem key={task.id} task={task} variant="stale" />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
     </div>
   );
 }
