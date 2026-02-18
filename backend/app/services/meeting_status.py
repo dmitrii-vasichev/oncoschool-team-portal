@@ -1,6 +1,6 @@
 """Compute effective meeting status based on current time."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 def compute_effective_status(
@@ -20,7 +20,11 @@ def compute_effective_status(
     if meeting_date is None:
         return stored_status
 
-    now = datetime.utcnow()
+    # Use timezone-aware UTC now to safely compare with tz-aware meeting_date
+    now = datetime.now(timezone.utc)
+    # If meeting_date is naive, treat it as UTC
+    if meeting_date.tzinfo is None:
+        meeting_date = meeting_date.replace(tzinfo=timezone.utc)
     end_time = meeting_date + timedelta(minutes=duration_minutes)
 
     if now >= end_time:
