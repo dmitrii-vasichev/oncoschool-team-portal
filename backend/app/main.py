@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 import uvicorn
 from aiogram import Bot, Dispatcher
-from aiogram.types import MenuButtonWebApp, WebAppInfo
+from aiogram.types import MenuButtonCommands, MenuButtonWebApp, WebAppInfo
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -190,8 +190,12 @@ async def main():
     meeting_scheduler.start()
     logger.info("Meeting scheduler started")
 
-    # Set Menu Button for Mini App
-    if settings.MINI_APP_URL:
+    # Task UI menu button depends on TELEGRAM_TASK_UI_MODE.
+    if settings.TELEGRAM_TASK_UI_MODE == "inline":
+        # Explicitly reset to standard commands so stale Mini App buttons disappear.
+        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        logger.info("Inline task UI mode enabled: Mini App menu button disabled")
+    elif settings.MINI_APP_URL:
         await bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
                 text="\U0001f4cb Задачи",

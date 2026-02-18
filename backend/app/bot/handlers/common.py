@@ -2,10 +2,10 @@ import logging
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message, WebAppInfo
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.config import settings
+from app.bot.callbacks import TaskListCallback, TaskListFilter, TaskListScope
 from app.db.models import TeamMember
 from app.db.repositories import TeamMemberRepository
 from app.services.permission_service import PermissionService
@@ -30,34 +30,36 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
     text = (
         f"Привет, {member.full_name}! Я бот-задачник Онкошколы.\n"
         f"Твоя роль: {role_emoji} {role_text}\n\n"
-        f"/help — список команд"
+        "Выбери раздел ниже или используй /help для списка команд"
     )
 
-    reply_markup = None
-    if settings.MINI_APP_URL:
-        reply_markup = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(
-                text="\U0001f4cb Открыть задачи",
-                web_app=WebAppInfo(url=settings.MINI_APP_URL),
-            )]
-        ])
+    buttons = [[InlineKeyboardButton(
+        text="\U0001f4cb Мои задачи",
+        callback_data=TaskListCallback(
+            scope=TaskListScope.MY,
+            task_filter=TaskListFilter.ALL,
+            page=1,
+        ).pack(),
+    )]]
+
+    if PermissionService.is_moderator(member):
+        buttons.append([InlineKeyboardButton(
+            text="\U0001f4ca Все задачи",
+            callback_data=TaskListCallback(
+                scope=TaskListScope.TEAM,
+                task_filter=TaskListFilter.ALL,
+                page=1,
+            ).pack(),
+        )])
+
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     await message.answer(text, reply_markup=reply_markup)
 
 
 @router.message(Command("app"))
-async def cmd_app(message: Message, member: TeamMember) -> None:
-    if not settings.MINI_APP_URL:
-        await message.answer("Mini App не настроен")
-        return
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text="\U0001f4cb Открыть задачи",
-            web_app=WebAppInfo(url=settings.MINI_APP_URL),
-        )]
-    ])
-    await message.answer("\U0001f4f1 Откройте Mini App:", reply_markup=keyboard)
+async def cmd_app(message: Message, _member: TeamMember) -> None:
+    await message.answer("Mini App отключен, используйте /tasks")
 
 
 @router.message(Command("help"))
@@ -75,8 +77,7 @@ async def cmd_help(message: Message, member: TeamMember) -> None:
         "/status &lt;id&gt; &lt;статус&gt; — изменить статус\n"
         "\U0001f3a4 Голосовое сообщение — создать задачу голосом\n"
         "/nextmeeting — следующая встреча\n"
-        "/myreminder — мои настройки напоминаний\n"
-        "/app — открыть Mini App"
+        "/myreminder — мои настройки напоминаний"
     )
 
     text = common_commands
