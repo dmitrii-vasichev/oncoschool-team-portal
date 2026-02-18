@@ -214,7 +214,7 @@ class ApiClient {
     return this.request<Task[]>(`/api/meetings/${id}/tasks`);
   }
 
-  async createMeetingManual(data: { title: string; meeting_date: string; zoom_enabled?: boolean }): Promise<Meeting> {
+  async createMeetingManual(data: { title: string; meeting_date: string; zoom_enabled?: boolean; duration_minutes?: number }): Promise<Meeting> {
     return this.request<Meeting>("/api/meetings", {
       method: "POST",
       body: JSON.stringify(data),

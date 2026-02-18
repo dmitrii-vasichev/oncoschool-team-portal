@@ -5,6 +5,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/layout/AuthProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { ToastProvider } from "@/components/shared/Toast";
+import { PageTitleProvider } from "@/hooks/usePageTitle";
 
 const manrope = Manrope({
   subsets: ["cyrillic", "latin"],
@@ -47,7 +48,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ToastProvider>
-            <AppShell>{children}</AppShell>
+            <PageTitleProvider>
+              <AppShell>{children}</AppShell>
+            </PageTitleProvider>
           </ToastProvider>
         </AuthProvider>
       </body>

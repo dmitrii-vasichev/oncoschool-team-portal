@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import type { Meeting, Task, MeetingStatus } from "@/lib/types";
@@ -36,6 +37,7 @@ export default function MeetingDetailPage() {
   const { user } = useCurrentUser();
 
   const isModerator = user ? PermissionService.isModerator(user) : false;
+  const { setPageTitle } = usePageTitle();
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -61,6 +63,12 @@ export default function MeetingDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  // Set breadcrumb title, clear on unmount
+  useEffect(() => {
+    if (meeting?.title) setPageTitle(meeting.title);
+    return () => setPageTitle(null);
+  }, [meeting?.title, setPageTitle]);
+
   const handleUpdateTitle = async (title: string) => {
     if (!meeting) return;
     try {
@@ -73,7 +81,7 @@ export default function MeetingDetailPage() {
   };
 
   const handleUpdateStatus = async (status: MeetingStatus) => {
-    if (!meeting || meeting.status === status) return;
+    if (!meeting || meeting.effective_status === status) return;
     try {
       const updated = await api.updateMeeting(meeting.id, { status } as Partial<Meeting>);
       setMeeting(updated);

@@ -129,6 +129,8 @@ export interface Meeting {
   transcript: string | null;
   transcript_source: "zoom_api" | "manual" | null;
   status: MeetingStatus;
+  duration_minutes: number;
+  effective_status: MeetingStatus;
 }
 
 export interface TelegramTargetRef {

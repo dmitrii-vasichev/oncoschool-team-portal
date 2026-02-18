@@ -7,10 +7,11 @@ import {
   CalendarDays,
   Clock,
   ChevronDown,
-  Check,
   Pencil,
   Trash2,
   Loader2,
+  Ban,
+  RotateCcw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -80,7 +81,8 @@ export function MeetingHeader({
     return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)}, ${day} · ${time} МСК`;
   };
 
-  const statusStyle = STATUS_STYLES[meeting.status] || STATUS_STYLES.scheduled;
+  const effectiveStatus = meeting.effective_status || meeting.status;
+  const statusStyle = STATUS_STYLES[effectiveStatus] || STATUS_STYLES.scheduled;
 
   return (
     <div className="space-y-4 animate-fade-in-up stagger-1">
@@ -131,36 +133,28 @@ export function MeetingHeader({
                   variant="outline"
                   className={`rounded-lg text-xs font-medium border gap-1 cursor-pointer hover:opacity-80 ${statusStyle}`}
                 >
-                  {MEETING_STATUS_LABELS[meeting.status]}
+                  {MEETING_STATUS_LABELS[effectiveStatus]}
                   <ChevronDown className="h-3 w-3" />
                 </Badge>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl">
-              {(Object.keys(MEETING_STATUS_LABELS) as MeetingStatus[]).map(
-                (s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    onClick={() => onUpdateStatus(s)}
-                    className="gap-2 rounded-lg"
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        s === "scheduled"
-                          ? "bg-blue-500"
-                          : s === "in_progress"
-                            ? "bg-amber-500"
-                            : s === "completed"
-                              ? "bg-emerald-500"
-                              : "bg-gray-400"
-                      }`}
-                    />
-                    {MEETING_STATUS_LABELS[s]}
-                    {meeting.status === s && (
-                      <Check className="h-3.5 w-3.5 ml-auto text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                )
+              {effectiveStatus === "cancelled" ? (
+                <DropdownMenuItem
+                  onClick={() => onUpdateStatus("scheduled")}
+                  className="gap-2 rounded-lg"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Возобновить
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => onUpdateStatus("cancelled")}
+                  className="gap-2 rounded-lg text-destructive focus:text-destructive"
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                  Отменить встречу
+                </DropdownMenuItem>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -169,7 +163,7 @@ export function MeetingHeader({
             variant="outline"
             className={`rounded-lg text-xs font-medium border shrink-0 ${statusStyle}`}
           >
-            {MEETING_STATUS_LABELS[meeting.status]}
+            {MEETING_STATUS_LABELS[effectiveStatus]}
           </Badge>
         )}
       </div>

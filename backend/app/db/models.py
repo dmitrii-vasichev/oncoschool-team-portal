@@ -170,6 +170,9 @@ class Meeting(Base):
     status: Mapped[str] = mapped_column(
         String(30), default="scheduled", server_default="scheduled"
     )  # scheduled | in_progress | completed | cancelled
+    duration_minutes: Mapped[int] = mapped_column(
+        Integer, default=60, server_default="60"
+    )
 
     # Relationships
     created_by: Mapped["TeamMember | None"] = relationship()

@@ -195,6 +195,8 @@ class MeetingResponse(BaseModel):
     transcript: str | None = None
     transcript_source: str | None = None
     status: str = "scheduled"
+    duration_minutes: int = 60
+    effective_status: str = "scheduled"
 
 
 # ── MeetingSchedule ──

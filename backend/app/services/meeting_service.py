@@ -56,6 +56,7 @@ class MeetingService:
         meeting_date: datetime,
         creator: TeamMember,
         zoom_data: dict | None = None,
+        duration_minutes: int = 60,
     ) -> Meeting:
         """Create a meeting manually (without schedule). Optionally with Zoom."""
         kwargs = dict(
@@ -63,6 +64,7 @@ class MeetingService:
             meeting_date=meeting_date,
             status="scheduled",
             created_by_id=creator.id,
+            duration_minutes=duration_minutes,
         )
         if zoom_data:
             kwargs["zoom_meeting_id"] = str(zoom_data["id"])

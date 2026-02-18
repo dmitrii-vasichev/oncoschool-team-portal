@@ -13,6 +13,7 @@ from app.db.schemas import MeetingResponse, TaskResponse
 from app.db.repositories import MeetingRepository, TeamMemberRepository
 from app.services.ai_service import AIService
 from app.services.meeting_service import MeetingService
+from app.services.meeting_status import compute_effective_status
 from app.services.task_service import TaskService
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
@@ -30,6 +31,7 @@ class ManualMeetingCreate(BaseModel):
     title: str
     meeting_date: datetime
     zoom_enabled: bool = False
+    duration_minutes: int = 60
 
 
 class MeetingUpdate(BaseModel):
@@ -82,6 +84,17 @@ def _get_zoom_service(request: Request):
     return getattr(request.app.state, "zoom_service", None)
 
 
+def _meeting_response(meeting) -> MeetingResponse:
+    """Build MeetingResponse with computed effective_status."""
+    resp = MeetingResponse.model_validate(meeting)
+    resp.effective_status = compute_effective_status(
+        stored_status=meeting.status,
+        meeting_date=meeting.meeting_date,
+        duration_minutes=meeting.duration_minutes,
+    )
+    return resp
+
+
 # ── LIST / GET endpoints ──
 
 
@@ -125,7 +138,7 @@ async def list_meetings(
         )
         result = await session.execute(stmt)
         meetings = list(result.scalars().all())
-    return meetings
+    return [_meeting_response(m) for m in meetings]
 
 
 @router.get("/{meeting_id}", response_model=MeetingResponse)
@@ -138,7 +151,7 @@ async def get_meeting(
     meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
-    return meeting
+    return _meeting_response(meeting)
 
 
 @router.get("/{meeting_id}/tasks", response_model=list[TaskResponse])
@@ -197,9 +210,10 @@ async def create_meeting(
         meeting_date=meeting_date,
         creator=member,
         zoom_data=zoom_data,
+        duration_minutes=data.duration_minutes,
     )
     await session.commit()
-    return meeting
+    return _meeting_response(meeting)
 
 
 @router.patch("/{meeting_id}", response_model=MeetingResponse)
@@ -217,7 +231,7 @@ async def update_meeting(
 
     fields = data.model_dump(exclude_unset=True)
     if not fields:
-        return meeting
+        return _meeting_response(meeting)
 
     # If changing date and Zoom meeting exists, update Zoom
     zoom_svc = _get_zoom_service(request)
@@ -234,7 +248,7 @@ async def update_meeting(
 
     updated = await meeting_service.update_meeting(session, meeting_id, **fields)
     await session.commit()
-    return updated
+    return _meeting_response(updated)
 
 
 @router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -279,7 +293,7 @@ async def add_transcript(
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
     await session.commit()
-    return meeting
+    return _meeting_response(meeting)
 
 
 @router.post("/{meeting_id}/fetch-transcript")
@@ -360,7 +374,7 @@ async def apply_summary(
         await session.commit()
 
         return MeetingWithTasksResponse(
-            meeting=MeetingResponse.model_validate(meeting),
+            meeting=_meeting_response(meeting),
             tasks_created=len(tasks),
         )
     except ValueError as e:

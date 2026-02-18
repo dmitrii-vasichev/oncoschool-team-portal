@@ -199,6 +199,7 @@ class MeetingSchedulerService:
                 meeting_date=meeting_date_naive,
                 schedule_id=schedule.id,
                 status="scheduled",
+                duration_minutes=schedule.duration_minutes,
                 zoom_meeting_id=str(zoom_data["id"]) if zoom_data else None,
                 zoom_join_url=zoom_data.get("join_url") if zoom_data else None,
                 created_by_id=schedule.created_by_id,

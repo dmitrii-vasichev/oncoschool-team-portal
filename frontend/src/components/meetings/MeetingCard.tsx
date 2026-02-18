@@ -63,7 +63,8 @@ interface MeetingCardProps {
 }
 
 export function MeetingCard({ meeting, variant, isModerator, onDelete }: MeetingCardProps) {
-  const statusStyle = STATUS_STYLES[meeting.status] || STATUS_STYLES.scheduled;
+  const effectiveStatus = meeting.effective_status || meeting.status;
+  const statusStyle = STATUS_STYLES[effectiveStatus] || STATUS_STYLES.scheduled;
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -89,7 +90,7 @@ export function MeetingCard({ meeting, variant, isModerator, onDelete }: Meeting
               variant="outline"
               className={`rounded-md text-2xs font-medium border ${statusStyle}`}
             >
-              {MEETING_STATUS_LABELS[meeting.status]}
+              {MEETING_STATUS_LABELS[effectiveStatus]}
             </Badge>
           </div>
 

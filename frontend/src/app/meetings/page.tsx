@@ -444,6 +444,7 @@ function CreateMeetingDialog({
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("15:00");
+  const [durationMinutes, setDurationMinutes] = useState(60);
   const [zoomEnabled, setZoomEnabled] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -467,6 +468,7 @@ function CreateMeetingDialog({
         title: title.trim(),
         meeting_date: meetingDate,
         zoom_enabled: zoomEnabled,
+        duration_minutes: durationMinutes,
       });
       toastSuccess("Встреча создана");
       onCreated();
@@ -521,6 +523,23 @@ function CreateMeetingDialog({
                 className="mt-1.5 rounded-xl"
               />
             </div>
+          </div>
+
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Длительность
+            </Label>
+            <select
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(Number(e.target.value))}
+              className="mt-1.5 w-full h-10 rounded-xl border border-input bg-background px-3 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value={30}>30 минут</option>
+              <option value={45}>45 минут</option>
+              <option value={60}>1 час</option>
+              <option value={90}>1.5 часа</option>
+              <option value={120}>2 часа</option>
+            </select>
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border/40">

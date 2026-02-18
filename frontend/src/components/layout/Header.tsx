@@ -12,6 +12,7 @@ import {
   Settings,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { MobileMenuTrigger } from "./Sidebar";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,10 @@ const PAGE_META: Record<string, PageMeta> = {
   "/settings": { title: "Настройки", icon: Settings },
 };
 
-function getPageMeta(pathname: string): PageMeta & { crumbs: { label: string; href?: string }[] } {
+function getPageMeta(
+  pathname: string,
+  pageTitle: string | null,
+): PageMeta & { crumbs: { label: string; href?: string }[] } {
   // Check for detail pages like /tasks/42
   const segments = pathname.split("/").filter(Boolean);
 
@@ -42,13 +46,18 @@ function getPageMeta(pathname: string): PageMeta & { crumbs: { label: string; hr
     const parentPath = `/${segments[0]}`;
     const parentMeta = PAGE_META[parentPath];
     if (parentMeta) {
+      // For tasks, show #short_id; for meetings and others, use pageTitle from context
+      const detailLabel =
+        parentPath === "/tasks"
+          ? `#${segments[1]}`
+          : pageTitle || parentMeta.title;
       return {
         ...parentMeta,
-        title: `#${segments[1]}`,
+        title: detailLabel,
         parent: parentPath,
         crumbs: [
           { label: parentMeta.title, href: parentPath },
-          { label: `#${segments[1]}` },
+          { label: detailLabel },
         ],
       };
     }
@@ -67,7 +76,8 @@ function getPageMeta(pathname: string): PageMeta & { crumbs: { label: string; hr
 export function Header() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
-  const pageMeta = getPageMeta(pathname);
+  const { pageTitle } = usePageTitle();
+  const pageMeta = getPageMeta(pathname, pageTitle);
 
   return (
     <>
