@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Protocol, Sequence
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,9 +16,13 @@ from app.bot.callbacks import (
 class TaskListItem(Protocol):
     short_id: int
     title: str
+    priority: str
+    deadline: date | None
 
 
 TASK_FILTER_LABELS: dict[TaskListFilter, str] = {
+    TaskListFilter.ALL: "Все",
+    TaskListFilter.OVERDUE: "Просроченные",
     TaskListFilter.ACTIVE: "Активные",
     TaskListFilter.NEW: "Новые",
     TaskListFilter.IN_PROGRESS: "В работе",
@@ -83,12 +88,11 @@ def task_filters_keyboard(
     buttons: list[list[InlineKeyboardButton]] = []
     row: list[InlineKeyboardButton] = []
     filter_order = (
-        TaskListFilter.ACTIVE,
+        TaskListFilter.ALL,
         TaskListFilter.NEW,
         TaskListFilter.IN_PROGRESS,
         TaskListFilter.REVIEW,
-        TaskListFilter.DONE,
-        TaskListFilter.CANCELLED,
+        TaskListFilter.OVERDUE,
     )
 
     for filter_value in filter_order:
@@ -177,10 +181,13 @@ def task_list_keyboard(
 
     for task in tasks:
         title = task.title.strip()
-        short_title = title if len(title) <= 48 else f"{title[:45]}..."
+        short_title = title if len(title) <= 24 else f"{title[:21]}..."
+        deadline = task.deadline.strftime("%d.%m") if task.deadline else "—"
+        line = f"#{task.short_id} · {short_title} · {task.priority} · {deadline}"
+        button_text = line if len(line) <= 64 else f"{line[:61]}..."
         buttons.append([
             InlineKeyboardButton(
-                text=f"#{task.short_id} · {short_title}",
+                text=button_text,
                 callback_data=TaskCardCallback(
                     short_id=task.short_id,
                     scope=scope,

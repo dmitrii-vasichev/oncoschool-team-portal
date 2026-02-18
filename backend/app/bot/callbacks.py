@@ -13,10 +13,13 @@ class TaskListScope(str, Enum):
 class TaskListFilter(str, Enum):
     """Available filters for task list view."""
 
-    ACTIVE = "active"
+    ALL = "all"
     NEW = "new"
     IN_PROGRESS = "in_progress"
     REVIEW = "review"
+    OVERDUE = "overdue"
+    # Legacy values kept for stale callback compatibility.
+    ACTIVE = "active"
     DONE = "done"
     CANCELLED = "cancelled"
 

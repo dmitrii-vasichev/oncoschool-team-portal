@@ -1,13 +1,28 @@
 import logging
 import uuid
+from datetime import date
 
 from aiogram import Bot, F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.bot.callbacks import (
+    TaskBackToListCallback,
+    TaskCardCallback,
+    TaskListCallback,
+    TaskListFilter,
+    TaskListScope,
+    TaskRefreshListCallback,
+)
 from app.bot.filters import IsModeratorFilter
-from app.bot.keyboards import task_actions_keyboard
+from app.bot.keyboards import (
+    TASK_FILTER_LABELS,
+    task_actions_keyboard,
+    task_card_keyboard,
+    task_list_keyboard,
+)
 from app.db.models import TeamMember
 from app.db.repositories import TaskRepository, TeamMemberRepository
 from app.services.notification_service import NotificationService
@@ -21,6 +36,10 @@ router = Router()
 task_service = TaskService()
 task_repo = TaskRepository()
 member_repo = TeamMemberRepository()
+TASKS_PER_PAGE = 8
+LEGACY_TASK_FILTER_ALIASES = {
+    TaskListFilter.ACTIVE: TaskListFilter.ALL,
+}
 
 PRIORITY_EMOJI = {
     "urgent": "🔴",
@@ -69,38 +88,223 @@ def _format_task_detail(task) -> str:
     return text
 
 
+def _normalize_task_filter(task_filter: TaskListFilter) -> TaskListFilter:
+    """Map legacy filter values to current UI filter set."""
+    return LEGACY_TASK_FILTER_ALIASES.get(task_filter, task_filter)
+
+
+def _is_task_overdue(task) -> bool:
+    if not task.deadline:
+        return False
+    if task.status in ("done", "cancelled"):
+        return False
+    return task.deadline < date.today()
+
+
+def _filter_tasks(tasks: list, task_filter: TaskListFilter) -> list:
+    normalized = _normalize_task_filter(task_filter)
+    if normalized == TaskListFilter.ALL:
+        return list(tasks)
+    if normalized in (TaskListFilter.NEW, TaskListFilter.IN_PROGRESS, TaskListFilter.REVIEW):
+        return [task for task in tasks if task.status == normalized.value]
+    if normalized == TaskListFilter.OVERDUE:
+        return [task for task in tasks if _is_task_overdue(task)]
+    if normalized in (TaskListFilter.DONE, TaskListFilter.CANCELLED):
+        return [task for task in tasks if task.status == normalized.value]
+    return list(tasks)
+
+
+def _paginate_tasks(tasks: list, page: int) -> tuple[list, int, int]:
+    total_pages = max(1, (len(tasks) + TASKS_PER_PAGE - 1) // TASKS_PER_PAGE)
+    safe_page = min(max(1, page), total_pages)
+    start = (safe_page - 1) * TASKS_PER_PAGE
+    end = start + TASKS_PER_PAGE
+    return tasks[start:end], safe_page, total_pages
+
+
+def _scope_title(scope: TaskListScope) -> str:
+    return "Мои задачи" if scope == TaskListScope.MY else "Все задачи команды"
+
+
+def _format_list_caption(
+    scope: TaskListScope,
+    task_filter: TaskListFilter,
+    page: int,
+    total_pages: int,
+    total_tasks: int,
+    page_tasks_count: int,
+) -> str:
+    filter_label = TASK_FILTER_LABELS.get(task_filter, task_filter.value)
+    lines = [
+        f"<b>📋 {_scope_title(scope)}</b>",
+        f"Фильтр: <b>{filter_label}</b>",
+        f"Страница: {page}/{total_pages} · Всего: {total_tasks}",
+        "",
+    ]
+    if page_tasks_count:
+        lines.append("Выбери задачу из списка ниже:")
+    else:
+        lines.append("По этому фильтру задач нет.")
+    return "\n".join(lines)
+
+
+async def _load_scope_tasks(
+    session_maker: async_sessionmaker,
+    scope: TaskListScope,
+    member: TeamMember,
+) -> list:
+    async with session_maker() as session:
+        if scope == TaskListScope.MY:
+            return await task_service.get_my_tasks(session, member.id)
+        return await task_service.get_all_active_tasks(session)
+
+
+async def _build_task_list_view(
+    session_maker: async_sessionmaker,
+    scope: TaskListScope,
+    member: TeamMember,
+    task_filter: TaskListFilter,
+    page: int,
+) -> tuple[str, InlineKeyboardMarkup]:
+    normalized_filter = _normalize_task_filter(task_filter)
+    tasks = await _load_scope_tasks(session_maker, scope, member)
+    filtered_tasks = _filter_tasks(tasks, normalized_filter)
+    page_tasks, safe_page, total_pages = _paginate_tasks(filtered_tasks, page)
+
+    text = _format_list_caption(
+        scope=scope,
+        task_filter=normalized_filter,
+        page=safe_page,
+        total_pages=total_pages,
+        total_tasks=len(filtered_tasks),
+        page_tasks_count=len(page_tasks),
+    )
+    keyboard = task_list_keyboard(
+        page_tasks,
+        scope=scope,
+        current_filter=normalized_filter,
+        page=safe_page,
+        total_pages=total_pages,
+    )
+    return text, keyboard
+
+
+async def _safe_edit_text(
+    message: Message,
+    text: str,
+    reply_markup: InlineKeyboardMarkup | None = None,
+    parse_mode: str | None = None,
+) -> None:
+    try:
+        await message.edit_text(
+            text=text,
+            parse_mode=parse_mode,
+            reply_markup=reply_markup,
+        )
+    except TelegramBadRequest as exc:
+        if "message is not modified" not in str(exc).lower():
+            raise
+        if reply_markup is None:
+            return
+        try:
+            await message.edit_reply_markup(reply_markup=reply_markup)
+        except TelegramBadRequest as markup_exc:
+            if "message is not modified" not in str(markup_exc).lower():
+                raise
+
+
+def _extract_list_context_from_markup(
+    markup: InlineKeyboardMarkup | None,
+) -> tuple[TaskListScope, TaskListFilter, int] | None:
+    if not markup:
+        return None
+
+    for row in markup.inline_keyboard:
+        for button in row:
+            data = button.callback_data or ""
+            if data.startswith("tback:"):
+                try:
+                    parsed = TaskBackToListCallback.unpack(data)
+                except ValueError:
+                    continue
+                return (
+                    parsed.scope,
+                    _normalize_task_filter(parsed.task_filter),
+                    max(1, parsed.page),
+                )
+
+            # Back callback from reassignment flow may carry list context.
+            if data.startswith("task_back:"):
+                parts = data.split(":")
+                if len(parts) >= 5:
+                    try:
+                        scope = TaskListScope(parts[2])
+                        task_filter = _normalize_task_filter(TaskListFilter(parts[3]))
+                        page = max(1, int(parts[4]))
+                    except (TypeError, ValueError):
+                        continue
+                    return (scope, task_filter, page)
+    return None
+
+
+def _task_back_callback_data(
+    short_id: int,
+    context: tuple[TaskListScope, TaskListFilter, int] | None = None,
+) -> str:
+    if not context:
+        return f"task_back:{short_id}"
+    scope, task_filter, page = context
+    return f"task_back:{short_id}:{scope.value}:{task_filter.value}:{page}"
+
+
+def _parse_task_back_callback_data(
+    callback_data: str,
+) -> tuple[int, tuple[TaskListScope, TaskListFilter, int] | None]:
+    parts = callback_data.split(":")
+    short_id = int(parts[1])
+    if len(parts) < 5:
+        return short_id, None
+
+    try:
+        scope = TaskListScope(parts[2])
+        task_filter = _normalize_task_filter(TaskListFilter(parts[3]))
+        page = max(1, int(parts[4]))
+    except (TypeError, ValueError):
+        return short_id, None
+
+    return short_id, (scope, task_filter, page)
+
+
+def _task_detail_keyboard(
+    task_id: int,
+    is_moderator: bool,
+    context: tuple[TaskListScope, TaskListFilter, int] | None = None,
+) -> InlineKeyboardMarkup:
+    if not context:
+        return task_actions_keyboard(task_id, is_moderator)
+    scope, task_filter, page = context
+    return task_card_keyboard(
+        task_id=task_id,
+        is_moderator=is_moderator,
+        scope=scope,
+        current_filter=task_filter,
+        page=page,
+    )
+
+
 # ── /tasks — Мои задачи ──
 
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: Message, member: TeamMember, session_maker: async_sessionmaker) -> None:
-    async with session_maker() as session:
-        tasks = await task_service.get_my_tasks(session, member.id)
-
-    if not tasks:
-        await message.answer("У тебя нет активных задач 🎉")
-        return
-
-    # Group by status
-    grouped: dict[str, list] = {}
-    for task in tasks:
-        grouped.setdefault(task.status, []).append(task)
-
-    status_order = ["in_progress", "review", "new"]
-    lines = ["<b>📋 Мои задачи:</b>\n"]
-
-    for status in status_order:
-        if status not in grouped:
-            continue
-        emoji = STATUS_EMOJI.get(status, "")
-        lines.append(f"\n{emoji} <b>{status}</b>:")
-        for task in grouped[status]:
-            lines.append(f"  {_format_task_line(task)}")
-
-    total = len(tasks)
-    lines.append(f"\nВсего: {total}")
-
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    text, keyboard = await _build_task_list_view(
+        session_maker=session_maker,
+        scope=TaskListScope.MY,
+        member=member,
+        task_filter=TaskListFilter.ALL,
+        page=1,
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 # ── /all — Все задачи команды ──
@@ -108,34 +312,124 @@ async def cmd_tasks(message: Message, member: TeamMember, session_maker: async_s
 
 @router.message(Command("all"))
 async def cmd_all(message: Message, member: TeamMember, session_maker: async_sessionmaker) -> None:
-    async with session_maker() as session:
-        tasks = await task_service.get_all_active_tasks(session)
+    text, keyboard = await _build_task_list_view(
+        session_maker=session_maker,
+        scope=TaskListScope.TEAM,
+        member=member,
+        task_filter=TaskListFilter.ALL,
+        page=1,
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
-    if not tasks:
-        await message.answer("Нет активных задач 🎉")
+
+@router.callback_query(TaskListCallback.filter())
+async def cb_task_list(
+    callback: CallbackQuery,
+    callback_data: TaskListCallback,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
         return
 
-    # Group by status
-    grouped: dict[str, list] = {}
-    for task in tasks:
-        grouped.setdefault(task.status, []).append(task)
+    text, keyboard = await _build_task_list_view(
+        session_maker=session_maker,
+        scope=callback_data.scope,
+        member=member,
+        task_filter=callback_data.task_filter,
+        page=callback_data.page,
+    )
+    await _safe_edit_text(callback.message, text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
 
-    status_order = ["in_progress", "review", "new"]
-    lines = ["<b>📋 Все задачи команды:</b>\n"]
 
-    for status in status_order:
-        if status not in grouped:
-            continue
-        emoji = STATUS_EMOJI.get(status, "")
-        lines.append(f"\n{emoji} <b>{status}</b>:")
-        for task in grouped[status]:
-            assignee_name = task.assignee.full_name if task.assignee else "—"
-            lines.append(f"  {_format_task_line(task)} · 👤 {assignee_name}")
+@router.callback_query(TaskRefreshListCallback.filter())
+async def cb_task_list_refresh(
+    callback: CallbackQuery,
+    callback_data: TaskRefreshListCallback,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
 
-    total = len(tasks)
-    lines.append(f"\nВсего: {total}")
+    text, keyboard = await _build_task_list_view(
+        session_maker=session_maker,
+        scope=callback_data.scope,
+        member=member,
+        task_filter=callback_data.task_filter,
+        page=callback_data.page,
+    )
+    await _safe_edit_text(callback.message, text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer("Обновлено")
 
-    await message.answer("\n".join(lines), parse_mode="HTML")
+
+@router.callback_query(TaskCardCallback.filter())
+async def cb_task_card_open(
+    callback: CallbackQuery,
+    callback_data: TaskCardCallback,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    normalized_filter = _normalize_task_filter(callback_data.task_filter)
+
+    async with session_maker() as session:
+        task = await task_service.get_task_by_short_id(session, callback_data.short_id)
+
+    if not task:
+        await callback.answer("Задача уже недоступна", show_alert=True)
+        text, keyboard = await _build_task_list_view(
+            session_maker=session_maker,
+            scope=callback_data.scope,
+            member=member,
+            task_filter=normalized_filter,
+            page=callback_data.page,
+        )
+        await _safe_edit_text(callback.message, text, reply_markup=keyboard, parse_mode="HTML")
+        return
+
+    is_mod = PermissionService.is_moderator(member)
+    await _safe_edit_text(
+        callback.message,
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=task_card_keyboard(
+            task_id=task.short_id,
+            is_moderator=is_mod,
+            scope=callback_data.scope,
+            current_filter=normalized_filter,
+            page=max(1, callback_data.page),
+        ),
+    )
+    await callback.answer()
+
+
+@router.callback_query(TaskBackToListCallback.filter())
+async def cb_task_back_to_list(
+    callback: CallbackQuery,
+    callback_data: TaskBackToListCallback,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    text, keyboard = await _build_task_list_view(
+        session_maker=session_maker,
+        scope=callback_data.scope,
+        member=member,
+        task_filter=callback_data.task_filter,
+        page=callback_data.page,
+    )
+    await _safe_edit_text(callback.message, text, reply_markup=keyboard, parse_mode="HTML")
+    await callback.answer()
 
 
 # ── /new <текст> — Создать задачу себе ──
@@ -349,7 +643,12 @@ async def cmd_status(message: Message, member: TeamMember, session_maker: async_
 
 @router.callback_query(F.data.startswith("task_done:"))
 async def cb_task_done(callback: CallbackQuery, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     short_id = int(callback.data.split(":")[1])
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
 
     async with session_maker() as session:
         async with session.begin():
@@ -376,14 +675,26 @@ async def cb_task_done(callback: CallbackQuery, member: TeamMember, session_make
             )
 
     await callback.answer("✅ Задача завершена!")
-    await callback.message.edit_text(
-        f"✅ Задача #{task.short_id} завершена!\n{task.title}"
+    await _safe_edit_text(
+        callback.message,
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=PermissionService.is_moderator(member),
+            context=context,
+        ),
     )
 
 
 @router.callback_query(F.data.startswith("task_inprogress:"))
 async def cb_task_inprogress(callback: CallbackQuery, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     short_id = int(callback.data.split(":")[1])
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
 
     async with session_maker() as session:
         async with session.begin():
@@ -404,18 +715,27 @@ async def cb_task_inprogress(callback: CallbackQuery, member: TeamMember, sessio
                 session, task, member, old_status, "in_progress"
             )
 
-    is_mod = PermissionService.is_moderator(member)
     await callback.answer("▶️ Задача в работе!")
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         _format_task_detail(task),
         parse_mode="HTML",
-        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=PermissionService.is_moderator(member),
+            context=context,
+        ),
     )
 
 
 @router.callback_query(F.data.startswith("task_review:"))
 async def cb_task_review(callback: CallbackQuery, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     short_id = int(callback.data.split(":")[1])
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
 
     async with session_maker() as session:
         async with session.begin():
@@ -436,12 +756,16 @@ async def cb_task_review(callback: CallbackQuery, member: TeamMember, session_ma
                 session, task, member, old_status, "review"
             )
 
-    is_mod = PermissionService.is_moderator(member)
     await callback.answer("👀 Задача на ревью!")
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         _format_task_detail(task),
         parse_mode="HTML",
-        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=PermissionService.is_moderator(member),
+            context=context,
+        ),
     )
 
 
@@ -451,7 +775,12 @@ async def cb_task_cancel(callback: CallbackQuery, member: TeamMember, session_ma
         await callback.answer("Только модератор может отменять задачи", show_alert=True)
         return
 
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     short_id = int(callback.data.split(":")[1])
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
 
     async with session_maker() as session:
         async with session.begin():
@@ -469,8 +798,15 @@ async def cb_task_cancel(callback: CallbackQuery, member: TeamMember, session_ma
             )
 
     await callback.answer("❌ Задача отменена!")
-    await callback.message.edit_text(
-        f"❌ Задача #{task.short_id} отменена\n{task.title}"
+    await _safe_edit_text(
+        callback.message,
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=True,
+            context=context,
+        ),
     )
 
 
@@ -480,7 +816,12 @@ async def cb_task_reassign(callback: CallbackQuery, member: TeamMember, session_
         await callback.answer("Только модератор может переназначать задачи", show_alert=True)
         return
 
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
     short_id = int(callback.data.split(":")[1])
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
 
     # Show team members list for reassignment
     async with session_maker() as session:
@@ -501,11 +842,15 @@ async def cb_task_reassign(callback: CallbackQuery, member: TeamMember, session_
             )
         ])
     buttons.append([
-        InlineKeyboardButton(text="↩️ Назад", callback_data=f"task_back:{short_id}")
+        InlineKeyboardButton(
+            text="↩️ Назад",
+            callback_data=_task_back_callback_data(short_id, context),
+        )
     ])
 
     await callback.answer()
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         f"🔄 Переназначить задачу #{short_id}:\n{task.title}\n\nВыбери исполнителя:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
@@ -517,6 +862,11 @@ async def cb_do_reassign(callback: CallbackQuery, member: TeamMember, session_ma
         await callback.answer("Только модератор", show_alert=True)
         return
 
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    context = _extract_list_context_from_markup(callback.message.reply_markup)
     parts = callback.data.split(":")
     short_id = int(parts[1])
     new_assignee_id = uuid.UUID(parts[2])
@@ -537,16 +887,29 @@ async def cb_do_reassign(callback: CallbackQuery, member: TeamMember, session_ma
             )
 
     await callback.answer("🔄 Задача переназначена!")
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         _format_task_detail(task),
         parse_mode="HTML",
-        reply_markup=task_actions_keyboard(task.short_id, True),
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=True,
+            context=context,
+        ),
     )
 
 
 @router.callback_query(F.data.startswith("task_back:"))
 async def cb_task_back(callback: CallbackQuery, member: TeamMember, session_maker: async_sessionmaker) -> None:
-    short_id = int(callback.data.split(":")[1])
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    try:
+        short_id, context = _parse_task_back_callback_data(callback.data)
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный callback", show_alert=True)
+        return
 
     async with session_maker() as session:
         task = await task_service.get_task_by_short_id(session, short_id)
@@ -557,10 +920,15 @@ async def cb_task_back(callback: CallbackQuery, member: TeamMember, session_make
 
     is_mod = PermissionService.is_moderator(member)
     await callback.answer()
-    await callback.message.edit_text(
+    await _safe_edit_text(
+        callback.message,
         _format_task_detail(task),
         parse_mode="HTML",
-        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=is_mod,
+            context=context,
+        ),
     )
 
 
