@@ -69,16 +69,17 @@ function formatBirthdayDate(date: Date): string {
 
 interface UpcomingBirthdaysProps {
   members: TeamMember[];
-  onMemberClick: (member: TeamMember) => void;
+  onMemberClick?: (member: TeamMember) => void;
+  className?: string;
 }
 
-export function UpcomingBirthdays({ members, onMemberClick }: UpcomingBirthdaysProps) {
+export function UpcomingBirthdays({ members, onMemberClick, className }: UpcomingBirthdaysProps) {
   const upcoming = getUpcomingBirthdays(members);
 
   if (upcoming.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-5 animate-fade-in-up stagger-2">
+    <div className={`rounded-2xl border border-border/60 bg-card p-5 ${className ?? "animate-fade-in-up stagger-2"}`}>
       <div className="flex items-center gap-2 mb-4">
         <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
           <Cake className="h-4 w-4 text-amber-500" />
@@ -97,11 +98,11 @@ export function UpcomingBirthdays({ members, onMemberClick }: UpcomingBirthdaysP
           return (
             <div
               key={member.id}
-              onClick={() => onMemberClick(member)}
+              onClick={onMemberClick ? () => onMemberClick(member) : undefined}
               className={`
                 relative flex-shrink-0 min-w-[140px] max-w-[160px] rounded-xl border p-3
-                text-center cursor-pointer transition-all duration-200
-                hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5
+                text-center transition-all duration-200
+                ${onMemberClick ? "cursor-pointer hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5" : ""}
                 ${isToday
                   ? "ring-2 ring-amber-400/50 border-amber-300/50"
                   : "border-border/60"

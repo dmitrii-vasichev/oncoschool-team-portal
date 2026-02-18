@@ -25,11 +25,13 @@ import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
+import { UpcomingBirthdays } from "./team/components/UpcomingBirthdays";
 import type {
   OverviewAnalytics,
   MeetingAnalytics,
   Task,
   Meeting,
+  TeamMember,
 } from "@/lib/types";
 import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
 
@@ -459,6 +461,7 @@ export default function DashboardPage() {
   const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
   const [staleTasks, setStaleTasks] = useState<Task[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -490,6 +493,7 @@ export default function DashboardPage() {
           }).catch(catchLog("getDoneTasks")),
           api.getMeetings({ upcoming: true }).catch(catchLog("getUpcomingMeetings")),
           api.getMeetings({ past: true }).catch(catchLog("getPastMeetings")),
+          api.getTeam().catch(catchLog("getTeam")),
         ];
 
         // Moderator-only data
@@ -520,11 +524,13 @@ export default function DashboardPage() {
         const doneTasksData = results[3] as { items: Task[] } | null;
         const upcomingData = results[4] as Meeting[] | null;
         const pastData = results[5] as Meeting[] | null;
+        const teamData = results[6] as TeamMember[] | null;
 
         const hasError = results.some((r) => r === null);
 
         if (overviewData) setOverview(overviewData);
         if (meetingData) setMeetingAnalytics(meetingData);
+        if (teamData) setTeamMembers(teamData);
 
         // My tasks — first 5 for display
         if (myTasksData) {
@@ -550,8 +556,8 @@ export default function DashboardPage() {
 
         // Moderator data
         if (isMod) {
-          const unassignedData = results[6] as { items: Task[] } | null;
-          const staleData = results[7] as { items: Task[] } | null;
+          const unassignedData = results[7] as { items: Task[] } | null;
+          const staleData = results[8] as { items: Task[] } | null;
 
           if (unassignedData) {
             setUnassignedTasks(
@@ -777,6 +783,16 @@ export default function DashboardPage() {
               />
             ))}
           </div>
+        </section>
+      )}
+
+      {/* ═══════════ Upcoming Birthdays ═══════════ */}
+      {teamMembers.length > 0 && (
+        <section className="animate-fade-in-up stagger-8">
+          <UpcomingBirthdays
+            members={teamMembers}
+            className=""
+          />
         </section>
       )}
 
