@@ -57,11 +57,6 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
     await message.answer(text, reply_markup=reply_markup)
 
 
-@router.message(Command("app"))
-async def cmd_app(message: Message, _member: TeamMember) -> None:
-    await message.answer("Mini App отключен, используйте /tasks")
-
-
 @router.message(Command("help"))
 async def cmd_help(message: Message, member: TeamMember) -> None:
     is_mod = PermissionService.is_moderator(member)

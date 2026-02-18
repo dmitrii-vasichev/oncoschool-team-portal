@@ -306,23 +306,6 @@ async def dev_login(
     )
 
 
-@router.post("/mini-app")
-@limiter.limit("10/minute")
-async def login_mini_app(
-    request: Request,
-):
-    """Legacy endpoint kept for backward compatibility."""
-    client_ip = request.client.host if request.client else "unknown"
-    auth_logger.info("mini_app_login GONE: ip=%s", client_ip)
-    raise HTTPException(
-        status_code=status.HTTP_410_GONE,
-        detail=(
-            "Mini App авторизация отключена. "
-            "Используйте /api/auth/telegram или /api/auth/web-login."
-        ),
-    )
-
-
 @router.get("/config")
 async def get_auth_config():
     """Public endpoint — returns bot username and auth mode config."""
