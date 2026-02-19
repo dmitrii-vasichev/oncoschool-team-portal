@@ -264,11 +264,12 @@ export default function LoginPage() {
           >
             <div className="rounded-2xl bg-white/95 p-6 shadow-2xl shadow-black/20 animate-login-float">
               <Image
-                src="/logo.png"
+                src="/logo.webp"
                 alt="Онкошкола"
                 width={280}
                 height={80}
                 priority
+                sizes="(min-width: 1280px) 280px, 240px"
                 className="h-auto w-[240px] xl:w-[280px]"
               />
             </div>
@@ -300,12 +301,13 @@ export default function LoginPage() {
             }}
           >
             <Image
-              src="/logo.png"
+              src="/logo-mobile.webp"
               alt="Онкошкола"
               width={200}
               height={56}
               priority
-              className="h-auto w-[180px] brightness-0 invert"
+              sizes="180px"
+              className="h-auto w-[180px]"
             />
           </div>
           <p className="mt-3 text-center text-sm text-muted-foreground">
