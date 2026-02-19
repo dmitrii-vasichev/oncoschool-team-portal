@@ -304,16 +304,6 @@ class MeetingRepository:
 
 
 class MeetingScheduleRepository:
-    async def get_all(
-        self, session: AsyncSession, include_inactive: bool = False
-    ) -> list[MeetingSchedule]:
-        stmt = select(MeetingSchedule)
-        if not include_inactive:
-            stmt = stmt.where(MeetingSchedule.is_active.is_(True))
-        stmt = stmt.order_by(MeetingSchedule.day_of_week, MeetingSchedule.time_utc)
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
-
     async def get_all_active(self, session: AsyncSession) -> list[MeetingSchedule]:
         stmt = (
             select(MeetingSchedule)

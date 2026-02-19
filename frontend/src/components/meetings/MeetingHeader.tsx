@@ -163,18 +163,13 @@ export function MeetingHeader({
           </div>
         )}
         {meeting.schedule_id && (
-          <Link
-            href={`/meetings?schedule_id=${encodeURIComponent(meeting.schedule_id)}`}
-            className="inline-flex"
+          <Badge
+            variant="secondary"
+            className="rounded-lg text-2xs bg-primary/5 text-primary border-primary/10"
           >
-            <Badge
-              variant="secondary"
-              className="rounded-lg text-2xs bg-primary/5 text-primary border-primary/10 hover:bg-primary/10 hover:border-primary/20 transition-colors"
-            >
-              <Clock className="h-3 w-3 mr-1" />
-              Из расписания
-            </Badge>
-          </Link>
+            <Clock className="h-3 w-3 mr-1" />
+            Из расписания
+          </Badge>
         )}
 
         {isModerator && onDelete && (

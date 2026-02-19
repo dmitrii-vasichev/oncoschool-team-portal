@@ -47,21 +47,21 @@ export function DatePicker({
   const [open, setOpen] = React.useState(false);
   const [inputValue, setInputValue] = React.useState("");
 
-  const date = React.useMemo(
-    () => (value ? parse(value, "yyyy-MM-dd", new Date()) : undefined),
-    [value],
-  );
+  const date = value
+    ? parse(value, "yyyy-MM-dd", new Date())
+    : undefined;
 
   const displayText = date
     ? format(date, "d MMM yyyy", { locale: ru })
     : null;
 
   // Sync input field when popover opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (open) {
       setInputValue(date ? format(date, "dd.MM.yyyy") : "");
     }
-  }, [open, date]);
+  }, [open]);
 
   function handleSelect(day: Date | undefined) {
     if (day) {

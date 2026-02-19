@@ -5,8 +5,6 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
-  CalendarClock,
-  Clock3,
   FileText,
   ListChecks,
   StickyNote,
@@ -19,12 +17,11 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
-import { formatUtcClockForSchedule } from "@/lib/meetingDateTime";
-import type { Meeting, Task, MeetingStatus, MeetingSchedule } from "@/lib/types";
-import { DAY_OF_WEEK_LABELS } from "@/lib/types";
+import type { Meeting, Task, MeetingStatus } from "@/lib/types";
 
 import { MeetingHeader } from "@/components/meetings/MeetingHeader";
 import { ZoomBlock } from "@/components/meetings/ZoomBlock";
+import { ParticipantsBlock } from "@/components/meetings/ParticipantsBlock";
 import { TranscriptTab } from "@/components/meetings/TranscriptTab";
 import { SummaryTab } from "@/components/meetings/SummaryTab";
 import { MeetingTasksTab } from "@/components/meetings/MeetingTasksTab";
@@ -44,26 +41,23 @@ export default function MeetingDetailPage() {
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [schedules, setSchedules] = useState<MeetingSchedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabId>("summary");
 
   const fetchData = useCallback(async () => {
     try {
-      const [meetingData, tasksData, schedulesData] = await Promise.all([
+      const [meetingData, tasksData] = await Promise.all([
         api.getMeeting(id),
         api.getMeetingTasks(id),
-        api.getMeetingSchedules({ includeInactive: true }),
       ]);
       setMeeting(meetingData);
       setTasks(tasksData);
-      setSchedules(schedulesData);
     } catch {
       toastError("Не удалось загрузить встречу");
     } finally {
       setLoading(false);
     }
-  }, [id, toastError]);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
@@ -168,14 +162,6 @@ export default function MeetingDetailPage() {
     { id: "notes", label: "Заметки", icon: StickyNote },
   ];
 
-  const linkedSchedule = meeting.schedule_id
-    ? schedules.find((schedule) => schedule.id === meeting.schedule_id) ?? null
-    : null;
-
-  const linkedScheduleTime = linkedSchedule
-    ? formatUtcClockForSchedule(linkedSchedule.time_utc)
-    : null;
-
   return (
     <div className="max-w-3xl space-y-6 animate-in fade-in duration-300">
       {/* Meeting header with title, date, status */}
@@ -187,50 +173,10 @@ export default function MeetingDetailPage() {
         onDelete={handleDelete}
       />
 
-      {/* Schedule link + Zoom row */}
+      {/* Zoom + Participants row */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up stagger-2">
-        <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <CalendarClock className="h-4 w-4 text-primary" />
-            </div>
-            <span className="text-sm font-heading font-semibold">Связь с расписанием</span>
-          </div>
-
-          {!meeting.schedule_id && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Ручная встреча</p>
-              <p className="text-xs text-muted-foreground">Создана вручную, без шаблона</p>
-            </div>
-          )}
-
-          {meeting.schedule_id && linkedSchedule && (
-            <>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Шаблон расписания</p>
-                <p className="text-sm font-medium text-foreground">{linkedSchedule.title}</p>
-                <p className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  {DAY_OF_WEEK_LABELS[linkedSchedule.day_of_week] || "День не указан"} ·{" "}
-                  {linkedScheduleTime?.moscow}
-                </p>
-              </div>
-              <Button asChild variant="outline" size="sm" className="rounded-xl w-fit">
-                <Link href={`/meetings?schedule_id=${encodeURIComponent(linkedSchedule.id)}`}>
-                  Показать в ленте
-                </Link>
-              </Button>
-            </>
-          )}
-
-          {meeting.schedule_id && !linkedSchedule && (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-rose-600">Шаблон удалён</p>
-              <p className="text-xs text-muted-foreground">Исходный шаблон больше не найден</p>
-            </div>
-          )}
-        </div>
         <ZoomBlock meeting={meeting} isModerator={isModerator} />
+        <ParticipantsBlock participants={[]} />
       </div>
 
       {/* Custom tabs */}

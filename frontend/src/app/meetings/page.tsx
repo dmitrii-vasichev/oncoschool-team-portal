@@ -1,11 +1,20 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Calendar, CalendarPlus, Loader2, Plus, Video } from "lucide-react";
+import {
+  Calendar,
+  Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Video,
+  CalendarPlus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -27,11 +36,7 @@ import { TimePicker } from "@/components/shared/TimePicker";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ScheduleCard } from "@/components/meetings/ScheduleCard";
 import { ScheduleForm } from "@/components/meetings/ScheduleForm";
-import {
-  ScheduleTemplatesPanel,
-  type ScheduleTemplatesFilter,
-} from "@/components/meetings/ScheduleTemplatesPanel";
-import { TimelineDaySection } from "@/components/meetings/TimelineDaySection";
+import { MeetingCard } from "@/components/meetings/MeetingCard";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type {
   MeetingSchedule,
@@ -39,40 +44,21 @@ import type {
   TelegramNotificationTarget,
 } from "@/lib/types";
 import {
-  buildMeetingsTimeline,
-  type TimelineDayGroup,
-  type TimelineMeetingItem,
-} from "@/lib/meetingsTimeline";
-import {
   PROJECT_TIMEZONE_LABEL,
   zonedDateTimeToUtcIso,
 } from "@/lib/meetingDateTime";
 
+const PER_PAGE = 6;
+
 export default function MeetingsPage() {
-  const router = useRouter();
   const { user } = useCurrentUser();
   const isModerator = user ? PermissionService.isModerator(user) : false;
 
-  const {
-    schedules,
-    loading: schedulesLoading,
-    refetch: refetchSchedules,
-  } = useMeetingSchedules();
-  const {
-    meetings: upcomingMeetings,
-    loading: upcomingLoading,
-    refetch: refetchUpcoming,
-  } = useMeetings({ upcoming: true });
-  const {
-    meetings: pastMeetings,
-    loading: pastLoading,
-    refetch: refetchPast,
-  } = useMeetings({ past: true });
+  const { schedules, loading: schedulesLoading, refetch: refetchSchedules } = useMeetingSchedules();
+  const { meetings: upcomingMeetings, loading: upcomingLoading, refetch: refetchUpcoming } = useMeetings({ upcoming: true });
+  const { meetings: pastMeetings, loading: pastLoading, refetch: refetchPast } = useMeetings({ past: true });
   const { members } = useTeam();
   const { departments } = useDepartments();
-
-  const [timelineFilter, setTimelineFilter] =
-    useState<ScheduleTemplatesFilter>({ type: "all" });
 
   // Telegram targets (for schedule form)
   const [telegramTargets, setTelegramTargets] = useState<TelegramNotificationTarget[]>([]);
@@ -92,81 +78,36 @@ export default function MeetingsPage() {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<MeetingSchedule | null>(null);
 
+  // Search + pagination for past meetings
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("upcoming");
+
   const { toastSuccess, toastError } = useToast();
 
-  const sortedSchedules = useMemo(
-    () =>
-      [...schedules].sort(
-        (a, b) =>
-          a.day_of_week - b.day_of_week ||
-          a.time_utc.localeCompare(b.time_utc) ||
-          a.title.localeCompare(b.title, "ru"),
-      ),
-    [schedules],
+  // Active schedules sorted by day_of_week
+  const activeSchedules = useMemo(
+    () => schedules.filter((s) => s.is_active).sort((a, b) => a.day_of_week - b.day_of_week),
+    [schedules]
   );
 
-  const timelineDays = useMemo(
-    () => buildMeetingsTimeline({ upcomingMeetings, pastMeetings, schedules }),
-    [upcomingMeetings, pastMeetings, schedules],
-  );
-
-  const timelineCounts = useMemo(() => {
-    const bySchedule: Record<string, number> = {};
-    let total = 0;
-    let manual = 0;
-
-    for (const day of timelineDays) {
-      for (const item of day.items) {
-        total += 1;
-        if (item.source === "manual") {
-          manual += 1;
-        }
-        if (item.scheduleId) {
-          bySchedule[item.scheduleId] = (bySchedule[item.scheduleId] ?? 0) + 1;
-        }
-      }
-    }
-
-    return {
-      total,
-      manual,
-      bySchedule,
-    };
-  }, [timelineDays]);
-
-  const filteredTimelineDays = useMemo(
-    () => filterTimelineDays(timelineDays, timelineFilter),
-    [timelineDays, timelineFilter],
-  );
-
-  const selectedSchedule = useMemo(() => {
-    if (timelineFilter.type !== "schedule_id") {
-      return null;
-    }
-
-    return (
-      sortedSchedules.find((schedule) => schedule.id === timelineFilter.scheduleId) ?? null
+  // Filtered past meetings
+  const filteredPast = useMemo(() => {
+    if (!search.trim()) return pastMeetings;
+    const q = search.toLowerCase();
+    return pastMeetings.filter(
+      (m) =>
+        m.title?.toLowerCase().includes(q) ||
+        m.parsed_summary?.toLowerCase().includes(q)
     );
-  }, [timelineFilter, sortedSchedules]);
+  }, [pastMeetings, search]);
 
-  const filteredCount = useMemo(
-    () => filteredTimelineDays.reduce((total, day) => total + day.items.length, 0),
-    [filteredTimelineDays],
+  const totalPages = Math.max(1, Math.ceil(filteredPast.length / PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedPast = filteredPast.slice(
+    (currentPage - 1) * PER_PAGE,
+    currentPage * PER_PAGE
   );
-
-  useEffect(() => {
-    if (timelineFilter.type !== "schedule_id") {
-      return;
-    }
-
-    const exists = sortedSchedules.some(
-      (schedule) => schedule.id === timelineFilter.scheduleId,
-    );
-
-    if (!exists) {
-      setTimelineFilter({ type: "all" });
-    }
-  }, [timelineFilter, sortedSchedules]);
 
   // Handlers
   const handleCreateSchedule = useCallback(
@@ -176,20 +117,18 @@ export default function MeetingsPage() {
       refetchSchedules();
       refetchUpcoming();
     },
-    [refetchSchedules, refetchUpcoming, toastSuccess],
+    [refetchSchedules, refetchUpcoming, toastSuccess]
   );
 
   const handleUpdateSchedule = useCallback(
     async (data: MeetingScheduleCreateRequest) => {
-      if (!editSchedule) {
-        return;
-      }
+      if (!editSchedule) return;
       await api.updateMeetingSchedule(editSchedule.id, data);
       toastSuccess("Расписание обновлено");
       refetchSchedules();
       refetchUpcoming();
     },
-    [editSchedule, refetchSchedules, refetchUpcoming, toastSuccess],
+    [editSchedule, refetchSchedules, refetchUpcoming, toastSuccess]
   );
 
   const handleDeleteSchedule = useCallback(
@@ -204,7 +143,7 @@ export default function MeetingsPage() {
         setDeleteTarget(null);
       }
     },
-    [refetchSchedules, toastSuccess, toastError],
+    [refetchSchedules, toastSuccess, toastError]
   );
 
   const handleDeleteMeeting = useCallback(
@@ -218,115 +157,124 @@ export default function MeetingsPage() {
         toastError(e instanceof Error ? e.message : "Ошибка удаления");
       }
     },
-    [refetchUpcoming, refetchPast, toastSuccess, toastError],
-  );
-
-  const handleDeleteTimelineMeeting = useCallback(
-    async (item: TimelineMeetingItem) => {
-      await handleDeleteMeeting(item.meeting);
-    },
-    [handleDeleteMeeting],
+    [refetchUpcoming, refetchPast, toastSuccess, toastError]
   );
 
   const loading = schedulesLoading || upcomingLoading || pastLoading;
 
   if (loading) {
     return (
-      <div className="grid animate-in gap-6 fade-in duration-300 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]">
-        <div className="space-y-4">
-          <Skeleton className="h-64 rounded-2xl" />
-          <Skeleton className="h-80 rounded-2xl" />
+      <div className="space-y-8 animate-in fade-in duration-300">
+        {/* Schedule skeletons */}
+        <div className="space-y-3">
+          <Skeleton className="h-7 w-48 rounded-lg" />
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-2xl" />
+            ))}
+          </div>
         </div>
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-64 rounded-xl" />
-          {[...Array(3)].map((_, index) => (
-            <Skeleton key={index} className="h-56 rounded-2xl" />
-          ))}
+        {/* Meeting skeletons */}
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-72 rounded-lg" />
+          <div className="grid gap-4 md:grid-cols-2">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-44 rounded-2xl" />
+            ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  const emptyState = getTimelineEmptyState(timelineFilter, selectedSchedule?.title);
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="grid gap-6 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]">
-        <aside className="self-start space-y-4 lg:sticky lg:top-6">
-          <ScheduleTemplatesPanel
-            schedules={sortedSchedules}
-            selectedFilter={timelineFilter}
-            onFilterChange={setTimelineFilter}
-            totalCount={timelineCounts.total}
-            manualCount={timelineCounts.manual}
-            scheduleCounts={timelineCounts.bySchedule}
-          />
+    <div className="space-y-8 animate-in fade-in duration-300">
+      {/* ============================================
+          SECTION 1: Расписание встреч
+          ============================================ */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Calendar className="h-4.5 w-4.5 text-primary" />
+            </div>
+            <h2 className="font-heading font-semibold text-lg">Расписание встреч</h2>
+          </div>
+          {isModerator && (
+            <Button
+              size="sm"
+              className="rounded-xl gap-1.5"
+              onClick={() => {
+                setEditSchedule(null);
+                setShowScheduleForm(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Новое расписание
+            </Button>
+          )}
+        </div>
 
-          <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/60">
-            <header className="flex items-center justify-between border-b border-border/50 p-4">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
-                  <Calendar className="h-4.5 w-4.5 text-primary" />
-                </div>
-                <h2 className="text-sm font-heading font-semibold">Управление расписаниями</h2>
-              </div>
-
-              {isModerator && (
-                <Button
-                  size="sm"
-                  className="gap-1.5 rounded-xl"
-                  onClick={() => {
-                    setEditSchedule(null);
+        {activeSchedules.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border/60 bg-muted/20 p-8 text-center">
+            <Calendar className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Нет активных расписаний</p>
+            {isModerator && (
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Создайте расписание для автоматических напоминаний
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {activeSchedules.map((schedule, i) => (
+              <div
+                key={schedule.id}
+                className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+              >
+                <ScheduleCard
+                  schedule={schedule}
+                  members={members}
+                  isModerator={isModerator}
+                  onEdit={(s) => {
+                    setEditSchedule(s);
                     setShowScheduleForm(true);
                   }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Новое
-                </Button>
-              )}
-            </header>
+                  onDelete={setDeleteTarget}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-            <div className="space-y-3 p-4">
-              {sortedSchedules.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-5 text-center">
-                  <Calendar className="mx-auto mb-2 h-7 w-7 text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">Нет активных расписаний</p>
-                </div>
-              ) : (
-                sortedSchedules.map((schedule, index) => (
-                  <div
-                    key={schedule.id}
-                    className={`animate-fade-in-up stagger-${Math.min(index + 1, 6)}`}
-                  >
-                    <ScheduleCard
-                      schedule={schedule}
-                      members={members}
-                      isModerator={isModerator}
-                      onEdit={(target) => {
-                        setEditSchedule(target);
-                        setShowScheduleForm(true);
-                      }}
-                      onDelete={setDeleteTarget}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        </aside>
+      {/* ============================================
+          SECTION 2: Встречи (Предстоящие / Прошедшие)
+          ============================================ */}
+      <section>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <div className="flex items-center justify-between mb-4">
+            <TabsList className="rounded-xl">
+              <TabsTrigger value="upcoming" className="rounded-lg gap-1.5 text-sm">
+                <Video className="h-3.5 w-3.5" />
+                Предстоящие
+                {upcomingMeetings.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-2xs font-semibold">
+                    {upcomingMeetings.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="past" className="rounded-lg gap-1.5 text-sm">
+                Прошедшие
+              </TabsTrigger>
+            </TabsList>
 
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-heading font-semibold">Единый таймлайн встреч</h2>
-              <p className="text-xs text-muted-foreground">Показано {filteredCount} встреч</p>
-            </div>
-
-            {isModerator && (
+            {/* Create meeting button (upcoming tab, moderator) */}
+            {activeTab === "upcoming" && isModerator && (
               <Button
                 size="sm"
                 variant="outline"
-                className="w-full gap-1.5 rounded-xl sm:w-auto"
+                className="rounded-xl gap-1.5"
                 onClick={() => setShowCreateMeeting(true)}
               >
                 <CalendarPlus className="h-4 w-4" />
@@ -335,42 +283,124 @@ export default function MeetingsPage() {
             )}
           </div>
 
-          {filteredTimelineDays.length === 0 ? (
-            <EmptyState
-              variant="meetings"
-              title={emptyState.title}
-              description={emptyState.description}
-              actionLabel={
-                isModerator && emptyState.allowCreateMeeting ? "Создать встречу" : undefined
-              }
-              onAction={
-                isModerator && emptyState.allowCreateMeeting
-                  ? () => setShowCreateMeeting(true)
-                  : undefined
-              }
-            />
-          ) : (
-            <div className="space-y-4">
-              {filteredTimelineDays.map((day, index) => (
-                <div
-                  key={day.dayKey}
-                  className={`animate-fade-in-up stagger-${Math.min(index + 1, 6)}`}
-                >
-                  <TimelineDaySection
-                    day={day}
-                    onMeetingOpen={(item) => router.push(`/meetings/${item.id}`)}
-                    isModerator={isModerator}
-                    onDeleteMeeting={
-                      isModerator ? handleDeleteTimelineMeeting : undefined
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+          {/* Upcoming tab */}
+          <TabsContent value="upcoming" className="mt-0">
+            {upcomingMeetings.length === 0 ? (
+              <EmptyState
+                variant="meetings"
+                title="Нет предстоящих встреч"
+                description="Встречи создаются автоматически по расписанию или вручную"
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {upcomingMeetings.map((meeting, i) => (
+                  <div
+                    key={meeting.id}
+                    className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+                  >
+                    <MeetingCard meeting={meeting} variant="upcoming" isModerator={isModerator} onDelete={handleDeleteMeeting} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
+          {/* Past tab */}
+          <TabsContent value="past" className="mt-0 space-y-4">
+            {/* Search */}
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Поиск по встречам..."
+                className="pl-9 h-10 rounded-xl bg-card border-border/60"
+              />
+            </div>
+
+            {filteredPast.length === 0 ? (
+              <EmptyState
+                variant="meetings"
+                title={search ? "Ничего не найдено" : "Нет прошедших встреч"}
+                description={
+                  search
+                    ? "Попробуйте изменить поисковый запрос"
+                    : "Завершённые встречи будут отображаться здесь"
+                }
+              />
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {paginatedPast.map((meeting, i) => (
+                    <div
+                      key={meeting.id}
+                      className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+                    >
+                      <MeetingCard meeting={meeting} variant="past" isModerator={isModerator} onDelete={handleDeleteMeeting} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1 pt-2">
+                    <button
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (num) => (
+                        <button
+                          key={num}
+                          onClick={() => setPage(num)}
+                          className={`
+                            h-9 w-9 rounded-xl text-sm font-medium flex items-center justify-center
+                            ${
+                              num === currentPage
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            }
+                          `}
+                        >
+                          {num}
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-center text-xs text-muted-foreground/60">
+                  {filteredPast.length}{" "}
+                  {filteredPast.length === 1
+                    ? "встреча"
+                    : filteredPast.length < 5
+                      ? "встречи"
+                      : "встреч"}
+                </p>
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </section>
+
+      {/* ============================================
+          DIALOGS
+          ============================================ */}
+
+      {/* Schedule create/edit form */}
       {showScheduleForm && (
         <ScheduleForm
           schedule={editSchedule}
@@ -385,6 +415,7 @@ export default function MeetingsPage() {
         />
       )}
 
+      {/* Delete schedule confirmation */}
       <ConfirmDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
@@ -393,88 +424,18 @@ export default function MeetingsPage() {
         onConfirm={() => deleteTarget && handleDeleteSchedule(deleteTarget)}
       />
 
+      {/* Create meeting manually */}
       {showCreateMeeting && (
         <CreateMeetingDialog
           onClose={() => setShowCreateMeeting(false)}
           onCreated={() => {
             refetchUpcoming();
-            refetchPast();
             setShowCreateMeeting(false);
           }}
         />
       )}
     </div>
   );
-}
-
-type TimelineEmptyState = {
-  title: string;
-  description: string;
-  allowCreateMeeting: boolean;
-};
-
-function filterTimelineDays(
-  days: TimelineDayGroup[],
-  filter: ScheduleTemplatesFilter,
-): TimelineDayGroup[] {
-  return days
-    .map((day) => {
-      const items = day.items.filter((item) => matchesTimelineFilter(item, filter));
-      return {
-        ...day,
-        items,
-      };
-    })
-    .filter((day) => day.items.length > 0);
-}
-
-function matchesTimelineFilter(
-  item: TimelineMeetingItem,
-  filter: ScheduleTemplatesFilter,
-): boolean {
-  if (filter.type === "all") {
-    return true;
-  }
-
-  if (filter.type === "manual_only") {
-    return item.source === "manual";
-  }
-
-  return item.scheduleId === filter.scheduleId;
-}
-
-function getTimelineEmptyState(
-  filter: ScheduleTemplatesFilter,
-  scheduleTitle?: string,
-): TimelineEmptyState {
-  if (filter.type === "manual_only") {
-    return {
-      title: "Нет встреч, созданных вручную",
-      description:
-        "Создайте ручную встречу, чтобы она появилась в единой ленте рядом со встречами из расписания.",
-      allowCreateMeeting: true,
-    };
-  }
-
-  if (filter.type === "schedule_id") {
-    const title = scheduleTitle
-      ? `По шаблону «${scheduleTitle}» пока нет встреч`
-      : "По выбранному шаблону пока нет встреч";
-
-    return {
-      title,
-      description:
-        "Встречи появятся после следующего запуска расписания или после ручного создания связанной встречи.",
-      allowCreateMeeting: false,
-    };
-  }
-
-  return {
-    title: "Лента встреч пока пуста",
-    description:
-      "Создайте встречу вручную или добавьте расписание, чтобы заполнить единый таймлайн.",
-    allowCreateMeeting: true,
-  };
 }
 
 // ============================================

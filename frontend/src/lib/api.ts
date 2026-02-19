@@ -304,13 +304,8 @@ class ApiClient {
 
   // ==================== Meeting Schedules ====================
 
-  async getMeetingSchedules(options?: { includeInactive?: boolean }): Promise<MeetingSchedule[]> {
-    const params = new URLSearchParams();
-    if (options?.includeInactive) {
-      params.set("include_inactive", "true");
-    }
-    const query = params.toString() ? `?${params.toString()}` : "";
-    return this.request<MeetingSchedule[]>(`/api/meeting-schedules${query}`);
+  async getMeetingSchedules(): Promise<MeetingSchedule[]> {
+    return this.request<MeetingSchedule[]>("/api/meeting-schedules");
   }
 
   async createMeetingSchedule(data: MeetingScheduleCreateRequest): Promise<MeetingSchedule> {
