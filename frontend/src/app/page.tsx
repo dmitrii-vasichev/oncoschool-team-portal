@@ -6,7 +6,6 @@ import {
   Zap,
   CheckCircle2,
   AlertTriangle,
-  CalendarDays,
   ArrowRight,
   Mic,
   FileText,
@@ -15,6 +14,7 @@ import {
   AlertOctagon,
   Video,
   ExternalLink,
+  CalendarDays,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -87,106 +87,25 @@ function firstAndLastName(fullName: string): string {
   return `${parts[0]} ${parts[1]}`;
 }
 
-function getGreetingMessage(activeTasks: number, overdue: number): string {
-  if (overdue > 0) {
-    return `${overdue} ${overdue === 1 ? "просроченная задача" : overdue < 5 ? "просроченные задачи" : "просроченных задач"} — пора разобраться`;
-  }
-  if (activeTasks === 0) {
-    return "Все задачи выполнены. Отличная работа!";
-  }
-  const messages = [
-    `У тебя ${activeTasks} ${activeTasks === 1 ? "задача" : activeTasks < 5 ? "задачи" : "задач"} в работе`,
-    `${activeTasks} ${activeTasks === 1 ? "активная задача" : activeTasks < 5 ? "активные задачи" : "активных задач"} — отличный день для прогресса`,
-    `Впереди ${activeTasks} ${activeTasks === 1 ? "задача" : activeTasks < 5 ? "задачи" : "задач"}. Ты справишься!`,
-  ];
-  return messages[new Date().getDate() % messages.length];
-}
-
-// ────────────────────────────────────────────
-// Metric Card
-// ────────────────────────────────────────────
-
-interface MetricCardProps {
-  label: string;
-  value: number;
-  subtitle: string;
-  icon: React.ElementType;
-  accentColor: string;
-  isPulsing?: boolean;
-  staggerClass: string;
-}
-
-function MetricCard({
-  label,
-  value,
-  subtitle,
-  icon: Icon,
-  accentColor,
-  isPulsing,
-  staggerClass,
-}: MetricCardProps) {
-  return (
-    <div
-      className={`animate-fade-in-up ${staggerClass} group relative overflow-hidden rounded-2xl border border-border/60 bg-card p-5 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/5`}
-    >
-      {/* Top accent bar */}
-      <div
-        className="absolute inset-x-0 top-0 h-1 opacity-80 group-hover:opacity-100"
-        style={{ backgroundColor: accentColor }}
-      />
-
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          <div className="flex items-baseline gap-2">
-            <span className="animate-count-up text-3xl font-bold font-heading tracking-tight">
-              {value}
-            </span>
-            {isPulsing && value > 0 && (
-              <span className="animate-pulse-glow inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        </div>
-
-        <div
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl opacity-70 group-hover:opacity-100"
-          style={{ backgroundColor: `${accentColor}18` }}
-        >
-          <Icon className="h-5 w-5" style={{ color: accentColor }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ────────────────────────────────────────────
 // Skeleton loading
 // ────────────────────────────────────────────
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
-      {/* Greeting skeleton */}
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
-      </div>
-
-      {/* Metric cards skeleton */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-9 w-16" />
-            <Skeleton className="h-3 w-32" />
-          </div>
-        ))}
+    <div className="space-y-6">
+      {/* Compact header skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-9 w-[240px]" />
       </div>
 
       {/* Two-column skeleton */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
+        <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
           <div className="flex items-center justify-between">
             <Skeleton className="h-5 w-28" />
             <Skeleton className="h-8 w-24" />
@@ -195,18 +114,18 @@ function DashboardSkeleton() {
             <Skeleton key={i} className="h-16 rounded-lg" />
           ))}
         </div>
-        <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
+        <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-3">
           <Skeleton className="h-5 w-36" />
           <Skeleton className="h-24 rounded-lg" />
         </div>
       </div>
 
       {/* Meetings skeleton */}
-      <div className="rounded-2xl border border-border/60 bg-card p-6">
+      <div className="rounded-2xl border border-border/60 bg-card p-5">
         <Skeleton className="mb-4 h-5 w-40" />
         <div className="grid gap-4 md:grid-cols-3">
           {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
       </div>
@@ -321,8 +240,14 @@ function TaskListItem({
 }
 
 // ────────────────────────────────────────────
-// Section header
+// Section header with inline badges
 // ────────────────────────────────────────────
+
+interface BadgeInfo {
+  label: string;
+  value: number;
+  color?: "default" | "green" | "red" | "blue";
+}
 
 function SectionHeader({
   title,
@@ -331,6 +256,7 @@ function SectionHeader({
   linkHref,
   linkLabel,
   count,
+  badges,
 }: {
   title: string;
   icon?: React.ElementType;
@@ -338,10 +264,18 @@ function SectionHeader({
   linkHref?: string;
   linkLabel?: string;
   count?: number;
+  badges?: BadgeInfo[];
 }) {
+  const badgeColors = {
+    default: "bg-muted text-muted-foreground",
+    green: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    red: "bg-destructive/10 text-destructive",
+    blue: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  };
+
   return (
     <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {Icon && (
           <Icon
             className="h-[18px] w-[18px]"
@@ -349,16 +283,28 @@ function SectionHeader({
           />
         )}
         <h2 className="text-base font-semibold font-heading">{title}</h2>
-        {count !== undefined && count > 0 && (
+        {count !== undefined && count > 0 && !badges && (
           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground">
             {count}
           </span>
+        )}
+        {badges && badges.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            {badges.map((badge, i) => (
+              <span
+                key={i}
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeColors[badge.color || "default"]}`}
+              >
+                {badge.value} {badge.label}
+              </span>
+            ))}
+          </div>
         )}
       </div>
       {linkHref && (
         <Link
           href={linkHref}
-          className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors shrink-0"
         >
           {linkLabel || "Смотреть все"}
           <ArrowRight className="h-3.5 w-3.5" />
@@ -400,7 +346,7 @@ function UpcomingMeetingCard({
 
   return (
     <div
-      className={`animate-fade-in-up ${staggerClass} group rounded-2xl border border-border/60 bg-card p-5 transition-shadow duration-200 hover:shadow-md hover:shadow-primary/5`}
+      className={`animate-fade-in-up ${staggerClass} group rounded-2xl border border-border/60 bg-card p-4 transition-shadow duration-200 hover:shadow-md hover:shadow-primary/5`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -415,7 +361,7 @@ function UpcomingMeetingCard({
             {dateStr} · {timeStr}
           </p>
         </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
           <Video className="h-4 w-4" />
         </div>
       </div>
@@ -424,62 +370,13 @@ function UpcomingMeetingCard({
           href={meeting.zoom_join_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
         >
           <ExternalLink className="h-3 w-3" />
           Подключиться к Zoom
         </a>
       )}
     </div>
-  );
-}
-
-// ────────────────────────────────────────────
-// Meeting card (past)
-// ────────────────────────────────────────────
-
-function MeetingCard({
-  meeting,
-  staggerClass,
-}: {
-  meeting: Meeting;
-  staggerClass: string;
-}) {
-  const meetingDate = meeting.meeting_date
-    ? parseUTCDate(meeting.meeting_date).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-      })
-    : parseUTCDate(meeting.created_at).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-      });
-
-  return (
-    <Link
-      href={`/meetings/${meeting.id}`}
-      className={`animate-fade-in-up ${staggerClass} group block rounded-2xl border border-border/60 bg-card p-5 transition-shadow duration-200 hover:shadow-md hover:shadow-primary/5`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
-            {meeting.title || "Встреча без названия"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-            <CalendarDays className="h-3 w-3 shrink-0" />
-            {meetingDate}
-          </p>
-          {meeting.decisions && meeting.decisions.length > 0 && (
-            <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-              {meeting.decisions[0]}
-            </p>
-          )}
-        </div>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <FileText className="h-4 w-4" />
-        </div>
-      </div>
-    </Link>
   );
 }
 
@@ -506,7 +403,6 @@ export default function DashboardPage() {
   );
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [taskScope, setTaskScope] = useState<"my" | "department">("my");
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
   const [staleTasks, setStaleTasks] = useState<Task[]>([]);
@@ -612,7 +508,6 @@ export default function DashboardPage() {
                 .catch(catchLog("getDepartmentTasks"))
             : Promise.resolve(emptyTasksPage),
           api.getMeetings({ upcoming: true }).catch(catchLog("getUpcomingMeetings")),
-          api.getMeetings({ past: true }).catch(catchLog("getPastMeetings")),
           api.getTeam().catch(catchLog("getTeam")),
           isModerator
             ? api
@@ -641,10 +536,9 @@ export default function DashboardPage() {
         const myTasksData = results[2] as { items: Task[] } | null;
         const departmentTasksData = results[3] as { items: Task[] } | null;
         const upcomingData = results[4] as Meeting[] | null;
-        const pastData = results[5] as Meeting[] | null;
-        const teamData = results[6] as TeamMember[] | null;
-        const unassignedData = results[7] as { items: Task[] } | null;
-        const staleData = results[8] as { items: Task[] } | null;
+        const teamData = results[5] as TeamMember[] | null;
+        const unassignedData = results[6] as { items: Task[] } | null;
+        const staleData = results[7] as { items: Task[] } | null;
 
         const hasError = results.some((r) => r === null);
 
@@ -672,9 +566,6 @@ export default function DashboardPage() {
 
         // Upcoming meetings (top 3)
         setUpcomingMeetings(upcomingData ? upcomingData.slice(0, 3) : []);
-
-        // Recent past meetings (top 3)
-        setMeetings(pastData ? pastData.slice(0, 3) : []);
 
         // Moderator data
         if (isModerator) {
@@ -725,8 +616,8 @@ export default function DashboardPage() {
   const taskListTitle = currentScope === "department" ? "Задачи отдела" : "Мои задачи";
   const overdueListTitle =
     currentScope === "department"
-      ? "Просроченные задачи отдела"
-      : "Мои просроченные задачи";
+      ? "Просроченные отдела"
+      : "Просроченные";
   const emptyTaskTitle =
     currentScope === "department"
       ? "В отделе нет активных задач"
@@ -736,37 +627,76 @@ export default function DashboardPage() {
       ? "По выбранному отделу сейчас нет активных задач."
       : "Все задачи выполнены — отличная работа!";
 
-  const departmentSubtitle = (value: number): string =>
-    selectedDepartment ? `Всего в отделе: ${value}` : "Отдел не выбран";
+  // Build badges for tasks section
+  const taskBadges: BadgeInfo[] = [];
+  if (currentScope === "my") {
+    taskBadges.push({ label: "активных", value: activeTasks, color: "default" });
+    if (completedThisWeek > 0) {
+      taskBadges.push({ label: "за неделю", value: completedThisWeek, color: "green" });
+    }
+  } else {
+    taskBadges.push({ label: "активных", value: departmentMetrics?.active ?? 0, color: "default" });
+    if ((departmentMetrics?.done_total ?? 0) > 0) {
+      taskBadges.push({ label: "выполнено", value: departmentMetrics?.done_total ?? 0, color: "green" });
+    }
+  }
+
+  const overdueBadges: BadgeInfo[] = [];
+  if (scopedOverdueTasks.length > 0) {
+    overdueBadges.push({ label: "просрочено", value: scopedOverdueTasks.length, color: "red" });
+  }
+
+  const meetingBadges: BadgeInfo[] = [];
+  if ((meetingAnalytics?.meetings_this_month ?? 0) > 0) {
+    meetingBadges.push({ label: "в этом месяце", value: meetingAnalytics?.meetings_this_month ?? 0, color: "blue" });
+  }
 
   const todayStr = formatFullDate(new Date());
-  const greeting = getGreetingMessage(activeTasks, overdueCount);
 
-  // Accent colors mapped to design system
-  const ACCENT_PRIMARY = "hsl(174, 62%, 26%)";
-  const ACCENT_DONE = "hsl(152, 55%, 28%)";
   const ACCENT_DESTRUCTIVE = "hsl(0, 72%, 51%)";
   const ACCENT_BLUE = "hsl(200, 65%, 48%)";
 
   return (
-    <div className="space-y-8">
-      {/* ═══════════ Greeting ═══════════ */}
+    <div className="space-y-6">
+      {/* ═══════════ Compact Header ═══════════ */}
       <section className="animate-fade-in-up stagger-1">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold font-heading tracking-tight md:text-3xl">
-              Привет, {firstName(user.full_name)}!
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-lg font-bold font-heading tracking-tight whitespace-nowrap">
+              {firstName(user.full_name)}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              <span className="capitalize">{todayStr}</span>
-              <span className="mx-2 text-border">|</span>
-              {greeting}
-            </p>
+            <span className="text-sm text-muted-foreground capitalize hidden sm:inline">
+              {todayStr}
+            </span>
           </div>
 
-          {canSwitchDepartment && (
-            <div className="w-full md:w-[280px]">
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Отдел</p>
+          <div className="flex items-center gap-3">
+            {canUseDepartmentView && (
+              <div className="inline-flex rounded-lg border border-border/60 bg-card p-0.5">
+                <button
+                  onClick={() => setTaskScope("my")}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    currentScope === "my"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Мои
+                </button>
+                <button
+                  onClick={() => setTaskScope("department")}
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                    currentScope === "department"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Отдел
+                </button>
+              </div>
+            )}
+
+            {canSwitchDepartment && (
               <Select
                 value={
                   selectedDepartmentId ||
@@ -779,8 +709,8 @@ export default function DashboardPage() {
                   setSelectedDepartmentId(value);
                 }}
               >
-                <SelectTrigger className="h-10 border-border/60 bg-card shadow-sm">
-                  <SelectValue placeholder="Выберите отдел" />
+                <SelectTrigger className="h-8 w-[200px] border-border/60 bg-card shadow-sm text-sm">
+                  <SelectValue placeholder="Отдел" />
                 </SelectTrigger>
                 <SelectContent>
                   {accessibleDepartments.length === 0 ? (
@@ -796,85 +726,22 @@ export default function DashboardPage() {
                   )}
                 </SelectContent>
               </Select>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </section>
 
-      {/* ═══════════ Metric Cards ═══════════ */}
-      <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard
-          label="Активных задач"
-          value={activeTasks}
-          subtitle={departmentSubtitle(departmentMetrics?.active ?? 0)}
-          icon={Zap}
-          accentColor={ACCENT_PRIMARY}
-          staggerClass="stagger-2"
-        />
-        <MetricCard
-          label="Выполнено за неделю"
-          value={completedThisWeek}
-          subtitle={departmentSubtitle(departmentMetrics?.done_total ?? 0)}
-          icon={CheckCircle2}
-          accentColor={ACCENT_DONE}
-          staggerClass="stagger-3"
-        />
-        <MetricCard
-          label="Просроченных"
-          value={overdueCount}
-          subtitle={departmentSubtitle(departmentMetrics?.overdue ?? 0)}
-          icon={AlertTriangle}
-          accentColor={ACCENT_DESTRUCTIVE}
-          isPulsing
-          staggerClass="stagger-4"
-        />
-        <MetricCard
-          label="Встреч за месяц"
-          value={meetingAnalytics?.meetings_this_month ?? 0}
-          subtitle={`Всего встреч: ${meetingAnalytics?.total_meetings ?? 0}`}
-          icon={CalendarDays}
-          accentColor={ACCENT_BLUE}
-          staggerClass="stagger-5"
-        />
-      </section>
-
       {/* ═══════════ Task Blocks ═══════════ */}
-      <section className="animate-fade-in-up stagger-6 space-y-4">
-        {canUseDepartmentView && (
-          <div className="flex justify-end">
-            <div className="inline-flex rounded-lg border border-border/60 bg-card p-1">
-              <button
-                onClick={() => setTaskScope("my")}
-                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                  currentScope === "my"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Мои
-              </button>
-              <button
-                onClick={() => setTaskScope("department")}
-                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                  currentScope === "department"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Отдел
-              </button>
-            </div>
-          </div>
-        )}
-
+      <section className="animate-fade-in-up stagger-2">
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Scope Tasks */}
-          <div className="rounded-2xl border border-border/60 bg-card p-6">
+          {/* Active Tasks */}
+          <div className="rounded-2xl border border-border/60 bg-card p-5">
             <SectionHeader
               title={taskListTitle}
-              count={scopedTasks.length}
+              icon={Zap}
+              badges={taskBadges}
               linkHref="/tasks"
-              linkLabel="Смотреть все"
+              linkLabel="Все задачи"
             />
 
             {scopedTasks.length === 0 ? (
@@ -898,9 +765,9 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Scope Overdue Tasks */}
+          {/* Overdue Tasks */}
           <div
-            className={`rounded-2xl border p-6 ${
+            className={`rounded-2xl border p-5 ${
               scopedOverdueTasks.length > 0
                 ? "border-destructive/20 bg-destructive/[0.02]"
                 : "border-border/60 bg-card"
@@ -910,7 +777,7 @@ export default function DashboardPage() {
               title={overdueListTitle}
               icon={AlertTriangle}
               iconColor={ACCENT_DESTRUCTIVE}
-              count={scopedOverdueTasks.length}
+              badges={overdueBadges}
             />
 
             {scopedOverdueTasks.length === 0 ? (
@@ -943,8 +810,8 @@ export default function DashboardPage() {
 
       {/* ═══════════ Moderator: Stale Tasks ═══════════ */}
       {isModerator && staleTasks.length > 0 && (
-        <section className="animate-fade-in-up stagger-8">
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-6">
+        <section className="animate-fade-in-up stagger-3">
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.02] p-5">
             <SectionHeader
               title="Не обновлялись >3 дней"
               icon={AlertOctagon}
@@ -964,45 +831,22 @@ export default function DashboardPage() {
 
       {/* ═══════════ Upcoming Meetings ═══════════ */}
       {upcomingMeetings.length > 0 && (
-        <section className="animate-fade-in-up stagger-7">
-          <div className="rounded-2xl border border-border/60 bg-card p-6">
+        <section className="animate-fade-in-up stagger-4">
+          <div className="rounded-2xl border border-border/60 bg-card p-5">
             <SectionHeader
               title="Предстоящие встречи"
               icon={Video}
               iconColor={ACCENT_BLUE}
               linkHref="/meetings"
               linkLabel="Все встречи"
-              count={upcomingMeetings.length}
+              badges={meetingBadges}
             />
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               {upcomingMeetings.map((meeting, i) => (
                 <UpcomingMeetingCard
                   key={meeting.id}
                   meeting={meeting}
-                  staggerClass={`stagger-${i + 7}`}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ═══════════ Recent Past Meetings ═══════════ */}
-      {meetings.length > 0 && (
-        <section className="animate-fade-in-up stagger-7">
-          <div className="rounded-2xl border border-border/60 bg-card p-6">
-            <SectionHeader
-              title="Последние встречи"
-              icon={CalendarDays}
-              linkHref="/meetings"
-              linkLabel="Все встречи"
-            />
-            <div className="grid gap-4 md:grid-cols-3">
-              {meetings.map((meeting, i) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  staggerClass={`stagger-${i + 7}`}
+                  staggerClass={`stagger-${i + 4}`}
                 />
               ))}
             </div>
@@ -1012,7 +856,7 @@ export default function DashboardPage() {
 
       {/* ═══════════ Upcoming Birthdays ═══════════ */}
       {teamMembers.length > 0 && (
-        <section className="animate-fade-in-up stagger-8">
+        <section className="animate-fade-in-up stagger-5">
           <UpcomingBirthdays
             members={teamMembers}
             className=""
@@ -1022,8 +866,8 @@ export default function DashboardPage() {
 
       {/* ═══════════ Moderator: Unassigned ═══════════ */}
       {isModerator && unassignedTasks.length > 0 && (
-        <section className="animate-fade-in-up stagger-8">
-          <div className="rounded-2xl border border-dashed border-muted-foreground/20 bg-card p-6">
+        <section className="animate-fade-in-up stagger-6">
+          <div className="rounded-2xl border border-dashed border-muted-foreground/20 bg-card p-5">
             <SectionHeader
               title="Ожидают назначения"
               icon={UserX}
