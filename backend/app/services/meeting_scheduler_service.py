@@ -105,7 +105,9 @@ class MeetingSchedulerService:
             if week_number % 2 != 0:
                 return False
         elif schedule.recurrence == "monthly_last_workday":
-            if not self._is_last_workday_friday(meeting_dt_local):
+            if not self._is_last_selected_weekday_of_month(
+                meeting_dt_local, schedule.day_of_week
+            ):
                 return False
 
         # 4. Time: trigger at (effective_time - reminder_minutes_before) with catch-up
@@ -145,12 +147,12 @@ class MeetingSchedulerService:
         return time(h, m)
 
     @staticmethod
-    def _is_last_workday_friday(dt: datetime) -> bool:
-        """Check: current day is Friday and it's the last Friday of the month."""
-        if dt.weekday() != 4:  # 4 = Friday
+    def _is_last_selected_weekday_of_month(dt: datetime, day_of_week: int) -> bool:
+        """Check: current day is selected weekday and it's the last one in this month."""
+        if dt.isoweekday() != day_of_week:
             return False
-        next_friday = dt + timedelta(days=7)
-        return next_friday.month != dt.month
+        next_same_weekday = dt + timedelta(days=7)
+        return next_same_weekday.month != dt.month
 
     async def _trigger_meeting(
         self,

@@ -27,6 +27,29 @@ member_repo = TeamMemberRepository()
 VALID_RECURRENCES = {"weekly", "biweekly", "monthly_last_workday"}
 
 
+def _is_last_selected_weekday_in_month(dt_local: datetime, day_of_week: int) -> bool:
+    """Check that local date is the last selected weekday in its month."""
+    if dt_local.isoweekday() != day_of_week:
+        return False
+    next_same_weekday = dt_local + timedelta(days=7)
+    return next_same_weekday.month != dt_local.month
+
+
+def _matches_recurrence(candidate_local: datetime, day_of_week: int, recurrence: str) -> bool:
+    """Validate candidate local datetime against weekly/biweekly/monthly rules."""
+    if candidate_local.isoweekday() != day_of_week:
+        return False
+
+    if recurrence == "biweekly":
+        week_number = candidate_local.isocalendar()[1]
+        return week_number % 2 == 0
+
+    if recurrence == "monthly_last_workday":
+        return _is_last_selected_weekday_in_month(candidate_local, day_of_week)
+
+    return True
+
+
 def _local_to_utc(time_local: str, timezone: str) -> time:
     """Convert local time string like '15:00' to UTC time."""
     local_time = time.fromisoformat(time_local)
@@ -37,23 +60,28 @@ def _local_to_utc(time_local: str, timezone: str) -> time:
 
 
 def _calc_next_meeting_datetime(
-    day_of_week: int, time_utc: time, timezone_str: str
+    day_of_week: int,
+    time_utc: time,
+    timezone_str: str,
+    recurrence: str,
 ) -> datetime | None:
     """Calculate the next meeting datetime (naive UTC) for a given schedule.
 
-    Iterates 0-7 days ahead, finds the first date where:
-    - the meeting time converted to local timezone matches day_of_week
+    Iterates up to ~2 months ahead and finds the first datetime where:
     - the meeting time is in the future
+    - local date matches recurrence/day_of_week rules
     """
     now_utc = datetime.now(ZoneInfo("UTC"))
     tz = ZoneInfo(timezone_str)
 
-    for days_ahead in range(8):
+    for days_ahead in range(60):
         candidate_date = now_utc.date() + timedelta(days=days_ahead)
         candidate_dt = datetime.combine(candidate_date, time_utc, tzinfo=ZoneInfo("UTC"))
         candidate_local = candidate_dt.astimezone(tz)
 
-        if candidate_local.isoweekday() == day_of_week and candidate_dt > now_utc:
+        if candidate_dt > now_utc and _matches_recurrence(
+            candidate_local, day_of_week, recurrence
+        ):
             return candidate_dt.replace(tzinfo=None)  # Return naive UTC
 
     return None
@@ -82,21 +110,9 @@ def _calc_next_occurrence_date(schedule: MeetingSchedule) -> date | None:
         if schedule.last_triggered_date and candidate_date <= schedule.last_triggered_date:
             continue
 
-        # Day of week match (in local timezone)
-        if candidate_local.isoweekday() != schedule.day_of_week:
+        # Day of week + recurrence check (in local timezone)
+        if not _matches_recurrence(candidate_local, schedule.day_of_week, schedule.recurrence):
             continue
-
-        # Recurrence check
-        if schedule.recurrence == "biweekly":
-            week_number = candidate_local.isocalendar()[1]
-            if week_number % 2 != 0:
-                continue
-        elif schedule.recurrence == "monthly_last_workday":
-            if candidate_local.weekday() != 4:  # Friday
-                continue
-            next_friday = candidate_local + timedelta(days=7)
-            if next_friday.month == candidate_local.month:
-                continue
 
         return candidate_date
 
@@ -190,7 +206,7 @@ async def create_schedule(
 
     # Create the first upcoming meeting immediately so it appears in the UI
     next_meeting_date = _calc_next_meeting_datetime(
-        data.day_of_week, time_utc, data.timezone
+        data.day_of_week, time_utc, data.timezone, data.recurrence
     )
     if next_meeting_date:
         zoom_data = None
