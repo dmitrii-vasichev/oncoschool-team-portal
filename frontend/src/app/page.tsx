@@ -37,7 +37,6 @@ import { api } from "@/lib/api";
 import { UpcomingBirthdays } from "./team/components/UpcomingBirthdays";
 import type {
   DashboardTasksAnalytics,
-  MeetingAnalytics,
   Task,
   Meeting,
   TeamMember,
@@ -393,8 +392,6 @@ export default function DashboardPage() {
   // Data
   const [dashboardTasksAnalytics, setDashboardTasksAnalytics] =
     useState<DashboardTasksAnalytics | null>(null);
-  const [meetingAnalytics, setMeetingAnalytics] =
-    useState<MeetingAnalytics | null>(null);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [myOverdueTasks, setMyOverdueTasks] = useState<Task[]>([]);
   const [departmentTasks, setDepartmentTasks] = useState<Task[]>([]);
@@ -488,7 +485,6 @@ export default function DashboardPage() {
           api
             .getDashboardTasksAnalytics(selectedDepartmentParam)
             .catch(catchLog("getDashboardTasksAnalytics")),
-          api.getMeetingsAnalytics().catch(catchLog("getMeetingsAnalytics")),
           api
             .getTasks({
               assignee_id: userId,
@@ -538,19 +534,17 @@ export default function DashboardPage() {
         if (cancelled) return;
 
         const dashboardData = results[0] as DashboardTasksAnalytics | null;
-        const meetingData = results[1] as MeetingAnalytics | null;
-        const myTasksData = results[2] as { items: Task[] } | null;
-        const departmentTasksData = results[3] as { items: Task[] } | null;
-        const myMeetingsData = results[4] as Meeting[] | null;
-        const deptMeetingsData = results[5] as Meeting[] | null;
-        const teamData = results[6] as TeamMember[] | null;
-        const unassignedData = results[7] as { items: Task[] } | null;
-        const staleData = results[8] as { items: Task[] } | null;
+        const myTasksData = results[1] as { items: Task[] } | null;
+        const departmentTasksData = results[2] as { items: Task[] } | null;
+        const myMeetingsData = results[3] as Meeting[] | null;
+        const deptMeetingsData = results[4] as Meeting[] | null;
+        const teamData = results[5] as TeamMember[] | null;
+        const unassignedData = results[6] as { items: Task[] } | null;
+        const staleData = results[7] as { items: Task[] } | null;
 
         const hasError = results.some((r) => r === null);
 
         setDashboardTasksAnalytics(dashboardData);
-        setMeetingAnalytics(meetingData);
         setTeamMembers(teamData ?? []);
 
         // My tasks — first 5 for display
