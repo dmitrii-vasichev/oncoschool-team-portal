@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
 import { Plus, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +20,6 @@ import type { Task, TaskStatus, TeamMember } from "@/lib/types";
 import { TASK_STATUS_LABELS } from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { parseLocalDate } from "@/lib/dateUtils";
 
 const COLUMNS: TaskStatus[] = ["new", "in_progress", "review", "done"];
 
@@ -39,17 +37,7 @@ const COLUMN_BG: Record<string, string> = {
   done: "bg-status-done-bg/50",
 };
 
-function isTaskOverdue(task: Task): boolean {
-  if (!task.deadline || task.status === "done" || task.status === "cancelled") {
-    return false;
-  }
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  return parseLocalDate(task.deadline) < todayStart;
-}
-
 export default function TasksPage() {
-  const searchParams = useSearchParams();
   const { user } = useCurrentUser();
   const { departments } = useDepartments();
   const { toastError } = useToast();
@@ -57,12 +45,9 @@ export default function TasksPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<TaskFilterValues>(EMPTY_FILTERS);
-  const [overdueOnly, setOverdueOnly] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<TaskStatus>("new");
-  const defaultScopeKeyRef = useRef<string | null>(null);
-  const preset = searchParams.get("preset");
-  const requestedDepartmentId = searchParams.get("department_id") || "";
+  const defaultScopeUserIdRef = useRef<string | null>(null);
   const userId = user?.id || "";
   const userDepartmentId = user?.department_id || "";
   const userRole = user?.role || "";
@@ -126,44 +111,18 @@ export default function TasksPage() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const scopeKey = `${user.id}:${preset || "default"}:${requestedDepartmentId}`;
-    if (defaultScopeKeyRef.current === scopeKey) return;
-
-    if (preset === "backlog") {
-      setFilters({
-        ...EMPTY_FILTERS,
-        department_id: requestedDepartmentId,
-      });
-      setOverdueOnly(false);
-    } else if (preset === "overdue") {
-      setFilters({
-        ...EMPTY_FILTERS,
-        department_id: requestedDepartmentId,
-        assignee_id: user.id,
-      });
-      setOverdueOnly(true);
-    } else if (preset === "kanban") {
-      setFilters({
-        ...EMPTY_FILTERS,
-        department_id: requestedDepartmentId,
-        assignee_id: user.id,
-      });
-      setOverdueOnly(false);
-    } else {
-      setFilters(
-        user.department_id
-          ? { ...EMPTY_FILTERS, department_id: user.department_id }
-          : { ...EMPTY_FILTERS, assignee_id: user.id }
-      );
-      setOverdueOnly(false);
-    }
-
-    defaultScopeKeyRef.current = scopeKey;
-  }, [preset, requestedDepartmentId, user?.department_id, user?.id]);
+    if (defaultScopeUserIdRef.current === user.id) return;
+    setFilters(
+      user.department_id
+        ? { ...EMPTY_FILTERS, department_id: user.department_id }
+        : { ...EMPTY_FILTERS, assignee_id: user.id }
+    );
+    defaultScopeUserIdRef.current = user.id;
+  }, [user?.department_id, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
-    if (!defaultScopeKeyRef.current?.startsWith(`${user.id}:`)) return;
+    if (defaultScopeUserIdRef.current !== user.id) return;
     fetchData();
   }, [fetchData, user?.id]);
 
@@ -192,10 +151,9 @@ export default function TasksPage() {
           return false;
         }
       }
-      if (overdueOnly && !isTaskOverdue(t)) return false;
       return true;
     });
-  }, [tasks, filters, overdueOnly]);
+  }, [tasks, filters]);
 
   const tasksByStatus = useMemo(() => {
     return COLUMNS.reduce(
@@ -340,23 +298,6 @@ export default function TasksPage() {
           </span>
         </div>
       </div>
-
-      {overdueOnly && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-destructive/25 bg-destructive/[0.04] px-3 py-2">
-          <p className="text-sm text-foreground">
-            <span className="font-semibold text-destructive">Режим просрочек:</span>{" "}
-            показаны только задачи с просроченным дедлайном.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOverdueOnly(false)}
-            className="h-8 border-destructive/25 text-destructive hover:bg-destructive/10 hover:text-destructive"
-          >
-            Показать все
-          </Button>
-        </div>
-      )}
 
       {/* Mobile tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1 lg:hidden" data-no-transition>

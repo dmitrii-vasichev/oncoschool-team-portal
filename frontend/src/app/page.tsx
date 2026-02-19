@@ -754,16 +754,25 @@ export default function DashboardPage() {
   const hasOverdueTasks = overdueCount > 0;
   const overdueSummary = `${overdueCount} ${pluralizeRu(overdueCount, "просроченная задача", "просроченные задачи", "просроченных задач")}`;
   const activeSummary = `${activeTasks} ${pluralizeRu(activeTasks, "задача", "задачи", "задач")} в работе`;
-  const buildTasksHref = (preset: "kanban" | "backlog" | "overdue"): string => {
-    const params = new URLSearchParams({ preset });
-    if (selectedDepartmentId) {
-      params.set("department_id", selectedDepartmentId);
+
+  const handleFocusOverdue = () => {
+    if (canUseDepartmentView && taskScope !== "my") {
+      setTaskScope("my");
     }
-    return `/tasks?${params.toString()}`;
+
+    const scroll = () => {
+      document
+        .getElementById("dashboard-overdue-tasks")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
+      window.requestAnimationFrame(scroll);
+      return;
+    }
+
+    scroll();
   };
-  const kanbanHref = buildTasksHref("kanban");
-  const backlogHref = buildTasksHref("backlog");
-  const overdueHref = buildTasksHref("overdue");
 
   // Accent colors mapped to design system
   const ACCENT_PRIMARY = "hsl(174, 62%, 26%)";
@@ -806,34 +815,29 @@ export default function DashboardPage() {
 
             <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
               {hasOverdueTasks ? (
-                <Button asChild size="sm" variant="destructive" className="sm:shrink-0">
-                  <Link href={overdueHref}>Разобрать просрочки</Link>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleFocusOverdue}
+                  className="sm:shrink-0"
+                >
+                  Разобрать просрочки
                 </Button>
               ) : (
-                <Button asChild size="sm" variant="secondary" className="sm:shrink-0">
-                  <Link href={backlogHref}>
-                    Весь бэклог
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
+                <Button asChild size="sm" className="sm:shrink-0">
+                  <Link href="/tasks">Открыть задачи</Link>
                 </Button>
               )}
-              <Button
-                asChild
-                size="sm"
-                variant="ghost"
-                className="sm:shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <Link href={kanbanHref}>
-                  Канбан-доска
+              <Button asChild size="sm" variant="outline" className="sm:shrink-0">
+                <Link href="/tasks">
+                  Канбан
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </Button>
 
               {canSwitchDepartment && (
-                <div className="flex h-9 w-full min-w-[240px] items-center gap-2 rounded-md border border-border/60 bg-background px-2 shadow-sm sm:w-[280px]">
-                  <span className="pl-1 text-xs font-medium text-muted-foreground">
-                    Отдел
-                  </span>
+                <div className="w-full min-w-[220px] sm:w-[260px]">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Отдел</p>
                   <Select
                     value={
                       selectedDepartmentId ||
@@ -846,7 +850,7 @@ export default function DashboardPage() {
                       setSelectedDepartmentId(value);
                     }}
                   >
-                    <SelectTrigger className="h-8 flex-1 border-0 bg-transparent px-2 shadow-none focus:ring-0">
+                    <SelectTrigger className="h-9 border-border/60 bg-background shadow-sm">
                       <SelectValue placeholder="Выберите отдел" />
                     </SelectTrigger>
                     <SelectContent>
@@ -874,11 +878,8 @@ export default function DashboardPage() {
                 <span className="font-semibold">Фокус дня:</span>{" "}
                 сначала закройте минимум 1 просроченную задачу, затем переходите к активным.
               </p>
-              <Button asChild size="sm" variant="secondary" className="sm:shrink-0">
-                <Link href={backlogHref}>
-                  Весь бэклог
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+              <Button asChild size="sm" variant="outline" className="sm:shrink-0">
+                <Link href="/tasks">Открыть весь бэклог</Link>
               </Button>
             </div>
           )}
