@@ -86,6 +86,7 @@ export interface Task {
   short_id: number;
   title: string;
   description: string | null;
+  checklist: TaskChecklistItem[];
   status: TaskStatus;
   priority: TaskPriority;
   assignee_id: string | null;
@@ -112,6 +113,12 @@ export interface TaskUpdate {
   source: string;
   created_at: string;
   author: TeamMember | null;
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  title: string;
+  is_completed: boolean;
 }
 
 export interface Meeting {
@@ -349,6 +356,7 @@ export interface LoginResponse {
 export interface TaskCreateRequest {
   title: string;
   description?: string | null;
+  checklist?: TaskChecklistItem[];
   priority?: TaskPriority;
   assignee_id?: string | null;
   meeting_id?: string | null;
@@ -359,6 +367,7 @@ export interface TaskCreateRequest {
 export interface TaskEditRequest {
   title?: string;
   description?: string | null;
+  checklist?: TaskChecklistItem[];
   status?: TaskStatus;
   priority?: TaskPriority;
   assignee_id?: string | null;

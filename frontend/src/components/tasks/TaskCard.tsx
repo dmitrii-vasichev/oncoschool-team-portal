@@ -5,10 +5,16 @@ import {
   Mic,
   CalendarDays,
   FileText,
+  CheckCircle2,
+  Circle,
+  ListChecks,
 } from "lucide-react";
-import { PriorityBadge } from "@/components/shared/PriorityBadge";
+import { PriorityIcon } from "@/components/shared/PriorityBadge";
+import { StatusIcon } from "@/components/shared/StatusBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
-import type { Task, TaskPriority } from "@/lib/types";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import type { Task } from "@/lib/types";
 import { parseLocalDate } from "@/lib/dateUtils";
 
 function formatDate(dateStr: string): string {
@@ -26,110 +32,160 @@ function isOverdue(task: Task): boolean {
   return parseLocalDate(task.deadline) < todayStart;
 }
 
-const PRIORITY_STRIP_COLORS: Record<TaskPriority, string> = {
-  urgent: "bg-priority-urgent-dot",
-  high: "bg-priority-high-dot",
-  medium: "bg-priority-medium-dot",
-  low: "bg-priority-low-dot",
-};
-
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task);
+  const checklist = task.checklist || [];
+  const completedChecklistCount = checklist.filter((item) => item.is_completed).length;
+  const checklistPreview = checklist.slice(0, 2);
+  const checklistHiddenCount = Math.max(0, checklist.length - checklistPreview.length);
+
   const cardClass = overdue
     ? "border-destructive/35 bg-destructive/[0.05] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset] hover:bg-destructive/[0.08] hover:border-destructive/45"
     : "bg-card border-border/50 hover:border-primary/20";
 
   return (
-    <div
-      className={`
-        group rounded-xl border overflow-hidden shadow-sm
-        transition-all duration-150 hover:shadow-md hover:-translate-y-0.5
-        ${cardClass}
-      `}
-    >
-      <Link
-        href={`/tasks/${task.short_id}`}
-        className="block"
-        draggable={false}
+    <TooltipProvider delayDuration={120}>
+      <div
+        className={`
+          group rounded-xl border overflow-hidden shadow-sm
+          transition-all duration-150 hover:shadow-md hover:-translate-y-0.5
+          ${cardClass}
+        `}
       >
-        {/* Priority color strip */}
-        <div
-          className={`h-[3px] w-full ${PRIORITY_STRIP_COLORS[task.priority]}`}
-        />
+        <Link
+          href={`/tasks/${task.short_id}`}
+          className="block"
+          draggable={false}
+        >
+          <div className="p-3.5 space-y-3">
+            {/* Header: title + status/priority icons */}
+            <div className="flex items-start gap-2.5">
+              <div className="min-w-0 flex-1 space-y-1">
+                <p
+                  className={`text-[15px] font-semibold leading-snug line-clamp-2 ${
+                    overdue
+                      ? "text-destructive group-hover:text-destructive"
+                      : "group-hover:text-primary"
+                  }`}
+                >
+                  {task.title}
+                </p>
 
-        <div className="p-3.5 space-y-2.5">
-          {/* Header: ID + source icons */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-mono">
-              #{task.short_id}
-            </span>
-            {task.source === "voice" && (
-              <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-purple-100 dark:bg-purple-900/30" title="Голосовая задача">
-                <Mic className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
-              </span>
-            )}
-            {task.source === "summary" && (
-              <span className="inline-flex items-center justify-center h-4 w-4 rounded bg-blue-100 dark:bg-blue-900/30" title="Из встречи">
-                <FileText className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400" />
-              </span>
-            )}
-            {overdue && (
-              <span className="ml-auto rounded-full bg-destructive/12 px-2 py-0.5 text-2xs font-medium text-destructive">
-                Просрочено
-              </span>
-            )}
-          </div>
+                <div className="flex items-center gap-1.5">
+                  {task.source === "voice" && (
+                    <span
+                      className="inline-flex items-center justify-center h-4 w-4 rounded bg-purple-100 dark:bg-purple-900/30"
+                      title="Голосовая задача"
+                    >
+                      <Mic className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                    </span>
+                  )}
+                  {task.source === "summary" && (
+                    <span
+                      className="inline-flex items-center justify-center h-4 w-4 rounded bg-blue-100 dark:bg-blue-900/30"
+                      title="Из встречи"
+                    >
+                      <FileText className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400" />
+                    </span>
+                  )}
+                </div>
+              </div>
 
-          {/* Title */}
-          <p
-            className={`text-sm font-semibold leading-snug line-clamp-2 ${
-              overdue
-                ? "text-destructive group-hover:text-destructive"
-                : "group-hover:text-primary"
-            }`}
-          >
-            {task.title}
-          </p>
+              <div className="flex items-center gap-1">
+                <StatusIcon status={task.status} />
+                <PriorityIcon priority={task.priority} />
+              </div>
+            </div>
 
-          {/* Meta row */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <PriorityBadge priority={task.priority} />
-            {task.deadline && (
-              <span
-                className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 ${
-                  overdue
-                    ? "text-destructive bg-destructive/12 font-medium"
-                    : "text-muted-foreground bg-muted"
-                }`}
-              >
-                <CalendarDays className="h-3 w-3" />
-                {formatDate(task.deadline)}
-              </span>
+            {/* Checklist preview */}
+            {checklist.length > 0 && (
+              <div className="rounded-lg border border-border/60 bg-muted/40 px-2.5 py-2">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1 text-2xs text-muted-foreground">
+                    <ListChecks className="h-3 w-3" />
+                    Подзадачи
+                  </span>
+                  <span className="text-2xs font-medium text-foreground/80">
+                    {completedChecklistCount}/{checklist.length}
+                  </span>
+                </div>
+
+                <div className="space-y-1">
+                  {checklistPreview.map((item) => (
+                    <div key={item.id} className="flex items-center gap-1.5">
+                      {item.is_completed ? (
+                        <CheckCircle2 className="h-3 w-3 shrink-0 text-status-done-fg" />
+                      ) : (
+                        <Circle className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      )}
+                      <span
+                        className={cn(
+                          "text-xs truncate",
+                          item.is_completed
+                            ? "line-through text-muted-foreground"
+                            : "text-foreground/85"
+                        )}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                  ))}
+                  {checklistHiddenCount > 0 && (
+                    <p className="text-2xs text-muted-foreground">
+                      + еще {checklistHiddenCount}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
-          </div>
 
-          {/* Footer: assignee */}
-          <div className="flex items-center justify-between pt-0.5">
-            {task.assignee ? (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <UserAvatar name={task.assignee.full_name} avatarUrl={task.assignee.avatar_url} size="sm" />
-                <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-                  {task.assignee.full_name}
-                </span>
-                {!task.assignee.is_active && (
-                  <span className="text-2xs rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground ring-1 ring-inset ring-border/60">
-                    Неактивен
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
+              <div className="flex items-center gap-1.5">
+                {overdue && (
+                  <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-2xs font-medium text-destructive">
+                    Просрочено
+                  </span>
+                )}
+                {task.deadline && (
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs rounded-full px-2 py-0.5 ${
+                      overdue
+                        ? "text-destructive bg-destructive/12 font-medium"
+                        : "text-muted-foreground bg-muted"
+                    }`}
+                  >
+                    <CalendarDays className="h-3 w-3" />
+                    {formatDate(task.deadline)}
                   </span>
                 )}
               </div>
-            ) : (
-              <span className="text-xs text-muted-foreground/50 italic">
-                Не назначен
-              </span>
-            )}
+
+              {task.assignee ? (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <UserAvatar
+                    name={task.assignee.full_name}
+                    avatarUrl={task.assignee.avatar_url}
+                    size="sm"
+                  />
+                  <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                    {task.assignee.full_name}
+                  </span>
+                  {!task.assignee.is_active && (
+                    <span className="text-2xs rounded-full px-1.5 py-0.5 bg-muted text-muted-foreground ring-1 ring-inset ring-border/60">
+                      Неактивен
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground/50 italic">
+                  Не назначен
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      </Link>
-    </div>
+        </Link>
+      </div>
+    </TooltipProvider>
   );
 }

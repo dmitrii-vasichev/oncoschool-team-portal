@@ -162,6 +162,7 @@ async def create_task(
             creator=member,
             assignee_id=data.assignee_id,
             description=data.description,
+            checklist=[item.model_dump() for item in data.checklist],
             priority=data.priority,
             deadline=data.deadline,
             source=data.source or "web",

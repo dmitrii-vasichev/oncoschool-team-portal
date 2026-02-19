@@ -103,7 +103,7 @@ export function ScheduleCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <h3
-                    className="font-heading font-semibold text-sm leading-5 text-foreground line-clamp-2 min-h-10"
+                    className="font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10"
                     title={schedule.title}
                   >
                     {schedule.title}

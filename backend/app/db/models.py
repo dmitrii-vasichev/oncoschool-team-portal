@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, time
+from typing import Any
 
 from sqlalchemy import (
     ARRAY,
@@ -203,6 +204,9 @@ class Task(Base):
     )
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checklist: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
     status: Mapped[str] = mapped_column(
         String(50), default="new", server_default="new"
     )

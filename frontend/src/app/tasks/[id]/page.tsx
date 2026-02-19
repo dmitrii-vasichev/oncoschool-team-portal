@@ -56,6 +56,7 @@ import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { TaskUpdates } from "@/components/tasks/TaskUpdates";
+import { TaskChecklist } from "@/components/tasks/TaskChecklist";
 import { useTask } from "@/hooks/useTasks";
 import { useTeam } from "@/hooks/useTeam";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -63,7 +64,7 @@ import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
-import type { TaskStatus, TaskPriority } from "@/lib/types";
+import type { TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/types";
 import { parseLocalDate } from "@/lib/dateUtils";
 
 /* ============================================
@@ -132,6 +133,7 @@ export default function TaskDetailPage() {
   const { toastSuccess, toastError } = useToast();
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [checklistSaving, setChecklistSaving] = useState(false);
   const [updatesKey, setUpdatesKey] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -186,6 +188,8 @@ export default function TaskDetailPage() {
     user && PermissionService.canChangeTaskStatus(user, task);
   const canAddUpdate =
     user && PermissionService.canAddTaskUpdate(user, task);
+  const canManageChecklist =
+    user && PermissionService.canChangeTaskStatus(user, task);
   const canDelete = user && PermissionService.canDeleteTask(user);
   const overdue = isOverdue(task.deadline, task.status);
   const transitions = STATUS_TRANSITIONS[task.status] || [];
@@ -257,6 +261,22 @@ export default function TaskDetailPage() {
     }
   }
 
+  async function handleChecklistChange(nextChecklist: TaskChecklistItem[]) {
+    if (!shortId) return;
+    setChecklistSaving(true);
+    try {
+      await api.updateTask(shortId, {
+        checklist: nextChecklist,
+      });
+      await refetch();
+    } catch (error) {
+      toastError("Не удалось обновить чек-лист");
+      throw error;
+    } finally {
+      setChecklistSaving(false);
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="max-w-4xl animate-fade-in-up">
@@ -270,14 +290,13 @@ export default function TaskDetailPage() {
         </button>
 
         {/* ── Hero header ── */}
-        <div className="mb-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <h1 className="text-2xl sm:text-3xl font-bold font-heading tracking-tight leading-tight">
-            <span className="font-mono text-muted-foreground font-semibold">
-              #{task.short_id}
-            </span>
-            <span className="mx-2 text-border select-none">&middot;</span>
             {task.title}
           </h1>
+          <span className="text-2xs text-muted-foreground/70 font-mono rounded-md bg-muted/50 px-1.5 py-0.5">
+            #{task.short_id}
+          </span>
         </div>
 
         {/* ── Badges row ── */}
@@ -565,6 +584,13 @@ export default function TaskDetailPage() {
             </div>
           </div>
         )}
+
+        <TaskChecklist
+          items={task.checklist || []}
+          canEdit={!!canManageChecklist}
+          isSaving={checklistSaving}
+          onChange={handleChecklistChange}
+        />
 
         {/* ── Timeline ── */}
         <div className="mt-10 pt-8 border-t border-border/50">

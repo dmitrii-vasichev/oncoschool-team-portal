@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime, time
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 # Domain value types
 TaskStatusType = Literal["new", "in_progress", "review", "done", "cancelled"]
@@ -98,9 +98,16 @@ class DepartmentResponse(BaseModel):
 # ── Task ──
 
 
+class TaskChecklistItem(BaseModel):
+    id: str
+    title: str
+    is_completed: bool = False
+
+
 class TaskCreate(BaseModel):
     title: str
     description: str | None = None
+    checklist: list[TaskChecklistItem] = Field(default_factory=list)
     priority: TaskPriorityType = "medium"
     assignee_id: uuid.UUID | None = None
     meeting_id: uuid.UUID | None = None
@@ -111,11 +118,11 @@ class TaskCreate(BaseModel):
 class TaskEdit(BaseModel):
     title: str | None = None
     description: str | None = None
+    checklist: list[TaskChecklistItem] | None = None
     status: TaskStatusType | None = None
     priority: TaskPriorityType | None = None
     assignee_id: uuid.UUID | None = None
     deadline: date | None = None
-
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -124,6 +131,7 @@ class TaskResponse(BaseModel):
     short_id: int
     title: str
     description: str | None
+    checklist: list[TaskChecklistItem] = Field(default_factory=list)
     status: str
     priority: str
     assignee_id: uuid.UUID | None
