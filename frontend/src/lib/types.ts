@@ -456,7 +456,7 @@ export const DAY_OF_WEEK_SHORT: Record<number, string> = {
 export const RECURRENCE_LABELS: Record<MeetingRecurrence, string> = {
   weekly: "Еженедельно",
   biweekly: "Раз в 2 недели",
-  monthly_last_workday: "Последний рабочий день месяца",
+  monthly_last_workday: "Последний день месяца",
 };
 
 export const MEETING_STATUS_LABELS: Record<MeetingStatus, string> = {
