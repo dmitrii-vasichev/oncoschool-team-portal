@@ -404,7 +404,9 @@ export default function DashboardPage() {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [taskScope, setTaskScope] = useState<"my" | "department">("my");
   const [myUpcomingMeetings, setMyUpcomingMeetings] = useState<Meeting[]>([]);
+  const [myUpcomingMeetingsTotal, setMyUpcomingMeetingsTotal] = useState(0);
   const [departmentUpcomingMeetings, setDepartmentUpcomingMeetings] = useState<Meeting[]>([]);
+  const [departmentUpcomingMeetingsTotal, setDepartmentUpcomingMeetingsTotal] = useState(0);
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
   const [staleTasks, setStaleTasks] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -569,9 +571,11 @@ export default function DashboardPage() {
           setDepartmentOverdueTasks([]);
         }
 
-        // Upcoming meetings (top 3)
+        // Upcoming meetings (top 3, but keep total count for badge)
         setMyUpcomingMeetings(myMeetingsData ? myMeetingsData.slice(0, 3) : []);
-        setDepartmentUpcomingMeetings(deptMeetingsData ? deptMeetingsData.slice(0, 3) : []);
+        setMyUpcomingMeetingsTotal(myMeetingsData ? myMeetingsData.length : 0);
+        setDepartmentUpcomingMeetings(deptMeetingsData ? (deptMeetingsData as Meeting[]).slice(0, 3) : []);
+        setDepartmentUpcomingMeetingsTotal(deptMeetingsData ? (deptMeetingsData as Meeting[]).length : 0);
 
         // Moderator data
         if (isModerator) {
@@ -653,9 +657,10 @@ export default function DashboardPage() {
     overdueBadges.push({ label: "просрочено", value: scopedOverdueTasks.length, color: "red" });
   }
 
+  const scopedMeetingsTotal = currentScope === "department" ? departmentUpcomingMeetingsTotal : myUpcomingMeetingsTotal;
   const meetingBadges: BadgeInfo[] = [];
-  if ((meetingAnalytics?.meetings_this_month ?? 0) > 0) {
-    meetingBadges.push({ label: "в этом месяце", value: meetingAnalytics?.meetings_this_month ?? 0, color: "blue" });
+  if (scopedMeetingsTotal > 0) {
+    meetingBadges.push({ label: "предстоящих", value: scopedMeetingsTotal, color: "blue" });
   }
 
   const todayStr = formatFullDate(new Date());
