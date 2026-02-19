@@ -33,6 +33,7 @@ in_app_notification_service = InAppNotificationService()
 class ManualMeetingCreate(BaseModel):
     title: str
     meeting_date: datetime
+    timezone: str = "Europe/Moscow"
     zoom_enabled: bool = False
     duration_minutes: int = 60
     participant_ids: list[uuid.UUID] = []
@@ -262,18 +263,28 @@ async def create_meeting(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a meeting manually (without schedule). Optionally creates Zoom meeting."""
-    # Strip timezone info — DB column is TIMESTAMP WITHOUT TIME ZONE
-    meeting_date = data.meeting_date.replace(tzinfo=None) if data.meeting_date.tzinfo else data.meeting_date
+    try:
+        selected_tz = ZoneInfo(data.timezone)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Неверный часовой пояс")
+
+    # Store as naive UTC in DB (legacy model stores timestamp without timezone).
+    if data.meeting_date.tzinfo:
+        meeting_date_utc = data.meeting_date.astimezone(ZoneInfo("UTC"))
+    else:
+        meeting_date_utc = data.meeting_date.replace(tzinfo=ZoneInfo("UTC"))
+    meeting_date = meeting_date_utc.replace(tzinfo=None)
 
     zoom_data = None
     zoom_svc = _get_zoom_service(request)
 
     if data.zoom_enabled and zoom_svc:
         try:
+            zoom_start_time = meeting_date_utc.astimezone(selected_tz).replace(tzinfo=None)
             zoom_data = await zoom_svc.create_meeting(
                 topic=data.title,
-                start_time=meeting_date,
-                timezone=settings.TIMEZONE,
+                start_time=zoom_start_time,
+                timezone=data.timezone,
             )
         except Exception as e:
             # Zoom failure is non-fatal — create meeting without Zoom

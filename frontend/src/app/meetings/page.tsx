@@ -25,6 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useMeetingSchedules } from "@/hooks/useMeetingSchedules";
 import { useMeetings } from "@/hooks/useMeetings";
@@ -50,9 +57,13 @@ import type {
   Department,
 } from "@/lib/types";
 import {
-  PROJECT_TIMEZONE_LABEL,
   zonedDateTimeToUtcIso,
 } from "@/lib/meetingDateTime";
+import {
+  DEFAULT_TIMEZONE,
+  TIMEZONE_OPTIONS,
+  getTimezoneShortLabel,
+} from "@/lib/timezones";
 
 const PER_PAGE = 6;
 
@@ -490,6 +501,7 @@ function CreateMeetingDialog({
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("15:00");
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [zoomEnabled, setZoomEnabled] = useState(true);
   const [participantIds, setParticipantIds] = useState<string[]>([]);
@@ -524,10 +536,11 @@ function CreateMeetingDialog({
     setError(null);
 
     try {
-      const meetingDate = zonedDateTimeToUtcIso(date, time);
+      const meetingDate = zonedDateTimeToUtcIso(date, time, timezone);
       await api.createMeetingManual({
         title: title.trim(),
         meeting_date: meetingDate,
+        timezone,
         zoom_enabled: zoomEnabled,
         duration_minutes: durationMinutes,
         participant_ids: participantIds.length > 0 ? participantIds : undefined,
@@ -563,7 +576,7 @@ function CreateMeetingDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 items-end gap-3">
             <div>
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Дата
@@ -577,14 +590,32 @@ function CreateMeetingDialog({
             </div>
             <div>
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Время ({PROJECT_TIMEZONE_LABEL})
+                Время ({getTimezoneShortLabel(timezone)})
               </Label>
               <TimePicker
                 value={time}
                 onChange={setTime}
-                className="mt-1.5 rounded-xl"
+                className="mt-1.5 w-full rounded-xl"
               />
             </div>
+          </div>
+
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Часовой пояс
+            </Label>
+            <Select value={timezone} onValueChange={setTimezone}>
+              <SelectTrigger className="mt-1.5 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <SelectItem key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
