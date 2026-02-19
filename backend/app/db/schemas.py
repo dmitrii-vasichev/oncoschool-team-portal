@@ -291,7 +291,8 @@ class TelegramTargetResponse(BaseModel):
 class TelegramBroadcastCreate(BaseModel):
     target_id: uuid.UUID
     message_html: str
-    scheduled_at: datetime
+    scheduled_at: datetime | None = None
+    send_now: bool = False
 
 
 class TelegramBroadcastUpdate(BaseModel):

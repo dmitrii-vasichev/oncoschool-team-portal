@@ -168,7 +168,8 @@ export interface TelegramBroadcast {
 export interface TelegramBroadcastCreateRequest {
   target_id: string;
   message_html: string;
-  scheduled_at: string;
+  scheduled_at?: string;
+  send_now?: boolean;
 }
 
 export interface TelegramBroadcastUpdateRequest {

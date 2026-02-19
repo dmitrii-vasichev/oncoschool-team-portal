@@ -397,6 +397,12 @@ class ApiClient {
     });
   }
 
+  async sendNowTelegramBroadcast(id: string): Promise<TelegramBroadcast> {
+    return this.request<TelegramBroadcast>(`/api/broadcasts/${id}/send-now`, {
+      method: "POST",
+    });
+  }
+
   // ==================== Departments ====================
 
   async getDepartments(): Promise<Department[]> {

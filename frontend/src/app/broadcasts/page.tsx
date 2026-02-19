@@ -17,10 +17,18 @@ import {
 } from "lucide-react";
 
 import { ModeratorGuard } from "@/components/shared/ModeratorGuard";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useToast } from "@/components/shared/Toast";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { TimePicker } from "@/components/shared/TimePicker";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Popover,
@@ -37,6 +45,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { parseUTCDate } from "@/lib/dateUtils";
+import { zonedDateTimeToUtcIso } from "@/lib/meetingDateTime";
 import { api } from "@/lib/api";
 import {
   TELEGRAM_BROADCAST_STATUS_LABELS,
@@ -44,8 +53,17 @@ import {
   type TelegramBroadcastStatus,
   type TelegramNotificationTarget,
 } from "@/lib/types";
+import {
+  DEFAULT_TIMEZONE,
+  TIMEZONE_OPTIONS,
+  getTimezoneShortLabel,
+} from "@/lib/timezones";
 
 type StatusFilter = "all" | TelegramBroadcastStatus;
+type LinkSelection = { start: number; end: number };
+type PendingBroadcastAction =
+  | { type: "send_now"; broadcast: TelegramBroadcast }
+  | { type: "cancel"; broadcast: TelegramBroadcast };
 
 const EMOJIS = [
   "🔥",
@@ -101,6 +119,18 @@ function getDefaultSchedule() {
     date: formatDateValue(date),
     time: formatTimeValue(date),
   };
+}
+
+function getInitialTimezone() {
+  try {
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (TIMEZONE_OPTIONS.some((tz) => tz.value === browserTimezone)) {
+      return browserTimezone;
+    }
+  } catch {
+    // Fallback handled below.
+  }
+  return DEFAULT_TIMEZONE;
 }
 
 function stripHtmlTags(value: string): string {
@@ -238,19 +268,21 @@ export default function BroadcastsPage() {
   const [targets, setTargets] = useState<TelegramNotificationTarget[]>([]);
   const [broadcasts, setBroadcasts] = useState<TelegramBroadcast[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<"schedule" | "now" | null>(null);
+  const [sendingBroadcastId, setSendingBroadcastId] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
+  const [pendingAction, setPendingAction] = useState<PendingBroadcastAction | null>(null);
 
   const defaultSchedule = useMemo(() => getDefaultSchedule(), []);
   const [targetId, setTargetId] = useState("");
   const [messageHtml, setMessageHtml] = useState("");
   const [scheduledDate, setScheduledDate] = useState(defaultSchedule.date);
   const [scheduledTime, setScheduledTime] = useState(defaultSchedule.time);
-
-  const timezone = useMemo(
-    () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    []
-  );
+  const [scheduledTimezone, setScheduledTimezone] = useState(getInitialTimezone);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("https://");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkSelection, setLinkSelection] = useState<LinkSelection | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -324,27 +356,34 @@ export default function BroadcastsPage() {
     });
   };
 
-  const insertLink = () => {
+  const openLinkDialog = () => {
     const textarea = messageRef.current;
-    const start = textarea?.selectionStart ?? 0;
-    const end = textarea?.selectionEnd ?? 0;
-    const selected = messageHtml.slice(start, end).trim();
-    const label = selected || "ссылка";
-    const url = window.prompt("Введите URL (https://...)", "https://");
-    if (!url) {
-      return;
-    }
+    const start = textarea?.selectionStart ?? messageHtml.length;
+    const end = textarea?.selectionEnd ?? messageHtml.length;
+    const selectedText = messageHtml.slice(start, end).trim();
 
-    if (!/^https?:\/\//i.test(url.trim())) {
+    setLinkSelection({ start, end });
+    setLinkLabel(selectedText || "");
+    setLinkUrl("https://");
+    setLinkDialogOpen(true);
+  };
+
+  const handleInsertLink = () => {
+    const href = linkUrl.trim();
+    if (!/^https?:\/\//i.test(href)) {
       toastError("URL должен начинаться с http:// или https://");
       return;
     }
 
-    const href = url.trim();
+    const label = linkLabel.trim() || "ссылка";
     const replacement = `<a href="${href}">${label}</a>`;
+    const start = Math.max(0, Math.min(linkSelection?.start ?? messageHtml.length, messageHtml.length));
+    const end = Math.max(start, Math.min(linkSelection?.end ?? start, messageHtml.length));
     const next = messageHtml.slice(0, start) + replacement + messageHtml.slice(end);
     setMessageHtml(next);
+    setLinkDialogOpen(false);
 
+    const textarea = messageRef.current;
     if (textarea) {
       requestAnimationFrame(() => {
         textarea.focus();
@@ -370,18 +409,16 @@ export default function BroadcastsPage() {
       return;
     }
 
-    const localDate = new Date(`${scheduledDate}T${scheduledTime}:00`);
-    if (Number.isNaN(localDate.getTime())) {
-      toastError("Неверная дата или время");
-      return;
-    }
-
-    setSaving(true);
+    setSavingAction("schedule");
     try {
       await api.createTelegramBroadcast({
         target_id: targetId,
         message_html: messageHtml.trim(),
-        scheduled_at: localDate.toISOString(),
+        scheduled_at: zonedDateTimeToUtcIso(
+          scheduledDate,
+          scheduledTime,
+          scheduledTimezone
+        ),
       });
 
       toastSuccess("Рассылка запланирована");
@@ -393,18 +430,88 @@ export default function BroadcastsPage() {
     } catch (e) {
       toastError(e instanceof Error ? e.message : "Ошибка при создании рассылки");
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   };
 
-  const handleCancel = async (broadcast: TelegramBroadcast) => {
-    const confirmed = window.confirm("Отменить эту запланированную рассылку?");
-    if (!confirmed) {
+  const handleSendNow = async () => {
+    if (!targetId) {
+      toastError("Выберите группу");
+      return;
+    }
+
+    if (!messageHtml.trim()) {
+      toastError("Введите текст сообщения");
+      return;
+    }
+
+    setSavingAction("now");
+    try {
+      const result = await api.createTelegramBroadcast({
+        target_id: targetId,
+        message_html: messageHtml.trim(),
+        send_now: true,
+      });
+
+      if (result.status === "failed") {
+        toastError(
+          result.error_message
+            ? `Ошибка отправки: ${result.error_message}`
+            : "Не удалось отправить рассылку"
+        );
+      } else {
+        toastSuccess("Рассылка отправлена");
+        setMessageHtml("");
+      }
+
+      await fetchData();
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : "Ошибка отправки рассылки");
+    } finally {
+      setSavingAction(null);
+    }
+  };
+
+  const requestSendScheduledNow = (broadcast: TelegramBroadcast) => {
+    setPendingAction({ type: "send_now", broadcast });
+  };
+
+  const requestCancelBroadcast = (broadcast: TelegramBroadcast) => {
+    setPendingAction({ type: "cancel", broadcast });
+  };
+
+  const handleConfirmPendingAction = async () => {
+    if (!pendingAction) {
+      return;
+    }
+
+    const action = pendingAction;
+    setPendingAction(null);
+
+    if (action.type === "send_now") {
+      setSendingBroadcastId(action.broadcast.id);
+      try {
+        const result = await api.sendNowTelegramBroadcast(action.broadcast.id);
+        if (result.status === "failed") {
+          toastError(
+            result.error_message
+              ? `Ошибка отправки: ${result.error_message}`
+              : "Не удалось отправить рассылку"
+          );
+        } else {
+          toastSuccess("Рассылка отправлена");
+        }
+        await fetchData();
+      } catch (e) {
+        toastError(e instanceof Error ? e.message : "Ошибка отправки рассылки");
+      } finally {
+        setSendingBroadcastId(null);
+      }
       return;
     }
 
     try {
-      await api.cancelTelegramBroadcast(broadcast.id);
+      await api.cancelTelegramBroadcast(action.broadcast.id);
       toastSuccess("Рассылка отменена");
       await fetchData();
     } catch (e) {
@@ -429,7 +536,10 @@ export default function BroadcastsPage() {
               </div>
             </div>
             <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Часовой пояс отправки: <span className="font-medium text-foreground">{timezone}</span>
+              Часовой пояс отправки:{" "}
+              <span className="font-medium text-foreground">
+                {getTimezoneShortLabel(scheduledTimezone)} · {scheduledTimezone}
+              </span>
             </div>
           </div>
         </section>
@@ -537,7 +647,7 @@ export default function BroadcastsPage() {
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={insertLink}
+                      onClick={openLinkDialog}
                       title="Ссылка"
                     >
                       <Link2 className="h-4 w-4" />
@@ -599,7 +709,7 @@ export default function BroadcastsPage() {
                 </div>
                 <div>
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Время отправки
+                    Время отправки ({getTimezoneShortLabel(scheduledTimezone)})
                   </Label>
                   <TimePicker
                     value={scheduledTime}
@@ -609,24 +719,61 @@ export default function BroadcastsPage() {
                   />
                 </div>
               </div>
+              <div>
+                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Часовой пояс
+                </Label>
+                <Select value={scheduledTimezone} onValueChange={setScheduledTimezone}>
+                  <SelectTrigger className="mt-1.5 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Button
-                className="w-full rounded-xl"
-                onClick={handleCreate}
-                disabled={saving || targets.length === 0}
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Планирование...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Запланировать рассылку
-                  </>
-                )}
-              </Button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button
+                  className="w-full rounded-xl"
+                  onClick={handleCreate}
+                  disabled={savingAction !== null || targets.length === 0}
+                >
+                  {savingAction === "schedule" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Планирование...
+                    </>
+                  ) : (
+                    <>
+                      <Clock3 className="mr-2 h-4 w-4" />
+                      Запланировать рассылку
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="w-full rounded-xl"
+                  onClick={handleSendNow}
+                  disabled={savingAction !== null || targets.length === 0}
+                >
+                  {savingAction === "now" ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Отправка...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Отправить сейчас
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -725,14 +872,35 @@ export default function BroadcastsPage() {
                       </div>
 
                       {broadcast.status === "scheduled" && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="rounded-lg"
-                          onClick={() => handleCancel(broadcast)}
-                        >
-                          Отменить
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={() => requestSendScheduledNow(broadcast)}
+                            disabled={sendingBroadcastId === broadcast.id}
+                          >
+                            {sendingBroadcastId === broadcast.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                Отправка...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="mr-1.5 h-3.5 w-3.5" />
+                                Отправить сейчас
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={() => requestCancelBroadcast(broadcast)}
+                            disabled={sendingBroadcastId === broadcast.id}
+                          >
+                            Отменить
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -742,6 +910,69 @@ export default function BroadcastsPage() {
           )}
         </section>
       </div>
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-base">Добавить ссылку</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="broadcast-link-url">URL</Label>
+              <Input
+                id="broadcast-link-url"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="broadcast-link-label">Текст ссылки</Label>
+              <Input
+                id="broadcast-link-label"
+                value={linkLabel}
+                onChange={(e) => setLinkLabel(e.target.value)}
+                placeholder="ссылка"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setLinkDialogOpen(false)}
+              >
+                Отмена
+              </Button>
+              <Button type="button" onClick={handleInsertLink}>
+                Вставить
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={pendingAction !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingAction(null);
+          }
+        }}
+        title={
+          pendingAction?.type === "send_now"
+            ? "Отправить рассылку сейчас?"
+            : "Отменить рассылку?"
+        }
+        description={
+          pendingAction?.type === "send_now"
+            ? "Сообщение будет отправлено немедленно и статус изменится на 'Отправлено'."
+            : "Рассылка не будет отправлена по расписанию и получит статус 'Отменено'."
+        }
+        confirmLabel={pendingAction?.type === "send_now" ? "Отправить" : "Отменить рассылку"}
+        cancelLabel="Назад"
+        variant={pendingAction?.type === "send_now" ? "default" : "destructive"}
+        onConfirm={handleConfirmPendingAction}
+      />
     </ModeratorGuard>
   );
 }
