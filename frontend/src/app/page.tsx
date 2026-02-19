@@ -17,7 +17,6 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -64,15 +63,6 @@ function formatFullDate(date: Date): string {
   });
 }
 
-function pluralizeRu(count: number, one: string, few: string, many: string): string {
-  const normalized = Math.abs(count) % 100;
-  const lastDigit = normalized % 10;
-  if (normalized > 10 && normalized < 20) return many;
-  if (lastDigit > 1 && lastDigit < 5) return few;
-  if (lastDigit === 1) return one;
-  return many;
-}
-
 function isOverdue(task: Task): boolean {
   if (!task.deadline || task.status === "done" || task.status === "cancelled")
     return false;
@@ -99,15 +89,15 @@ function firstAndLastName(fullName: string): string {
 
 function getGreetingMessage(activeTasks: number, overdue: number): string {
   if (overdue > 0) {
-    return `${overdue} ${pluralizeRu(overdue, "просроченная задача", "просроченные задачи", "просроченных задач")} — пора разобраться`;
+    return `${overdue} ${overdue === 1 ? "просроченная задача" : overdue < 5 ? "просроченные задачи" : "просроченных задач"} — пора разобраться`;
   }
   if (activeTasks === 0) {
     return "Все задачи выполнены. Отличная работа!";
   }
   const messages = [
-    `У тебя ${activeTasks} ${pluralizeRu(activeTasks, "задача", "задачи", "задач")} в работе`,
-    `${activeTasks} ${pluralizeRu(activeTasks, "активная задача", "активные задачи", "активных задач")} — отличный день для прогресса`,
-    `Впереди ${activeTasks} ${pluralizeRu(activeTasks, "задача", "задачи", "задач")}. Ты справишься!`,
+    `У тебя ${activeTasks} ${activeTasks === 1 ? "задача" : activeTasks < 5 ? "задачи" : "задач"} в работе`,
+    `${activeTasks} ${activeTasks === 1 ? "активная задача" : activeTasks < 5 ? "активные задачи" : "активных задач"} — отличный день для прогресса`,
+    `Впереди ${activeTasks} ${activeTasks === 1 ? "задача" : activeTasks < 5 ? "задачи" : "задач"}. Ты справишься!`,
   ];
   return messages[new Date().getDate() % messages.length];
 }
@@ -751,28 +741,6 @@ export default function DashboardPage() {
 
   const todayStr = formatFullDate(new Date());
   const greeting = getGreetingMessage(activeTasks, overdueCount);
-  const hasOverdueTasks = overdueCount > 0;
-  const overdueSummary = `${overdueCount} ${pluralizeRu(overdueCount, "просроченная задача", "просроченные задачи", "просроченных задач")}`;
-  const activeSummary = `${activeTasks} ${pluralizeRu(activeTasks, "задача", "задачи", "задач")} в работе`;
-
-  const handleFocusOverdue = () => {
-    if (canUseDepartmentView && taskScope !== "my") {
-      setTaskScope("my");
-    }
-
-    const scroll = () => {
-      document
-        .getElementById("dashboard-overdue-tasks")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-
-    if (typeof window !== "undefined" && "requestAnimationFrame" in window) {
-      window.requestAnimationFrame(scroll);
-      return;
-    }
-
-    scroll();
-  };
 
   // Accent colors mapped to design system
   const ACCENT_PRIMARY = "hsl(174, 62%, 26%)";
@@ -784,103 +752,50 @@ export default function DashboardPage() {
     <div className="space-y-8">
       {/* ═══════════ Greeting ═══════════ */}
       <section className="animate-fade-in-up stagger-1">
-        <div
-          className={`rounded-2xl border p-4 md:p-5 ${
-            hasOverdueTasks
-              ? "border-destructive/25 bg-destructive/[0.03]"
-              : "border-border/60 bg-card"
-          }`}
-        >
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <h1 className="text-xl font-bold font-heading tracking-tight md:text-2xl">
-                Привет, {firstName(user.full_name)}!
-              </h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground md:text-sm">
-                <span className="capitalize">{todayStr}</span>
-                <span className="text-border">•</span>
-                {hasOverdueTasks ? (
-                  <span className="inline-flex items-center gap-1 font-medium text-destructive">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    {overdueSummary}
-                  </span>
-                ) : (
-                  <span>{greeting}</span>
-                )}
-              </p>
-              {!hasOverdueTasks && (
-                <p className="mt-1 text-xs text-muted-foreground">{activeSummary}</p>
-              )}
-            </div>
-
-            <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
-              {hasOverdueTasks ? (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={handleFocusOverdue}
-                  className="sm:shrink-0"
-                >
-                  Разобрать просрочки
-                </Button>
-              ) : (
-                <Button asChild size="sm" className="sm:shrink-0">
-                  <Link href="/tasks">Открыть задачи</Link>
-                </Button>
-              )}
-              <Button asChild size="sm" variant="outline" className="sm:shrink-0">
-                <Link href="/tasks">
-                  Канбан
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-
-              {canSwitchDepartment && (
-                <div className="w-full min-w-[220px] sm:w-[260px]">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Отдел</p>
-                  <Select
-                    value={
-                      selectedDepartmentId ||
-                      (accessibleDepartments[0]?.id
-                        ? accessibleDepartments[0].id
-                        : "__none__")
-                    }
-                    onValueChange={(value) => {
-                      if (value === "__none__") return;
-                      setSelectedDepartmentId(value);
-                    }}
-                  >
-                    <SelectTrigger className="h-9 border-border/60 bg-background shadow-sm">
-                      <SelectValue placeholder="Выберите отдел" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accessibleDepartments.length === 0 ? (
-                        <SelectItem value="__none__" disabled>
-                          Нет доступных отделов
-                        </SelectItem>
-                      ) : (
-                        accessibleDepartments.map((department) => (
-                          <SelectItem key={department.id} value={department.id}>
-                            {department.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold font-heading tracking-tight md:text-3xl">
+              Привет, {firstName(user.full_name)}!
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              <span className="capitalize">{todayStr}</span>
+              <span className="mx-2 text-border">|</span>
+              {greeting}
+            </p>
           </div>
 
-          {hasOverdueTasks && (
-            <div className="mt-3 flex flex-col gap-3 rounded-xl border border-destructive/20 bg-background/80 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-foreground">
-                <span className="font-semibold">Фокус дня:</span>{" "}
-                сначала закройте минимум 1 просроченную задачу, затем переходите к активным.
-              </p>
-              <Button asChild size="sm" variant="outline" className="sm:shrink-0">
-                <Link href="/tasks">Открыть весь бэклог</Link>
-              </Button>
+          {canSwitchDepartment && (
+            <div className="w-full md:w-[280px]">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Отдел</p>
+              <Select
+                value={
+                  selectedDepartmentId ||
+                  (accessibleDepartments[0]?.id
+                    ? accessibleDepartments[0].id
+                    : "__none__")
+                }
+                onValueChange={(value) => {
+                  if (value === "__none__") return;
+                  setSelectedDepartmentId(value);
+                }}
+              >
+                <SelectTrigger className="h-10 border-border/60 bg-card shadow-sm">
+                  <SelectValue placeholder="Выберите отдел" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accessibleDepartments.length === 0 ? (
+                    <SelectItem value="__none__" disabled>
+                      Нет доступных отделов
+                    </SelectItem>
+                  ) : (
+                    accessibleDepartments.map((department) => (
+                      <SelectItem key={department.id} value={department.id}>
+                        {department.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -985,7 +900,6 @@ export default function DashboardPage() {
 
           {/* Scope Overdue Tasks */}
           <div
-            id="dashboard-overdue-tasks"
             className={`rounded-2xl border p-6 ${
               scopedOverdueTasks.length > 0
                 ? "border-destructive/20 bg-destructive/[0.02]"
