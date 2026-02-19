@@ -200,8 +200,8 @@ function DashboardSkeleton() {
       </div>
 
       {/* Meetings skeleton */}
-      <div className="space-y-4">
-        <Skeleton className="h-5 w-40" />
+      <div className="rounded-2xl border border-border/60 bg-card p-6">
+        <Skeleton className="mb-4 h-5 w-40" />
         <div className="grid gap-4 md:grid-cols-3">
           {[...Array(3)].map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
@@ -394,7 +394,7 @@ function UpcomingMeetingCard({
 
   return (
     <div
-      className={`animate-fade-in-up ${staggerClass} group rounded-2xl border border-border/60 bg-card p-5 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5`}
+      className={`animate-fade-in-up ${staggerClass} group rounded-2xl border border-border/60 bg-card p-5 transition-shadow duration-200 hover:shadow-md hover:shadow-primary/5`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -452,7 +452,7 @@ function MeetingCard({
   return (
     <Link
       href={`/meetings/${meeting.id}`}
-      className={`animate-fade-in-up ${staggerClass} group block rounded-2xl border border-border/60 bg-card p-5 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/5`}
+      className={`animate-fade-in-up ${staggerClass} group block rounded-2xl border border-border/60 bg-card p-5 transition-shadow duration-200 hover:shadow-md hover:shadow-primary/5`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -959,22 +959,24 @@ export default function DashboardPage() {
       {/* ═══════════ Upcoming Meetings ═══════════ */}
       {upcomingMeetings.length > 0 && (
         <section className="animate-fade-in-up stagger-7">
-          <SectionHeader
-            title="Предстоящие встречи"
-            icon={Video}
-            iconColor={ACCENT_BLUE}
-            linkHref="/meetings"
-            linkLabel="Все встречи"
-            count={upcomingMeetings.length}
-          />
-          <div className="grid gap-4 md:grid-cols-3">
-            {upcomingMeetings.map((meeting, i) => (
-              <UpcomingMeetingCard
-                key={meeting.id}
-                meeting={meeting}
-                staggerClass={`stagger-${i + 7}`}
-              />
-            ))}
+          <div className="rounded-2xl border border-border/60 bg-card p-6">
+            <SectionHeader
+              title="Предстоящие встречи"
+              icon={Video}
+              iconColor={ACCENT_BLUE}
+              linkHref="/meetings"
+              linkLabel="Все встречи"
+              count={upcomingMeetings.length}
+            />
+            <div className="grid gap-4 md:grid-cols-3">
+              {upcomingMeetings.map((meeting, i) => (
+                <UpcomingMeetingCard
+                  key={meeting.id}
+                  meeting={meeting}
+                  staggerClass={`stagger-${i + 7}`}
+                />
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -982,20 +984,22 @@ export default function DashboardPage() {
       {/* ═══════════ Recent Past Meetings ═══════════ */}
       {meetings.length > 0 && (
         <section className="animate-fade-in-up stagger-7">
-          <SectionHeader
-            title="Последние встречи"
-            icon={CalendarDays}
-            linkHref="/meetings"
-            linkLabel="Все встречи"
-          />
-          <div className="grid gap-4 md:grid-cols-3">
-            {meetings.map((meeting, i) => (
-              <MeetingCard
-                key={meeting.id}
-                meeting={meeting}
-                staggerClass={`stagger-${i + 7}`}
-              />
-            ))}
+          <div className="rounded-2xl border border-border/60 bg-card p-6">
+            <SectionHeader
+              title="Последние встречи"
+              icon={CalendarDays}
+              linkHref="/meetings"
+              linkLabel="Все встречи"
+            />
+            <div className="grid gap-4 md:grid-cols-3">
+              {meetings.map((meeting, i) => (
+                <MeetingCard
+                  key={meeting.id}
+                  meeting={meeting}
+                  staggerClass={`stagger-${i + 7}`}
+                />
+              ))}
+            </div>
           </div>
         </section>
       )}
