@@ -41,9 +41,12 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<TaskFilterValues>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<TaskFilterValues>(() =>
+    user ? { ...EMPTY_FILTERS, assignee_id: user.id } : EMPTY_FILTERS
+  );
   const [createOpen, setCreateOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<TaskStatus>("new");
+  const hasAppliedDefaultAssigneeRef = useRef(Boolean(user?.id));
 
   // Native DnD state
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -69,6 +72,12 @@ export default function TasksPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id || hasAppliedDefaultAssigneeRef.current) return;
+    setFilters((prev) => ({ ...prev, assignee_id: prev.assignee_id || user.id }));
+    hasAppliedDefaultAssigneeRef.current = true;
+  }, [user?.id]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {

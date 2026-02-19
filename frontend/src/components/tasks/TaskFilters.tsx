@@ -226,7 +226,7 @@ export function TaskFilters({
               <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
             </button>
           ))}
-          {activeFilters.length > 1 && (
+          {activeFilters.length > 0 && (
             <button
               onClick={() => onFiltersChange(EMPTY_FILTERS)}
               className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
