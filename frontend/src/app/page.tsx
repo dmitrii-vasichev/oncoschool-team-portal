@@ -587,6 +587,9 @@ export default function DashboardPage() {
           api
             .getTasks({
               assignee_id: userId,
+              ...(selectedDepartmentParam
+                ? { department_id: selectedDepartmentParam }
+                : {}),
               status: openStatuses,
               per_page: "50",
               sort: "created_at_desc",
