@@ -57,7 +57,7 @@ export default function MeetingDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, toastError]);
 
   useEffect(() => {
     fetchData();

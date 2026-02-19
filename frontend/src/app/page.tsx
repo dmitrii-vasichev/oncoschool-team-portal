@@ -605,7 +605,6 @@ export default function DashboardPage() {
 
   const activeTasks = myMetrics?.active ?? 0;
   const completedThisWeek = myMetrics?.done_week ?? 0;
-  const overdueCount = myMetrics?.overdue ?? 0;
 
   const currentScope =
     canUseDepartmentView && taskScope === "department" ? "department" : "my";

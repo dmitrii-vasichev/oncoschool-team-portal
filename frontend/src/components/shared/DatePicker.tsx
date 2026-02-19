@@ -56,12 +56,11 @@ export function DatePicker({
     : null;
 
   // Sync input field when popover opens
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (open) {
       setInputValue(date ? format(date, "dd.MM.yyyy") : "");
     }
-  }, [open]);
+  }, [open, date]);
 
   function handleSelect(day: Date | undefined) {
     if (day) {
