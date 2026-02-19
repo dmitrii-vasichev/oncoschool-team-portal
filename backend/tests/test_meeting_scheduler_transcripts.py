@@ -13,6 +13,7 @@ class MeetingSchedulerTranscriptTests(unittest.TestCase):
             MeetingSchedulerService._has_meeting_finished(
                 meeting_date=meeting_date,
                 duration_minutes=60,
+                status="scheduled",
                 now_utc_naive=now_utc_naive,
             )
         )
@@ -25,6 +26,7 @@ class MeetingSchedulerTranscriptTests(unittest.TestCase):
             MeetingSchedulerService._has_meeting_finished(
                 meeting_date=meeting_date,
                 duration_minutes=60,
+                status="in_progress",
                 now_utc_naive=now_utc_naive,
             )
         )
@@ -37,6 +39,20 @@ class MeetingSchedulerTranscriptTests(unittest.TestCase):
             MeetingSchedulerService._has_meeting_finished(
                 meeting_date=meeting_date,
                 duration_minutes=None,
+                status="scheduled",
+                now_utc_naive=now_utc_naive,
+            )
+        )
+
+    def test_has_meeting_finished_returns_true_when_status_completed(self) -> None:
+        meeting_date = datetime(2026, 2, 19, 10, 0)
+        now_utc_naive = datetime(2026, 2, 19, 10, 10)
+
+        self.assertTrue(
+            MeetingSchedulerService._has_meeting_finished(
+                meeting_date=meeting_date,
+                duration_minutes=60,
+                status="completed",
                 now_utc_naive=now_utc_naive,
             )
         )

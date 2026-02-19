@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   FileText,
   Copy,
@@ -10,13 +10,18 @@ import {
   Bot,
   Upload,
   RefreshCw,
+  CircleCheck,
+  AlertCircle,
+  Clock3,
+  Video,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
-import type { Meeting } from "@/lib/types";
+import type { Meeting, ZoomStatusResponse } from "@/lib/types";
 
 interface TranscriptTabProps {
   meeting: Meeting;
@@ -36,6 +41,81 @@ export function TranscriptTab({
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [zoomStatus, setZoomStatus] = useState<ZoomStatusResponse | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  const refreshZoomStatus = useCallback(
+    async (silent = true) => {
+      if (!meeting.zoom_meeting_id) return;
+      if (!silent) setStatusLoading(true);
+      try {
+        const status = await api.getZoomStatus(meeting.id);
+        setZoomStatus(status);
+      } catch (e) {
+        if (!silent) {
+          toastError(e instanceof Error ? e.message : "Ошибка проверки Zoom");
+        }
+      } finally {
+        if (!silent) setStatusLoading(false);
+      }
+    },
+    [meeting.id, meeting.zoom_meeting_id, toastError]
+  );
+
+  useEffect(() => {
+    if (!meeting.zoom_meeting_id || meeting.transcript) return;
+
+    void refreshZoomStatus(true);
+    const intervalId = window.setInterval(() => {
+      void refreshZoomStatus(true);
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [meeting.zoom_meeting_id, meeting.transcript, refreshZoomStatus]);
+
+  useEffect(() => {
+    if (!isModerator || !meeting.zoom_meeting_id || meeting.transcript) return;
+    if (meeting.effective_status !== "completed" && meeting.status !== "completed") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const tryAutoFetch = async () => {
+      try {
+        const result = await api.fetchZoomTranscript(meeting.id);
+        if (!result.transcript || cancelled) return;
+
+        const updated = await api.getMeeting(meeting.id);
+        if (cancelled) return;
+        onMeetingUpdate(updated);
+        toastSuccess("Транскрипция получена из Zoom автоматически");
+        void refreshZoomStatus(true);
+      } catch {
+        // Keep silent; manual button remains available.
+      }
+    };
+
+    void tryAutoFetch();
+    const intervalId = window.setInterval(() => {
+      void tryAutoFetch();
+    }, 60000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [
+    isModerator,
+    meeting.id,
+    meeting.zoom_meeting_id,
+    meeting.transcript,
+    meeting.status,
+    meeting.effective_status,
+    onMeetingUpdate,
+    refreshZoomStatus,
+    toastSuccess,
+  ]);
 
   // ── Copy transcript ──
   const handleCopy = async () => {
@@ -78,7 +158,90 @@ export function TranscriptTab({
       toastError(e instanceof Error ? e.message : "Ошибка получения");
     } finally {
       setFetching(false);
+      void refreshZoomStatus(true);
     }
+  };
+
+  const renderZoomStatus = () => {
+    if (!meeting.zoom_meeting_id || meeting.transcript) return null;
+
+    if (statusLoading && !zoomStatus) {
+      return (
+        <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Проверяем состояние Zoom...
+        </div>
+      );
+    }
+
+    if (!zoomStatus) {
+      return (
+        <div className="rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          Статус Zoom пока недоступен
+        </div>
+      );
+    }
+
+    if (!zoomStatus.zoom_configured) {
+      return (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          Интеграция Zoom не настроена на сервере
+        </div>
+      );
+    }
+
+    if (zoomStatus.has_transcript) {
+      return (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400 space-y-2">
+          <div className="flex items-center gap-2">
+            <CircleCheck className="h-4 w-4 shrink-0" />
+            Транскрипт уже доступен в Zoom
+          </div>
+          {zoomStatus.recording_url && (
+            <a
+              href={zoomStatus.recording_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium underline underline-offset-2"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Открыть запись Zoom
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      );
+    }
+
+    if (zoomStatus.has_recording) {
+      return (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-400 space-y-2">
+          <div className="flex items-center gap-2">
+            <Clock3 className="h-4 w-4 shrink-0" />
+            Запись готова, Zoom ещё формирует транскрипт
+          </div>
+          {zoomStatus.recording_url && (
+            <a
+              href={zoomStatus.recording_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium underline underline-offset-2"
+            >
+              <Video className="h-3.5 w-3.5" />
+              Открыть запись Zoom
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-sm text-blue-800 dark:text-blue-400 flex items-center gap-2">
+        <Clock3 className="h-4 w-4 shrink-0" />
+        Запись встречи ещё не появилась в Zoom
+      </div>
+    );
   };
 
   // ── State A: Transcript exists ──
@@ -170,6 +333,8 @@ export function TranscriptTab({
   if (meeting.zoom_meeting_id) {
     return (
       <div className="space-y-5">
+        {renderZoomStatus()}
+
         {/* Zoom fetch section */}
         <div className="rounded-2xl border border-border/60 bg-card p-6 text-center space-y-4">
           <div className="h-14 w-14 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto">
@@ -185,23 +350,43 @@ export function TranscriptTab({
             </p>
           </div>
           {isModerator && (
-            <Button
-              onClick={handleFetchZoom}
-              disabled={fetching}
-              className="rounded-xl gap-2"
-            >
-              {fetching ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Загрузка...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" />
-                  Попробовать получить
-                </>
-              )}
-            </Button>
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                onClick={handleFetchZoom}
+                disabled={fetching}
+                className="rounded-xl gap-2"
+              >
+                {fetching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Загрузка...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Попробовать получить
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void refreshZoomStatus(false)}
+                disabled={statusLoading}
+                className="rounded-xl gap-2"
+              >
+                {statusLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Проверка...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Проверить статус Zoom
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
 

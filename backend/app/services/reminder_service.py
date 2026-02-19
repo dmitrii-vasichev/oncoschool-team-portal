@@ -44,6 +44,10 @@ class ReminderService:
 
     def start(self) -> None:
         """Start the scheduler with periodic checks."""
+        if self.scheduler.running:
+            logger.info("ReminderService already running")
+            return
+
         # Check every minute for reminders to send
         self.scheduler.add_job(
             self._check_and_send_reminders,

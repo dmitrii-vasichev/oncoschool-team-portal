@@ -153,6 +153,19 @@ meeting_scheduler = MeetingSchedulerService(
 )
 
 
+@app.on_event("startup")
+async def _start_background_schedulers() -> None:
+    """Ensure schedulers run for both `python -m app.main` and `uvicorn app.main:app`."""
+    reminder_service.start()
+    meeting_scheduler.start()
+
+
+@app.on_event("shutdown")
+async def _stop_background_schedulers() -> None:
+    reminder_service.stop()
+    meeting_scheduler.stop()
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -179,24 +192,13 @@ async def start_api():
 
 async def main():
     """Запуск FastAPI + aiogram polling + APScheduler параллельно."""
-    # Start schedulers
-    reminder_service.start()
-    logger.info("Reminder scheduler started")
-    meeting_scheduler.start()
-    logger.info("Meeting scheduler started")
-
     # Configure Telegram menu commands for private chats.
     await configure_global_menu(bot)
     logger.info("Telegram menu commands configured")
-
-    try:
-        await asyncio.gather(
-            start_bot(),
-            start_api(),
-        )
-    finally:
-        reminder_service.stop()
-        meeting_scheduler.stop()
+    await asyncio.gather(
+        start_bot(),
+        start_api(),
+    )
 
 
 if __name__ == "__main__":

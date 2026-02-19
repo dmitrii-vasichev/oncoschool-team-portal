@@ -34,6 +34,10 @@ class MeetingSchedulerService:
 
     def start(self) -> None:
         """Start the scheduler with a per-minute check."""
+        if self.scheduler.running:
+            logger.info("MeetingSchedulerService already running")
+            return
+
         self.scheduler.add_job(
             self._check_schedules,
             "interval",
@@ -93,9 +97,12 @@ class MeetingSchedulerService:
     def _has_meeting_finished(
         meeting_date: datetime | None,
         duration_minutes: int | None,
+        status: str | None,
         now_utc_naive: datetime,
     ) -> bool:
         """Check if a meeting has ended (all datetimes are naive UTC)."""
+        if status == "completed":
+            return True
         if not meeting_date:
             return False
         duration = duration_minutes or 60
@@ -132,6 +139,7 @@ class MeetingSchedulerService:
                     if not self._has_meeting_finished(
                         meeting.meeting_date,
                         meeting.duration_minutes,
+                        meeting.status,
                         now_utc_naive,
                     ):
                         continue
