@@ -12,6 +12,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import type { MeetingSchedule, TeamMember } from "@/lib/types";
 import {
@@ -59,7 +65,29 @@ export function ScheduleCard({
       {/* Subtle decorative accent */}
       <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/3 to-transparent rounded-bl-3xl pointer-events-none" />
 
-      <div className="p-3 sm:p-5">
+      <div className="relative p-3 sm:p-5">
+        {/* Actions (moderator only, do not take layout width) */}
+        {isModerator && (
+          <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 z-10 flex items-center gap-1 opacity-100 pointer-events-auto sm:opacity-0 sm:pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto sm:group-focus-within:opacity-100 sm:group-focus-within:pointer-events-auto transition-opacity">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-foreground bg-card/70 backdrop-blur-[1px]"
+              onClick={() => onEdit(schedule)}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-destructive bg-card/70 backdrop-blur-[1px]"
+              onClick={() => onDelete(schedule)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
         {/* Top row: day badge + title + actions */}
         <div className="flex items-start gap-2.5 sm:gap-3">
           {/* Day badge */}
@@ -70,10 +98,22 @@ export function ScheduleCard({
           </div>
 
           {/* Content */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-heading font-semibold text-sm text-foreground truncate">
-              {schedule.title}
-            </h3>
+          <div className={`flex-1 min-w-0 ${isModerator ? "pr-14 sm:pr-[4.5rem]" : ""}`}>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h3
+                    className="font-heading font-semibold text-sm leading-5 text-foreground line-clamp-2 min-h-10"
+                    title={schedule.title}
+                  >
+                    {schedule.title}
+                  </h3>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[280px] break-words">
+                  {schedule.title}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Time and recurrence block */}
             <div className="mt-1 space-y-1">
@@ -95,28 +135,6 @@ export function ScheduleCard({
               </Badge>
             </div>
           </div>
-
-          {/* Actions (moderator only, visible on hover) */}
-          {isModerator && (
-            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-foreground"
-                onClick={() => onEdit(schedule)}
-              >
-                <Settings className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(schedule)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* Bottom row: indicators + participants */}
