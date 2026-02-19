@@ -402,6 +402,7 @@ export default function DashboardPage() {
   const [taskScope, setTaskScope] = useState<"my" | "department">("my");
   const [myUpcomingMeetings, setMyUpcomingMeetings] = useState<Meeting[]>([]);
   const [myUpcomingMeetingsTotal, setMyUpcomingMeetingsTotal] = useState(0);
+  const [myPastMeetingsTotal, setMyPastMeetingsTotal] = useState(0);
   const [departmentUpcomingMeetings, setDepartmentUpcomingMeetings] = useState<Meeting[]>([]);
   const [departmentUpcomingMeetingsTotal, setDepartmentUpcomingMeetingsTotal] = useState(0);
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
@@ -507,6 +508,7 @@ export default function DashboardPage() {
                 .catch(catchLog("getDepartmentTasks"))
             : Promise.resolve(emptyTasksPage),
           api.getMeetings({ upcoming: true, member_id: userId }).catch(catchLog("getMyUpcomingMeetings")),
+          api.getMeetings({ past: true, member_id: userId }).catch(catchLog("getMyPastMeetings")),
           selectedDepartmentParam
             ? api.getMeetings({ upcoming: true, department_id: selectedDepartmentParam }).catch(catchLog("getDeptUpcomingMeetings"))
             : Promise.resolve([]),
@@ -537,10 +539,11 @@ export default function DashboardPage() {
         const myTasksData = results[1] as { items: Task[] } | null;
         const departmentTasksData = results[2] as { items: Task[] } | null;
         const myMeetingsData = results[3] as Meeting[] | null;
-        const deptMeetingsData = results[4] as Meeting[] | null;
-        const teamData = results[5] as TeamMember[] | null;
-        const unassignedData = results[6] as { items: Task[] } | null;
-        const staleData = results[7] as { items: Task[] } | null;
+        const myPastMeetingsData = results[4] as Meeting[] | null;
+        const deptMeetingsData = results[5] as Meeting[] | null;
+        const teamData = results[6] as TeamMember[] | null;
+        const unassignedData = results[7] as { items: Task[] } | null;
+        const staleData = results[8] as { items: Task[] } | null;
 
         const hasError = results.some((r) => r === null);
 
@@ -568,6 +571,7 @@ export default function DashboardPage() {
         // Upcoming meetings (top 3, but keep total count for badge)
         setMyUpcomingMeetings(myMeetingsData ? myMeetingsData.slice(0, 3) : []);
         setMyUpcomingMeetingsTotal(myMeetingsData ? myMeetingsData.length : 0);
+        setMyPastMeetingsTotal(myPastMeetingsData ? myPastMeetingsData.length : 0);
         setDepartmentUpcomingMeetings(deptMeetingsData ? (deptMeetingsData as Meeting[]).slice(0, 3) : []);
         setDepartmentUpcomingMeetingsTotal(deptMeetingsData ? (deptMeetingsData as Meeting[]).length : 0);
 
@@ -655,6 +659,26 @@ export default function DashboardPage() {
   const meetingBadges: BadgeInfo[] = [];
   if (scopedMeetingsTotal > 0) {
     meetingBadges.push({ label: "предстоящих", value: scopedMeetingsTotal, color: "blue" });
+  }
+
+  const isMemberInMyScope = currentScope === "my" && userRole === "member";
+  const hasMyUpcomingMeetings = myUpcomingMeetingsTotal > 0;
+  const hasMyPastMeetings = myPastMeetingsTotal > 0;
+
+  let meetingsLinkHref: string | undefined = "/meetings";
+  let meetingsLinkLabel: string | undefined = "Все встречи";
+
+  if (isMemberInMyScope) {
+    if (hasMyUpcomingMeetings) {
+      meetingsLinkHref = "/meetings?scope=my";
+      meetingsLinkLabel = "Мои встречи";
+    } else if (hasMyPastMeetings) {
+      meetingsLinkHref = "/meetings?scope=my&tab=past";
+      meetingsLinkLabel = "История встреч";
+    } else {
+      meetingsLinkHref = undefined;
+      meetingsLinkLabel = undefined;
+    }
   }
 
   const todayStr = formatFullDate(new Date());
@@ -842,8 +866,8 @@ export default function DashboardPage() {
             title={currentScope === "department" ? "Встречи отдела" : "Мои встречи"}
             icon={Video}
             iconColor={ACCENT_BLUE}
-            linkHref="/meetings"
-            linkLabel="Все встречи"
+            linkHref={meetingsLinkHref}
+            linkLabel={meetingsLinkLabel}
             badges={meetingBadges}
           />
           {scopedMeetings.length === 0 ? (

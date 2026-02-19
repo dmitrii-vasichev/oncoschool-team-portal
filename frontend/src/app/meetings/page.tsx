@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Calendar,
   Plus,
@@ -57,11 +58,22 @@ const PER_PAGE = 6;
 
 export default function MeetingsPage() {
   const { user } = useCurrentUser();
+  const searchParams = useSearchParams();
   const isModerator = user ? PermissionService.isModerator(user) : false;
+  const scopeParam = searchParams.get("scope");
+  const tabParam = searchParams.get("tab");
+  const meetingsMemberId =
+    scopeParam === "my" && user?.id ? user.id : undefined;
 
   const { schedules, loading: schedulesLoading, refetch: refetchSchedules } = useMeetingSchedules();
-  const { meetings: upcomingMeetings, loading: upcomingLoading, refetch: refetchUpcoming } = useMeetings({ upcoming: true });
-  const { meetings: pastMeetings, loading: pastLoading, refetch: refetchPast } = useMeetings({ past: true });
+  const { meetings: upcomingMeetings, loading: upcomingLoading, refetch: refetchUpcoming } = useMeetings({
+    upcoming: true,
+    ...(meetingsMemberId ? { member_id: meetingsMemberId } : {}),
+  });
+  const { meetings: pastMeetings, loading: pastLoading, refetch: refetchPast } = useMeetings({
+    past: true,
+    ...(meetingsMemberId ? { member_id: meetingsMemberId } : {}),
+  });
   const { members } = useTeam();
   const { departments } = useDepartments();
 
@@ -86,9 +98,17 @@ export default function MeetingsPage() {
   // Search + pagination for past meetings
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const [activeTab, setActiveTab] = useState<"upcoming" | "past">(
+    tabParam === "past" ? "past" : "upcoming"
+  );
 
   const { toastSuccess, toastError } = useToast();
+
+  useEffect(() => {
+    if (tabParam === "past" || tabParam === "upcoming") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Active schedules sorted by day_of_week
   const activeSchedules = useMemo(
