@@ -2,6 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  BellDot,
+  CircleAlert,
+  ClipboardList,
+  SearchX,
+  Users,
+  Video,
+} from "lucide-react";
 
 /* ============================================
    Inline SVG illustrations for empty states
@@ -244,6 +252,7 @@ interface EmptyStateProps {
   onAction?: () => void;
   actionHref?: string;
   className?: string;
+  compact?: boolean;
 }
 
 const ILLUSTRATIONS: Record<string, React.FC<{ className?: string }>> = {
@@ -254,6 +263,15 @@ const ILLUSTRATIONS: Record<string, React.FC<{ className?: string }>> = {
   notFound: NotFoundIllustration,
 };
 
+const COMPACT_ICONS: Partial<Record<EmptyStateVariant, React.ElementType>> = {
+  tasks: ClipboardList,
+  meetings: Video,
+  team: Users,
+  updates: BellDot,
+  notFound: SearchX,
+  generic: CircleAlert,
+};
+
 export function EmptyState({
   variant = "generic",
   title,
@@ -262,17 +280,26 @@ export function EmptyState({
   onAction,
   actionHref,
   className,
+  compact = false,
 }: EmptyStateProps) {
   const Illustration = ILLUSTRATIONS[variant];
+  const CompactIcon = COMPACT_ICONS[variant] ?? CircleAlert;
 
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-16 text-center animate-fade-in-up",
+        "animate-fade-in-up",
+        compact
+          ? "flex items-start gap-3 rounded-xl bg-muted/20 px-3 py-3 text-left"
+          : "flex flex-col items-center justify-center py-16 text-center",
         className
       )}
     >
-      {Illustration ? (
+      {compact ? (
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-card text-muted-foreground">
+          <CompactIcon className="h-4 w-4" />
+        </div>
+      ) : Illustration ? (
         <Illustration className="mb-4 opacity-80" />
       ) : (
         <div className="h-16 w-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
@@ -282,35 +309,48 @@ export function EmptyState({
         </div>
       )}
 
-      <h3 className="text-sm font-heading font-semibold text-foreground mb-1">
-        {title}
-      </h3>
+      <div className={cn(compact ? "min-w-0 flex-1" : undefined)}>
+        <h3
+          className={cn(
+            "font-heading font-semibold text-foreground",
+            compact ? "mb-0.5 text-sm" : "mb-1 text-sm"
+          )}
+        >
+          {title}
+        </h3>
 
-      {description && (
-        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
-          {description}
-        </p>
-      )}
+        {description && (
+          <p
+            className={cn(
+              compact
+                ? "text-xs text-muted-foreground leading-relaxed"
+                : "text-sm text-muted-foreground max-w-xs leading-relaxed"
+            )}
+          >
+            {description}
+          </p>
+        )}
 
-      {actionLabel && (onAction || actionHref) && (
-        <div className="mt-4">
-          {actionHref ? (
-            <a href={actionHref}>
-              <Button size="sm" className="rounded-xl gap-1.5">
+        {actionLabel && (onAction || actionHref) && (
+          <div className={cn(compact ? "mt-2" : "mt-4")}>
+            {actionHref ? (
+              <a href={actionHref}>
+                <Button size="sm" className="rounded-xl gap-1.5">
+                  {actionLabel}
+                </Button>
+              </a>
+            ) : (
+              <Button
+                size="sm"
+                className="rounded-xl gap-1.5"
+                onClick={onAction}
+              >
                 {actionLabel}
               </Button>
-            </a>
-          ) : (
-            <Button
-              size="sm"
-              className="rounded-xl gap-1.5"
-              onClick={onAction}
-            >
-              {actionLabel}
-            </Button>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

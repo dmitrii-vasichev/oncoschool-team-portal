@@ -686,6 +686,11 @@ export default function DashboardPage() {
     }
   }
 
+  if (scopedMeetingsTotal === 0 && meetingsLinkLabel === "Все встречи") {
+    meetingsLinkHref = undefined;
+    meetingsLinkLabel = undefined;
+  }
+
   const todayStr = formatFullDate(new Date());
 
   const ACCENT_DESTRUCTIVE = "hsl(0, 72%, 51%)";
@@ -878,9 +883,9 @@ export default function DashboardPage() {
           {scopedMeetings.length === 0 ? (
             <EmptyState
               variant="meetings"
+              compact
               title={currentScope === "department" ? "В отделе нет предстоящих встреч" : "У вас нет предстоящих встреч"}
               description={currentScope === "department" ? "По выбранному отделу нет запланированных встреч." : "Вы пока не являетесь участником ни одной предстоящей встречи."}
-              className="py-6"
             />
           ) : (
             <div className="grid gap-3 md:grid-cols-3">
