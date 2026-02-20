@@ -1,4 +1,5 @@
 import logging
+from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
@@ -22,7 +23,7 @@ from app.bot.keyboards import (
     MENU_BTN_TEAM_REMINDERS,
     main_menu_reply_keyboard,
 )
-from app.bot.menu import configure_chat_menu
+from app.bot.menu import build_private_commands, configure_chat_menu
 from app.db.models import TeamMember
 from app.db.repositories import TeamMemberRepository
 from app.services.permission_service import PermissionService
@@ -66,7 +67,8 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
         f"Привет, {member.full_name}! Я бот-задачник Онкошколы.\n"
         f"Твоя роль: {role_emoji} {role_text}\n\n"
         "Ниже закреплена постоянная клавиатура с быстрыми действиями.\n"
-        "Кнопки «Мои задачи», «Хелп» и другие доступны сразу."
+        "Кнопки «Мои задачи», «Хелп» и другие доступны сразу.\n"
+        "Кнопка «Портал» рядом с полем ввода открывает веб-версию."
     )
     if message.chat.type == "private":
         await message.answer(
@@ -86,50 +88,22 @@ async def cmd_start(message: Message, member: TeamMember) -> None:
 
 @router.message(Command("help"))
 async def cmd_help(message: Message, member: TeamMember) -> None:
-    is_mod = PermissionService.is_moderator(member)
-    is_adm = PermissionService.is_admin(member)
-    all_tasks_help = "/all — задачи компании\n" if is_mod else "/all — задачи отдела\n"
-
-    common_commands = (
-        "<b>Команды:</b>\n\n"
-        "/tasks — мои задачи\n"
-        f"{all_tasks_help}"
-        "/new &lt;текст&gt; — создать задачу себе\n"
-        "/assign @username &lt;текст&gt; — назначить задачу (модератор)\n"
-        "/done &lt;id&gt; — завершить задачу\n"
-        "/update &lt;id&gt; &lt;текст&gt; — промежуточный апдейт\n"
-        "/updates &lt;id&gt; — история обновлений задачи\n"
-        "/blocker &lt;id&gt; &lt;текст&gt; — добавить блокер\n"
-        "/status &lt;id&gt; &lt;статус&gt; — изменить статус\n"
-        "\U0001f3a4 Голосовое сообщение — создать задачу голосом\n"
-        "/nextmeeting — следующая встреча\n"
-        "/myreminder — мои настройки напоминаний\n"
-        "/help — показать эту справку"
+    commands = build_private_commands(
+        is_moderator=PermissionService.is_moderator(member),
+        is_admin=PermissionService.is_admin(member),
     )
 
-    text = common_commands
+    lines = ["<b>Доступные команды:</b>", ""]
+    for cmd in commands:
+        lines.append(f"/{cmd.command} — {escape(cmd.description)}")
 
-    if is_mod:
-        mod_commands = (
-            "\n\n<b>\U0001f6e1\ufe0f Модератор:</b>\n\n"
-            "/meetings — предстоящие и прошедшие встречи\n"
-            "/subscribe — подписки на уведомления\n"
-            "/reminders — настройки напоминаний\n"
-            "/summary — парсинг Zoom AI Summary\n"
-            "/stats — статистика"
-        )
-        text += mod_commands
+    lines.extend([
+        "",
+        "\U0001f3a4 Голосовое сообщение — создать задачу голосом",
+        "\U0001f310 Портал — кнопка «Портал» рядом с полем ввода",
+    ])
 
-    if is_adm:
-        admin_commands = (
-            "\n\n<b>\U0001f451 Администрирование:</b>\n\n"
-            "/setrole @username admin|moderator|member — изменить роль\n"
-            "/aimodel — текущая AI-модель\n"
-            "\u2699\ufe0f Настройки AI, напоминания — через веб-интерфейс"
-        )
-        text += admin_commands
-
-    await message.answer(text, parse_mode="HTML")
+    await message.answer("\n".join(lines), parse_mode="HTML")
 
 
 @router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_MY_TASKS)

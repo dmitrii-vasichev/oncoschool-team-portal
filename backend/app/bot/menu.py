@@ -4,10 +4,15 @@ from aiogram.types import (
     BotCommandScopeAllPrivateChats,
     BotCommandScopeChat,
     MenuButtonCommands,
+    MenuButtonWebApp,
+    WebAppInfo,
 )
+
+from app.config import settings
 
 
 HELP_PRIVATE_COMMAND = BotCommand(command="help", description="Хелп и список команд")
+PORTAL_MENU_BUTTON_TEXT = "Портал"
 
 COMMON_PRIVATE_COMMANDS: list[BotCommand] = [
     BotCommand(command="tasks", description="Мои задачи"),
@@ -52,12 +57,23 @@ def build_private_commands(
     return commands
 
 
+def build_private_menu_button() -> MenuButtonCommands | MenuButtonWebApp:
+    """Use Telegram menu button for opening the web portal when URL is configured."""
+    frontend_url = settings.NEXT_PUBLIC_FRONTEND_URL.strip().rstrip("/")
+    if frontend_url.startswith(("http://", "https://")):
+        return MenuButtonWebApp(
+            text=PORTAL_MENU_BUTTON_TEXT,
+            web_app=WebAppInfo(url=f"{frontend_url}/login"),
+        )
+    return MenuButtonCommands()
+
+
 async def configure_global_menu(bot: Bot) -> None:
     commands = build_private_commands(is_moderator=False, is_admin=False)
     private_scope = BotCommandScopeAllPrivateChats()
 
     await bot.set_my_commands(commands=commands, scope=private_scope)
-    await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+    await bot.set_chat_menu_button(menu_button=build_private_menu_button())
 
 
 async def configure_chat_menu(
@@ -73,4 +89,7 @@ async def configure_chat_menu(
     )
     chat_scope = BotCommandScopeChat(chat_id=chat_id)
     await bot.set_my_commands(commands=commands, scope=chat_scope)
-    await bot.set_chat_menu_button(chat_id=chat_id, menu_button=MenuButtonCommands())
+    await bot.set_chat_menu_button(
+        chat_id=chat_id,
+        menu_button=build_private_menu_button(),
+    )

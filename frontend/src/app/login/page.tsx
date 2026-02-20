@@ -62,6 +62,15 @@ function PulsingDots() {
 }
 
 type LoginStep = "username" | "waiting" | "error";
+type TelegramWindow = Window & {
+  Telegram?: {
+    WebApp?: {
+      initData?: string;
+      ready?: () => void;
+      expand?: () => void;
+    };
+  };
+};
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +89,8 @@ export default function LoginPage() {
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { loginWithTelegramId, loginWithWebLogin } = useCurrentUser();
+  const { loginWithTelegramId, loginWithTelegramWebApp, loginWithWebLogin } =
+    useCurrentUser();
   const router = useRouter();
 
   // Fetch config from backend
@@ -104,6 +114,43 @@ export default function LoginPage() {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
+
+  // Auto-login when opened as Telegram WebApp (menu button "Портал").
+  useEffect(() => {
+    if (configLoading || debugMode || step !== "username") return;
+
+    const telegramWebApp = (window as TelegramWindow).Telegram?.WebApp;
+    const initData = telegramWebApp?.initData?.trim();
+    if (!initData) return;
+
+    telegramWebApp.ready?.();
+    telegramWebApp.expand?.();
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        await loginWithTelegramWebApp(initData);
+        if (!cancelled) router.push("/");
+      } catch (err) {
+        if (!cancelled) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Ошибка авторизации через Telegram";
+          setError(message);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [configLoading, debugMode, step, loginWithTelegramWebApp, router]);
 
   const stopPolling = useCallback(() => {
     if (pollingRef.current) {

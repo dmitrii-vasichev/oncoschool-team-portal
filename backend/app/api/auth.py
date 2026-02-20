@@ -1,11 +1,13 @@
 import hashlib
 import hmac
 import io
+import json
 import logging
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import parse_qsl
 
 import httpx
 import jwt
@@ -48,6 +50,10 @@ class TelegramAuthData(BaseModel):
     photo_url: str | None = None
     auth_date: int
     hash: str
+
+
+class TelegramWebAppAuthRequest(BaseModel):
+    init_data: str
 
 
 class TokenResponse(BaseModel):
@@ -102,6 +108,30 @@ def verify_telegram_auth(data: TelegramAuthData, bot_token: str) -> bool:
         secret_key, data_check_string.encode(), hashlib.sha256
     ).hexdigest()
     return hmac.compare_digest(check_hash, data.hash)
+
+
+def verify_telegram_webapp_init_data(
+    init_data: str,
+    bot_token: str,
+) -> dict[str, str] | None:
+    """Verify Telegram WebApp initData using HMAC-SHA256."""
+    payload = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = payload.pop("hash", None)
+    if not received_hash:
+        return None
+
+    data_check_string = "\n".join(
+        f"{k}={v}" for k, v in sorted(payload.items())
+    )
+    secret_key = hmac.new(
+        b"WebAppData", bot_token.encode(), hashlib.sha256
+    ).digest()
+    check_hash = hmac.new(
+        secret_key, data_check_string.encode(), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(check_hash, received_hash):
+        return None
+    return payload
 
 
 # --- Dependencies ---
@@ -262,6 +292,110 @@ async def login_telegram(
 
     # 6. Issue JWT
     auth_logger.info("telegram_login OK: member_id=%s, telegram_id=%s, ip=%s", member.id, data.id, client_ip)
+    token = create_access_token(member.id)
+    return TokenResponse(
+        access_token=token,
+        member_id=str(member.id),
+        role=member.role,
+    )
+
+
+@router.post("/telegram-webapp", response_model=TokenResponse)
+@limiter.limit("20/minute")
+async def login_telegram_webapp(
+    request: Request,
+    data: TelegramWebAppAuthRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Authenticate Telegram WebApp user by validating initData signature."""
+    client_ip = request.client.host if request.client else "unknown"
+    init_data = data.init_data.strip()
+    verified_payload = verify_telegram_webapp_init_data(init_data, settings.BOT_TOKEN)
+    if verified_payload is None:
+        auth_logger.warning("telegram_webapp_login FAIL: invalid signature, ip=%s", client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Невалидная подпись Telegram WebApp",
+        )
+
+    auth_date_raw = verified_payload.get("auth_date")
+    try:
+        auth_date = int(auth_date_raw) if auth_date_raw else 0
+    except ValueError:
+        auth_date = 0
+    if auth_date <= 0 or abs(time.time() - auth_date) > 300:
+        auth_logger.warning("telegram_webapp_login FAIL: expired auth_date, ip=%s", client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Авторизация устарела. Откройте портал из Telegram снова",
+        )
+
+    user_raw = verified_payload.get("user")
+    if not user_raw:
+        auth_logger.warning("telegram_webapp_login FAIL: user missing, ip=%s", client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Некорректные данные Telegram WebApp",
+        )
+
+    try:
+        user_data = json.loads(user_raw)
+        telegram_id = int(user_data["id"])
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
+        auth_logger.warning("telegram_webapp_login FAIL: bad user payload, ip=%s", client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Некорректные данные пользователя Telegram",
+        )
+
+    member = await member_repo.get_by_telegram_id(session, telegram_id)
+    if not member or not member.is_active:
+        auth_logger.warning(
+            "telegram_webapp_login FAIL: member not found/inactive, telegram_id=%s, ip=%s",
+            telegram_id,
+            client_ip,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Доступ запрещён. Обратитесь к модератору для добавления в команду",
+        )
+
+    needs_commit = False
+    username = user_data.get("username")
+    if username and username != member.telegram_username:
+        member.telegram_username = username
+        needs_commit = True
+
+    photo_url = user_data.get("photo_url")
+    if photo_url:
+        has_custom_upload = bool(
+            member.avatar_url
+            and not member.avatar_url.endswith("_tg.webp")
+            and (
+                "/static/avatars/" in member.avatar_url
+                or "supabase.co" in member.avatar_url
+            )
+        )
+        if not has_custom_upload:
+            local_url = await _download_avatar_from_url(
+                photo_url,
+                str(member.id),
+                storage_service=request.app.state.storage_service,
+            )
+            if local_url and local_url != member.avatar_url:
+                member.avatar_url = local_url
+                needs_commit = True
+
+    if needs_commit:
+        session.add(member)
+        await session.commit()
+
+    auth_logger.info(
+        "telegram_webapp_login OK: member_id=%s, telegram_id=%s, ip=%s",
+        member.id,
+        telegram_id,
+        client_ip,
+    )
     token = create_access_token(member.id)
     return TokenResponse(
         access_token=token,

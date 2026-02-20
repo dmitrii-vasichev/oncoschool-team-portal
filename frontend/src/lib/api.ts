@@ -143,6 +143,15 @@ class ApiClient {
     return resp;
   }
 
+  async loginWithTelegramWebApp(initData: string): Promise<LoginResponse> {
+    const resp = await this.request<LoginResponse>("/api/auth/telegram-webapp", {
+      method: "POST",
+      body: JSON.stringify({ init_data: initData }),
+    });
+    this.setToken(resp.access_token);
+    return resp;
+  }
+
   async getAuthConfig(): Promise<{ bot_username: string; debug?: boolean }> {
     return this.request<{ bot_username: string; debug?: boolean }>("/api/auth/config");
   }

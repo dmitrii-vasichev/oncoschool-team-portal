@@ -16,6 +16,7 @@ interface AuthContextValue {
   user: TeamMember | null;
   loading: boolean;
   loginWithTelegram: (data: TelegramAuthData) => Promise<void>;
+  loginWithTelegramWebApp: (initData: string) => Promise<void>;
   loginWithTelegramId: (telegramId: number) => Promise<void>;
   loginWithWebLogin: (token: string) => Promise<void>;
   logout: () => void;
@@ -80,6 +81,12 @@ export function useAuthProvider(): AuthContextValue {
     setUser(me);
   }, []);
 
+  const loginWithTelegramWebApp = useCallback(async (initData: string) => {
+    await api.loginWithTelegramWebApp(initData);
+    const me = await api.getMe();
+    setUser(me);
+  }, []);
+
   const loginWithTelegramId = useCallback(async (telegramId: number) => {
     await api.devLogin(telegramId);
     const me = await api.getMe();
@@ -97,7 +104,16 @@ export function useAuthProvider(): AuthContextValue {
     setUser(null);
   }, []);
 
-  return { user, loading, loginWithTelegram, loginWithTelegramId, loginWithWebLogin, logout, refreshUser };
+  return {
+    user,
+    loading,
+    loginWithTelegram,
+    loginWithTelegramWebApp,
+    loginWithTelegramId,
+    loginWithWebLogin,
+    logout,
+    refreshUser,
+  };
 }
 
 export function createAuthProvider(children: ReactNode, value: AuthContextValue) {
