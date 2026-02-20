@@ -1224,14 +1224,14 @@ function ReminderEditDialog({
           </div>
 
           {/* Time */}
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <div className="space-y-2">
+            <Label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Время отправки
             </Label>
             <TimePicker
               value={time}
               onChange={setTime}
-              className="mt-1.5 w-32 rounded-xl"
+              className="w-28 rounded-xl"
             />
           </div>
 
