@@ -13,6 +13,7 @@ from app.bot.keyboards import (
     MENU_BTN_ALL_TASKS_DEPARTMENT,
     MENU_BTN_ALL_TASKS_LEGACY,
     MENU_BTN_CREATE_TASK,
+    MENU_BTN_CREATE_TASK_LEGACY,
     MENU_BTN_HELP,
     MENU_BTN_MEETINGS,
     MENU_BTN_MY_REMINDER,
@@ -21,7 +22,9 @@ from app.bot.keyboards import (
     MENU_BTN_STATS,
     MENU_BTN_SUBSCRIBE,
     MENU_BTN_SUMMARY,
+    MENU_BTN_SUMMARY_LEGACY,
     MENU_BTN_TEAM_REMINDERS,
+    MENU_BTN_TEAM_REMINDERS_LEGACY,
     main_menu_reply_keyboard,
 )
 from app.bot.menu import build_private_commands, configure_chat_menu
@@ -119,6 +122,7 @@ async def menu_btn_my_tasks(
 
 
 @router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_CREATE_TASK)
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_CREATE_TASK_LEGACY)
 async def menu_btn_create_task(
     message: Message,
     state: FSMContext,
@@ -214,6 +218,7 @@ async def menu_btn_subscribe(
 
 
 @router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_SUMMARY)
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_SUMMARY_LEGACY)
 async def menu_btn_summary(
     message: Message,
     member: TeamMember,
@@ -244,6 +249,7 @@ async def menu_btn_ai_model(
 
 
 @router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_TEAM_REMINDERS)
+@router.message(StateFilter(None), F.chat.type == "private", F.text == MENU_BTN_TEAM_REMINDERS_LEGACY)
 async def menu_btn_team_reminders(
     message: Message,
     member: TeamMember,

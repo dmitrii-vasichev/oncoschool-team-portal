@@ -39,6 +39,7 @@ TASK_FILTER_LABELS: dict[TaskListFilter, str] = {
 
 MENU_BTN_MY_TASKS = "📋 Мои задачи"
 MENU_BTN_CREATE_TASK = "➕ Создать задачу"
+MENU_BTN_CREATE_TASK_LEGACY = "Создать задачу"
 MENU_BTN_HELP = "❓ Хелп"
 MENU_BTN_ALL_TASKS_DEPARTMENT = "📊 Задачи отдела"
 MENU_BTN_ALL_TASKS_COMPANY = "🏢 Задачи проекта"
@@ -49,8 +50,10 @@ MENU_BTN_MEETINGS = "🗓 Встречи"
 MENU_BTN_STATS = "📈 Статистика"
 MENU_BTN_SUBSCRIBE = "🔔 Подписки"
 MENU_BTN_SUMMARY = "🧠 Summary"
+MENU_BTN_SUMMARY_LEGACY = "🧠 Сводка"
 MENU_BTN_AI_MODEL = "🤖 AI-модель"
 MENU_BTN_TEAM_REMINDERS = "⏰ Напоминания команды"
+MENU_BTN_TEAM_REMINDERS_LEGACY = "⚙️ Напоминания команды"
 
 
 def main_menu_reply_keyboard(
