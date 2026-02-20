@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getConfiguredApiUrl } from "@/lib/api-base-url";
 
 function getInitials(name: string): string {
   return name
@@ -23,7 +24,7 @@ function getAvatarColor(name: string): string {
   return `hsl(${hue}, 55%, 42%)`;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = getConfiguredApiUrl();
 
 function resolveAvatarUrl(url: string): string {
   if (url.startsWith("http://") || url.startsWith("https://")) return url;

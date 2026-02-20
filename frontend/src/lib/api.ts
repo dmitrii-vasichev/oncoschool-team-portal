@@ -1,3 +1,5 @@
+import { getApiBaseCandidates, getConfiguredApiUrl } from "./api-base-url";
+
 import type {
   TelegramAuthData,
   LoginResponse,
@@ -33,10 +35,39 @@ import type {
   InAppNotificationListResponse,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 class ApiClient {
   private token: string | null = null;
+  private activeApiBaseUrl: string | null = null;
+
+  private getApiBases(): string[] {
+    return getApiBaseCandidates(this.activeApiBaseUrl);
+  }
+
+  private async fetchWithApiFallback(path: string, options: RequestInit): Promise<Response> {
+    const apiBases = this.getApiBases();
+    let lastError: unknown = null;
+
+    for (const apiBase of apiBases) {
+      try {
+        const response = await fetch(`${apiBase}${path}`, options);
+        this.activeApiBaseUrl = apiBase;
+        return response;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const configuredBase = getConfiguredApiUrl();
+    const reason =
+      lastError instanceof Error && lastError.message
+        ? ` Причина: ${lastError.message}.`
+        : "";
+    throw new Error(
+      `Сервер недоступен. Убедитесь, что бэкенд запущен на ${configuredBase}.` +
+        (apiBases.length > 1 ? ` Попытки: ${apiBases.join(", ")}.` : "") +
+        reason
+    );
+  }
 
   setToken(token: string | null) {
     this.token = token;
@@ -68,17 +99,10 @@ class ApiClient {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    let res: Response;
-    try {
-      res = await fetch(`${API_URL}${path}`, {
-        ...options,
-        headers,
-      });
-    } catch {
-      throw new Error(
-        "Сервер недоступен. Убедитесь, что бэкенд запущен на " + API_URL
-      );
-    }
+    const res = await this.fetchWithApiFallback(path, {
+      ...options,
+      headers,
+    });
 
     if (res.status === 401) {
       const body = await res.json().catch(() => ({}));
@@ -492,7 +516,7 @@ class ApiClient {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
-    const res = await fetch(`${API_URL}/api/team/${memberId}/avatar`, {
+    const res = await this.fetchWithApiFallback(`/api/team/${memberId}/avatar`, {
       method: "POST",
       headers,
       body: formData,
