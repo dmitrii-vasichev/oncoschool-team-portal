@@ -10,7 +10,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.bot.keyboards import voice_edit_fields_keyboard, voice_task_confirm_keyboard
+from app.bot.keyboards import (
+    voice_assignee_keyboard,
+    voice_edit_fields_keyboard,
+    voice_task_confirm_keyboard,
+)
 from app.config import settings
 from app.db.models import TeamMember
 from app.db.repositories import TeamMemberRepository
@@ -291,8 +295,28 @@ async def cb_voice_edit(
 async def cb_voice_select_field(
     callback: CallbackQuery,
     state: FSMContext,
+    session_maker: async_sessionmaker,
 ) -> None:
     field = callback.data.split(":")[1]
+
+    if field == "assignee":
+        async with session_maker() as session:
+            team_members = await member_repo.get_all_active(session)
+
+        if not team_members:
+            await callback.answer("Нет активных участников для назначения", show_alert=True)
+            return
+
+        data = await state.get_data()
+
+        await callback.answer()
+        await callback.message.edit_reply_markup(
+            reply_markup=voice_assignee_keyboard(
+                team_members,
+                current_assignee_id=data.get("assignee_id"),
+            )
+        )
+        return
 
     await state.set_state(VoiceTaskFSM.editing_field)
     await state.update_data(editing_field=field)
@@ -308,6 +332,50 @@ async def cb_voice_select_field(
     await callback.message.edit_text(
         field_labels.get(field, "Введи новое значение:") + "\n\nДля отмены: /cancel",
     )
+
+
+@router.callback_query(VoiceTaskFSM.preview, F.data.startswith("voice_assignee:"))
+async def cb_voice_select_assignee(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session_maker: async_sessionmaker,
+) -> None:
+    assignee_id_raw = callback.data.split(":")[1]
+    try:
+        assignee_id = uuid.UUID(assignee_id_raw)
+    except ValueError:
+        await callback.answer("Некорректный исполнитель", show_alert=True)
+        return
+
+    async with session_maker() as session:
+        assignee = await member_repo.get_by_id(session, assignee_id)
+
+    if not assignee or not assignee.is_active:
+        await callback.answer("Исполнитель не найден или неактивен", show_alert=True)
+        return
+
+    await state.update_data(
+        assignee_id=str(assignee.id),
+        assignee_display_name=assignee.full_name,
+    )
+
+    updated_data = await state.get_data()
+    preview_text = _format_voice_preview(updated_data)
+
+    await callback.answer("Исполнитель обновлён")
+    await callback.message.edit_text(
+        preview_text,
+        parse_mode="HTML",
+        reply_markup=voice_task_confirm_keyboard(),
+    )
+
+
+@router.callback_query(VoiceTaskFSM.preview, F.data == "voice_back_fields")
+async def cb_voice_back_fields(
+    callback: CallbackQuery,
+) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=voice_edit_fields_keyboard())
 
 
 @router.callback_query(VoiceTaskFSM.preview, F.data == "voice_back_preview")

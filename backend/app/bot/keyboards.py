@@ -397,13 +397,41 @@ def voice_edit_fields_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="⚡ Приоритет", callback_data="voice_field:priority"),
         ],
         [
+            InlineKeyboardButton(text="👤 Исполнитель", callback_data="voice_field:assignee"),
             InlineKeyboardButton(text="📅 Дедлайн", callback_data="voice_field:deadline"),
+        ],
+        [
             InlineKeyboardButton(text="📝 Описание", callback_data="voice_field:description"),
         ],
         [
             InlineKeyboardButton(text="↩️ Назад к превью", callback_data="voice_back_preview"),
         ],
     ])
+
+
+def voice_assignee_keyboard(
+    team_members: Sequence,
+    current_assignee_id: str | None,
+) -> InlineKeyboardMarkup:
+    """Клавиатура выбора исполнителя для голосовой задачи."""
+    buttons = []
+    for member in team_members:
+        label = f"{'✓ ' if str(member.id) == current_assignee_id else ''}{member.full_name}"
+        buttons.append([
+            InlineKeyboardButton(
+                text=label,
+                callback_data=f"voice_assignee:{member.id}",
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(text="↩️ К полям", callback_data="voice_back_fields"),
+    ])
+    buttons.append([
+        InlineKeyboardButton(text="↩️ К превью", callback_data="voice_back_preview"),
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 # ── Subscription keyboards ──
