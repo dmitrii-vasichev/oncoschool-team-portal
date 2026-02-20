@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from contextlib import suppress
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -177,8 +178,15 @@ async def health():
 
 async def start_bot():
     """Запуск Telegram-бота в режиме polling."""
-    logger.info("Starting Telegram bot polling...")
-    await dp.start_polling(bot)
+    while True:
+        try:
+            logger.info("Starting Telegram bot polling...")
+            await dp.start_polling(bot)
+            logger.info("Telegram bot polling stopped gracefully")
+            return
+        except Exception:
+            logger.exception("Telegram polling crashed; retrying in 5 seconds")
+            await asyncio.sleep(5)
 
 
 async def start_api():
@@ -197,12 +205,26 @@ async def start_api():
 async def main():
     """Запуск FastAPI + aiogram polling + APScheduler параллельно."""
     # Configure Telegram menu commands for private chats.
-    await configure_global_menu(bot)
-    logger.info("Telegram menu commands configured")
-    await asyncio.gather(
-        start_bot(),
-        start_api(),
+    try:
+        await configure_global_menu(bot)
+        logger.info("Telegram menu commands configured")
+    except Exception:
+        logger.exception("Failed to configure Telegram menu commands at startup")
+
+    bot_task = asyncio.create_task(start_bot(), name="telegram-polling")
+    api_task = asyncio.create_task(start_api(), name="fastapi-server")
+    done, pending = await asyncio.wait(
+        {bot_task, api_task},
+        return_when=asyncio.FIRST_EXCEPTION,
     )
+    for task in done:
+        exc = task.exception()
+        if exc is not None:
+            logger.exception("Main task %s failed", task.get_name(), exc_info=exc)
+    for task in pending:
+        task.cancel()
+    with suppress(asyncio.CancelledError):
+        await asyncio.gather(*pending)
 
 
 if __name__ == "__main__":
