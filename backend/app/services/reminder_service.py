@@ -220,12 +220,13 @@ class ReminderService:
                 sections.append("\n".join(lines))
 
         # New tasks
-        new_tasks = [t for t in active_tasks if t.status == "new"]
-        if new_tasks:
-            lines = ["\n🆕 Новые ({}):" .format(len(new_tasks))]
-            for t in new_tasks:
-                lines.append(f"  #{t.short_id} · {t.title} · ⚡ {t.priority}")
-            sections.append("\n".join(lines))
+        if rs.include_new:
+            new_tasks = [t for t in active_tasks if t.status == "new"]
+            if new_tasks:
+                lines = ["\n🆕 Новые ({}):" .format(len(new_tasks))]
+                for t in new_tasks:
+                    lines.append(f"  #{t.short_id} · {t.title} · ⚡ {t.priority}")
+                sections.append("\n".join(lines))
 
         # Completed yesterday
         yesterday = today - timedelta(days=1)

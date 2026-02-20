@@ -396,6 +396,7 @@ class ReminderSettingsCreate(BaseModel):
     include_overdue: bool = True
     include_upcoming: bool = True
     include_in_progress: bool = True
+    include_new: bool = True
 
 
 class ReminderSettingsUpdate(BaseModel):
@@ -406,6 +407,7 @@ class ReminderSettingsUpdate(BaseModel):
     include_overdue: bool | None = None
     include_upcoming: bool | None = None
     include_in_progress: bool | None = None
+    include_new: bool | None = None
 
 
 class ReminderSettingsResponse(BaseModel):
@@ -420,6 +422,7 @@ class ReminderSettingsResponse(BaseModel):
     include_overdue: bool
     include_upcoming: bool
     include_in_progress: bool
+    include_new: bool
     configured_by_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime

@@ -453,6 +453,7 @@ class ReminderSettings(Base):
     include_in_progress: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
     )
+    include_new: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     configured_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("team_members.id"), nullable=True
     )

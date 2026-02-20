@@ -496,6 +496,8 @@ async def cmd_myreminder(
         includes.append("ближайшие (3 дня)")
     if rs.include_in_progress:
         includes.append("в работе")
+    if rs.include_new:
+        includes.append("новые")
     includes_str = ", ".join(includes) if includes else "—"
 
     await message.answer(

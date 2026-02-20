@@ -293,6 +293,7 @@ export interface ReminderSettings {
   include_overdue: boolean;
   include_upcoming: boolean;
   include_in_progress: boolean;
+  include_new: boolean;
   configured_by_id: string | null;
   created_at: string;
   updated_at: string;

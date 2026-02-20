@@ -1162,6 +1162,9 @@ function ReminderEditDialog({
   const [includeInProgress, setIncludeInProgress] = useState(
     reminder?.include_in_progress ?? true
   );
+  const [includeNew, setIncludeNew] = useState(
+    reminder?.include_new ?? true
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1184,6 +1187,7 @@ function ReminderEditDialog({
         include_overdue: includeOverdue,
         include_upcoming: includeUpcoming,
         include_in_progress: includeInProgress,
+        include_new: includeNew,
       });
       onSaved();
       onClose();
@@ -1283,7 +1287,7 @@ function ReminderEditDialog({
               <div className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-muted/40">
                 <div className="flex items-center gap-2">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-sm">Ближайшие задачи (3 дня)</span>
+                  <span className="text-sm">Ближайшие по дедлайну (3 дня)</span>
                 </div>
                 <Switch
                   checked={includeUpcoming}
@@ -1298,6 +1302,16 @@ function ReminderEditDialog({
                 <Switch
                   checked={includeInProgress}
                   onCheckedChange={setIncludeInProgress}
+                />
+              </div>
+              <div className="flex items-center justify-between rounded-xl px-3 py-2.5 hover:bg-muted/40">
+                <div className="flex items-center gap-2">
+                  <CalendarPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-sm">Новые задачи</span>
+                </div>
+                <Switch
+                  checked={includeNew}
+                  onCheckedChange={setIncludeNew}
                 />
               </div>
             </div>
