@@ -121,7 +121,7 @@ export default function LoginPage() {
 
     const telegramWebApp = (window as TelegramWindow).Telegram?.WebApp;
     const initData = telegramWebApp?.initData?.trim();
-    if (!initData) return;
+    if (!telegramWebApp || !initData) return;
 
     telegramWebApp.ready?.();
     telegramWebApp.expand?.();
