@@ -268,10 +268,7 @@ async def create_meeting(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a meeting manually (without schedule). Optionally creates Zoom meeting."""
-    try:
-        selected_tz = ZoneInfo(data.timezone)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Неверный часовой пояс")
+    selected_tz = ZoneInfo("Europe/Moscow")
 
     # Store as naive UTC in DB (legacy model stores timestamp without timezone).
     if data.meeting_date.tzinfo:
@@ -290,7 +287,7 @@ async def create_meeting(
                 topic=data.title,
                 start_time=zoom_start_time,
                 duration=data.duration_minutes,
-                timezone=data.timezone,
+                timezone="Europe/Moscow",
             )
         except Exception as e:
             # Zoom failure is non-fatal — create meeting without Zoom

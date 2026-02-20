@@ -173,7 +173,7 @@ async def create_schedule(
 
     # Convert local time to UTC
     try:
-        time_utc = _local_to_utc(data.time_local, data.timezone)
+        time_utc = _local_to_utc(data.time_local, "Europe/Moscow")
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -207,7 +207,7 @@ async def create_schedule(
         title=data.title,
         day_of_week=data.day_of_week,
         time_utc=time_utc,
-        timezone=data.timezone,
+        timezone="Europe/Moscow",
         duration_minutes=data.duration_minutes,
         recurrence=data.recurrence,
         reminder_enabled=data.reminder_enabled,
@@ -224,7 +224,7 @@ async def create_schedule(
 
     # Create the first upcoming meeting immediately so it appears in the UI
     next_meeting_date = _calc_next_meeting_datetime(
-        data.day_of_week, time_utc, data.timezone, data.recurrence
+        data.day_of_week, time_utc, "Europe/Moscow", data.recurrence
     )
     if next_meeting_date:
         zoom_data = None
@@ -236,7 +236,7 @@ async def create_schedule(
                     topic=data.title,
                     start_time=tz_aware,
                     duration=data.duration_minutes,
-                    timezone=data.timezone,
+                    timezone="Europe/Moscow",
                 )
             except Exception as e:
                 logger.warning(f"Zoom create failed for new schedule: {e}")
@@ -298,11 +298,13 @@ async def update_schedule(
             (update_data["reminder_zoom_missing_text"] or "").strip() or None
         )
 
+    # Force timezone to Moscow
+    update_data["timezone"] = "Europe/Moscow"
+
     # Convert time_local -> time_utc if provided
     if "time_local" in update_data:
-        tz = update_data.get("timezone", schedule.timezone)
         try:
-            update_data["time_utc"] = _local_to_utc(update_data.pop("time_local"), tz)
+            update_data["time_utc"] = _local_to_utc(update_data.pop("time_local"), "Europe/Moscow")
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -315,9 +317,8 @@ async def update_schedule(
     if "next_occurrence_time_local" in update_data:
         time_local_str = update_data.pop("next_occurrence_time_local")
         if time_local_str:
-            tz = update_data.get("timezone", schedule.timezone)
             try:
-                update_data["next_occurrence_time_override"] = _local_to_utc(time_local_str, tz)
+                update_data["next_occurrence_time_override"] = _local_to_utc(time_local_str, "Europe/Moscow")
             except Exception:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,

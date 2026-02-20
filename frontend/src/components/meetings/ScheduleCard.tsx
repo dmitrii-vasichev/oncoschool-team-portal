@@ -123,9 +123,11 @@ export function ScheduleCard({
                 <span className="text-border mx-0.5">·</span>
                 <span>{schedule.duration_minutes} мин</span>
               </div>
-              <div className="text-2xs text-muted-foreground pl-4">
-                {displayTime.local}
-              </div>
+              {displayTime.local && (
+                <div className="text-2xs text-muted-foreground pl-4">
+                  {displayTime.local}
+                </div>
+              )}
               <Badge
                 variant="secondary"
                 className="rounded-md text-2xs font-medium px-1.5 py-0 h-5"

@@ -14,9 +14,18 @@ function getUpcomingBirthdays(
   members: TeamMember[],
   daysAhead: number = 30
 ): UpcomingBirthday[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const currentYear = today.getFullYear();
+  // Use Moscow date as "today" so all users see the same birthday list
+  const mskParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Moscow",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const mskYear = Number(mskParts.find((p) => p.type === "year")!.value);
+  const mskMonth = Number(mskParts.find((p) => p.type === "month")!.value) - 1;
+  const mskDay = Number(mskParts.find((p) => p.type === "day")!.value);
+  const today = new Date(mskYear, mskMonth, mskDay);
+  const currentYear = mskYear;
   const results: UpcomingBirthday[] = [];
 
   for (const member of members) {

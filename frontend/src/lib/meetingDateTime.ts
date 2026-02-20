@@ -141,10 +141,32 @@ export function formatTimeInZone(date: Date, timeZone: string): string {
   });
 }
 
+function isBrowserInMsk(): boolean {
+  return getBrowserTimeZone() === PROJECT_TIMEZONE;
+}
+
 export function formatMoscowTimeWithLocal(dateInput: string | Date): string {
   const date = typeof dateInput === "string" ? parseUTCDate(dateInput) : dateInput;
   const moscowTime = formatTimeInZone(date, PROJECT_TIMEZONE);
-  const localTime = formatTimeInZone(date, getBrowserTimeZone());
+
+  if (isBrowserInMsk()) {
+    return `${moscowTime} ${PROJECT_TIMEZONE_LABEL}`;
+  }
+
+  const localTz = getBrowserTimeZone();
+  const localTime = formatTimeInZone(date, localTz);
+  const moscowDay = getDayIndexInTimeZone(date, PROJECT_TIMEZONE);
+  const localDay = getDayIndexInTimeZone(date, localTz);
+
+  if (moscowDay !== localDay) {
+    const localDateStr = date.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      timeZone: localTz,
+    });
+    return `${moscowTime} ${PROJECT_TIMEZONE_LABEL} (${localTime} ${localDateStr}, ${LOCAL_TIME_LABEL})`;
+  }
+
   return `${moscowTime} ${PROJECT_TIMEZONE_LABEL} (${localTime} ${LOCAL_TIME_LABEL})`;
 }
 
@@ -193,30 +215,62 @@ export function formatMeetingHeaderDateTime(dateInput: string): string {
 
 export function formatUtcClockForSchedule(timeUtc: string): {
   moscow: string;
-  local: string;
+  local: string | null;
 } {
   try {
     const { hour, minute, second } = parseUtcClock(timeUtc);
     const utcDate = new Date(Date.UTC(2024, 0, 1, hour, minute, second));
     const moscowTime = formatTimeInZone(utcDate, PROJECT_TIMEZONE);
-    const localTime = formatTimeInZone(utcDate, getBrowserTimeZone());
+
+    if (isBrowserInMsk()) {
+      return {
+        moscow: `${moscowTime} ${PROJECT_TIMEZONE_LABEL}`,
+        local: null,
+      };
+    }
+
+    const localTz = getBrowserTimeZone();
+    const localTime = formatTimeInZone(utcDate, localTz);
+    const moscowDay = getDayIndexInTimeZone(utcDate, PROJECT_TIMEZONE);
+    const localDay = getDayIndexInTimeZone(utcDate, localTz);
+
+    let localLabel: string;
+    if (moscowDay !== localDay) {
+      const localWeekday = utcDate.toLocaleDateString("ru-RU", {
+        weekday: "short",
+        timeZone: localTz,
+      });
+      localLabel = `${localTime} ${localWeekday}, ${LOCAL_TIME_LABEL}`;
+    } else {
+      localLabel = `${localTime} ${LOCAL_TIME_LABEL}`;
+    }
 
     return {
       moscow: `${moscowTime} ${PROJECT_TIMEZONE_LABEL}`,
-      local: `${localTime} ${LOCAL_TIME_LABEL}`,
+      local: localLabel,
     };
   } catch {
     const fallback = timeUtc.slice(0, 5);
     return {
       moscow: `${fallback} ${PROJECT_TIMEZONE_LABEL}`,
-      local: `${fallback} ${LOCAL_TIME_LABEL}`,
+      local: null,
     };
   }
 }
 
 export function formatUtcClockAsMoscowWithLocal(timeUtc: string): string {
   const { moscow, local } = formatUtcClockForSchedule(timeUtc);
-  return `${moscow} (${local})`;
+  return local ? `${moscow} (${local})` : moscow;
+}
+
+export function utcTimeToMsk(timeUtc: string): string {
+  try {
+    const [h, m] = timeUtc.split(":").map(Number);
+    const utcDate = new Date(Date.UTC(2024, 0, 1, h, m));
+    return formatTimeInZone(utcDate, PROJECT_TIMEZONE);
+  } catch {
+    return timeUtc.slice(0, 5);
+  }
 }
 
 export function zonedDateTimeToUtcIso(

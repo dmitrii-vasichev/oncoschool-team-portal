@@ -42,11 +42,7 @@ import type {
   Department,
 } from "@/lib/types";
 import { DAY_OF_WEEK_LABELS, RECURRENCE_LABELS } from "@/lib/types";
-import {
-  DEFAULT_TIMEZONE,
-  TIMEZONE_OPTIONS,
-  getTimezoneShortLabel,
-} from "@/lib/timezones";
+import { utcTimeToMsk } from "@/lib/meetingDateTime";
 
 const DURATION_OPTIONS = [
   { value: "15", label: "15 мин" },
@@ -73,20 +69,6 @@ const REMINDER_TEMPLATE_VARIABLES = [
   { token: "{дата}", label: "Дата (МСК)" },
   { token: "{день_недели}", label: "День недели" },
 ];
-
-function utcTimeToLocal(timeUtc: string, timezone: string): string {
-  try {
-    const [h, m] = timeUtc.split(":").map(Number);
-    const utcDate = new Date(Date.UTC(2024, 0, 1, h, m));
-    return utcDate.toLocaleTimeString("ru-RU", {
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: timezone,
-    });
-  } catch {
-    return timeUtc.slice(0, 5);
-  }
-}
 
 function applyReminderTemplate(
   template: string,
@@ -124,9 +106,8 @@ export function ScheduleForm({
 
   const [title, setTitle] = useState(schedule?.title ?? "");
   const [dayOfWeek, setDayOfWeek] = useState(String(schedule?.day_of_week ?? 1));
-  const [timezone, setTimezone] = useState(schedule?.timezone ?? DEFAULT_TIMEZONE);
-  const [timeLocal, setTimeLocal] = useState(
-    schedule ? utcTimeToLocal(schedule.time_utc, schedule.timezone) : "15:00"
+  const [timeMsk, setTimeMsk] = useState(
+    schedule ? utcTimeToMsk(schedule.time_utc) : "15:00"
   );
   const [duration, setDuration] = useState(String(schedule?.duration_minutes ?? 60));
   const [recurrence, setRecurrence] = useState<MeetingRecurrence>(
@@ -170,9 +151,9 @@ export function ScheduleForm({
   const [nextOccurrenceSkip, setNextOccurrenceSkip] = useState(
     schedule?.next_occurrence_skip ?? false
   );
-  const [nextOccurrenceTimeLocal, setNextOccurrenceTimeLocal] = useState<string>(() => {
+  const [nextOccurrenceTimeMsk, setNextOccurrenceTimeMsk] = useState<string>(() => {
     if (schedule?.next_occurrence_time_override) {
-      return utcTimeToLocal(schedule.next_occurrence_time_override, schedule.timezone);
+      return utcTimeToMsk(schedule.next_occurrence_time_override);
     }
     return "";
   });
@@ -213,7 +194,7 @@ export function ScheduleForm({
   );
 
   const previewTemplateValues = useMemo(() => {
-    const previewTime = timeLocal || "15:00";
+    const previewTime = timeMsk || "15:00";
     const previewTitle = title.trim() || "Название встречи";
     const previewDate = new Date().toLocaleDateString("ru-RU", {
       timeZone: "Europe/Moscow",
@@ -225,7 +206,7 @@ export function ScheduleForm({
       date: previewDate,
       weekday: previewWeekday.toLowerCase(),
     };
-  }, [dayOfWeek, timeLocal, title]);
+  }, [dayOfWeek, timeMsk, title]);
 
   const baseReminderPreview = useMemo(() => {
     if (reminderText.trim()) {
@@ -305,8 +286,8 @@ export function ScheduleForm({
       const data: MeetingScheduleCreateRequest = {
         title: title.trim(),
         day_of_week: Number(dayOfWeek),
-        time_local: timeLocal,
-        timezone,
+        time_local: timeMsk,
+        timezone: "Europe/Moscow",
         duration_minutes: Number(duration),
         recurrence,
         reminder_enabled: reminderEnabled,
@@ -325,7 +306,7 @@ export function ScheduleForm({
         zoom_enabled: zoomEnabled,
         ...(isEdit && {
           next_occurrence_skip: nextOccurrenceSkip,
-          next_occurrence_time_local: nextOccurrenceTimeLocal || null,
+          next_occurrence_time_local: nextOccurrenceTimeMsk || null,
         }),
       };
 
@@ -382,33 +363,14 @@ export function ScheduleForm({
             </div>
             <div>
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Время ({getTimezoneShortLabel(timezone)})
+                Время (МСК)
               </Label>
               <TimePicker
-                value={timeLocal}
-                onChange={setTimeLocal}
+                value={timeMsk}
+                onChange={setTimeMsk}
                 className="mt-1.5 w-full rounded-xl"
               />
             </div>
-          </div>
-
-          {/* Timezone */}
-          <div>
-            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Часовой пояс
-            </Label>
-            <Select value={timezone} onValueChange={setTimezone}>
-              <SelectTrigger className="mt-1.5 rounded-xl">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <SelectItem key={tz.value} value={tz.value}>
-                    {tz.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Duration + Recurrence */}
@@ -786,13 +748,22 @@ export function ScheduleForm({
                 <p className="text-sm font-medium mt-1.5">
                   {(() => {
                     try {
-                      const d = new Date(schedule.next_occurrence_date + "T00:00:00");
-                      const formatted = d.toLocaleDateString("ru-RU", {
+                      const timeUtc = schedule.time_utc;
+                      const [th, tm] = timeUtc.split(":").map(Number);
+                      const [year, month, day] = schedule.next_occurrence_date!.split("-").map(Number);
+                      const utcDate = new Date(Date.UTC(year, month - 1, day, th, tm));
+                      const formatted = utcDate.toLocaleDateString("ru-RU", {
                         weekday: "long",
                         day: "numeric",
                         month: "long",
+                        timeZone: "Europe/Moscow",
                       });
-                      return `${formatted.charAt(0).toUpperCase() + formatted.slice(1)}, ${timeLocal}`;
+                      const mskTime = utcDate.toLocaleTimeString("ru-RU", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        timeZone: "Europe/Moscow",
+                      });
+                      return `${formatted.charAt(0).toUpperCase() + formatted.slice(1)}, ${mskTime} МСК`;
                     } catch {
                       return schedule.next_occurrence_date;
                     }
@@ -811,7 +782,7 @@ export function ScheduleForm({
                     checked={nextOccurrenceSkip}
                     onCheckedChange={(checked) => {
                       setNextOccurrenceSkip(checked);
-                      if (checked) setNextOccurrenceTimeLocal("");
+                      if (checked) setNextOccurrenceTimeMsk("");
                     }}
                   />
                 </div>
@@ -820,18 +791,18 @@ export function ScheduleForm({
                 {!nextOccurrenceSkip && (
                   <div>
                     <Label className="text-2xs text-muted-foreground">
-                      Перенести на другое время (только эта встреча)
+                      Перенести на другое время, МСК (только эта встреча)
                     </Label>
                     <div className="flex items-center gap-2 mt-1">
                       <TimePicker
-                        value={nextOccurrenceTimeLocal}
-                        onChange={setNextOccurrenceTimeLocal}
+                        value={nextOccurrenceTimeMsk}
+                        onChange={setNextOccurrenceTimeMsk}
                         className="rounded-lg h-8 text-sm flex-1"
                       />
-                      {nextOccurrenceTimeLocal && (
+                      {nextOccurrenceTimeMsk && (
                         <button
                           type="button"
-                          onClick={() => setNextOccurrenceTimeLocal("")}
+                          onClick={() => setNextOccurrenceTimeMsk("")}
                           className="h-8 w-8 flex items-center justify-center rounded-lg border border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />

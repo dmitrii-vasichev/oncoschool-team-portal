@@ -53,11 +53,6 @@ import {
   type TelegramBroadcastStatus,
   type TelegramNotificationTarget,
 } from "@/lib/types";
-import {
-  DEFAULT_TIMEZONE,
-  TIMEZONE_OPTIONS,
-  getTimezoneShortLabel,
-} from "@/lib/timezones";
 
 type StatusFilter = "all" | TelegramBroadcastStatus;
 type LinkSelection = { start: number; end: number };
@@ -119,18 +114,6 @@ function getDefaultSchedule() {
     date: formatDateValue(date),
     time: formatTimeValue(date),
   };
-}
-
-function getInitialTimezone() {
-  try {
-    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (TIMEZONE_OPTIONS.some((tz) => tz.value === browserTimezone)) {
-      return browserTimezone;
-    }
-  } catch {
-    // Fallback handled below.
-  }
-  return DEFAULT_TIMEZONE;
 }
 
 function stripHtmlTags(value: string): string {
@@ -278,7 +261,7 @@ export default function BroadcastsPage() {
   const [messageHtml, setMessageHtml] = useState("");
   const [scheduledDate, setScheduledDate] = useState(defaultSchedule.date);
   const [scheduledTime, setScheduledTime] = useState(defaultSchedule.time);
-  const [scheduledTimezone, setScheduledTimezone] = useState(getInitialTimezone);
+  const scheduledTimezone = "Europe/Moscow";
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("https://");
   const [linkLabel, setLinkLabel] = useState("");
@@ -536,10 +519,8 @@ export default function BroadcastsPage() {
               </div>
             </div>
             <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Часовой пояс отправки:{" "}
-              <span className="font-medium text-foreground">
-                {getTimezoneShortLabel(scheduledTimezone)} · {scheduledTimezone}
-              </span>
+              Время отправки по{" "}
+              <span className="font-medium text-foreground">МСК</span>
             </div>
           </div>
         </section>
@@ -709,7 +690,7 @@ export default function BroadcastsPage() {
                 </div>
                 <div>
                   <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Время отправки ({getTimezoneShortLabel(scheduledTimezone)})
+                    Время отправки (МСК)
                   </Label>
                   <TimePicker
                     value={scheduledTime}
@@ -719,24 +700,6 @@ export default function BroadcastsPage() {
                   />
                 </div>
               </div>
-              <div>
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Часовой пояс
-                </Label>
-                <Select value={scheduledTimezone} onValueChange={setScheduledTimezone}>
-                  <SelectTrigger className="mt-1.5 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIMEZONE_OPTIONS.map((tz) => (
-                      <SelectItem key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button
                   className="w-full rounded-xl"
