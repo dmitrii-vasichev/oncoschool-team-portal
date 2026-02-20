@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Bot,
   Bell,
@@ -899,6 +899,104 @@ const DAY_LABELS: Record<number, string> = {
   7: "Вс",
 };
 
+const MOSCOW_TIMEZONE = "Europe/Moscow";
+
+function getTimezoneOffsetMinutes(timeZone: string, date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    timeZoneName: "shortOffset",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const offsetToken =
+    parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT+0";
+  const match = offsetToken.match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/);
+  if (!match) return 0;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2] || "0");
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return 0;
+  return hours >= 0 ? hours * 60 + minutes : hours * 60 - minutes;
+}
+
+function formatUtcOffset(minutes: number): string {
+  const sign = minutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(minutes);
+  const hh = String(Math.floor(absolute / 60)).padStart(2, "0");
+  const mm = String(absolute % 60).padStart(2, "0");
+  return `UTC${sign}${hh}:${mm}`;
+}
+
+function getLocalTimeFromMoscow(time: string): {
+  localTime: string;
+  localTimezone: string;
+  localOffset: string;
+} | null {
+  const parts = time.split(":");
+  if (parts.length !== 2) return null;
+  const hh = Number(parts[0]);
+  const mm = Number(parts[1]);
+  if (
+    Number.isNaN(hh) ||
+    Number.isNaN(mm) ||
+    hh < 0 ||
+    hh > 23 ||
+    mm < 0 ||
+    mm > 59
+  ) {
+    return null;
+  }
+
+  try {
+    const now = new Date();
+    const dateParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: MOSCOW_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(now);
+    const year = Number(
+      dateParts.find((part) => part.type === "year")?.value ?? now.getUTCFullYear()
+    );
+    const month = Number(
+      dateParts.find((part) => part.type === "month")?.value ??
+        now.getUTCMonth() + 1
+    );
+    const day = Number(
+      dateParts.find((part) => part.type === "day")?.value ?? now.getUTCDate()
+    );
+    const utcGuess = Date.UTC(year, month - 1, day, hh, mm, 0);
+    const mskOffset = getTimezoneOffsetMinutes(
+      MOSCOW_TIMEZONE,
+      new Date(utcGuess)
+    );
+    const exactInstant = new Date(utcGuess - mskOffset * 60 * 1000);
+
+    const localTimezone =
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+    const localTime = new Intl.DateTimeFormat("ru-RU", {
+      timeZone: localTimezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(exactInstant);
+    const localOffset = formatUtcOffset(
+      getTimezoneOffsetMinutes(localTimezone, exactInstant)
+    );
+
+    return {
+      localTime,
+      localTimezone,
+      localOffset,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function RemindersSection() {
   const { toastSuccess, toastError } = useToast();
   const { members, loading: membersLoading } = useTeam();
@@ -1034,6 +1132,9 @@ function RemindersSection() {
                 onChange={setBulkTime}
                 className="w-28 rounded-lg h-8 text-sm shrink-0"
               />
+              <span className="text-2xs text-muted-foreground shrink-0">
+                МСК
+              </span>
               <Button
                 size="sm"
                 className="rounded-lg shrink-0"
@@ -1080,7 +1181,7 @@ function RemindersSection() {
                     </p>
                     {reminder?.is_enabled ? (
                       <p className="text-2xs text-muted-foreground">
-                        {reminder.reminder_time?.slice(0, 5)}{" "}
+                        {reminder.reminder_time?.slice(0, 5)} МСК{" "}
                         <span className="text-border mx-0.5">|</span>{" "}
                         {reminder.days_of_week
                           ?.map((d) => DAY_LABELS[d])
@@ -1167,6 +1268,7 @@ function ReminderEditDialog({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const localTimeInfo = useMemo(() => getLocalTimeFromMoscow(time), [time]);
   const hasAnyDigestSectionEnabled =
     includeOverdue || includeUpcoming || includeInProgress || includeNew;
 
@@ -1254,13 +1356,22 @@ function ReminderEditDialog({
           {/* Time */}
           <div className="space-y-2">
             <Label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Время отправки
+              Время отправки (МСК)
             </Label>
             <TimePicker
               value={time}
               onChange={setTime}
               className="w-28 rounded-xl"
             />
+            <p className="text-2xs text-muted-foreground">
+              Время задается по Москве (Europe/Moscow).
+            </p>
+            {localTimeInfo && (
+              <p className="text-2xs text-muted-foreground">
+                Локальное время: {localTimeInfo.localTime} ({localTimeInfo.localTimezone},{" "}
+                {localTimeInfo.localOffset})
+              </p>
+            )}
           </div>
 
           {/* Days */}

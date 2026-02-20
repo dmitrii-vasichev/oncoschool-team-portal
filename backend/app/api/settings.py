@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Simple in-memory cooldown for bulk operations (member_id -> last_call_timestamp)
 _bulk_cooldowns: dict[str, float] = {}
 BULK_COOLDOWN_SECONDS = 30
+REMINDER_TIMEZONE = "Europe/Moscow"
 from app.db.database import get_session
 from app.db.models import TeamMember
 from app.db.repositories import (
@@ -114,6 +115,8 @@ async def update_reminder_settings(
     """Update reminder settings for a member. Moderator only."""
     update_data = data.model_dump(exclude_unset=True)
     update_data["configured_by_id"] = member.id
+    # Portal reminder time is interpreted in Moscow timezone.
+    update_data["timezone"] = REMINDER_TIMEZONE
 
     rs = await reminder_repo.upsert(session, member_id, **update_data)
     await session.commit()
@@ -181,6 +184,7 @@ async def bulk_update_reminders(
         kwargs = {
             "is_enabled": data.is_enabled,
             "configured_by_id": member.id,
+            "timezone": REMINDER_TIMEZONE,
         }
         if parsed_time:
             kwargs["reminder_time"] = parsed_time
