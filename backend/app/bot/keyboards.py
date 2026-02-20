@@ -38,7 +38,7 @@ TASK_FILTER_LABELS: dict[TaskListFilter, str] = {
 }
 
 MENU_BTN_MY_TASKS = "📋 Мои задачи"
-MENU_BTN_CREATE_TASK = "Создать задачу"
+MENU_BTN_CREATE_TASK = "➕ Создать задачу"
 MENU_BTN_HELP = "❓ Хелп"
 MENU_BTN_ALL_TASKS_DEPARTMENT = "📊 Задачи отдела"
 MENU_BTN_ALL_TASKS_COMPANY = "🏢 Задачи проекта"
@@ -50,7 +50,7 @@ MENU_BTN_STATS = "📈 Статистика"
 MENU_BTN_SUBSCRIBE = "🔔 Подписки"
 MENU_BTN_SUMMARY = "🧠 Summary"
 MENU_BTN_AI_MODEL = "🤖 AI-модель"
-MENU_BTN_TEAM_REMINDERS = "⚙️ Напоминания команды"
+MENU_BTN_TEAM_REMINDERS = "⏰ Напоминания команды"
 
 
 def main_menu_reply_keyboard(
@@ -62,64 +62,33 @@ def main_menu_reply_keyboard(
     all_tasks_button = (
         MENU_BTN_ALL_TASKS_COMPANY if is_moderator else MENU_BTN_ALL_TASKS_DEPARTMENT
     )
-    rows = []
-
-    # 1) Блок задач
-    rows.extend([
-        [
-            KeyboardButton(text=MENU_BTN_MY_TASKS),
-            KeyboardButton(text=MENU_BTN_CREATE_TASK),
-        ],
-        [
-            KeyboardButton(text=all_tasks_button),
-        ],
-    ])
-
-    # 2) Блок встреч
-    if is_moderator:
-        rows.extend([
-            [
-                KeyboardButton(text=MENU_BTN_NEXT_MEETING),
-                KeyboardButton(text=MENU_BTN_MEETINGS),
-            ],
-        ])
-    else:
-        rows.extend([
-            [
-                KeyboardButton(text=MENU_BTN_NEXT_MEETING),
-            ],
-        ])
-
-    # 3) Остальные действия
-    rows.extend([
-        [
-            KeyboardButton(text=MENU_BTN_MY_REMINDER),
-        ],
-    ])
+    button_order = [
+        MENU_BTN_MY_TASKS,
+        MENU_BTN_CREATE_TASK,
+        all_tasks_button,
+        MENU_BTN_MY_REMINDER,
+        MENU_BTN_NEXT_MEETING,
+    ]
 
     if is_moderator:
-        rows.extend([
-            [
-                KeyboardButton(text=MENU_BTN_SUBSCRIBE),
-                KeyboardButton(text=MENU_BTN_SUMMARY),
-            ],
-            [
-                KeyboardButton(text=MENU_BTN_STATS),
-                KeyboardButton(text=MENU_BTN_TEAM_REMINDERS),
-            ],
+        button_order.extend([
+            MENU_BTN_MEETINGS,
+            MENU_BTN_SUBSCRIBE,
+            MENU_BTN_SUMMARY,
+            MENU_BTN_STATS,
+            MENU_BTN_TEAM_REMINDERS,
         ])
 
     if is_admin:
-        rows.append([
-            KeyboardButton(text=MENU_BTN_AI_MODEL),
-        ])
+        button_order.append(MENU_BTN_AI_MODEL)
 
-    # 4) Служебные кнопки внизу
-    rows.extend([
-        [
-            KeyboardButton(text=MENU_BTN_HELP),
-        ],
-    ])
+    button_order.append(MENU_BTN_HELP)
+
+    # Pair buttons row-by-row; if count is odd, last one stays single in the bottom row.
+    rows: list[list[KeyboardButton]] = []
+    for idx in range(0, len(button_order), 2):
+        row_texts = button_order[idx: idx + 2]
+        rows.append([KeyboardButton(text=text) for text in row_texts])
 
     return ReplyKeyboardMarkup(
         keyboard=rows,
