@@ -591,17 +591,6 @@ export function ScheduleForm({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-border/60 bg-card px-2.5 py-2 space-y-2">
-                  <div>
-                    <div>
-                      <Label className="text-xs font-medium">Zoom-ссылка обязательна</Label>
-                      <p className="text-2xs text-muted-foreground/70 mt-0.5">
-                        Ссылка добавляется автоматически. Если Zoom не создан, напоминание не отправляется.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Telegram targets */}
                 <div>
                   <Label className="text-2xs text-muted-foreground flex items-center gap-1">
