@@ -124,8 +124,8 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
   return (
     <>
       {variant === "upcoming" ? (
-        <Link href={`/meetings/${meeting.id}`} className="group block">
-          <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
+        <Link href={`/meetings/${meeting.id}`} className="group block h-full">
+          <div className="group relative h-[256px] sm:h-[264px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/3 to-transparent rounded-bl-3xl pointer-events-none" />
 
             {isModerator && onDelete && (
@@ -149,7 +149,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
               </div>
             )}
 
-            <div className="relative p-3 sm:p-4">
+            <div className="relative flex h-full flex-col p-3 sm:p-4">
               <div className="flex items-start gap-2.5 sm:gap-3">
                 <div
                   className={`shrink-0 flex items-center justify-center h-10 w-10 rounded-xl border font-heading font-bold text-sm ${upcomingMeta.dayColor}`}
@@ -159,7 +159,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
 
                 <div className={`flex-1 min-w-0 ${isModerator && onDelete ? "pr-9 sm:pr-11" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="min-w-0 flex-1 font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-8">
+                    <h3 className="min-w-0 flex-1 font-heading font-semibold text-[15px] leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10">
                       {meeting.title || "Встреча без названия"}
                     </h3>
 
@@ -186,11 +186,11 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                     )}
                   </div>
 
-                  <div className="mt-1.5 space-y-1.5">
+                  <div className="mt-1.5 space-y-1.5 border-t border-border/40 pt-1.5">
                     <div
                       className={`flex items-center gap-1.5 ${
                         hasMeetingDate
-                          ? "text-sm font-semibold tracking-tight text-foreground"
+                          ? "text-sm font-medium tracking-tight text-muted-foreground"
                           : "text-xs text-muted-foreground"
                       }`}
                     >
@@ -224,7 +224,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                 </div>
               </div>
 
-              <div className="mt-2.5 border-t border-border/40 pt-2.5">
+              <div className="mt-auto border-t border-border/40 pt-2.5">
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
                     {safeJoinUrl && (
@@ -279,8 +279,8 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
           </div>
         </Link>
       ) : (
-        <Link href={`/meetings/${meeting.id}`} className="group block">
-          <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
+        <Link href={`/meetings/${meeting.id}`} className="group block h-full">
+          <div className="group relative h-[256px] sm:h-[264px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/3 to-transparent rounded-bl-3xl pointer-events-none" />
 
             {isModerator && onDelete && (
@@ -304,7 +304,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
               </div>
             )}
 
-            <div className="relative p-3 sm:p-4">
+            <div className="relative flex h-full flex-col p-3 sm:p-4">
               <div className="flex items-start gap-2.5 sm:gap-3">
                 <div
                   className={`shrink-0 flex items-center justify-center h-10 w-10 rounded-xl border font-heading font-bold text-sm ${upcomingMeta.dayColor}`}
@@ -314,7 +314,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
 
                 <div className={`flex-1 min-w-0 ${isModerator && onDelete ? "pr-9 sm:pr-11" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="min-w-0 flex-1 font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-8">
+                    <h3 className="min-w-0 flex-1 font-heading font-semibold text-[15px] leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10">
                       {meeting.title || "Встреча без названия"}
                     </h3>
 
@@ -341,11 +341,11 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                     )}
                   </div>
 
-                  <div className="mt-1.5 space-y-1.5">
+                  <div className="mt-1.5 space-y-1.5 border-t border-border/40 pt-1.5">
                     <div
                       className={`flex items-center gap-1.5 ${
                         hasMeetingDate
-                          ? "text-sm font-semibold tracking-tight text-foreground"
+                          ? "text-sm font-medium tracking-tight text-muted-foreground"
                           : "text-xs text-muted-foreground"
                       }`}
                     >
@@ -379,7 +379,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                 </div>
               </div>
 
-              <div className="mt-2.5 border-t border-border/40 pt-2.5">
+              <div className="mt-auto border-t border-border/40 pt-2.5">
                 <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
                     {meeting.parsed_summary && (

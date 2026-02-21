@@ -188,7 +188,7 @@ export default function MeetingsPage() {
                 {upcomingMeetings.map((meeting, i) => (
                   <div
                     key={meeting.id}
-                    className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+                    className={`h-full animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
                   >
                     <MeetingCard
                       meeting={meeting}
@@ -235,7 +235,7 @@ export default function MeetingsPage() {
                   {paginatedPast.map((meeting, i) => (
                     <div
                     key={meeting.id}
-                    className={`animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
+                    className={`h-full animate-fade-in-up stagger-${Math.min(i + 1, 6)}`}
                   >
                     <MeetingCard
                       meeting={meeting}
