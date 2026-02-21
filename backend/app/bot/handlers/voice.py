@@ -102,11 +102,6 @@ async def handle_voice(
     if not _should_process_voice(message):
         return
 
-    # Voice tasks only for admin/moderator
-    if not PermissionService.is_moderator(member):
-        await message.reply("⛔ Создание задач голосом доступно только администраторам и модераторам.")
-        return
-
     voice = message.voice or message.video_note
 
     # Check file size (Whisper limit 25MB, soft limit 20MB)
@@ -285,21 +280,31 @@ async def cb_voice_create(
 @router.callback_query(VoiceTaskFSM.preview, F.data == "voice_edit")
 async def cb_voice_edit(
     callback: CallbackQuery,
+    member: TeamMember,
     state: FSMContext,
 ) -> None:
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=voice_edit_fields_keyboard())
+    await callback.message.edit_reply_markup(
+        reply_markup=voice_edit_fields_keyboard(
+            is_moderator=PermissionService.is_moderator(member),
+        )
+    )
 
 
 @router.callback_query(VoiceTaskFSM.preview, F.data.startswith("voice_field:"))
 async def cb_voice_select_field(
     callback: CallbackQuery,
+    member: TeamMember,
     state: FSMContext,
     session_maker: async_sessionmaker,
 ) -> None:
     field = callback.data.split(":")[1]
 
     if field == "assignee":
+        if not PermissionService.is_moderator(member):
+            await callback.answer("⛔ Только модератор может менять исполнителя", show_alert=True)
+            return
+
         async with session_maker() as session:
             team_members = await member_repo.get_all_active(session)
 
@@ -337,9 +342,14 @@ async def cb_voice_select_field(
 @router.callback_query(VoiceTaskFSM.preview, F.data.startswith("voice_assignee:"))
 async def cb_voice_select_assignee(
     callback: CallbackQuery,
+    member: TeamMember,
     state: FSMContext,
     session_maker: async_sessionmaker,
 ) -> None:
+    if not PermissionService.is_moderator(member):
+        await callback.answer("⛔ Только модератор может менять исполнителя", show_alert=True)
+        return
+
     assignee_id_raw = callback.data.split(":")[1]
     try:
         assignee_id = uuid.UUID(assignee_id_raw)
@@ -373,9 +383,14 @@ async def cb_voice_select_assignee(
 @router.callback_query(VoiceTaskFSM.preview, F.data == "voice_back_fields")
 async def cb_voice_back_fields(
     callback: CallbackQuery,
+    member: TeamMember,
 ) -> None:
     await callback.answer()
-    await callback.message.edit_reply_markup(reply_markup=voice_edit_fields_keyboard())
+    await callback.message.edit_reply_markup(
+        reply_markup=voice_edit_fields_keyboard(
+            is_moderator=PermissionService.is_moderator(member),
+        )
+    )
 
 
 @router.callback_query(VoiceTaskFSM.preview, F.data == "voice_back_preview")
