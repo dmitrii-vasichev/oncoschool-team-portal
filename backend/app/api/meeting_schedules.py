@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from zoneinfo import ZoneInfo
 
@@ -815,15 +815,15 @@ async def update_schedule(
                 session,
                 schedule.id,
             )
+            target = template or meeting_with_date
+
+            # If both a template and a dated scheduled meeting exist, keep the template and
+            # remove the dated duplicate via SQL (avoid ORM PK-nullification on participants).
             if (
                 template
                 and meeting_with_date
                 and template.id != meeting_with_date.id
             ):
-                await session.delete(template)
-                template = None
-
-            if meeting_with_date:
                 if meeting_with_date.zoom_meeting_id and zoom_service:
                     try:
                         await zoom_service.delete_meeting(meeting_with_date.zoom_meeting_id)
@@ -833,15 +833,39 @@ async def update_schedule(
                             schedule.id,
                             e,
                         )
+                await session.execute(
+                    sa_delete(MeetingParticipant).where(
+                        MeetingParticipant.meeting_id == meeting_with_date.id
+                    )
+                )
+                await session.execute(
+                    sa_delete(Meeting).where(Meeting.id == meeting_with_date.id)
+                )
+            elif (
+                meeting_with_date
+                and target
+                and target.id == meeting_with_date.id
+                and meeting_with_date.zoom_meeting_id
+                and zoom_service
+            ):
+                try:
+                    await zoom_service.delete_meeting(meeting_with_date.zoom_meeting_id)
+                except Exception as e:
+                    logger.warning(
+                        "Zoom delete failed while clearing on_demand schedule %s: %s",
+                        schedule.id,
+                        e,
+                    )
 
-                meeting_with_date.title = schedule.title
-                meeting_with_date.meeting_date = None
-                meeting_with_date.status = "scheduled"
-                meeting_with_date.duration_minutes = schedule.duration_minutes
-                meeting_with_date.zoom_meeting_id = None
-                meeting_with_date.zoom_join_url = None
-                meeting_with_date.zoom_recording_url = None
-                meeting_with_date.sent_reminder_offsets_minutes = []
+            if target:
+                target.title = schedule.title
+                target.meeting_date = None
+                target.status = "scheduled"
+                target.duration_minutes = schedule.duration_minutes
+                target.zoom_meeting_id = None
+                target.zoom_join_url = None
+                target.zoom_recording_url = None
+                target.sent_reminder_offsets_minutes = []
 
             await _ensure_on_demand_template_meeting(session, schedule, schedule.created_by_id)
     elif previous_recurrence == "on_demand":
