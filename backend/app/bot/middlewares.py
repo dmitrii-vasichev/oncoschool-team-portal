@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 AVATAR_CHECK_INTERVAL = 86400  # 24 hours
 UI_SYNC_COOLDOWN_SECONDS = 5
 AVATARS_DIR = Path(__file__).resolve().parents[2] / "static" / "avatars"
+INT32_MAX = 2_147_483_647
 
 
 class AuthMiddleware(BaseMiddleware):
@@ -176,11 +177,27 @@ class AuthMiddleware(BaseMiddleware):
             separators=(",", ":"),
         )
         digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-        return int(digest[:8], 16)
+        return self._normalize_ui_version(int(digest[:8], 16))
+
+    @staticmethod
+    def _normalize_ui_version(value: int) -> int:
+        """Keep UI version inside signed int32 range used by DB column."""
+        if value <= 0:
+            return 0
+        normalized = value & INT32_MAX
+        # Avoid 0 for positive inputs so version comparison keeps working.
+        return normalized or 1
 
     def _resolve_ui_version(self) -> int:
         if settings.BOT_UI_VERSION > 0:
-            return settings.BOT_UI_VERSION
+            normalized = self._normalize_ui_version(settings.BOT_UI_VERSION)
+            if normalized != settings.BOT_UI_VERSION:
+                logger.warning(
+                    "BOT_UI_VERSION=%s exceeds int32; normalized to %s",
+                    settings.BOT_UI_VERSION,
+                    normalized,
+                )
+            return normalized
         return self._compute_ui_version()
 
     @staticmethod
