@@ -169,20 +169,20 @@ export default function MeetingsPage() {
               <div className="flex w-full gap-2 sm:w-auto">
                 <Button
                   size="sm"
+                  className="w-full rounded-xl gap-1.5 sm:w-auto"
+                  onClick={() => setShowScheduleForm(true)}
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  Новая встреча
+                </Button>
+                <Button
+                  size="sm"
                   variant="outline"
                   className="w-full rounded-xl gap-1.5 sm:w-auto"
                   onClick={() => setShowReminderTextsDialog(true)}
                 >
                   <FileText className="h-3.5 w-3.5" />
                   Тексты напоминаний
-                </Button>
-                <Button
-                  size="sm"
-                  className="w-full rounded-xl gap-1.5 sm:w-auto"
-                  onClick={() => setShowScheduleForm(true)}
-                >
-                  <Video className="h-3.5 w-3.5" />
-                  Новая встреча
                 </Button>
               </div>
             )}
