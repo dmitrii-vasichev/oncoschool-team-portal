@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_current_user, require_moderator
 from app.config import settings
 from app.db.database import get_session
-from app.db.models import TeamMember
+from app.db.models import MeetingSchedule, TeamMember
 from app.db.schemas import MeetingResponse, TaskResponse
 from app.db.repositories import MeetingRepository, TeamMemberRepository
 from app.services.ai_service import AIService
@@ -424,6 +424,24 @@ async def delete_meeting(
     meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
+
+    # For schedule-generated meetings, mark current occurrence as handled so
+    # background scheduler does not recreate the same meeting after manual delete.
+    if meeting.schedule_id:
+        schedule = await session.get(MeetingSchedule, meeting.schedule_id)
+        if schedule and schedule.is_active:
+            if schedule.recurrence == "on_demand":
+                schedule.next_occurrence_at = None
+                schedule.next_occurrence_skip = False
+            elif meeting.meeting_date:
+                occurrence_date = meeting.meeting_date.date()
+                if (
+                    schedule.last_triggered_date is None
+                    or schedule.last_triggered_date < occurrence_date
+                ):
+                    schedule.last_triggered_date = occurrence_date
+                if schedule.recurrence == "one_time":
+                    schedule.is_active = False
 
     # Delete from Zoom if possible
     zoom_svc = _get_zoom_service(request)
