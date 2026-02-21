@@ -574,10 +574,13 @@ class ApiClient {
 
   // ==================== Team ====================
 
-  async getTeam(options?: { includeInactive?: boolean }): Promise<TeamMember[]> {
+  async getTeam(options?: { includeInactive?: boolean; includeTest?: boolean }): Promise<TeamMember[]> {
     const params = new URLSearchParams();
     if (options?.includeInactive) {
       params.set("include_inactive", "true");
+    }
+    if (options?.includeTest) {
+      params.set("include_test", "true");
     }
     const query = params.toString() ? `?${params.toString()}` : "";
     return this.request<TeamMember[]>(`/api/team${query}`);
@@ -602,10 +605,13 @@ class ApiClient {
     });
   }
 
-  async getTeamTree(options?: { includeInactive?: boolean }): Promise<TeamTreeResponse> {
+  async getTeamTree(options?: { includeInactive?: boolean; includeTest?: boolean }): Promise<TeamTreeResponse> {
     const params = new URLSearchParams();
     if (options?.includeInactive) {
       params.set("include_inactive", "true");
+    }
+    if (options?.includeTest) {
+      params.set("include_test", "true");
     }
     const query = params.toString() ? `?${params.toString()}` : "";
     return this.request<TeamTreeResponse>(`/api/team/tree${query}`);
