@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 
 const REMINDER_OPTIONS = [120, 60, 30, 15, 0];
+const DEFAULT_LINK_LABEL = "Подключиться ↗";
 const EMOJIS = [
   "🔥",
   "✅",
@@ -154,7 +155,7 @@ export function MeetingReminderTextsDialog({
   const [activeReminderOffset, setActiveReminderOffset] = useState<number>(60);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("{zoom_link}");
-  const [linkLabel, setLinkLabel] = useState("");
+  const [linkLabel, setLinkLabel] = useState(DEFAULT_LINK_LABEL);
   const [linkSelection, setLinkSelection] = useState<{ start: number; end: number } | null>(null);
 
   const reminderTextRef = useRef<HTMLTextAreaElement | null>(null);
@@ -248,7 +249,7 @@ export function MeetingReminderTextsDialog({
     const selectedText = activeReminderText.slice(start, end).trim();
 
     setLinkSelection({ start, end });
-    setLinkLabel(selectedText || "");
+    setLinkLabel(selectedText || DEFAULT_LINK_LABEL);
     setLinkUrl("{zoom_link}");
     setLinkDialogOpen(true);
   };
@@ -616,7 +617,7 @@ export function MeetingReminderTextsDialog({
                 id="global-reminder-link-label"
                 value={linkLabel}
                 onChange={(e) => setLinkLabel(e.target.value)}
-                placeholder="Подключиться ↗"
+                placeholder={DEFAULT_LINK_LABEL}
               />
             </div>
             <div className="flex justify-end gap-2">
