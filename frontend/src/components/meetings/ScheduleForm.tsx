@@ -329,7 +329,7 @@ export function ScheduleForm({
       setError("Выберите день недели");
       return;
     }
-    if ((isOneTimeMode || (isOnDemandMode && !isEdit)) && !meetingDate) {
+    if (isOneTimeMode && !meetingDate) {
       setError("Выберите дату встречи");
       return;
     }
