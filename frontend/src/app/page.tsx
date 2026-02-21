@@ -291,7 +291,7 @@ function SectionHeader({
   };
 
   return (
-    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mb-4 flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex items-center gap-2 flex-wrap">
         {Icon && (
           <Icon
@@ -321,7 +321,7 @@ function SectionHeader({
       {linkHref && (
         <Link
           href={linkHref}
-          className="flex items-center gap-1 self-start text-sm text-muted-foreground transition-colors hover:text-foreground sm:self-auto"
+          className="flex shrink-0 items-center gap-1 self-start whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground xl:self-auto"
         >
           {linkLabel || "Смотреть все"}
           <ArrowRight className="h-3.5 w-3.5" />
