@@ -207,6 +207,93 @@ class MeetingSchedulerZoomRulesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("https://zoom.us/j/987654321", text)
         self.assertNotIn("legacy text", text)
 
+    async def test_send_reminders_replaces_participants_placeholder(self) -> None:
+        bot = SimpleNamespace(send_message=AsyncMock())
+        scheduler = MeetingSchedulerService(
+            bot=bot,
+            session_maker=SimpleNamespace(),
+            zoom_service=None,
+        )
+        scheduler._get_global_reminder_templates = AsyncMock(
+            return_value={"60": "Участники: {участники}"}
+        )
+        scheduler._get_participants = AsyncMock(
+            return_value=[
+                SimpleNamespace(telegram_username="alice"),
+                SimpleNamespace(telegram_username="@bob"),
+                SimpleNamespace(telegram_username=None),
+            ]
+        )
+        schedule = SimpleNamespace(
+            id=uuid.uuid4(),
+            title="Планерка",
+            participant_ids=[uuid.uuid4(), uuid.uuid4()],
+            reminder_include_zoom_link=False,
+            zoom_enabled=False,
+            telegram_targets=[{"chat_id": "12345", "thread_id": None}],
+            time_utc=datetime(2026, 2, 21, 12, 0).time(),
+        )
+        meeting = SimpleNamespace(
+            zoom_meeting_id=None,
+            zoom_join_url=None,
+            meeting_date=datetime(2026, 2, 21, 12, 0),
+        )
+
+        await scheduler._send_reminders(
+            session=SimpleNamespace(),
+            schedule=schedule,
+            meeting=meeting,
+            zoom_data=None,
+            reminder_offset_minutes=60,
+        )
+
+        bot.send_message.assert_awaited_once()
+        text = bot.send_message.await_args.kwargs["text"]
+        self.assertEqual(text, "Участники: @alice @bob")
+
+    async def test_send_reminders_appends_participants_without_placeholder(self) -> None:
+        bot = SimpleNamespace(send_message=AsyncMock())
+        scheduler = MeetingSchedulerService(
+            bot=bot,
+            session_maker=SimpleNamespace(),
+            zoom_service=None,
+        )
+        scheduler._get_global_reminder_templates = AsyncMock(
+            return_value={"60": "Встреча {название}"}
+        )
+        scheduler._get_participants = AsyncMock(
+            return_value=[
+                SimpleNamespace(telegram_username="alice"),
+                SimpleNamespace(telegram_username="@bob"),
+            ]
+        )
+        schedule = SimpleNamespace(
+            id=uuid.uuid4(),
+            title="Планерка",
+            participant_ids=[uuid.uuid4(), uuid.uuid4()],
+            reminder_include_zoom_link=False,
+            zoom_enabled=False,
+            telegram_targets=[{"chat_id": "12345", "thread_id": None}],
+            time_utc=datetime(2026, 2, 21, 12, 0).time(),
+        )
+        meeting = SimpleNamespace(
+            zoom_meeting_id=None,
+            zoom_join_url=None,
+            meeting_date=datetime(2026, 2, 21, 12, 0),
+        )
+
+        await scheduler._send_reminders(
+            session=SimpleNamespace(),
+            schedule=schedule,
+            meeting=meeting,
+            zoom_data=None,
+            reminder_offset_minutes=60,
+        )
+
+        bot.send_message.assert_awaited_once()
+        text = bot.send_message.await_args.kwargs["text"]
+        self.assertEqual(text, "Встреча Планерка\n\n@alice @bob")
+
     def test_default_reminder_text_for_start_offset(self) -> None:
         schedule = SimpleNamespace(title="Планерка", time_utc=datetime(2026, 2, 21, 12, 0).time())
         meeting = SimpleNamespace(meeting_date=datetime(2026, 2, 21, 12, 0))

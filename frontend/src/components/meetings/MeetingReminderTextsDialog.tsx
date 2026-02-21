@@ -72,6 +72,7 @@ const REMINDER_TEMPLATE_VARIABLES = [
   { token: "{название}", label: "Название встречи" },
   { token: "{дата}", label: "Дата (МСК)" },
   { token: "{день_недели}", label: "День недели" },
+  { token: "{участники}", label: "Список участников" },
   { token: "{zoom_link}", label: "Zoom-ссылка" },
 ];
 
@@ -99,17 +100,29 @@ function normalizeReminderTextsByOffset(
 
 function applyReminderTemplate(
   template: string,
-  values: { time: string; title: string; date: string; weekday: string; zoomLink: string }
+  values: {
+    time: string;
+    title: string;
+    date: string;
+    weekday: string;
+    participants: string;
+    zoomLink: string;
+  }
 ): string {
   return template
     .replaceAll("{время}", values.time)
     .replaceAll("{название}", values.title)
     .replaceAll("{дата}", values.date)
     .replaceAll("{день_недели}", values.weekday)
+    .replaceAll("{участники}", values.participants)
+    .replaceAll("{юзернеймы}", values.participants)
     .replaceAll("{time_msk}", values.time)
     .replaceAll("{title}", values.title)
     .replaceAll("{date_msk}", values.date)
     .replaceAll("{weekday_ru}", values.weekday)
+    .replaceAll("{participants}", values.participants)
+    .replaceAll("{usernames}", values.participants)
+    .replaceAll("{participant_usernames}", values.participants)
     .replaceAll("{zoom_link}", values.zoomLink)
     .replaceAll("{zoom_url}", values.zoomLink)
     .replaceAll("{ссылка_zoom}", values.zoomLink);
@@ -131,6 +144,17 @@ function hasZoomPlaceholder(template: string): boolean {
     lower.includes("{zoom_link}") ||
     lower.includes("{zoom_url}") ||
     lower.includes("{ссылка_zoom}")
+  );
+}
+
+function hasParticipantsPlaceholder(template: string): boolean {
+  const lower = template.toLowerCase();
+  return (
+    lower.includes("{участники}") ||
+    lower.includes("{юзернеймы}") ||
+    lower.includes("{participants}") ||
+    lower.includes("{usernames}") ||
+    lower.includes("{participant_usernames}")
   );
 }
 
@@ -299,22 +323,31 @@ export function MeetingReminderTextsDialog({
       title: "Планёрка команды",
       date: previewDate,
       weekday,
+      participants: "@ivanov @petrova",
       zoomLink: "https://zoom.us/j/1234567890",
     };
   }, []);
 
   const reminderPreviewWithZoom = useMemo(() => {
-    const baseText = activeReminderText.trim()
+    let previewText = activeReminderText.trim()
       ? applyReminderTemplate(activeReminderText.trim(), previewTemplateValues)
       : getDefaultReminderText(activeReminderOffset, {
           time: previewTemplateValues.time,
           title: previewTemplateValues.title,
         });
 
-    if (hasZoomPlaceholder(activeReminderText)) {
-      return baseText;
+    if (
+      previewTemplateValues.participants &&
+      !hasParticipantsPlaceholder(activeReminderText)
+    ) {
+      previewText += `\n\n${previewTemplateValues.participants}`;
     }
-    return `${baseText}\n\nСсылка для подключения: ${previewTemplateValues.zoomLink}`;
+
+    if (!hasZoomPlaceholder(activeReminderText)) {
+      previewText += `\n\nСсылка для подключения: ${previewTemplateValues.zoomLink}`;
+    }
+
+    return previewText;
   }, [activeReminderOffset, activeReminderText, previewTemplateValues]);
 
   const handleSave = async () => {

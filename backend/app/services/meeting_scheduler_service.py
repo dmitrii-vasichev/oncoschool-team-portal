@@ -18,6 +18,13 @@ ZOOM_CREATE_RETRY_BASE_DELAY_SECONDS = 2
 ALLOWED_REMINDER_OFFSETS_MINUTES = (0, 15, 30, 60, 120)
 DEFAULT_REMINDER_OFFSET_MINUTES = 60
 MEETING_REMINDER_TEXTS_KEY = "meeting_reminder_texts"
+REMINDER_PARTICIPANTS_PLACEHOLDERS = (
+    "{участники}",
+    "{юзернеймы}",
+    "{participants}",
+    "{usernames}",
+    "{participant_usernames}",
+)
 TRIGGER_EARLY_WINDOW_SECONDS = 90
 TRIGGER_LATE_GRACE_SECONDS = 300
 RUSSIAN_WEEKDAYS = {
@@ -360,6 +367,11 @@ class MeetingSchedulerService:
         )
 
     @staticmethod
+    def _contains_participants_placeholder(template: str) -> bool:
+        template_lower = template.lower()
+        return any(token in template_lower for token in REMINDER_PARTICIPANTS_PLACEHOLDERS)
+
+    @staticmethod
     def _get_custom_reminder_template(
         reminder_templates_by_offset: dict[str, str],
         reminder_offset_minutes: int | None,
@@ -647,7 +659,7 @@ class MeetingSchedulerService:
         zoom_data,
         reminder_offset_minutes: int | None = None,
     ) -> None:
-        """Send reminders to all telegram_targets, including participant @mentions."""
+        """Send reminders to all telegram targets."""
         raw_join_url = (zoom_data or {}).get("join_url") or meeting.zoom_join_url
         safe_join_url = self._resolve_zoom_join_url(
             raw_join_url,
@@ -668,12 +680,26 @@ class MeetingSchedulerService:
             reminder_offset_minutes=reminder_offset_minutes,
         )
         contains_zoom_placeholder = self._contains_zoom_link_placeholder(custom_template)
+        contains_participants_placeholder = self._contains_participants_placeholder(
+            custom_template
+        )
+        participants_mentions = ""
+        if schedule.participant_ids:
+            members = await self._get_participants(session, schedule.participant_ids)
+            mentions = []
+            for member in members:
+                if member.telegram_username:
+                    username = member.telegram_username.lstrip("@")
+                    mentions.append(f"@{username}")
+            participants_mentions = " ".join(mentions)
+
         if custom_template:
             text = self._render_custom_reminder_text(
                 custom_template,
                 schedule,
                 meeting,
                 zoom_link=safe_join_url if include_zoom_link else None,
+                participants_mentions=participants_mentions,
             )
         else:
             text = self._default_reminder_text(
@@ -682,16 +708,9 @@ class MeetingSchedulerService:
                 reminder_offset_minutes=reminder_offset_minutes,
             )
 
-        # Add participant @username mentions
-        if schedule.participant_ids:
-            members = await self._get_participants(session, schedule.participant_ids)
-            mentions = []
-            for m in members:
-                if m.telegram_username:
-                    username = m.telegram_username.lstrip("@")
-                    mentions.append(f"@{username}")
-            if mentions:
-                text += "\n\n" + " ".join(mentions)
+        # Backward compatibility: old templates without participant placeholder.
+        if participants_mentions and not contains_participants_placeholder:
+            text += "\n\n" + participants_mentions
 
         if include_zoom_link:
             if contains_zoom_placeholder:
@@ -778,11 +797,13 @@ class MeetingSchedulerService:
         schedule: MeetingSchedule,
         meeting: Meeting,
         zoom_link: str | None = None,
+        participants_mentions: str | None = None,
     ) -> str:
         """Render template placeholders for custom reminder text."""
         time_str, date_str, weekday_str = MeetingSchedulerService._meeting_time_parts(
             schedule, meeting
         )
+        participants_text = participants_mentions or ""
         replacements = {
             "{время}": time_str,
             "{название}": schedule.title,
@@ -795,6 +816,11 @@ class MeetingSchedulerService:
             "{zoom_link}": zoom_link or "",
             "{zoom_url}": zoom_link or "",
             "{ссылка_zoom}": zoom_link or "",
+            "{участники}": participants_text,
+            "{юзернеймы}": participants_text,
+            "{participants}": participants_text,
+            "{usernames}": participants_text,
+            "{participant_usernames}": participants_text,
         }
         rendered = template
         for token, value in replacements.items():
