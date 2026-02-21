@@ -158,7 +158,7 @@ export function DepartmentManager({ open, departments, members, onUpdate, onClos
                     style={{ backgroundColor: dept.color || "#6B7280" }}
                   />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium truncate block">
+                    <span className="text-sm font-heading font-semibold truncate block">
                       {dept.name}
                     </span>
                     <span className="text-2xs text-muted-foreground flex items-center gap-1">

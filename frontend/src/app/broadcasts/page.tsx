@@ -790,7 +790,7 @@ export default function BroadcastsPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="truncate text-sm font-medium">
+                          <span className="truncate text-sm font-heading font-semibold">
                             {broadcast.target_label || `Chat ${broadcast.chat_id}`}
                           </span>
                           <span

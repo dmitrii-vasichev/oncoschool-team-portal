@@ -47,22 +47,22 @@ export function TaskCard({ task }: { task: Task }) {
     <TooltipProvider delayDuration={120}>
       <div
         className={`
-          group rounded-xl border overflow-hidden shadow-sm
+          group h-full rounded-xl border overflow-hidden shadow-sm
           transition-all duration-150 hover:shadow-md hover:-translate-y-0.5
           ${cardClass}
         `}
       >
         <Link
           href={`/tasks/${task.short_id}`}
-          className="block"
+          className="block h-full"
           draggable={false}
         >
-          <div className="p-3.5 space-y-3">
+          <div className="flex h-full flex-col gap-3 p-3.5">
             {/* Header: title + status/priority icons */}
             <div className="flex items-start gap-2.5">
               <div className="min-w-0 flex-1 space-y-1">
                 <p
-                  className={`text-[15px] font-semibold leading-snug line-clamp-2 ${
+                  className={`min-h-10 line-clamp-2 text-[15px] leading-5 font-heading font-semibold ${
                     overdue
                       ? "text-destructive group-hover:text-destructive"
                       : "group-hover:text-primary"
@@ -71,7 +71,7 @@ export function TaskCard({ task }: { task: Task }) {
                   {task.title}
                 </p>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex h-4 items-center gap-1.5">
                   {task.source === "voice" && (
                     <span
                       className="inline-flex items-center justify-center h-4 w-4 rounded bg-purple-100 dark:bg-purple-900/30"
@@ -140,8 +140,8 @@ export function TaskCard({ task }: { task: Task }) {
             )}
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-2 pt-0.5">
-              <div className="flex items-center gap-1.5">
+            <div className="mt-auto flex min-h-6 items-center justify-between gap-2 pt-0.5">
+              <div className="flex min-h-6 items-center gap-1.5">
                 {overdue && (
                   <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-2xs font-medium text-destructive">
                     Просрочено

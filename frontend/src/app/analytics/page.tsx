@@ -859,7 +859,7 @@ export default function AnalyticsPage() {
                   key={insight.title}
                   className="rounded-xl border border-border/60 bg-background/40 p-3"
                 >
-                  <p className="text-sm font-semibold">{insight.title}</p>
+                  <p className="text-sm font-heading font-semibold">{insight.title}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {insight.description}
                   </p>
@@ -881,7 +881,7 @@ export default function AnalyticsPage() {
                 key={item.title}
                 className="rounded-xl border border-border/60 bg-background/40 p-3"
               >
-                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="text-sm font-heading font-semibold">{item.title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
                 <p className="mt-1.5 text-xs text-foreground/80">{item.usage}</p>
                 <p className="mt-1.5 text-xs text-primary/90">{item.extension}</p>

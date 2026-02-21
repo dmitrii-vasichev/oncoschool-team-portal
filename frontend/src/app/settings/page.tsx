@@ -427,7 +427,7 @@ function TelegramTargetsSection() {
                     <Send className="h-4 w-4" style={{ color: "hsl(200, 60%, 50%)" }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-sm font-heading font-semibold truncate">
                       {target.label || `Chat ${target.chat_id}`}
                     </p>
                     <div className="flex items-center gap-2 text-2xs text-muted-foreground">
@@ -1176,7 +1176,7 @@ function RemindersSection() {
                 >
                   <UserAvatar name={member.full_name} avatarUrl={member.avatar_url} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-sm font-heading font-semibold truncate">
                       {member.full_name}
                     </p>
                     {reminder?.is_enabled ? (

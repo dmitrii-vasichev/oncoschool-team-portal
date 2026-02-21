@@ -188,7 +188,7 @@ function TaskListItem({
             <div className="min-w-0 flex items-start gap-1.5">
               {sourceIcon}
               <span
-                className={`text-sm font-semibold leading-tight line-clamp-2 ${
+                className={`text-sm font-heading font-semibold leading-tight line-clamp-2 ${
                   overdue ? "text-destructive" : ""
                 }`}
               >
@@ -373,7 +373,7 @@ function UpcomingMeetingCard({
         <div className="min-w-0 flex-1">
           <Link
             href={`/meetings/${meeting.id}`}
-            className="text-sm font-semibold truncate block group-hover:text-primary transition-colors"
+            className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
           >
             {meeting.title || "Встреча без названия"}
           </Link>

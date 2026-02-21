@@ -88,7 +88,7 @@ export function MeetingTasksTab({
                   <span className="text-2xs font-mono text-muted-foreground bg-muted/60 rounded px-1.5 py-0.5">
                     #{task.short_id}
                   </span>
-                  <span className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                  <span className="text-sm font-heading font-semibold truncate group-hover:text-primary transition-colors">
                     {task.title}
                   </span>
                 </div>
