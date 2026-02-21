@@ -57,6 +57,37 @@ docker compose up --build
 Backend: http://localhost:8000 (API docs: http://localhost:8000/docs)
 Frontend: http://localhost:3000
 
+## Учет изменений (Change Log)
+
+В проекте используется подход с change-фрагментами:
+
+- каждый релевантный change хранится отдельным файлом в `.changes/`;
+- итоговый `CHANGELOG.md` собирается автоматически из этих фрагментов.
+
+### Режимы записи
+
+- `business` — изменение нужно для бизнес-отчета;
+- `internal` — внутреннее тех. изменение;
+- `none` — change-фрагмент не создаем.
+
+### Команды
+
+```bash
+# Создать фрагмент изменения
+make change-add ARGS="--scope business --task ONCO-142 --type feature --area 'Расписание' --summary 'Добавили автоподбор слота врача' --business-value 'Сократили время записи пациента' --risk low"
+
+# Собрать CHANGELOG.md из .changes/*.md
+make change-build
+```
+
+### Быстрые команды для Codex
+
+Можно просто писать в чат:
+
+- `внеси это в change` -> будет создан `business` change;
+- `внеси это в change internal` -> будет создан `internal` change;
+- `не вноси в change` -> запись не создается.
+
 ## Переменные окружения
 
 ### Backend (`backend/.env`)
