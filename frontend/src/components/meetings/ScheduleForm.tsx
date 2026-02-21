@@ -56,7 +56,7 @@ const DURATION_OPTIONS = [
 ];
 
 const REMINDER_OPTIONS = [120, 60, 30, 15, 0];
-const DEFAULT_REMINDER_OFFSETS = [60];
+const DEFAULT_REMINDER_OFFSETS = [60, 0];
 
 function formatReminderOffsetLabel(offsetMinutes: number): string {
   if (offsetMinutes === 0) return "в момент начала";
@@ -129,7 +129,7 @@ export function ScheduleForm({
   const isEdit = !!schedule;
   const initialReminderOffsets = normalizeReminderOffsets(
     schedule?.reminder_offsets_minutes,
-    schedule?.reminder_minutes_before ?? 60
+    schedule ? (schedule.reminder_minutes_before ?? 60) : null
   );
 
   const [title, setTitle] = useState(schedule?.title ?? "");

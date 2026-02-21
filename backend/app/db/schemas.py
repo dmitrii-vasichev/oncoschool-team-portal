@@ -231,7 +231,7 @@ class MeetingScheduleCreate(BaseModel):
     meeting_date_local: str | None = None  # "YYYY-MM-DDTHH:MM" for one_time/on_demand next run
     reminder_enabled: bool = True
     reminder_minutes_before: int = 60
-    reminder_offsets_minutes: list[int] = Field(default_factory=lambda: [60])
+    reminder_offsets_minutes: list[int] = Field(default_factory=lambda: [60, 0])
     reminder_text: str | None = None
     reminder_texts_by_offset: dict[str, str] = Field(default_factory=dict)
     reminder_include_zoom_link: bool = True

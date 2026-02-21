@@ -33,7 +33,7 @@ VALID_RECURRENCES = {
 }
 RECURRING_RECURRENCES = {"weekly", "biweekly", "monthly_last_workday"}
 ALLOWED_REMINDER_OFFSETS_MINUTES = (0, 15, 30, 60, 120)
-DEFAULT_REMINDER_OFFSETS_MINUTES = [60]
+DEFAULT_REMINDER_OFFSETS_MINUTES = [60, 0]
 
 
 def _normalize_reminder_offsets(
