@@ -40,6 +40,7 @@ export function MemberCreateModal({ open, departments, currentUser, onCreated, o
   const [departmentId, setDepartmentId] = useState<string>("__none__");
   const [extraDepartmentIds, setExtraDepartmentIds] = useState<string[]>([]);
   const [newExtraDepartmentId, setNewExtraDepartmentId] = useState<string>("");
+  const [isTest, setIsTest] = useState(false);
   const [position, setPosition] = useState("");
   const [email, setEmail] = useState("");
   const [birthday, setBirthday] = useState("");
@@ -58,6 +59,7 @@ export function MemberCreateModal({ open, departments, currentUser, onCreated, o
     setDepartmentId("__none__");
     setExtraDepartmentIds([]);
     setNewExtraDepartmentId("");
+    setIsTest(false);
     setPosition("");
     setEmail("");
     setBirthday("");
@@ -86,6 +88,9 @@ export function MemberCreateModal({ open, departments, currentUser, onCreated, o
         extra_department_ids: getEffectiveExtraDepartmentIds(),
         name_variants: nameVariants,
       };
+      if (isAdmin) {
+        data.is_test = isTest;
+      }
       if (telegramId.trim()) {
         const parsed = parseInt(telegramId.trim(), 10);
         if (isNaN(parsed)) {
@@ -252,6 +257,29 @@ export function MemberCreateModal({ open, departments, currentUser, onCreated, o
               </Select>
             </div>
           </div>
+
+          {isAdmin && (
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Тип участника
+              </Label>
+              <Select
+                value={isTest ? "test" : "regular"}
+                onValueChange={(value) => setIsTest(value === "test")}
+              >
+                <SelectTrigger className="mt-1.5 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="regular">Обычный участник</SelectItem>
+                  <SelectItem value="test">Тестовый участник</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-2xs text-muted-foreground mt-1">
+                Тестовый участник скрыт в интерфейсе и не входит в общий счётчик.
+              </p>
+            </div>
+          )}
 
           {/* Extra department access */}
           <div>

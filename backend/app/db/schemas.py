@@ -21,6 +21,7 @@ MeetingReminderZoomMissingBehaviorType = Literal["hide", "fallback"]
 class TeamMemberCreate(BaseModel):
     full_name: str
     role: MemberRoleType = "member"
+    is_test: bool = False
     telegram_id: int | None = None
     telegram_username: str | None = None
     name_variants: list[str] = []
@@ -36,6 +37,7 @@ class TeamMemberUpdate(BaseModel):
     full_name: str | None = None
     name_variants: list[str] | None = None
     role: MemberRoleType | None = None
+    is_test: bool | None = None
     is_active: bool | None = None
     department_id: uuid.UUID | None = None
     extra_department_ids: list[uuid.UUID] | None = None
@@ -61,6 +63,7 @@ class TeamMemberResponse(BaseModel):
     birthday: date | None
     avatar_url: str | None
     role: str
+    is_test: bool
     is_active: bool
     created_at: datetime
     updated_at: datetime

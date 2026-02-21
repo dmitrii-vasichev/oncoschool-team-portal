@@ -96,13 +96,33 @@ async def _sync_extra_department_access(
     await session.flush()
 
 
+def _is_member_visible(
+    target: TeamMember,
+    *,
+    include_inactive: bool,
+    include_test: bool,
+) -> bool:
+    if not include_inactive and not target.is_active:
+        return False
+    if not include_test and target.is_test:
+        return False
+    return True
+
+
 @router.get("/tree")
 async def get_team_tree(
     include_inactive: bool = Query(False),
+    include_test: bool = Query(False),
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Get team organized by departments."""
+    if include_test and not PermissionService.is_admin(member):
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может просматривать тестовых участников",
+        )
+
     # Fetch departments with members eager-loaded
     stmt = (
         select(Department)
@@ -126,10 +146,23 @@ async def get_team_tree(
     assigned_ids = set()
     for dept in departments:
         for m in dept.members:
-            if include_inactive or m.is_active:
+            if _is_member_visible(
+                m,
+                include_inactive=include_inactive,
+                include_test=include_test,
+            ):
                 assigned_ids.add(m.id)
 
-    unassigned = [m for m in all_members if m.id not in assigned_ids]
+    unassigned = [
+        m
+        for m in all_members
+        if m.id not in assigned_ids
+        and _is_member_visible(
+            m,
+            include_inactive=include_inactive,
+            include_test=include_test,
+        )
+    ]
 
     def member_to_dict(m: TeamMember) -> dict:
         return {
@@ -145,6 +178,7 @@ async def get_team_tree(
             "birthday": m.birthday.isoformat() if m.birthday else None,
             "avatar_url": m.avatar_url,
             "role": m.role,
+            "is_test": m.is_test,
             "is_active": m.is_active,
             "created_at": m.created_at.isoformat() if m.created_at else None,
             "updated_at": m.updated_at.isoformat() if m.updated_at else None,
@@ -152,7 +186,15 @@ async def get_team_tree(
 
     def dept_to_dict(d: Department) -> dict:
         dept_members = sorted(
-            [m for m in d.members if include_inactive or m.is_active],
+            [
+                m
+                for m in d.members
+                if _is_member_visible(
+                    m,
+                    include_inactive=include_inactive,
+                    include_test=include_test,
+                )
+            ],
             key=lambda m: (not m.is_active, m.full_name.lower()),
         )
         return {
@@ -179,16 +221,31 @@ async def get_team_tree(
 @router.get("", response_model=list[TeamMemberResponse])
 async def list_team(
     include_inactive: bool = Query(False),
+    include_test: bool = Query(False),
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """List team members."""
+    if include_test and not PermissionService.is_admin(member):
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может просматривать тестовых участников",
+        )
+
     members = (
         await member_repo.get_all(session)
         if include_inactive
         else await member_repo.get_all_active(session)
     )
-    return members
+    return [
+        m
+        for m in members
+        if _is_member_visible(
+            m,
+            include_inactive=include_inactive,
+            include_test=include_test,
+        )
+    ]
 
 
 @router.post("", response_model=TeamMemberResponse, status_code=201)
@@ -203,6 +260,11 @@ async def create_team_member(
         raise HTTPException(
             status_code=403,
             detail="Только администратор может создавать администраторов",
+        )
+    if data.is_test and not PermissionService.is_admin(member):
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может создавать тестовых участников",
         )
 
     # Check telegram_id uniqueness if provided
@@ -243,6 +305,8 @@ async def get_team_member(
     target = await member_repo.get_by_id(session, member_id)
     if not target:
         raise HTTPException(status_code=404, detail="Участник не найден")
+    if target.is_test and not PermissionService.is_admin(member):
+        raise HTTPException(status_code=404, detail="Участник не найден")
     return target
 
 
@@ -257,6 +321,8 @@ async def get_member_deactivation_preview(
 ):
     target = await member_repo.get_by_id(session, member_id)
     if not target:
+        raise HTTPException(status_code=404, detail="Участник не найден")
+    if target.is_test and not PermissionService.is_admin(member):
         raise HTTPException(status_code=404, detail="Участник не найден")
 
     open_tasks_stmt = select(func.count(Task.id)).where(
@@ -298,6 +364,11 @@ async def update_team_member(
     target = await member_repo.get_by_id(session, member_id)
     if not target:
         raise HTTPException(status_code=404, detail="Участник не найден")
+    if target.is_test and not PermissionService.is_admin(member):
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может изменять тестовых участников",
+        )
 
     update_data = data.model_dump(exclude_unset=True)
     if not update_data:
@@ -307,6 +378,7 @@ async def update_team_member(
     reassign_to_member_id = update_data.pop("reassign_to_member_id", None)
     extra_department_ids = update_data.pop("extra_department_ids", None)
     role_changed = "role" in update_data and update_data["role"] != target.role
+    is_test_changed = "is_test" in update_data and update_data["is_test"] != target.is_test
 
     # Role change requires admin
     if role_changed:
@@ -317,6 +389,12 @@ async def update_team_member(
             )
         # Force Telegram menu refresh on the next interaction.
         update_data["bot_ui_version"] = 0
+
+    if is_test_changed and not PermissionService.is_admin(member):
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может менять признак тестового участника",
+        )
 
     # Deactivation workflow:
     # - block self-deactivation to avoid accidental lockout

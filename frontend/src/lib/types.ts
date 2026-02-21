@@ -74,6 +74,7 @@ export interface TeamMember {
   birthday: string | null;
   avatar_url: string | null;
   role: MemberRole;
+  is_test: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -433,6 +434,7 @@ export interface TeamMemberUpdateRequest {
   full_name?: string;
   name_variants?: string[];
   role?: MemberRole;
+  is_test?: boolean;
   is_active?: boolean;
   department_id?: string | null;
   extra_department_ids?: string[];

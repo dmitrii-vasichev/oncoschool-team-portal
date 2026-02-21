@@ -586,6 +586,7 @@ class ApiClient {
   async createTeamMember(data: {
     full_name: string;
     role?: string;
+    is_test?: boolean;
     telegram_id?: number | null;
     telegram_username?: string;
     department_id?: string | null;

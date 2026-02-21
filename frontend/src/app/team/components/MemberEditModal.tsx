@@ -64,6 +64,7 @@ export function MemberEditModal({
   const [deactivationStrategy, setDeactivationStrategy] =
     useState<MemberDeactivationStrategy>("unassign");
   const [reassignToMemberId, setReassignToMemberId] = useState("__none__");
+  const [isTest, setIsTest] = useState(false);
   const [departmentId, setDepartmentId] = useState<string>("__none__");
   const [extraDepartmentIds, setExtraDepartmentIds] = useState<string[]>([]);
   const [newExtraDepartmentId, setNewExtraDepartmentId] = useState<string>("");
@@ -87,11 +88,13 @@ export function MemberEditModal({
   const [error, setError] = useState<string | null>(null);
 
   const canChangeRole = PermissionService.canManageRoles(currentUser);
+  const canManageTestFlag = PermissionService.isAdmin(currentUser);
 
   useEffect(() => {
     if (member) {
       setFullName(member.full_name);
       setRole(member.role);
+      setIsTest(member.is_test);
       setIsActive(member.is_active);
       setDepartmentId(member.department_id || "__none__");
       setExtraDepartmentIds(
@@ -147,6 +150,9 @@ export function MemberEditModal({
     data.telegram_username = telegramUsername.trim().replace(/^@/, "") || null;
     if (canChangeRole) {
       data.role = role;
+    }
+    if (canManageTestFlag) {
+      data.is_test = isTest;
     }
 
     const isSwitchingToInactive = member.is_active && !isActive;
@@ -381,6 +387,29 @@ export function MemberEditModal({
               )}
             </div>
           </div>
+
+          {canManageTestFlag && (
+            <div>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Тип участника
+              </Label>
+              <Select
+                value={isTest ? "test" : "regular"}
+                onValueChange={(value) => setIsTest(value === "test")}
+              >
+                <SelectTrigger className="mt-1.5 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="regular">Обычный участник</SelectItem>
+                  <SelectItem value="test">Тестовый участник</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-2xs text-muted-foreground mt-1">
+                Тестовый участник скрыт в интерфейсе и не входит в общий счётчик.
+              </p>
+            </div>
+          )}
 
           {isDeactivationFlow && (
             <div className="rounded-xl border border-amber-300/50 bg-amber-50/50 p-3 space-y-3">

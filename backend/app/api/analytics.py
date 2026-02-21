@@ -361,7 +361,10 @@ async def analytics_overview(
     meetings_stmt = select(func.count(Meeting.id))
     total_meetings = int((await session.execute(meetings_stmt)).scalar_one() or 0)
 
-    members_stmt = select(func.count(TeamMember.id)).where(TeamMember.is_active.is_(True))
+    members_stmt = select(func.count(TeamMember.id)).where(
+        TeamMember.is_active.is_(True),
+        TeamMember.is_test.is_(False),
+    )
     if selected_department_id is not None:
         members_stmt = members_stmt.where(TeamMember.department_id == selected_department_id)
     elif visible_department_ids is not None:
@@ -533,7 +536,10 @@ async def analytics_members(
 
     members_stmt = (
         select(TeamMember)
-        .where(TeamMember.is_active.is_(True))
+        .where(
+            TeamMember.is_active.is_(True),
+            TeamMember.is_test.is_(False),
+        )
         .order_by(TeamMember.full_name.asc())
     )
     if department_id is not None:
@@ -559,7 +565,8 @@ async def analytics_members(
     )
     if department_id is not None:
         task_stats_stmt = task_stats_stmt.join(Task.assignee).where(
-            TeamMember.department_id == department_id
+            TeamMember.department_id == department_id,
+            TeamMember.is_test.is_(False),
         )
     task_stats_stmt = task_stats_stmt.group_by(Task.assignee_id)
 

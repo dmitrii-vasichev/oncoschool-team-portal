@@ -551,6 +551,7 @@ async def get_me(member: TeamMember = Depends(get_current_user)):
         "full_name": member.full_name,
         "name_variants": member.name_variants,
         "role": member.role,
+        "is_test": member.is_test,
         "is_active": member.is_active,
         "position": member.position,
         "department_id": str(member.department_id) if member.department_id else None,
