@@ -125,7 +125,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
     <>
       {variant === "upcoming" ? (
         <Link href={`/meetings/${meeting.id}`} className="group block h-full">
-          <div className="group relative h-[256px] sm:h-[264px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
+          <div className="group relative h-full min-h-[236px] sm:min-h-[228px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/3 to-transparent rounded-bl-3xl pointer-events-none" />
 
             {isModerator && onDelete && (
@@ -194,9 +194,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                           : "text-xs text-muted-foreground"
                       }`}
                     >
-                      <CalendarDays
-                        className={`h-3.5 w-3.5 ${hasMeetingDate ? "text-primary/80" : "text-muted-foreground"}`}
-                      />
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/80" />
                       <span className="line-clamp-1">{upcomingMeta.dateLabel}</span>
                     </div>
 
@@ -219,6 +217,11 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                         <Repeat className="h-2.5 w-2.5 mr-0.5" />
                         {recurrenceLabel}
                       </Badge>
+                      {variant === "upcoming" && meeting.meeting_date && (
+                        <span className="inline-flex items-center rounded-md bg-muted/70 px-1.5 py-0 h-5 text-2xs text-muted-foreground">
+                          {formatTimeRemaining(meeting.meeting_date, meeting.duration_minutes)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -241,12 +244,6 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                       </a>
                     )}
 
-                    {meeting.meeting_date && (
-                      <div className="flex items-center gap-1 text-2xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        {formatTimeRemaining(meeting.meeting_date, meeting.duration_minutes)}
-                      </div>
-                    )}
                   </div>
 
                   {participants.length > 0 ? (
@@ -280,7 +277,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
         </Link>
       ) : (
         <Link href={`/meetings/${meeting.id}`} className="group block h-full">
-          <div className="group relative h-[256px] sm:h-[264px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
+          <div className="group relative h-full min-h-[236px] sm:min-h-[228px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
             <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-primary/3 to-transparent rounded-bl-3xl pointer-events-none" />
 
             {isModerator && onDelete && (
@@ -349,9 +346,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                           : "text-xs text-muted-foreground"
                       }`}
                     >
-                      <CalendarDays
-                        className={`h-3.5 w-3.5 ${hasMeetingDate ? "text-primary/80" : "text-muted-foreground"}`}
-                      />
+                      <CalendarDays className="h-3.5 w-3.5 text-muted-foreground/80" />
                       <span className="line-clamp-1">{upcomingMeta.dateLabel}</span>
                     </div>
 
