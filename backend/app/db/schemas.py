@@ -231,6 +231,7 @@ class MeetingScheduleCreate(BaseModel):
     meeting_date_local: str | None = None  # "YYYY-MM-DDTHH:MM" for one_time/on_demand next run
     reminder_enabled: bool = True
     reminder_minutes_before: int = 60
+    reminder_offsets_minutes: list[int] = Field(default_factory=lambda: [60])
     reminder_text: str | None = None
     reminder_include_zoom_link: bool = True
     reminder_zoom_missing_behavior: MeetingReminderZoomMissingBehaviorType = "hide"
@@ -250,6 +251,7 @@ class MeetingScheduleUpdate(BaseModel):
     meeting_date_local: str | None = None
     reminder_enabled: bool | None = None
     reminder_minutes_before: int | None = None
+    reminder_offsets_minutes: list[int] | None = None
     reminder_text: str | None = None
     reminder_include_zoom_link: bool | None = None
     reminder_zoom_missing_behavior: MeetingReminderZoomMissingBehaviorType | None = None
@@ -277,6 +279,7 @@ class MeetingScheduleResponse(BaseModel):
     next_occurrence_at: datetime | None = None
     reminder_enabled: bool
     reminder_minutes_before: int
+    reminder_offsets_minutes: list[int]
     reminder_text: str | None
     reminder_include_zoom_link: bool
     reminder_zoom_missing_behavior: MeetingReminderZoomMissingBehaviorType

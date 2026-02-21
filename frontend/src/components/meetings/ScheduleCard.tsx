@@ -45,6 +45,13 @@ interface ScheduleCardProps {
   onDelete: (schedule: MeetingSchedule) => void;
 }
 
+function formatReminderOffset(minutes: number): string {
+  if (minutes === 0) return "в момент начала";
+  if (minutes === 60) return "за 1 час";
+  if (minutes === 120) return "за 2 часа";
+  return `за ${minutes} мин`;
+}
+
 export function ScheduleCard({
   schedule,
   members,
@@ -59,6 +66,12 @@ export function ScheduleCard({
   const participants = schedule.participant_ids
     .map((pid) => members.find((m) => m.id === pid))
     .filter(Boolean) as TeamMember[];
+  const reminderOffsets = (
+    schedule.reminder_offsets_minutes?.length
+      ? schedule.reminder_offsets_minutes
+      : [schedule.reminder_minutes_before]
+  ).slice().sort((a, b) => b - a);
+  const reminderSummary = reminderOffsets.map(formatReminderOffset).join(", ");
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
@@ -153,7 +166,7 @@ export function ScheduleCard({
               {schedule.reminder_enabled && (
                 <div className="flex items-center gap-1 text-2xs text-muted-foreground">
                   <Bell className="h-3 w-3 text-amber-500" />
-                  <span>за {schedule.reminder_minutes_before} мин</span>
+                  <span>{reminderSummary}</span>
                 </div>
               )}
               {schedule.next_occurrence_skip && (

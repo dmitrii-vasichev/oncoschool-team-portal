@@ -9,6 +9,17 @@ import {
   CalendarClock,
   SkipForward,
   X,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Code2,
+  Eye,
+  Link2,
+  Smile,
+  Plus,
+  Trash2,
+  PencilLine,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +39,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { TimePicker } from "@/components/shared/TimePicker";
@@ -54,11 +70,33 @@ const DURATION_OPTIONS = [
   { value: "180", label: "3 часа" },
 ];
 
-const REMINDER_OPTIONS = [
-  { value: "15", label: "за 15 мин" },
-  { value: "30", label: "за 30 мин" },
-  { value: "60", label: "за 1 час" },
-  { value: "120", label: "за 2 часа" },
+const REMINDER_OPTIONS = [120, 60, 30, 15, 0];
+const DEFAULT_REMINDER_OFFSETS = [60];
+const EMOJIS = [
+  "🔥",
+  "✅",
+  "📌",
+  "📣",
+  "⚠️",
+  "💡",
+  "🎯",
+  "🚀",
+  "🙂",
+  "😊",
+  "😉",
+  "🙏",
+  "🤝",
+  "👏",
+  "❤️",
+  "📅",
+  "⏰",
+  "📈",
+  "🧠",
+  "📎",
+  "🎉",
+  "📝",
+  "🔔",
+  "👀",
 ];
 
 const REMINDER_TEMPLATE_VARIABLES = [
@@ -66,11 +104,12 @@ const REMINDER_TEMPLATE_VARIABLES = [
   { token: "{название}", label: "Название встречи" },
   { token: "{дата}", label: "Дата (МСК)" },
   { token: "{день_недели}", label: "День недели" },
+  { token: "{zoom_link}", label: "Zoom-ссылка" },
 ];
 
 function applyReminderTemplate(
   template: string,
-  values: { time: string; title: string; date: string; weekday: string }
+  values: { time: string; title: string; date: string; weekday: string; zoomLink: string }
 ): string {
   return template
     .replaceAll("{время}", values.time)
@@ -80,7 +119,45 @@ function applyReminderTemplate(
     .replaceAll("{time_msk}", values.time)
     .replaceAll("{title}", values.title)
     .replaceAll("{date_msk}", values.date)
-    .replaceAll("{weekday_ru}", values.weekday);
+    .replaceAll("{weekday_ru}", values.weekday)
+    .replaceAll("{zoom_link}", values.zoomLink)
+    .replaceAll("{zoom_url}", values.zoomLink)
+    .replaceAll("{ссылка_zoom}", values.zoomLink);
+}
+
+function formatReminderOffsetLabel(offsetMinutes: number): string {
+  if (offsetMinutes === 0) return "в момент начала";
+  if (offsetMinutes === 60) return "за 1 час";
+  if (offsetMinutes === 120) return "за 2 часа";
+  return `за ${offsetMinutes} мин`;
+}
+
+function normalizeReminderOffsets(
+  offsets: number[] | null | undefined,
+  fallback?: number | null
+): number[] {
+  const source = offsets?.length ? offsets : fallback != null ? [fallback] : DEFAULT_REMINDER_OFFSETS;
+  const normalized: number[] = [];
+  for (const value of source) {
+    const offset = Number(value);
+    if (!REMINDER_OPTIONS.includes(offset)) continue;
+    if (!normalized.includes(offset)) normalized.push(offset);
+  }
+  if (!normalized.length) return [...DEFAULT_REMINDER_OFFSETS];
+  return normalized.sort((a, b) => b - a);
+}
+
+function hasZoomPlaceholder(template: string): boolean {
+  const lower = template.toLowerCase();
+  return (
+    lower.includes("{zoom_link}") ||
+    lower.includes("{zoom_url}") ||
+    lower.includes("{ссылка_zoom}")
+  );
+}
+
+function renderTelegramHtmlPreview(htmlText: string): { __html: string } {
+  return { __html: htmlText.replace(/\n/g, "<br/>") };
 }
 
 function toMoscowDate(utcIso: string): string {
@@ -152,10 +229,18 @@ export function ScheduleForm({
   const [reminderEnabled, setReminderEnabled] = useState(
     schedule?.reminder_enabled ?? true
   );
-  const [reminderMinutes, setReminderMinutes] = useState(
-    String(schedule?.reminder_minutes_before ?? 60)
+  const [reminderOffsets, setReminderOffsets] = useState<number[]>(() =>
+    normalizeReminderOffsets(
+      schedule?.reminder_offsets_minutes,
+      schedule?.reminder_minutes_before ?? 60
+    )
   );
   const [reminderText, setReminderText] = useState(schedule?.reminder_text ?? "");
+  const [reminderEditorOpen, setReminderEditorOpen] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("https://");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkSelection, setLinkSelection] = useState<{ start: number; end: number } | null>(null);
   const [selectedTargetIds, setSelectedTargetIds] = useState<string[]>(() => {
     // Pre-select telegram targets that match the schedule's targets
     if (!schedule?.telegram_targets?.length) return telegramTargets.map((t) => t.id);
@@ -236,6 +321,7 @@ export function ScheduleForm({
         timeZone: "Europe/Moscow",
       }),
       weekday: previewWeekday.toLowerCase(),
+      zoomLink: "https://zoom.us/j/1234567890",
     };
   }, [dayOfWeek, meetingDate, timeMsk, title]);
 
@@ -251,25 +337,120 @@ export function ScheduleForm({
     if (participantMentionsPreview) {
       text += `\n\n${participantMentionsPreview}`;
     }
-    text += "\n\nСсылка для подключения: https://zoom.us/j/1234567890";
+    if (!hasZoomPlaceholder(reminderText)) {
+      text += "\n\nСсылка для подключения: https://zoom.us/j/1234567890";
+    }
     return text;
-  }, [baseReminderPreview, participantMentionsPreview]);
+  }, [baseReminderPreview, participantMentionsPreview, reminderText]);
 
-  const insertReminderVariable = (token: string) => {
+  const updateReminderOffset = (index: number, value: number) => {
+    setReminderOffsets((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return normalizeReminderOffsets(next);
+    });
+  };
+
+  const addReminderOffset = () => {
+    setReminderOffsets((prev) => {
+      const next = normalizeReminderOffsets(prev);
+      const candidate = REMINDER_OPTIONS.find((value) => !next.includes(value));
+      if (candidate == null) return next;
+      return normalizeReminderOffsets([...next, candidate]);
+    });
+  };
+
+  const removeReminderOffset = (index: number) => {
+    setReminderOffsets((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((_, idx) => idx !== index);
+      return normalizeReminderOffsets(next);
+    });
+  };
+
+  const replaceReminderSelection = (replacement: string, cursorOffset = replacement.length) => {
     const textarea = reminderTextRef.current;
     if (!textarea) {
-      setReminderText((prev) => `${prev}${token}`);
+      setReminderText((prev) => `${prev}${replacement}`);
       return;
     }
     const start = textarea.selectionStart ?? reminderText.length;
     const end = textarea.selectionEnd ?? reminderText.length;
-    const next = `${reminderText.slice(0, start)}${token}${reminderText.slice(end)}`;
+    const next = `${reminderText.slice(0, start)}${replacement}${reminderText.slice(end)}`;
     setReminderText(next);
     requestAnimationFrame(() => {
       textarea.focus();
-      const cursor = start + token.length;
+      const cursor = start + cursorOffset;
       textarea.setSelectionRange(cursor, cursor);
     });
+  };
+
+  const wrapReminderSelection = (openTag: string, closeTag: string, fallback = "текст") => {
+    const textarea = reminderTextRef.current;
+    if (!textarea) {
+      replaceReminderSelection(`${openTag}${fallback}${closeTag}`);
+      return;
+    }
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    const selected = reminderText.slice(start, end) || fallback;
+    const next =
+      reminderText.slice(0, start) +
+      openTag +
+      selected +
+      closeTag +
+      reminderText.slice(end);
+    setReminderText(next);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const selectionStart = start + openTag.length;
+      const selectionEnd = selectionStart + selected.length;
+      textarea.setSelectionRange(selectionStart, selectionEnd);
+    });
+  };
+
+  const openLinkDialog = () => {
+    const textarea = reminderTextRef.current;
+    const start = textarea?.selectionStart ?? reminderText.length;
+    const end = textarea?.selectionEnd ?? reminderText.length;
+    const selectedText = reminderText.slice(start, end).trim();
+
+    setLinkSelection({ start, end });
+    setLinkLabel(selectedText || "");
+    setLinkUrl("https://");
+    setLinkDialogOpen(true);
+  };
+
+  const handleInsertLink = () => {
+    const href = linkUrl.trim();
+    const isZoomToken =
+      href === "{zoom_link}" || href === "{zoom_url}" || href === "{ссылка_zoom}";
+    if (!isZoomToken && !/^https?:\/\//i.test(href)) {
+      setError("URL должен начинаться с http://, https:// или быть {zoom_link}");
+      return;
+    }
+    setError(null);
+
+    const label = linkLabel.trim() || "ссылка";
+    const replacement = `<a href="${href}">${label}</a>`;
+    const start = Math.max(0, Math.min(linkSelection?.start ?? reminderText.length, reminderText.length));
+    const end = Math.max(start, Math.min(linkSelection?.end ?? start, reminderText.length));
+    const next = reminderText.slice(0, start) + replacement + reminderText.slice(end);
+    setReminderText(next);
+    setLinkDialogOpen(false);
+
+    const textarea = reminderTextRef.current;
+    if (textarea) {
+      requestAnimationFrame(() => {
+        textarea.focus();
+        const caret = start + `<a href="${href}">`.length + label.length;
+        textarea.setSelectionRange(caret, caret);
+      });
+    }
+  };
+
+  const insertReminderVariable = (token: string) => {
+    replaceReminderSelection(token);
   };
 
   const toggleTarget = (id: string) => {
@@ -302,6 +483,10 @@ export function ScheduleForm({
       setError("Выберите время встречи");
       return;
     }
+    if (reminderEnabled && reminderOffsets.length === 0) {
+      setError("Добавьте хотя бы один тайминг напоминания");
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -320,7 +505,8 @@ export function ScheduleForm({
         duration_minutes: Number(duration),
         recurrence,
         reminder_enabled: reminderEnabled,
-        reminder_minutes_before: Number(reminderMinutes),
+        reminder_minutes_before: reminderOffsets[0] ?? 60,
+        reminder_offsets_minutes: reminderOffsets,
         reminder_text: reminderText.trim() || null,
         reminder_include_zoom_link: true,
         reminder_zoom_missing_behavior: "hide",
@@ -562,71 +748,94 @@ export function ScheduleForm({
             {reminderEnabled && (
               <div className="px-3 pb-3 space-y-3 border-t border-border/40 pt-3">
                 <div>
-                  <Label className="text-2xs text-muted-foreground">
-                    Отправить
-                  </Label>
-                  <Select value={reminderMinutes} onValueChange={setReminderMinutes}>
-                    <SelectTrigger className="mt-1 rounded-lg h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REMINDER_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-2xs text-muted-foreground">
+                      Тайминги напоминаний
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-lg text-2xs px-2"
+                      onClick={addReminderOffset}
+                      disabled={reminderOffsets.length >= REMINDER_OPTIONS.length}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Добавить напоминание
+                    </Button>
+                  </div>
+
+                  <div className="mt-1.5 space-y-2">
+                    {reminderOffsets.map((offset, index) => (
+                      <div key={`${offset}-${index}`} className="flex items-center gap-2">
+                        <Select
+                          value={String(offset)}
+                          onValueChange={(value) => updateReminderOffset(index, Number(value))}
+                        >
+                          <SelectTrigger className="rounded-lg h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {REMINDER_OPTIONS.map((option) => {
+                              const usedByAnother = reminderOffsets.some(
+                                (existingOffset, existingIdx) =>
+                                  existingOffset === option && existingIdx !== index
+                              );
+                              return (
+                                <SelectItem
+                                  key={option}
+                                  value={String(option)}
+                                  disabled={usedByAnother}
+                                >
+                                  {formatReminderOffsetLabel(option)}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-lg text-muted-foreground"
+                          onClick={() => removeReminderOffset(index)}
+                          disabled={reminderOffsets.length <= 1}
+                          title="Удалить тайминг"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div>
-                  <Label className="text-2xs text-muted-foreground">
-                    Текст напоминания (необязательно)
-                  </Label>
-                  <Textarea
-                    ref={reminderTextRef}
-                    value={reminderText}
-                    onChange={(e) => setReminderText(e.target.value)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const token = e.dataTransfer.getData("text/reminder-variable");
-                      if (token) {
-                        insertReminderVariable(token);
-                      }
-                    }}
-                    placeholder="Здравствуйте! Напоминаю, сегодня в {время} по МСК встреча {название}"
-                    rows={2}
-                    className="mt-1 rounded-lg text-sm resize-none"
-                  />
-                  <p className="text-2xs text-muted-foreground/70 mt-1">
-                    Участники и Zoom-блок добавляются отдельно, внизу сообщения.
-                  </p>
-                  <div className="mt-2">
-                    <Label className="text-2xs text-muted-foreground">
-                      Вставить переменную
-                    </Label>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {REMINDER_TEMPLATE_VARIABLES.map((item) => (
-                        <button
-                          key={item.token}
-                          type="button"
-                          draggable
-                          onDragStart={(e) =>
-                            e.dataTransfer.setData("text/reminder-variable", item.token)
-                          }
-                          onClick={() => insertReminderVariable(item.token)}
-                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-card px-2 py-1 text-2xs hover:border-border transition-colors"
-                        >
-                          <span className="text-muted-foreground">{item.label}</span>
-                          <code className="font-mono text-[10px]">{item.token}</code>
-                        </button>
-                      ))}
+                <div className="rounded-lg border border-border/60 bg-card px-2.5 py-2 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <Label className="text-xs font-medium">Текст напоминания</Label>
+                      <p className="text-2xs text-muted-foreground/70 mt-0.5">
+                        Откройте редактор, чтобы настроить форматирование, переменные и ссылку.
+                      </p>
                     </div>
-                    <p className="text-2xs text-muted-foreground/60 mt-1">
-                      Нажмите на переменную или перетащите ее в текст.
-                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg"
+                      onClick={() => setReminderEditorOpen(true)}
+                    >
+                      <PencilLine className="h-3.5 w-3.5 mr-1.5" />
+                      Редактировать
+                    </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {reminderText.trim()
+                      ? reminderText
+                          .replace(/<[^>]*>/g, " ")
+                          .replace(/\s+/g, " ")
+                          .trim()
+                      : "Будет использован стандартный текст напоминания."}
+                  </p>
                 </div>
 
                 <div className="rounded-lg border border-border/60 bg-card px-2.5 py-2 space-y-2">
@@ -647,7 +856,10 @@ export function ScheduleForm({
                       <p className="text-2xs font-medium text-muted-foreground mb-1">
                         Итоговый текст напоминания
                       </p>
-                      <p className="whitespace-pre-wrap">{reminderPreviewWithZoom}</p>
+                      <div
+                        className="whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={renderTelegramHtmlPreview(reminderPreviewWithZoom)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -716,6 +928,225 @@ export function ScheduleForm({
               </div>
             )}
           </div>
+
+          <Dialog open={reminderEditorOpen} onOpenChange={setReminderEditorOpen}>
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="font-heading">Редактор напоминания</DialogTitle>
+              </DialogHeader>
+
+              <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-border/60 bg-muted/20 p-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<b>", "</b>", "жирный")}
+                        title="Жирный"
+                      >
+                        <Bold className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<i>", "</i>", "курсив")}
+                        title="Курсив"
+                      >
+                        <Italic className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<u>", "</u>", "подчеркнуто")}
+                        title="Подчеркнутый"
+                      >
+                        <Underline className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<s>", "</s>", "зачеркнуто")}
+                        title="Зачеркнутый"
+                      >
+                        <Strikethrough className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<code>", "</code>", "код")}
+                        title="Код"
+                      >
+                        <Code2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => wrapReminderSelection("<tg-spoiler>", "</tg-spoiler>", "спойлер")}
+                        title="Спойлер"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={openLinkDialog}
+                        title="Ссылка"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Emoji"
+                          >
+                            <Smile className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-3">
+                          <div className="grid grid-cols-8 gap-1">
+                            {EMOJIS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                className="h-8 w-8 rounded-md text-lg hover:bg-muted"
+                                onClick={() => replaceReminderSelection(emoji)}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <Textarea
+                    ref={reminderTextRef}
+                    value={reminderText}
+                    onChange={(e) => setReminderText(e.target.value)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const token = e.dataTransfer.getData("text/reminder-variable");
+                      if (token) {
+                        insertReminderVariable(token);
+                      }
+                    }}
+                    placeholder="Здравствуйте! Напоминаю, сегодня в {время} по МСК встреча {название}"
+                    rows={10}
+                    className="rounded-xl text-sm font-body"
+                  />
+
+                  <div>
+                    <Label className="text-2xs text-muted-foreground">
+                      Вставить переменную
+                    </Label>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {REMINDER_TEMPLATE_VARIABLES.map((item) => (
+                        <button
+                          key={item.token}
+                          type="button"
+                          draggable
+                          onDragStart={(e) =>
+                            e.dataTransfer.setData("text/reminder-variable", item.token)
+                          }
+                          onClick={() => insertReminderVariable(item.token)}
+                          className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-card px-2 py-1 text-2xs hover:border-border transition-colors"
+                        >
+                          <span className="text-muted-foreground">{item.label}</span>
+                          <code className="font-mono text-[10px]">{item.token}</code>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-2xs text-muted-foreground/60 mt-1">
+                      Можно использовать HTML, например:
+                      {" "}
+                      <code className="font-mono">{`<a href="{zoom_link}">Подключиться ↗</a>`}</code>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-border/60 bg-card p-4">
+                  <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+                    <Eye className="h-3.5 w-3.5" />
+                    Предпросмотр
+                  </div>
+                  <div className="max-h-[360px] overflow-auto rounded-xl border border-border/40 bg-muted/20 p-4">
+                    <div
+                      className="ml-auto max-w-[96%] rounded-2xl bg-primary/10 px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words"
+                      dangerouslySetInnerHTML={renderTelegramHtmlPreview(reminderPreviewWithZoom)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="button" className="rounded-xl" onClick={() => setReminderEditorOpen(false)}>
+                  Готово
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-heading text-base">Добавить ссылку</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="reminder-link-url">URL</Label>
+                  <Input
+                    id="reminder-link-url"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder='https://example.com или {zoom_link}'
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reminder-link-label">Текст ссылки</Label>
+                  <Input
+                    id="reminder-link-label"
+                    value={linkLabel}
+                    onChange={(e) => setLinkLabel(e.target.value)}
+                    placeholder="Подключиться ↗"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setLinkDialogOpen(false)}
+                  >
+                    Отмена
+                  </Button>
+                  <Button type="button" onClick={handleInsertLink}>
+                    Вставить
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Next meeting override (edit mode only) */}
           {isEdit && isRecurringMode && schedule?.next_occurrence_date && (

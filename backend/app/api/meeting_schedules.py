@@ -32,6 +32,38 @@ VALID_RECURRENCES = {
     "on_demand",
 }
 RECURRING_RECURRENCES = {"weekly", "biweekly", "monthly_last_workday"}
+ALLOWED_REMINDER_OFFSETS_MINUTES = (0, 15, 30, 60, 120)
+DEFAULT_REMINDER_OFFSETS_MINUTES = [60]
+
+
+def _normalize_reminder_offsets(
+    reminder_offsets_minutes: list[int] | None,
+    fallback_minutes: int | None = None,
+) -> list[int]:
+    raw_values = list(reminder_offsets_minutes or [])
+    if not raw_values and fallback_minutes is not None:
+        raw_values = [fallback_minutes]
+    if not raw_values:
+        raw_values = list(DEFAULT_REMINDER_OFFSETS_MINUTES)
+
+    normalized: list[int] = []
+    for value in raw_values:
+        try:
+            offset = int(value)
+        except (TypeError, ValueError):
+            continue
+        if offset not in ALLOWED_REMINDER_OFFSETS_MINUTES:
+            continue
+        if offset not in normalized:
+            normalized.append(offset)
+
+    if not normalized:
+        if fallback_minutes in ALLOWED_REMINDER_OFFSETS_MINUTES:
+            normalized = [int(fallback_minutes)]
+        else:
+            normalized = list(DEFAULT_REMINDER_OFFSETS_MINUTES)
+
+    return sorted(normalized, reverse=True)
 
 
 def _is_last_selected_weekday_in_month(dt_local: datetime, day_of_week: int) -> bool:
@@ -180,6 +212,11 @@ def _calc_next_occurrence_date(schedule: MeetingSchedule) -> date | None:
 def _enrich_response(schedule: MeetingSchedule) -> MeetingScheduleResponse:
     """Build response with computed next_occurrence_date."""
     resp = MeetingScheduleResponse.model_validate(schedule)
+    resp.reminder_offsets_minutes = _normalize_reminder_offsets(
+        resp.reminder_offsets_minutes,
+        fallback_minutes=resp.reminder_minutes_before,
+    )
+    resp.reminder_minutes_before = resp.reminder_offsets_minutes[0]
     if resp.next_occurrence_at and resp.next_occurrence_at.tzinfo is None:
         resp.next_occurrence_at = resp.next_occurrence_at.replace(tzinfo=ZoneInfo("UTC"))
     resp.next_occurrence_date = _calc_next_occurrence_date(schedule)
@@ -346,6 +383,11 @@ async def create_schedule(
         ]
 
     reminder_text = (data.reminder_text or "").strip() or None
+    reminder_offsets_minutes = _normalize_reminder_offsets(
+        data.reminder_offsets_minutes,
+        fallback_minutes=data.reminder_minutes_before,
+    )
+    reminder_minutes_before = reminder_offsets_minutes[0]
     reminder_include_zoom_link = True
     reminder_zoom_missing_behavior = "hide"
     reminder_zoom_missing_text = None
@@ -361,7 +403,8 @@ async def create_schedule(
         one_time_date=one_time_date,
         next_occurrence_at=next_occurrence_at,
         reminder_enabled=data.reminder_enabled,
-        reminder_minutes_before=data.reminder_minutes_before,
+        reminder_minutes_before=reminder_minutes_before,
+        reminder_offsets_minutes=reminder_offsets_minutes,
         reminder_text=reminder_text,
         reminder_include_zoom_link=reminder_include_zoom_link,
         reminder_zoom_missing_behavior=reminder_zoom_missing_behavior,
@@ -552,6 +595,17 @@ async def update_schedule(
 
         if update_data.get("next_occurrence_skip") is True:
             update_data["next_occurrence_time_override"] = None
+
+    effective_fallback_minutes = update_data.get(
+        "reminder_minutes_before",
+        schedule.reminder_minutes_before,
+    )
+    effective_offsets = _normalize_reminder_offsets(
+        update_data.get("reminder_offsets_minutes"),
+        fallback_minutes=effective_fallback_minutes,
+    )
+    update_data["reminder_offsets_minutes"] = effective_offsets
+    update_data["reminder_minutes_before"] = effective_offsets[0]
 
     # Zoom link in reminders is mandatory for schedules.
     update_data["reminder_include_zoom_link"] = True

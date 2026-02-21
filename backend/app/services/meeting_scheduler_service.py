@@ -15,6 +15,10 @@ from app.services.zoom_service import sanitize_zoom_join_url
 logger = logging.getLogger(__name__)
 ZOOM_CREATE_MAX_ATTEMPTS = 3
 ZOOM_CREATE_RETRY_BASE_DELAY_SECONDS = 2
+ALLOWED_REMINDER_OFFSETS_MINUTES = (0, 15, 30, 60, 120)
+DEFAULT_REMINDER_OFFSET_MINUTES = 60
+TRIGGER_EARLY_WINDOW_SECONDS = 90
+TRIGGER_LATE_GRACE_SECONDS = 300
 RUSSIAN_WEEKDAYS = {
     1: "понедельник",
     2: "вторник",
@@ -85,14 +89,20 @@ class MeetingSchedulerService:
 
                 for schedule in schedules:
                     try:
-                        if self._should_trigger(schedule, now_utc):
+                        reminder_offsets = self._get_schedule_reminder_offsets(schedule)
+                        for reminder_offset in reminder_offsets:
+                            if not self._should_trigger(schedule, now_utc, reminder_offset):
+                                continue
                             if schedule.next_occurrence_skip:
                                 # Skip this occurrence: mark triggered, reset flags
                                 logger.info(
                                     f"Skipping schedule '{schedule.title}' "
                                     f"(next_occurrence_skip=True)"
                                 )
-                                schedule.last_triggered_date = now_utc.date()
+                                schedule.last_triggered_date = self._next_meeting_datetime(
+                                    schedule,
+                                    now_utc,
+                                ).date()
                                 schedule.next_occurrence_skip = False
                                 if schedule.recurrence == "on_demand":
                                     schedule.next_occurrence_at = None
@@ -105,7 +115,14 @@ class MeetingSchedulerService:
                                     schedule.next_occurrence_time_override = None
                                 await session.commit()
                             else:
-                                await self._trigger_meeting(session, schedule, now_utc)
+                                await self._trigger_meeting(
+                                    session,
+                                    schedule,
+                                    now_utc,
+                                    reminder_offset_minutes=reminder_offset,
+                                )
+                            # One reminder send/skip action per schedule per tick.
+                            break
                     except Exception as e:
                         logger.error(
                             f"Error processing schedule {schedule.id} ({schedule.title}): {e}",
@@ -206,80 +223,73 @@ class MeetingSchedulerService:
         except Exception as e:
             logger.error(f"Error in _sync_zoom_transcripts: {e}", exc_info=True)
 
-    def _should_trigger(self, schedule: MeetingSchedule, now_utc: datetime) -> bool:
-        """Check all conditions for triggering a schedule."""
+    def _should_trigger(
+        self,
+        schedule: MeetingSchedule,
+        now_utc: datetime,
+        reminder_offset_minutes: int,
+    ) -> bool:
+        """Check trigger window for a specific reminder offset."""
         recurrence = schedule.recurrence
-        today_utc = now_utc.date()
+        effective_time = schedule.next_occurrence_time_override or schedule.time_utc
 
-        # on_demand has its own explicit datetime, not weekday-based recurrence.
+        # on_demand has explicit datetime, not weekday-based recurrence.
         if recurrence == "on_demand":
             if not schedule.next_occurrence_at:
                 return False
-
-            next_occurrence = schedule.next_occurrence_at
-            if next_occurrence.tzinfo is None:
-                next_occurrence = next_occurrence.replace(tzinfo=ZoneInfo("UTC"))
+            meeting_dt_utc = schedule.next_occurrence_at
+            if meeting_dt_utc.tzinfo is None:
+                meeting_dt_utc = meeting_dt_utc.replace(tzinfo=ZoneInfo("UTC"))
             else:
-                next_occurrence = next_occurrence.astimezone(ZoneInfo("UTC"))
-
-            trigger_at = next_occurrence - timedelta(minutes=schedule.reminder_minutes_before)
-
-            # Exact trigger window + catch-up window before meeting start.
-            in_trigger_window = abs((now_utc - trigger_at).total_seconds()) <= 90
-            in_catchup = trigger_at <= now_utc <= next_occurrence
-            return in_trigger_window or in_catchup
-
-        # one_time / recurring meetings still use once-per-day safeguard.
-        if schedule.last_triggered_date and schedule.last_triggered_date >= today_utc:
-            return False
-
-        effective_time = schedule.next_occurrence_time_override or schedule.time_utc
+                meeting_dt_utc = meeting_dt_utc.astimezone(ZoneInfo("UTC"))
+            trigger_at = meeting_dt_utc - timedelta(minutes=reminder_offset_minutes)
+            delta_seconds = (now_utc - trigger_at).total_seconds()
+            return -TRIGGER_EARLY_WINDOW_SECONDS <= delta_seconds <= TRIGGER_LATE_GRACE_SECONDS
 
         if recurrence == "one_time":
             if not schedule.one_time_date:
                 return False
             meeting_dt_utc = datetime.combine(
-                schedule.one_time_date, effective_time, tzinfo=ZoneInfo("UTC")
+                schedule.one_time_date,
+                effective_time,
+                tzinfo=ZoneInfo("UTC"),
             )
-            trigger_at = meeting_dt_utc - timedelta(minutes=schedule.reminder_minutes_before)
-            in_trigger_window = abs((now_utc - trigger_at).total_seconds()) <= 90
-            in_catchup = trigger_at <= now_utc <= meeting_dt_utc
-            return in_trigger_window or in_catchup
+            if schedule.last_triggered_date and schedule.last_triggered_date >= meeting_dt_utc.date():
+                return False
+            trigger_at = meeting_dt_utc - timedelta(minutes=reminder_offset_minutes)
+            delta_seconds = (now_utc - trigger_at).total_seconds()
+            return -TRIGGER_EARLY_WINDOW_SECONDS <= delta_seconds <= TRIGGER_LATE_GRACE_SECONDS
 
         # Recurring weekday modes.
-        meeting_dt_utc = datetime.combine(
-            now_utc.date(), effective_time, tzinfo=ZoneInfo("UTC")
-        )
-        meeting_dt_local = meeting_dt_utc.astimezone(ZoneInfo(schedule.timezone))
-        if meeting_dt_local.isoweekday() != schedule.day_of_week:
-            return False
+        timezone = ZoneInfo(schedule.timezone)
+        for day_shift in (0, 1):
+            meeting_dt_utc = datetime.combine(
+                now_utc.date() + timedelta(days=day_shift),
+                effective_time,
+                tzinfo=ZoneInfo("UTC"),
+            )
+            if schedule.last_triggered_date and schedule.last_triggered_date >= meeting_dt_utc.date():
+                continue
+            meeting_dt_local = meeting_dt_utc.astimezone(timezone)
+            if meeting_dt_local.isoweekday() != schedule.day_of_week:
+                continue
 
-        if recurrence == "biweekly":
-            week_number = meeting_dt_local.isocalendar()[1]
-            if week_number % 2 != 0:
-                return False
-        elif recurrence == "monthly_last_workday":
-            if not self._is_last_selected_weekday_of_month(
-                meeting_dt_local, schedule.day_of_week
-            ):
-                return False
+            if recurrence == "biweekly":
+                week_number = meeting_dt_local.isocalendar()[1]
+                if week_number % 2 != 0:
+                    continue
+            elif recurrence == "monthly_last_workday":
+                if not self._is_last_selected_weekday_of_month(
+                    meeting_dt_local,
+                    schedule.day_of_week,
+                ):
+                    continue
 
-        trigger_time = self._calc_trigger_time(schedule, effective_time)
-        current_minutes = now_utc.hour * 60 + now_utc.minute
-        trigger_minutes = trigger_time.hour * 60 + trigger_time.minute
-        meeting_minutes = effective_time.hour * 60 + effective_time.minute
-
-        diff = abs(current_minutes - trigger_minutes)
-        if diff > 720:
-            diff = 1440 - diff
-        in_trigger_window = diff <= 1
-
-        if trigger_minutes <= meeting_minutes:
-            in_catchup = trigger_minutes <= current_minutes <= meeting_minutes
-        else:
-            in_catchup = current_minutes >= trigger_minutes or current_minutes <= meeting_minutes
-
-        return in_trigger_window or in_catchup
+            trigger_at = meeting_dt_utc - timedelta(minutes=reminder_offset_minutes)
+            delta_seconds = (now_utc - trigger_at).total_seconds()
+            if -TRIGGER_EARLY_WINDOW_SECONDS <= delta_seconds <= TRIGGER_LATE_GRACE_SECONDS:
+                return True
+        return False
 
     def _calc_trigger_time(self, schedule: MeetingSchedule, effective_time: time | None = None) -> time:
         """Calculate trigger time = effective_time - reminder_minutes_before."""
@@ -300,6 +310,52 @@ class MeetingSchedulerService:
             return False
         next_same_weekday = dt + timedelta(days=7)
         return next_same_weekday.month != dt.month
+
+    @staticmethod
+    def _normalize_reminder_offsets(
+        reminder_offsets_minutes: list[int] | None,
+        fallback_minutes: int | None = None,
+    ) -> list[int]:
+        raw_values = list(reminder_offsets_minutes or [])
+        if not raw_values and fallback_minutes is not None:
+            raw_values = [fallback_minutes]
+        if not raw_values:
+            raw_values = [DEFAULT_REMINDER_OFFSET_MINUTES]
+
+        normalized: list[int] = []
+        for value in raw_values:
+            try:
+                offset = int(value)
+            except (TypeError, ValueError):
+                continue
+            if offset not in ALLOWED_REMINDER_OFFSETS_MINUTES:
+                continue
+            if offset not in normalized:
+                normalized.append(offset)
+
+        if not normalized:
+            if fallback_minutes in ALLOWED_REMINDER_OFFSETS_MINUTES:
+                normalized = [int(fallback_minutes)]
+            else:
+                normalized = [DEFAULT_REMINDER_OFFSET_MINUTES]
+
+        return sorted(normalized, reverse=True)
+
+    @classmethod
+    def _get_schedule_reminder_offsets(cls, schedule: MeetingSchedule) -> list[int]:
+        return cls._normalize_reminder_offsets(
+            getattr(schedule, "reminder_offsets_minutes", None),
+            fallback_minutes=getattr(schedule, "reminder_minutes_before", DEFAULT_REMINDER_OFFSET_MINUTES),
+        )
+
+    @staticmethod
+    def _contains_zoom_link_placeholder(template: str) -> bool:
+        template_lower = template.lower()
+        return (
+            "{zoom_link}" in template_lower
+            or "{zoom_url}" in template_lower
+            or "{ссылка_zoom}" in template_lower
+        )
 
     @staticmethod
     def _resolve_zoom_join_url(raw_join_url: str | None, zoom_meeting_id: str | None) -> str | None:
@@ -367,13 +423,17 @@ class MeetingSchedulerService:
         session,
         schedule: MeetingSchedule,
         now_utc: datetime,
+        reminder_offset_minutes: int,
     ) -> None:
-        """Create Zoom meeting (if needed) + Meeting record + send Telegram reminders."""
+        """Create/update meeting + send reminder for a specific offset."""
         meeting_date = self._next_meeting_datetime(schedule, now_utc)
         meeting_date_naive = meeting_date.replace(tzinfo=None)
+        configured_offsets = self._get_schedule_reminder_offsets(schedule)
 
         # Check if meeting already exists (pre-created when schedule was created)
         existing = await self._find_existing_meeting(session, schedule.id, meeting_date_naive)
+        if existing and reminder_offset_minutes in (existing.sent_reminder_offsets_minutes or []):
+            return
 
         # 1. Create Zoom meeting (required for reminder delivery)
         zoom_data = None
@@ -421,7 +481,11 @@ class MeetingSchedulerService:
                 existing.zoom_join_url = zoom_join_url
                 updated = True
             if updated:
-                await session.commit()
+                logger.info(
+                    "Zoom metadata refreshed for schedule '%s' at %s",
+                    schedule.title,
+                    meeting_date,
+                )
             logger.info(f"Using existing meeting for schedule '{schedule.title}' at {meeting_date}")
         else:
             meeting = Meeting(
@@ -441,24 +505,34 @@ class MeetingSchedulerService:
             if schedule.participant_ids:
                 for pid in schedule.participant_ids:
                     session.add(MeetingParticipant(meeting_id=meeting.id, member_id=pid))
-
-            await session.commit()
-            logger.info(f"Meeting created for schedule '{schedule.title}' at {meeting_date}")
+            logger.info(f"Meeting prepared for schedule '{schedule.title}' at {meeting_date}")
 
         # 3. Send Telegram reminders (only if enabled)
         if schedule.reminder_enabled:
-            await self._send_reminders(session, schedule, meeting, zoom_data)
+            await self._send_reminders(
+                session,
+                schedule,
+                meeting,
+                zoom_data,
+                reminder_offset_minutes=reminder_offset_minutes,
+            )
 
-        # 4. Mark as triggered in DB (survives restarts) + reset one-shot flags
-        schedule.last_triggered_date = now_utc.date()
-        if schedule.recurrence == "on_demand":
-            schedule.next_occurrence_at = None
-            await self._ensure_on_demand_template_meeting(session, schedule)
-        elif schedule.recurrence == "one_time":
-            schedule.is_active = False
-        else:
-            schedule.next_occurrence_time_override = None
-            schedule.next_occurrence_skip = False
+        sent_offsets = set(meeting.sent_reminder_offsets_minutes or [])
+        sent_offsets.add(reminder_offset_minutes)
+        meeting.sent_reminder_offsets_minutes = sorted(sent_offsets, reverse=True)
+
+        all_required_sent = all(offset in sent_offsets for offset in configured_offsets)
+        if all_required_sent:
+            # Mark occurrence as fully processed only after all configured reminders were sent.
+            schedule.last_triggered_date = meeting_date.date()
+            if schedule.recurrence == "on_demand":
+                schedule.next_occurrence_at = None
+                await self._ensure_on_demand_template_meeting(session, schedule)
+            elif schedule.recurrence == "one_time":
+                schedule.is_active = False
+            else:
+                schedule.next_occurrence_time_override = None
+                schedule.next_occurrence_skip = False
         await session.commit()
 
     def _next_meeting_datetime(self, schedule: MeetingSchedule, now_utc: datetime) -> datetime:
@@ -522,12 +596,37 @@ class MeetingSchedulerService:
         return template
 
     async def _send_reminders(
-        self, session, schedule: MeetingSchedule, meeting: Meeting, zoom_data
+        self,
+        session,
+        schedule: MeetingSchedule,
+        meeting: Meeting,
+        zoom_data,
+        reminder_offset_minutes: int | None = None,
     ) -> None:
         """Send reminders to all telegram_targets, including participant @mentions."""
+        raw_join_url = (zoom_data or {}).get("join_url") or meeting.zoom_join_url
+        safe_join_url = self._resolve_zoom_join_url(
+            raw_join_url,
+            meeting.zoom_meeting_id,
+        )
+        include_zoom_link = bool(getattr(schedule, "zoom_enabled", False)) or getattr(
+            schedule, "reminder_include_zoom_link", True
+        )
+
+        if include_zoom_link and not safe_join_url:
+            raise RuntimeError(
+                f"Cannot send reminder for schedule {schedule.id}: Zoom link is missing"
+            )
+
         custom_template = (schedule.reminder_text or "").strip()
+        contains_zoom_placeholder = self._contains_zoom_link_placeholder(custom_template)
         if custom_template:
-            text = self._render_custom_reminder_text(custom_template, schedule, meeting)
+            text = self._render_custom_reminder_text(
+                custom_template,
+                schedule,
+                meeting,
+                zoom_link=safe_join_url if include_zoom_link else None,
+            )
         else:
             text = self._default_reminder_text(schedule, meeting)
 
@@ -542,21 +641,15 @@ class MeetingSchedulerService:
             if mentions:
                 text += "\n\n" + " ".join(mentions)
 
-        raw_join_url = (zoom_data or {}).get("join_url") or meeting.zoom_join_url
-        safe_join_url = self._resolve_zoom_join_url(
-            raw_join_url,
-            meeting.zoom_meeting_id,
-        )
-        include_zoom_link = bool(getattr(schedule, "zoom_enabled", False)) or getattr(
-            schedule, "reminder_include_zoom_link", True
-        )
-
         if include_zoom_link:
-            if not safe_join_url:
-                raise RuntimeError(
-                    f"Cannot send reminder for schedule {schedule.id}: Zoom link is missing"
+            if contains_zoom_placeholder:
+                logger.info(
+                    "Reminder for schedule %s uses {zoom_link} placeholder (offset=%s)",
+                    schedule.id,
+                    reminder_offset_minutes,
                 )
-            text += f"\n\nСсылка для подключения: {safe_join_url}"
+            else:
+                text += f"\n\nСсылка для подключения: {safe_join_url}"
 
         # Deduplicate targets by chat_id+thread_id to avoid sending twice
         seen_targets: set[str] = set()
@@ -623,6 +716,7 @@ class MeetingSchedulerService:
         template: str,
         schedule: MeetingSchedule,
         meeting: Meeting,
+        zoom_link: str | None = None,
     ) -> str:
         """Render template placeholders for custom reminder text."""
         time_str, date_str, weekday_str = MeetingSchedulerService._meeting_time_parts(
@@ -637,6 +731,9 @@ class MeetingSchedulerService:
             "{title}": schedule.title,
             "{date_msk}": date_str,
             "{weekday_ru}": weekday_str,
+            "{zoom_link}": zoom_link or "",
+            "{zoom_url}": zoom_link or "",
+            "{ссылка_zoom}": zoom_link or "",
         }
         rendered = template
         for token, value in replacements.items():

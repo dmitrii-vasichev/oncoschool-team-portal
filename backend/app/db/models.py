@@ -185,6 +185,9 @@ class MeetingSchedule(Base):
     next_occurrence_at: Mapped[datetime | None] = mapped_column(nullable=True)
     reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     reminder_minutes_before: Mapped[int] = mapped_column(Integer, default=60, server_default="60")
+    reminder_offsets_minutes: Mapped[list[int]] = mapped_column(
+        ARRAY(Integer), default=list, server_default="{}"
+    )
     reminder_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     reminder_include_zoom_link: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
@@ -252,6 +255,9 @@ class Meeting(Base):
     )  # scheduled | in_progress | completed | cancelled
     duration_minutes: Mapped[int] = mapped_column(
         Integer, default=60, server_default="60"
+    )
+    sent_reminder_offsets_minutes: Mapped[list[int]] = mapped_column(
+        ARRAY(Integer), default=list, server_default="{}"
     )
 
     # Relationships

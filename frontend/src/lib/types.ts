@@ -206,6 +206,7 @@ export interface MeetingSchedule {
   next_occurrence_at: string | null;
   reminder_enabled: boolean;
   reminder_minutes_before: number;
+  reminder_offsets_minutes: number[];
   reminder_text: string | null;
   reminder_include_zoom_link: boolean;
   reminder_zoom_missing_behavior: MeetingReminderZoomMissingBehavior;
@@ -232,6 +233,7 @@ export interface MeetingScheduleCreateRequest {
   meeting_date_local?: string | null;
   reminder_enabled?: boolean;
   reminder_minutes_before?: number;
+  reminder_offsets_minutes?: number[];
   reminder_text?: string | null;
   reminder_include_zoom_link?: boolean;
   reminder_zoom_missing_behavior?: MeetingReminderZoomMissingBehavior;
