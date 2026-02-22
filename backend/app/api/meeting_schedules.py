@@ -552,7 +552,7 @@ def _build_schedule_change_message_html(
         time_lines.append(f"{prefix}: <b>{html.escape(current_next_label)}</b>")
 
     sections = [
-        "Добрый день!",
+        "Внимание! ⚠️",
         "\n".join(change_lines),
     ]
     if time_lines:

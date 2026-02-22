@@ -102,7 +102,7 @@ class MeetingScheduleChangeNotificationTests(unittest.TestCase):
             participants_mentions="@alice @bob",
         )
 
-        self.assertIn("Добрый день!\n\nПо встрече", message)
+        self.assertIn("Внимание! ⚠️\n\nПо встрече", message)
         self.assertIn("перенесена.\n\nБыло:", message)
         self.assertIn("</b>\n\nУчастники: @alice @bob", message)
 
