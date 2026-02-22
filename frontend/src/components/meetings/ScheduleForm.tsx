@@ -200,6 +200,21 @@ export function ScheduleForm({
     [participantIds, membersById]
   );
 
+  const selectedTargets = useMemo(
+    () =>
+      telegramTargets
+        .filter((target) => selectedTargetIds.includes(target.id))
+        .map((target) => ({
+          id: target.id,
+          chat_id: String(target.chat_id),
+          thread_id: target.thread_id,
+          displayName:
+            `${target.label?.trim() || `Chat ${target.chat_id}`}` +
+            (target.thread_id ? ` (тема #${target.thread_id})` : ""),
+        })),
+    [telegramTargets, selectedTargetIds]
+  );
+
   const hiddenSelectedCount = participantIds.length - selectedMembers.length;
 
   const updateReminderOffset = (index: number, value: number) => {
@@ -292,12 +307,10 @@ export function ScheduleForm({
     }
 
     try {
-      const tgTargets = telegramTargets
-        .filter((t) => selectedTargetIds.includes(t.id))
-        .map((t) => ({
-          chat_id: String(t.chat_id),
-          thread_id: t.thread_id,
-        }));
+      const tgTargets = selectedTargets.map((target) => ({
+        chat_id: target.chat_id,
+        thread_id: target.thread_id,
+      }));
 
       const data: MeetingScheduleCreateRequest = {
         title: title.trim(),
@@ -815,7 +828,27 @@ export function ScheduleForm({
         open={notifyParticipantsDialogOpen}
         onOpenChange={handleNotifyParticipantsDialogOpenChange}
         title="Оповестить участников?"
-        description="Отправить сообщение об изменениях встречи в выбранные Telegram-группы."
+        description={
+          <div className="space-y-2">
+            <p>Отправить сообщение об изменениях встречи в выбранные Telegram-группы.</p>
+            {selectedTargets.length > 0 ? (
+              <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
+                <p className="text-xs font-medium text-foreground">Выбранные группы:</p>
+                <ul className="mt-1 space-y-1 text-xs text-foreground/90">
+                  {selectedTargets.map((target) => (
+                    <li key={target.id} className="truncate">
+                      • {target.displayName}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Сейчас группы не выбраны, уведомление не будет отправлено.
+              </p>
+            )}
+          </div>
+        }
         confirmLabel="Оповестить"
         cancelLabel="Без оповещения"
         variant="default"
