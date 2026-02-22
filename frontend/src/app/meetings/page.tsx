@@ -182,7 +182,7 @@ export default function MeetingsPage() {
                   onClick={() => setShowReminderTextsDialog(true)}
                 >
                   <FileText className="h-3.5 w-3.5" />
-                  Тексты напоминаний
+                  Сообщения по встречам
                 </Button>
               </div>
             )}
@@ -338,6 +338,7 @@ export default function MeetingsPage() {
         <MeetingReminderTextsDialog
           open={showReminderTextsDialog}
           onOpenChange={setShowReminderTextsDialog}
+          telegramTargets={telegramTargets}
         />
       )}
     </div>

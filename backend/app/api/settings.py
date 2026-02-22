@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user, require_admin, require_moderator
@@ -16,13 +16,20 @@ _bulk_cooldowns: dict[str, float] = {}
 BULK_COOLDOWN_SECONDS = 30
 REMINDER_TIMEZONE = "Europe/Moscow"
 MEETING_REMINDER_TEXTS_KEY = "meeting_reminder_texts"
+MEETING_WEEKLY_DIGEST_SETTINGS_KEY = "meeting_weekly_digest_settings"
 ALLOWED_MEETING_REMINDER_OFFSETS_MINUTES = {0, 15, 30, 60, 120}
+DEFAULT_MEETING_WEEKLY_DIGEST_DAY = 7
+DEFAULT_MEETING_WEEKLY_DIGEST_TIME = "21:00"
+DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE = (
+    "Наши встречи с {week_start} по {week_end}:\n\n{meetings}"
+)
 from app.db.database import get_session
 from app.db.models import TeamMember
 from app.db.repositories import (
     AppSettingsRepository,
     NotificationSubscriptionRepository,
     ReminderSettingsRepository,
+    TelegramTargetRepository,
 )
 from app.db.schemas import (
     AIProviderUpdate,
@@ -36,6 +43,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 sub_repo = NotificationSubscriptionRepository()
 reminder_repo = ReminderSettingsRepository()
 app_settings_repo = AppSettingsRepository()
+target_repo = TelegramTargetRepository()
 ai_service = AIService()
 
 
@@ -69,6 +77,66 @@ def _normalize_meeting_reminder_texts(
         reverse=True,
     )
     return dict(ordered_items)
+
+
+def _parse_hhmm(value: str) -> tuple[int, int]:
+    raw = str(value or "").strip()
+    parts = raw.split(":")
+    if len(parts) != 2:
+        raise ValueError("Неверный формат времени")
+    hour = int(parts[0])
+    minute = int(parts[1])
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        raise ValueError("Время должно быть в диапазоне 00:00 — 23:59")
+    return hour, minute
+
+
+def _normalize_meeting_weekly_digest_settings(raw_value: dict | None) -> dict:
+    source = raw_value if isinstance(raw_value, dict) else {}
+
+    enabled = bool(source.get("enabled", False))
+
+    try:
+        day_of_week = int(source.get("day_of_week", DEFAULT_MEETING_WEEKLY_DIGEST_DAY))
+    except (TypeError, ValueError):
+        day_of_week = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+    if day_of_week < 1 or day_of_week > 7:
+        day_of_week = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+
+    time_local = str(source.get("time_local", DEFAULT_MEETING_WEEKLY_DIGEST_TIME) or "").strip()
+    try:
+        _parse_hhmm(time_local)
+    except (TypeError, ValueError):
+        time_local = DEFAULT_MEETING_WEEKLY_DIGEST_TIME
+
+    raw_target_ids = source.get("target_ids")
+    normalized_target_ids: list[str] = []
+    if isinstance(raw_target_ids, list):
+        for raw_target_id in raw_target_ids:
+            try:
+                target_id = str(uuid.UUID(str(raw_target_id)))
+            except (TypeError, ValueError):
+                continue
+            if target_id not in normalized_target_ids:
+                normalized_target_ids.append(target_id)
+
+    template = str(source.get("template") or "").strip() or DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+
+    last_sent_week_start = source.get("last_sent_week_start")
+    if isinstance(last_sent_week_start, str) and last_sent_week_start.strip():
+        normalized_last_sent_week_start = last_sent_week_start.strip()
+    else:
+        normalized_last_sent_week_start = None
+
+    return {
+        "enabled": enabled,
+        "day_of_week": day_of_week,
+        "time_local": time_local,
+        "timezone": REMINDER_TIMEZONE,
+        "target_ids": normalized_target_ids,
+        "template": template,
+        "last_sent_week_start": normalized_last_sent_week_start,
+    }
 
 
 # ── Notification Subscriptions ──
@@ -289,6 +357,122 @@ async def update_meeting_reminder_texts(
 
     return MeetingReminderTextsResponse(
         texts_by_offset=normalized,
+        updated_by_id=setting.updated_by_id,
+        updated_at=setting.updated_at,
+    )
+
+
+class MeetingWeeklyDigestSettingsResponse(BaseModel):
+    enabled: bool = False
+    day_of_week: int = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+    time_local: str = DEFAULT_MEETING_WEEKLY_DIGEST_TIME
+    timezone: str = REMINDER_TIMEZONE
+    target_ids: list[uuid.UUID] = Field(default_factory=list)
+    template: str = DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+    updated_by_id: uuid.UUID | None = None
+    updated_at: datetime | None = None
+
+
+class MeetingWeeklyDigestSettingsUpdate(BaseModel):
+    enabled: bool = False
+    day_of_week: int = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+    time_local: str = DEFAULT_MEETING_WEEKLY_DIGEST_TIME
+    target_ids: list[uuid.UUID] = Field(default_factory=list)
+    template: str = DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+
+
+@router.get(
+    "/meeting-weekly-digest",
+    response_model=MeetingWeeklyDigestSettingsResponse,
+)
+async def get_meeting_weekly_digest_settings(
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get weekly meeting digest settings. Moderator only."""
+    setting = await app_settings_repo.get(session, MEETING_WEEKLY_DIGEST_SETTINGS_KEY)
+    normalized = _normalize_meeting_weekly_digest_settings(setting.value if setting else None)
+
+    return MeetingWeeklyDigestSettingsResponse(
+        enabled=normalized["enabled"],
+        day_of_week=normalized["day_of_week"],
+        time_local=normalized["time_local"],
+        timezone=REMINDER_TIMEZONE,
+        target_ids=[uuid.UUID(value) for value in normalized["target_ids"]],
+        template=normalized["template"],
+        updated_by_id=setting.updated_by_id if setting else None,
+        updated_at=setting.updated_at if setting else None,
+    )
+
+
+@router.put(
+    "/meeting-weekly-digest",
+    response_model=MeetingWeeklyDigestSettingsResponse,
+)
+async def update_meeting_weekly_digest_settings(
+    data: MeetingWeeklyDigestSettingsUpdate,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update weekly meeting digest settings. Moderator only."""
+    try:
+        _parse_hhmm(data.time_local)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail="Неверный формат времени. Используйте HH:MM (00:00 — 23:59)",
+        )
+
+    active_targets = await target_repo.get_all_active(session)
+    active_target_ids = {target.id for target in active_targets}
+    normalized_target_ids: list[uuid.UUID] = []
+    for target_id in data.target_ids:
+        if target_id not in active_target_ids:
+            raise HTTPException(
+                status_code=404,
+                detail="Одна или несколько Telegram-групп не найдены",
+            )
+        if target_id not in normalized_target_ids:
+            normalized_target_ids.append(target_id)
+
+    if data.enabled and not normalized_target_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите хотя бы одну Telegram-группу для дайджеста",
+        )
+
+    template = str(data.template or "").strip() or DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+    normalized = _normalize_meeting_weekly_digest_settings(
+        {
+            "enabled": data.enabled,
+            "day_of_week": data.day_of_week,
+            "time_local": data.time_local,
+            "target_ids": [str(value) for value in normalized_target_ids],
+            "template": template,
+        }
+    )
+
+    existing = await app_settings_repo.get(session, MEETING_WEEKLY_DIGEST_SETTINGS_KEY)
+    if existing and isinstance(existing.value, dict):
+        last_sent_week_start = existing.value.get("last_sent_week_start")
+        if isinstance(last_sent_week_start, str) and last_sent_week_start.strip():
+            normalized["last_sent_week_start"] = last_sent_week_start.strip()
+
+    setting = await app_settings_repo.set(
+        session,
+        MEETING_WEEKLY_DIGEST_SETTINGS_KEY,
+        normalized,
+        updated_by_id=member.id,
+    )
+    await session.commit()
+
+    return MeetingWeeklyDigestSettingsResponse(
+        enabled=normalized["enabled"],
+        day_of_week=normalized["day_of_week"],
+        time_local=normalized["time_local"],
+        timezone=REMINDER_TIMEZONE,
+        target_ids=[uuid.UUID(value) for value in normalized["target_ids"]],
+        template=normalized["template"],
         updated_by_id=setting.updated_by_id,
         updated_at=setting.updated_at,
     )

@@ -337,6 +337,17 @@ export interface MeetingReminderTextsSettings {
   updated_at: string | null;
 }
 
+export interface MeetingWeeklyDigestSettings {
+  enabled: boolean;
+  day_of_week: number;
+  time_local: string;
+  timezone: string;
+  target_ids: string[];
+  template: string;
+  updated_by_id: string | null;
+  updated_at: string | null;
+}
+
 export interface AppSettingsValue {
   provider: string;
   model: string;

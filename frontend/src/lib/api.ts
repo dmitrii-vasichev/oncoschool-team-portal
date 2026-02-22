@@ -19,6 +19,7 @@ import type {
   MeetingAnalytics,
   ReminderSettings,
   MeetingReminderTextsSettings,
+  MeetingWeeklyDigestSettings,
   AppSettingsValue,
   AISettingsResponse,
   ParseSummaryResponse,
@@ -747,6 +748,28 @@ class ApiClient {
       {
         method: "PUT",
         body: JSON.stringify({ texts_by_offset: textsByOffset }),
+      }
+    );
+  }
+
+  async getMeetingWeeklyDigestSettings(): Promise<MeetingWeeklyDigestSettings> {
+    return this.request<MeetingWeeklyDigestSettings>(
+      "/api/settings/meeting-weekly-digest"
+    );
+  }
+
+  async updateMeetingWeeklyDigestSettings(data: {
+    enabled: boolean;
+    day_of_week: number;
+    time_local: string;
+    target_ids: string[];
+    template: string;
+  }): Promise<MeetingWeeklyDigestSettings> {
+    return this.request<MeetingWeeklyDigestSettings>(
+      "/api/settings/meeting-weekly-digest",
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
       }
     );
   }

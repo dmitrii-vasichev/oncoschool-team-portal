@@ -1,5 +1,7 @@
 import asyncio
+import html
 import logging
+import uuid
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -8,7 +10,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.db.models import Meeting, MeetingParticipant, MeetingSchedule, TeamMember
+from app.db.models import (
+    Meeting,
+    MeetingParticipant,
+    MeetingSchedule,
+    TeamMember,
+    TelegramNotificationTarget,
+)
 from app.db.repositories import AppSettingsRepository, MeetingScheduleRepository
 from app.services.zoom_service import sanitize_zoom_join_url
 
@@ -18,6 +26,14 @@ ZOOM_CREATE_RETRY_BASE_DELAY_SECONDS = 2
 ALLOWED_REMINDER_OFFSETS_MINUTES = (0, 15, 30, 60, 120)
 DEFAULT_REMINDER_OFFSET_MINUTES = 60
 MEETING_REMINDER_TEXTS_KEY = "meeting_reminder_texts"
+MEETING_WEEKLY_DIGEST_SETTINGS_KEY = "meeting_weekly_digest_settings"
+DEFAULT_MEETING_WEEKLY_DIGEST_DAY = 7
+DEFAULT_MEETING_WEEKLY_DIGEST_TIME = "21:00"
+DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE = (
+    "Наши встречи с {week_start} по {week_end}:\n\n{meetings}"
+)
+MEETING_DIGEST_TIMEZONE = "Europe/Moscow"
+WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY = "last_sent_week_start"
 REMINDER_PARTICIPANTS_PLACEHOLDERS = (
     "{участники}",
     "{юзернеймы}",
@@ -35,6 +51,15 @@ RUSSIAN_WEEKDAYS = {
     5: "пятница",
     6: "суббота",
     7: "воскресенье",
+}
+RUSSIAN_WEEKDAYS_SHORT = {
+    1: "Пн",
+    2: "Вт",
+    3: "Ср",
+    4: "Чт",
+    5: "Пт",
+    6: "Сб",
+    7: "Вс",
 }
 
 
@@ -77,6 +102,14 @@ class MeetingSchedulerService:
             "interval",
             minutes=1,
             id="meeting_transcript_sync",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._check_weekly_meeting_digest,
+            "cron",
+            minute="*",
+            second=10,
+            id="meeting_weekly_digest",
             replace_existing=True,
         )
         self.scheduler.start()
@@ -232,6 +265,460 @@ class MeetingSchedulerService:
                     logger.info("Zoom transcript sync updated %s meeting(s)", updated)
         except Exception as e:
             logger.error(f"Error in _sync_zoom_transcripts: {e}", exc_info=True)
+
+    @staticmethod
+    def _parse_hhmm(value: str) -> tuple[int, int]:
+        raw = str(value or "").strip()
+        parts = raw.split(":")
+        if len(parts) != 2:
+            raise ValueError("Invalid HH:MM format")
+        hour = int(parts[0])
+        minute = int(parts[1])
+        if not (0 <= hour < 24 and 0 <= minute < 60):
+            raise ValueError("Time must be in 00:00..23:59 range")
+        return hour, minute
+
+    @classmethod
+    def _normalize_weekly_digest_settings(cls, value: dict | None) -> dict:
+        source = value if isinstance(value, dict) else {}
+        enabled = bool(source.get("enabled", False))
+
+        try:
+            day_of_week = int(source.get("day_of_week", DEFAULT_MEETING_WEEKLY_DIGEST_DAY))
+        except (TypeError, ValueError):
+            day_of_week = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+        if day_of_week < 1 or day_of_week > 7:
+            day_of_week = DEFAULT_MEETING_WEEKLY_DIGEST_DAY
+
+        time_local = str(source.get("time_local", DEFAULT_MEETING_WEEKLY_DIGEST_TIME) or "").strip()
+        try:
+            hour, minute = cls._parse_hhmm(time_local)
+        except (TypeError, ValueError):
+            time_local = DEFAULT_MEETING_WEEKLY_DIGEST_TIME
+            hour, minute = cls._parse_hhmm(time_local)
+
+        template = str(source.get("template") or "").strip() or DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+
+        target_ids: list[uuid.UUID] = []
+        raw_target_ids = source.get("target_ids")
+        if isinstance(raw_target_ids, list):
+            for raw_target_id in raw_target_ids:
+                try:
+                    parsed_target_id = uuid.UUID(str(raw_target_id))
+                except (TypeError, ValueError):
+                    continue
+                if parsed_target_id not in target_ids:
+                    target_ids.append(parsed_target_id)
+
+        last_sent_week_start = source.get(WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY)
+        if not isinstance(last_sent_week_start, str) or not last_sent_week_start.strip():
+            last_sent_week_start = None
+        else:
+            last_sent_week_start = last_sent_week_start.strip()
+
+        return {
+            "enabled": enabled,
+            "day_of_week": day_of_week,
+            "time_local": time_local,
+            "hour": hour,
+            "minute": minute,
+            "target_ids": target_ids,
+            "template": template,
+            "timezone": MEETING_DIGEST_TIMEZONE,
+            WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY: last_sent_week_start,
+        }
+
+    @staticmethod
+    def _serialize_weekly_digest_settings(normalized: dict) -> dict:
+        return {
+            "enabled": bool(normalized.get("enabled", False)),
+            "day_of_week": int(normalized.get("day_of_week", DEFAULT_MEETING_WEEKLY_DIGEST_DAY)),
+            "time_local": str(normalized.get("time_local", DEFAULT_MEETING_WEEKLY_DIGEST_TIME)),
+            "timezone": MEETING_DIGEST_TIMEZONE,
+            "target_ids": [str(target_id) for target_id in (normalized.get("target_ids") or [])],
+            "template": str(
+                normalized.get("template") or DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+            ),
+            WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY: normalized.get(
+                WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY
+            ),
+        }
+
+    @staticmethod
+    def _next_week_bounds(now_msk: datetime) -> tuple[date, date]:
+        days_until_next_monday = 8 - now_msk.isoweekday()
+        week_start = now_msk.date() + timedelta(days=days_until_next_monday)
+        week_end = week_start + timedelta(days=6)
+        return week_start, week_end
+
+    async def _check_weekly_meeting_digest(self) -> None:
+        try:
+            now_utc = datetime.now(ZoneInfo("UTC"))
+            now_msk = now_utc.astimezone(ZoneInfo(MEETING_DIGEST_TIMEZONE))
+
+            async with self.session_maker() as session:
+                setting = await self.app_settings_repo.get(
+                    session, MEETING_WEEKLY_DIGEST_SETTINGS_KEY
+                )
+                normalized = self._normalize_weekly_digest_settings(
+                    setting.value if setting else None
+                )
+                if not normalized["enabled"]:
+                    return
+
+                if now_msk.isoweekday() != normalized["day_of_week"]:
+                    return
+                if now_msk.hour != normalized["hour"] or now_msk.minute != normalized["minute"]:
+                    return
+
+                week_start, week_end = self._next_week_bounds(now_msk)
+                week_start_key = week_start.isoformat()
+                if normalized.get(WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY) == week_start_key:
+                    return
+
+                targets = await self._resolve_weekly_digest_targets(
+                    session,
+                    normalized["target_ids"],
+                )
+                if not targets:
+                    logger.warning("Weekly meeting digest skipped: no Telegram targets configured")
+                    return
+
+                digest_items = await self._build_weekly_digest_items(
+                    session,
+                    week_start=week_start,
+                    week_end=week_end,
+                    now_utc=now_utc,
+                )
+                message_text = self._render_weekly_digest_message(
+                    template=normalized["template"],
+                    week_start=week_start,
+                    week_end=week_end,
+                    items=digest_items,
+                )
+                if len(message_text) > 4096:
+                    message_text = message_text[:4000].rstrip() + "\n\n..."
+
+                sent_count = 0
+                for target in targets:
+                    try:
+                        kwargs = {
+                            "chat_id": int(target.chat_id),
+                            "text": message_text,
+                            "parse_mode": "HTML",
+                        }
+                        if target.thread_id:
+                            kwargs["message_thread_id"] = int(target.thread_id)
+                        await self.bot.send_message(**kwargs)
+                        sent_count += 1
+                    except Exception as e:
+                        logger.error(
+                            "Weekly meeting digest failed for chat=%s thread=%s: %s",
+                            target.chat_id,
+                            target.thread_id,
+                            e,
+                        )
+
+                if sent_count == 0:
+                    return
+
+                normalized[WEEKLY_DIGEST_LAST_SENT_WEEK_START_KEY] = week_start_key
+                await self.app_settings_repo.set(
+                    session,
+                    MEETING_WEEKLY_DIGEST_SETTINGS_KEY,
+                    self._serialize_weekly_digest_settings(normalized),
+                    updated_by_id=setting.updated_by_id if setting else None,
+                )
+                await session.commit()
+                logger.info(
+                    "Weekly meeting digest sent (week=%s, targets=%s, items=%s)",
+                    week_start_key,
+                    sent_count,
+                    len(digest_items),
+                )
+        except Exception as e:
+            logger.error("Error in _check_weekly_meeting_digest: %s", e, exc_info=True)
+
+    async def _resolve_weekly_digest_targets(
+        self,
+        session,
+        target_ids: list[uuid.UUID],
+    ) -> list[TelegramNotificationTarget]:
+        if not target_ids:
+            return []
+        stmt = (
+            select(TelegramNotificationTarget)
+            .where(
+                TelegramNotificationTarget.is_active.is_(True),
+                TelegramNotificationTarget.id.in_(target_ids),
+            )
+            .order_by(TelegramNotificationTarget.created_at.asc())
+        )
+        result = await session.execute(stmt)
+        targets = list(result.scalars().all())
+        targets_by_id = {target.id: target for target in targets}
+        ordered_targets: list[TelegramNotificationTarget] = []
+        for target_id in target_ids:
+            target = targets_by_id.get(target_id)
+            if target:
+                ordered_targets.append(target)
+        return ordered_targets
+
+    async def _build_weekly_digest_items(
+        self,
+        session,
+        *,
+        week_start: date,
+        week_end: date,
+        now_utc: datetime,
+    ) -> list[dict]:
+        schedule_repo = MeetingScheduleRepository()
+        schedules = await schedule_repo.get_all_active(session)
+
+        participant_ids: list[uuid.UUID] = []
+        for schedule in schedules:
+            for participant_id in schedule.participant_ids or []:
+                if participant_id not in participant_ids:
+                    participant_ids.append(participant_id)
+
+        members = await self._get_participants(session, participant_ids)
+        mention_by_member_id: dict[uuid.UUID, str] = {}
+        for member in members:
+            username = (member.telegram_username or "").strip().lstrip("@")
+            if username:
+                mention_by_member_id[member.id] = f"@{username}"
+
+        items: list[dict] = []
+        for schedule in schedules:
+            occurrence_utc = self._schedule_occurrence_for_digest_week(
+                schedule,
+                week_start=week_start,
+                week_end=week_end,
+                now_utc=now_utc,
+            )
+            if not occurrence_utc:
+                continue
+
+            occurrence_msk = occurrence_utc.astimezone(ZoneInfo(MEETING_DIGEST_TIMEZONE))
+            participants_mentions = " ".join(
+                mention_by_member_id[member_id]
+                for member_id in (schedule.participant_ids or [])
+                if member_id in mention_by_member_id
+            )
+            items.append(
+                {
+                    "occurrence_utc": occurrence_utc,
+                    "occurrence_msk": occurrence_msk,
+                    "title": html.escape((schedule.title or "").strip() or "Встреча"),
+                    "participants_mentions": participants_mentions,
+                }
+            )
+
+        items.sort(key=lambda item: item["occurrence_utc"])
+        return items
+
+    def _schedule_occurrence_for_digest_week(
+        self,
+        schedule: MeetingSchedule,
+        *,
+        week_start: date,
+        week_end: date,
+        now_utc: datetime,
+    ) -> datetime | None:
+        timezone = ZoneInfo(schedule.timezone or MEETING_DIGEST_TIMEZONE)
+
+        if schedule.recurrence == "on_demand":
+            if not schedule.next_occurrence_at:
+                return None
+            occurrence_utc = self._to_utc_aware(schedule.next_occurrence_at)
+            if occurrence_utc < now_utc:
+                return None
+            occurrence_local_date = occurrence_utc.astimezone(timezone).date()
+            if week_start <= occurrence_local_date <= week_end:
+                return occurrence_utc
+            return None
+
+        if schedule.recurrence == "one_time":
+            if not schedule.one_time_date:
+                return None
+            if schedule.last_triggered_date and schedule.last_triggered_date >= schedule.one_time_date:
+                return None
+            occurrence_utc = datetime.combine(
+                schedule.one_time_date,
+                schedule.time_utc,
+                tzinfo=ZoneInfo("UTC"),
+            )
+            if occurrence_utc < now_utc:
+                return None
+            occurrence_local_date = occurrence_utc.astimezone(timezone).date()
+            if week_start <= occurrence_local_date <= week_end:
+                return occurrence_utc
+            return None
+
+        recurring_occurrences = self._iter_recurring_occurrences_until_week_end(
+            schedule=schedule,
+            now_utc=now_utc,
+            week_end=week_end,
+        )
+        if not recurring_occurrences:
+            return None
+
+        if schedule.next_occurrence_skip and recurring_occurrences:
+            recurring_occurrences = recurring_occurrences[1:]
+
+        if schedule.next_occurrence_time_override and recurring_occurrences:
+            first_occurrence = recurring_occurrences[0]
+            adjusted = self._apply_time_override_for_occurrence(
+                first_occurrence,
+                schedule.next_occurrence_time_override,
+                timezone,
+            )
+            recurring_occurrences[0] = adjusted
+            recurring_occurrences = sorted(recurring_occurrences)
+            if recurring_occurrences and recurring_occurrences[0] < now_utc:
+                recurring_occurrences = recurring_occurrences[1:]
+
+        for occurrence_utc in recurring_occurrences:
+            occurrence_local_date = occurrence_utc.astimezone(timezone).date()
+            if week_start <= occurrence_local_date <= week_end:
+                return occurrence_utc
+            if occurrence_local_date > week_end:
+                break
+
+        return None
+
+    @staticmethod
+    def _to_utc_aware(value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=ZoneInfo("UTC"))
+        return value.astimezone(ZoneInfo("UTC"))
+
+    def _iter_recurring_occurrences_until_week_end(
+        self,
+        *,
+        schedule: MeetingSchedule,
+        now_utc: datetime,
+        week_end: date,
+    ) -> list[datetime]:
+        timezone = ZoneInfo(schedule.timezone or MEETING_DIGEST_TIMEZONE)
+        week_end_local_dt = datetime.combine(
+            week_end,
+            time(23, 59, 59),
+            tzinfo=timezone,
+        )
+        search_end_utc_date = week_end_local_dt.astimezone(ZoneInfo("UTC")).date() + timedelta(
+            days=1
+        )
+        cursor_utc_date = now_utc.date() - timedelta(days=1)
+        occurrences: list[datetime] = []
+
+        while cursor_utc_date <= search_end_utc_date:
+            occurrence_utc = datetime.combine(
+                cursor_utc_date,
+                schedule.time_utc,
+                tzinfo=ZoneInfo("UTC"),
+            )
+            if occurrence_utc < now_utc:
+                cursor_utc_date += timedelta(days=1)
+                continue
+
+            if schedule.last_triggered_date and schedule.last_triggered_date >= occurrence_utc.date():
+                cursor_utc_date += timedelta(days=1)
+                continue
+
+            occurrence_local = occurrence_utc.astimezone(timezone)
+            if occurrence_local.isoweekday() != schedule.day_of_week:
+                cursor_utc_date += timedelta(days=1)
+                continue
+
+            if schedule.recurrence == "biweekly":
+                week_number = occurrence_local.isocalendar()[1]
+                if week_number % 2 != 0:
+                    cursor_utc_date += timedelta(days=1)
+                    continue
+            elif schedule.recurrence == "monthly_last_workday":
+                if not self._is_last_selected_weekday_of_month(
+                    occurrence_local,
+                    schedule.day_of_week,
+                ):
+                    cursor_utc_date += timedelta(days=1)
+                    continue
+            elif schedule.recurrence != "weekly":
+                cursor_utc_date += timedelta(days=1)
+                continue
+
+            occurrences.append(occurrence_utc)
+            cursor_utc_date += timedelta(days=1)
+
+        return occurrences
+
+    @staticmethod
+    def _apply_time_override_for_occurrence(
+        occurrence_utc: datetime,
+        override_time_utc: time,
+        timezone: ZoneInfo,
+    ) -> datetime:
+        occurrence_local = occurrence_utc.astimezone(timezone)
+        override_local_time = datetime.combine(
+            occurrence_local.date(),
+            override_time_utc,
+            tzinfo=ZoneInfo("UTC"),
+        ).astimezone(timezone).time()
+        adjusted_local = datetime.combine(
+            occurrence_local.date(),
+            override_local_time,
+            tzinfo=timezone,
+        )
+        return adjusted_local.astimezone(ZoneInfo("UTC"))
+
+    @classmethod
+    def _render_weekly_digest_message(
+        cls,
+        *,
+        template: str,
+        week_start: date,
+        week_end: date,
+        items: list[dict],
+    ) -> str:
+        safe_template = str(template or "").strip() or DEFAULT_MEETING_WEEKLY_DIGEST_TEMPLATE
+        meetings_block = cls._format_weekly_digest_items_block(items)
+        week_start_short = week_start.strftime("%d.%m")
+        week_end_short = week_end.strftime("%d.%m")
+        week_start_long = week_start.strftime("%d.%m.%Y")
+        week_end_long = week_end.strftime("%d.%m.%Y")
+
+        replacements = {
+            "{week_start}": week_start_short,
+            "{week_end}": week_end_short,
+            "{week_start_date}": week_start_long,
+            "{week_end_date}": week_end_long,
+            "{meetings_count}": str(len(items)),
+            "{meetings}": meetings_block,
+            "{items}": meetings_block,
+        }
+
+        rendered = safe_template
+        for token, value in replacements.items():
+            rendered = rendered.replace(token, value)
+        return rendered.strip()
+
+    @staticmethod
+    def _format_weekly_digest_items_block(items: list[dict]) -> str:
+        if not items:
+            return "На следующей неделе встречи не запланированы."
+
+        blocks: list[str] = []
+        for item in items:
+            occurrence_msk = item["occurrence_msk"]
+            weekday = RUSSIAN_WEEKDAYS_SHORT.get(occurrence_msk.isoweekday(), "")
+            title = item["title"]
+            mentions = item["participants_mentions"]
+            lines = [f"<b>{weekday} {occurrence_msk.strftime('%H:%M')} по мск</b>", title]
+            if mentions:
+                lines.append(mentions)
+            blocks.append("\n".join(lines))
+
+        return "\n\n".join(blocks)
 
     def _should_trigger(
         self,
