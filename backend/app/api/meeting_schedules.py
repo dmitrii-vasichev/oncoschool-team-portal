@@ -522,15 +522,15 @@ def _build_schedule_change_message_html(
         deleted=deleted,
     )
 
-    lines = [f"Добрый день! По встрече <b>{safe_title}</b> произошли изменения."]
+    change_lines = [f"По встрече <b>{safe_title}</b> произошли изменения."]
     if change_kind == "deleted":
-        lines.append("Расписание удалено, новые повторения больше не будут создаваться.")
+        change_lines.append("Расписание удалено, новые повторения больше не будут создаваться.")
     elif change_kind == "cancel_next":
-        lines.append("Ближайшая встреча отменена.")
+        change_lines.append("Ближайшая встреча отменена.")
     elif change_kind == "reschedule_next":
-        lines.append("Ближайшая встреча перенесена.")
+        change_lines.append("Ближайшая встреча перенесена.")
     else:
-        lines.append("Расписание встречи обновлено.")
+        change_lines.append("Расписание встречи обновлено.")
 
     previous_next = previous_snapshot.get("next_occurrence_dt")
     previous_next_label = _format_datetime_msk(
@@ -539,8 +539,9 @@ def _build_schedule_change_message_html(
     current_next = None if deleted or not schedule else _calc_next_occurrence_datetime(schedule)
     current_next_label = _format_datetime_msk(current_next)
 
+    time_lines: list[str] = []
     if previous_next_label and (deleted or previous_next_label != current_next_label):
-        lines.append(f"Было: <b>{html.escape(previous_next_label)}</b>")
+        time_lines.append(f"Было: <b>{html.escape(previous_next_label)}</b>")
 
     if current_next_label and not deleted:
         prefix = (
@@ -548,12 +549,18 @@ def _build_schedule_change_message_html(
             if previous_next_label and previous_next_label != current_next_label
             else "Ближайшая встреча"
         )
-        lines.append(f"{prefix}: <b>{html.escape(current_next_label)}</b>")
+        time_lines.append(f"{prefix}: <b>{html.escape(current_next_label)}</b>")
 
+    sections = [
+        "Добрый день!",
+        "\n".join(change_lines),
+    ]
+    if time_lines:
+        sections.append("\n".join(time_lines))
     if participants_mentions:
-        lines.append(f"Участники: {participants_mentions}")
+        sections.append(f"Участники: {participants_mentions}")
 
-    return "\n".join(lines)
+    return "\n\n".join(sections)
 
 
 async def _notify_schedule_change(

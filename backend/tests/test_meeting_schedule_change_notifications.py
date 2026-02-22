@@ -76,6 +76,36 @@ class MeetingScheduleChangeNotificationTests(unittest.TestCase):
         self.assertIn("Ближайшая встреча перенесена", message)
         self.assertIn("Стало:", message)
 
+    def test_build_message_has_blank_lines_between_sections(self) -> None:
+        now = datetime.utcnow()
+        previous_snapshot = {
+            "title": "Тест",
+            "next_occurrence_skip": False,
+            "next_occurrence_time_override": None,
+            "next_occurrence_dt": now + timedelta(days=1),
+            "participant_ids": [],
+            "telegram_targets": [],
+        }
+        schedule = SimpleNamespace(
+            title="Тест",
+            recurrence="on_demand",
+            next_occurrence_at=now + timedelta(days=2),
+            next_occurrence_skip=False,
+            next_occurrence_time_override=None,
+            time_utc=time(12, 0),
+        )
+
+        message = _build_schedule_change_message_html(
+            previous_snapshot=previous_snapshot,
+            schedule=schedule,
+            deleted=False,
+            participants_mentions="@alice @bob",
+        )
+
+        self.assertIn("Добрый день!\n\nПо встрече", message)
+        self.assertIn("перенесена.\n\nБыло:", message)
+        self.assertIn("</b>\n\nУчастники: @alice @bob", message)
+
     def test_has_schedule_notification_changes_returns_false_for_identical_snapshot(self) -> None:
         next_occurrence = datetime(2026, 3, 2, 12, 0)
         participant_id = uuid.uuid4()
