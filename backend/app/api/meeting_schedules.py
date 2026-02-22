@@ -323,6 +323,82 @@ def _build_schedule_notification_snapshot(schedule: MeetingSchedule) -> dict[str
     }
 
 
+def _normalize_participant_ids(raw_ids: object) -> tuple[str, ...]:
+    normalized: set[str] = set()
+    if not isinstance(raw_ids, list):
+        return ()
+
+    for participant_id in raw_ids:
+        if isinstance(participant_id, uuid.UUID):
+            normalized.add(str(participant_id))
+            continue
+        try:
+            normalized.add(str(uuid.UUID(str(participant_id))))
+        except (TypeError, ValueError):
+            continue
+
+    return tuple(sorted(normalized))
+
+
+def _normalize_targets(raw_targets: object) -> tuple[tuple[int, int | None], ...]:
+    if not isinstance(raw_targets, list):
+        return ()
+    return tuple(sorted(_extract_unique_notification_targets(raw_targets)))
+
+
+def _normalize_override_time(raw_time: object) -> str | None:
+    if raw_time is None:
+        return None
+    if isinstance(raw_time, time):
+        return raw_time.isoformat()
+    return str(raw_time)
+
+
+def _normalize_next_occurrence(raw_dt: object) -> datetime | None:
+    if not isinstance(raw_dt, datetime):
+        return None
+    return _to_utc_aware(raw_dt)
+
+
+def _has_schedule_notification_changes(
+    previous_snapshot: dict[str, object],
+    schedule: MeetingSchedule,
+) -> bool:
+    current_snapshot = _build_schedule_notification_snapshot(schedule)
+
+    if str(previous_snapshot.get("title") or "").strip() != str(
+        current_snapshot.get("title") or ""
+    ).strip():
+        return True
+
+    if bool(previous_snapshot.get("next_occurrence_skip", False)) != bool(
+        current_snapshot.get("next_occurrence_skip", False)
+    ):
+        return True
+
+    if _normalize_override_time(previous_snapshot.get("next_occurrence_time_override")) != (
+        _normalize_override_time(current_snapshot.get("next_occurrence_time_override"))
+    ):
+        return True
+
+    if _normalize_next_occurrence(previous_snapshot.get("next_occurrence_dt")) != (
+        _normalize_next_occurrence(current_snapshot.get("next_occurrence_dt"))
+    ):
+        return True
+
+    if _normalize_participant_ids(previous_snapshot.get("participant_ids")) != (
+        _normalize_participant_ids(current_snapshot.get("participant_ids"))
+    ):
+        return True
+
+    if _normalize_targets(previous_snapshot.get("telegram_targets")) != (
+        _normalize_targets(current_snapshot.get("telegram_targets"))
+    ):
+        return True
+
+    return False
+
+
 def _extract_unique_notification_targets(raw_targets: list | None) -> list[tuple[int, int | None]]:
     unique_targets: list[tuple[int, int | None]] = []
     seen: set[tuple[int, int | None]] = set()
@@ -1346,7 +1422,11 @@ async def update_schedule(
         await _sync_next_scheduled_meeting(session, schedule, zoom_service)
 
     await session.commit()
-    if notify_participants and notification_snapshot:
+    if (
+        notify_participants
+        and notification_snapshot
+        and _has_schedule_notification_changes(notification_snapshot, schedule)
+    ):
         try:
             await _notify_schedule_change(
                 request,

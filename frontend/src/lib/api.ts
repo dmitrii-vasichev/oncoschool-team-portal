@@ -46,9 +46,6 @@ class ApiClient {
     "GET",
     "HEAD",
     "OPTIONS",
-    "PUT",
-    "PATCH",
-    "DELETE",
   ]);
 
   private getApiBases(): string[] {
