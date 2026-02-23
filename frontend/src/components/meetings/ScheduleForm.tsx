@@ -351,13 +351,9 @@ export function ScheduleForm({
         }
       }
 
-      if (isEdit) {
-        setPendingSaveData(data);
-        setNotifyParticipantsDialogOpen(true);
-        return;
-      }
-
-      await submitSchedule(data);
+      setPendingSaveData(data);
+      setNotifyParticipantsDialogOpen(true);
+      return;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка сохранения");
     }
@@ -834,7 +830,11 @@ export function ScheduleForm({
         title="Оповестить участников?"
         description={
           <div className="space-y-2">
-            <p>Отправить сообщение об изменениях встречи в выбранные Telegram-группы.</p>
+            <p>
+              {isEdit
+                ? "Отправить сообщение об изменениях встречи в выбранные Telegram-группы."
+                : "Отправить сообщение о создании встречи в выбранные Telegram-группы."}
+            </p>
             {selectedTargets.length > 0 ? (
               <div className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2">
                 <p className="text-xs font-medium text-foreground">Выбранные группы:</p>

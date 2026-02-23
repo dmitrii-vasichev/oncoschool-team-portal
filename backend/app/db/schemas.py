@@ -243,7 +243,7 @@ class MeetingScheduleCreate(BaseModel):
     telegram_targets: list[dict] = []  # [{"chat_id": ..., "thread_id": ...}]
     participant_ids: list[uuid.UUID] = []
     zoom_enabled: bool = True
-    notify_participants: bool = True
+    notify_participants: bool = False
 
 
 class MeetingScheduleUpdate(BaseModel):
