@@ -57,43 +57,44 @@ export function TaskCard({ task }: { task: Task }) {
           className="block h-full"
           draggable={false}
         >
-          <div className="flex h-full flex-col gap-3 p-3.5">
+          <div className="flex h-full flex-col gap-2.5 p-3">
             {/* Header: title + status/priority icons */}
-            <div className="flex items-start gap-2.5">
-              <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1 space-y-0.5">
                 <p
-                  className={`min-h-10 line-clamp-2 text-[15px] leading-5 font-heading font-semibold ${
+                  className={`min-h-[3.75rem] line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-tight font-heading font-semibold ${
                     overdue
                       ? "text-destructive group-hover:text-destructive"
                       : "group-hover:text-primary"
                   }`}
+                  title={task.title}
                 >
                   {task.title}
                 </p>
 
-                <div className="flex h-4 items-center gap-1.5">
+                <div className="flex h-3.5 items-center gap-1">
                   {task.source === "voice" && (
                     <span
-                      className="inline-flex items-center justify-center h-4 w-4 rounded bg-purple-100 dark:bg-purple-900/30"
+                      className="inline-flex items-center justify-center h-3.5 w-3.5 rounded bg-purple-100 dark:bg-purple-900/30"
                       title="Голосовая задача"
                     >
-                      <Mic className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                      <Mic className="h-2 w-2 text-purple-600 dark:text-purple-400" />
                     </span>
                   )}
                   {task.source === "summary" && (
                     <span
-                      className="inline-flex items-center justify-center h-4 w-4 rounded bg-blue-100 dark:bg-blue-900/30"
+                      className="inline-flex items-center justify-center h-3.5 w-3.5 rounded bg-blue-100 dark:bg-blue-900/30"
                       title="Из встречи"
                     >
-                      <FileText className="h-2.5 w-2.5 text-blue-600 dark:text-blue-400" />
+                      <FileText className="h-2 w-2 text-blue-600 dark:text-blue-400" />
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center gap-1">
-                <StatusIcon status={task.status} />
-                <PriorityIcon priority={task.priority} />
+                <StatusIcon status={task.status} className="h-6 w-6 rounded-[10px]" />
+                <PriorityIcon priority={task.priority} className="h-6 w-6 rounded-[10px]" />
               </div>
             </div>
 
