@@ -303,17 +303,19 @@ export default function TaskDetailPage() {
 
   function handleStartTitleEdit() {
     if (!canEditTitle) return;
+    if (!task) return;
     setTitleDraft(task.title);
     setIsEditingTitle(true);
   }
 
   function handleCancelTitleEdit() {
+    if (!task) return;
     setTitleDraft(task.title);
     setIsEditingTitle(false);
   }
 
   async function handleSaveTitle() {
-    if (!shortId || !canEditTitle || savingTitle) return;
+    if (!shortId || !canEditTitle || savingTitle || !task) return;
     const nextTitle = titleDraft.trim();
 
     if (!nextTitle) {
@@ -341,17 +343,19 @@ export default function TaskDetailPage() {
 
   function handleStartDescriptionEdit() {
     if (!canEditTaskMeta) return;
+    if (!task) return;
     setDescriptionDraft(task.description || "");
     setIsEditingDescription(true);
   }
 
   function handleCancelDescriptionEdit() {
+    if (!task) return;
     setDescriptionDraft(task.description || "");
     setIsEditingDescription(false);
   }
 
   async function handleSaveDescription() {
-    if (!shortId || !canEditTaskMeta || savingDescription) return;
+    if (!shortId || !canEditTaskMeta || savingDescription || !task) return;
 
     const normalizedNext = descriptionDraft.trim() || null;
     const normalizedCurrent = (task.description || "").trim() || null;
