@@ -36,6 +36,7 @@ const STATUS_STYLES: Record<MeetingStatus, string> = {
 interface MeetingHeaderProps {
   meeting: Meeting;
   isModerator: boolean;
+  canEditTitle: boolean;
   onUpdateTitle: (title: string) => Promise<void>;
   onUpdateStatus: (status: MeetingStatus) => Promise<void>;
   onDelete?: (options?: { notifyParticipants?: boolean }) => Promise<void>;
@@ -44,6 +45,7 @@ interface MeetingHeaderProps {
 export function MeetingHeader({
   meeting,
   isModerator,
+  canEditTitle,
   onUpdateTitle,
   onUpdateStatus,
   onDelete,
@@ -102,7 +104,7 @@ export function MeetingHeader({
       {/* Title + Status row */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex-1 min-w-0">
-          {editingTitle && isModerator ? (
+          {editingTitle && canEditTitle ? (
             <div className="flex items-center gap-2">
               <Input
                 value={titleValue}
@@ -116,12 +118,12 @@ export function MeetingHeader({
           ) : (
             <h1
               className={`text-2xl font-heading font-bold text-foreground tracking-tight ${
-                isModerator ? "cursor-pointer group" : ""
+                canEditTitle ? "cursor-pointer group" : ""
               }`}
-              onClick={() => isModerator && setEditingTitle(true)}
+              onClick={() => canEditTitle && setEditingTitle(true)}
             >
               {meeting.title || "Встреча без названия"}
-              {isModerator && (
+              {canEditTitle && (
                 <Pencil className="inline-block h-4 w-4 ml-2 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity" />
               )}
             </h1>

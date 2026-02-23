@@ -154,7 +154,7 @@ class TaskService:
         new_status: str,
     ) -> Task:
         """
-        Change task status. Permission check: assignee or moderator.
+        Change task status. Permission check: assignee, author, or moderator.
         Auto-creates TaskUpdate(type=status_change).
         """
         if not PermissionService.can_change_task_status(member, task):
@@ -194,9 +194,9 @@ class TaskService:
         member: TeamMember,
         new_assignee_id: uuid.UUID,
     ) -> Task:
-        """Reassign task. Moderator only."""
-        if not PermissionService.can_assign_task(member):
-            raise PermissionError("Только модератор может переназначать задачи")
+        """Reassign task. Allowed for moderator or task author."""
+        if not PermissionService.can_assign_task(member, task):
+            raise PermissionError("Нет прав на переназначение этой задачи")
 
         assignee = await self.member_repo.get_by_id(session, new_assignee_id)
         if not assignee or not assignee.is_active:
@@ -236,7 +236,7 @@ class TaskService:
     ) -> TaskUpdate:
         """
         Add a task update (progress, blocker, comment).
-        Permission check: assignee or moderator.
+        Permission check: assignee, author, or moderator.
         """
         if not PermissionService.can_add_task_update(member, task):
             raise PermissionError("Нет прав на добавление обновления к этой задаче")

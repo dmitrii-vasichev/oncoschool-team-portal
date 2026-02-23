@@ -225,7 +225,7 @@ export default function TasksPage() {
       const task = tasks.find((t) => t.id === taskId);
       if (!task || task.status === newStatus) return;
 
-      // Permission check: only moderator or task assignee can change status
+      // Permission check: moderator, task assignee, or task author
       if (user && !PermissionService.canChangeTaskStatus(user, task)) {
         setDraggedTaskId(null);
         setDragOverStatus(null);

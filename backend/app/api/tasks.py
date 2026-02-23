@@ -190,7 +190,7 @@ async def update_task(
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Update task fields. Permission check: assignee or moderator."""
+    """Update task fields. Permission check: assignee, author, or moderator."""
     task = await task_service.get_task_by_short_id(session, short_id)
     if not task:
         raise HTTPException(status_code=404, detail="Задача не найдена")
@@ -200,20 +200,26 @@ async def update_task(
             detail="Нет доступа к задаче: она вне вашей зоны видимости",
         )
 
-    # Permission: moderator can edit any, member can edit own
+    # Permission: moderator can edit any, member can edit if assignee or author
     is_moderator = PermissionService.is_moderator(member)
-    if not is_moderator and task.assignee_id != member.id:
+    is_assignee = task.assignee_id == member.id
+    is_author = task.created_by_id == member.id
+    if not is_moderator and not (is_assignee or is_author):
         raise HTTPException(status_code=403, detail="Нет прав на редактирование этой задачи")
 
-    # Members can only change status on their own tasks
+    # Members can edit only selected fields:
+    # - assignee: status, checklist, title
+    # - author:  status, checklist, title, description, priority, deadline, assignee_id
     if not is_moderator:
-        moderator_only_fields = {"assignee_id", "priority", "deadline", "title", "description"}
         provided_fields = set(data.model_dump(exclude_unset=True).keys())
-        forbidden = provided_fields & moderator_only_fields
+        allowed_fields = {"status", "checklist", "title"}
+        if is_author:
+            allowed_fields |= {"description", "priority", "deadline", "assignee_id"}
+        forbidden = provided_fields - allowed_fields
         if forbidden:
             raise HTTPException(
                 status_code=403,
-                detail=f"Нет прав на изменение полей: {', '.join(forbidden)}",
+                detail=f"Нет прав на изменение полей: {', '.join(sorted(forbidden))}",
             )
 
     try:
@@ -225,12 +231,21 @@ async def update_task(
 
         # Handle other field updates
         update_fields = data.model_dump(exclude_unset=True, exclude={"status"})
+        if "title" in update_fields:
+            new_title = (update_fields.get("title") or "").strip()
+            if not new_title:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Название задачи не может быть пустым",
+                )
+            update_fields["title"] = new_title
+
         assignee_present = "assignee_id" in update_fields
         new_assignee_id = update_fields.pop("assignee_id", None) if assignee_present else None
 
         if assignee_present:
             if new_assignee_id is None:
-                if not is_moderator:
+                if not (is_moderator or is_author):
                     raise HTTPException(status_code=403, detail="Нет прав на снятие исполнителя")
                 old_assignee_id = task.assignee_id
                 from app.db.repositories import TaskRepository

@@ -13,18 +13,19 @@ export class PermissionService {
     return PermissionService.isModerator(member);
   }
 
-  static canAssignTask(member: TeamMember): boolean {
-    return PermissionService.isModerator(member);
+  static canAssignTask(member: TeamMember, task?: Task): boolean {
+    if (PermissionService.isModerator(member)) return true;
+    return !!task && task.created_by_id === member.id;
   }
 
   static canChangeTaskStatus(member: TeamMember, task: Task): boolean {
     if (PermissionService.isModerator(member)) return true;
-    return task.assignee_id === member.id;
+    return task.assignee_id === member.id || task.created_by_id === member.id;
   }
 
   static canAddTaskUpdate(member: TeamMember, task: Task): boolean {
     if (PermissionService.isModerator(member)) return true;
-    return task.assignee_id === member.id;
+    return task.assignee_id === member.id || task.created_by_id === member.id;
   }
 
   static canDeleteTask(member: TeamMember): boolean {

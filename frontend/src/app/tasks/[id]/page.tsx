@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, type KeyboardEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,10 +17,15 @@ import {
   User,
   UserPlus,
   FileText,
+  Pencil,
+  Loader2,
+  X,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -136,10 +141,26 @@ export default function TaskDetailPage() {
   const [checklistSaving, setChecklistSaving] = useState(false);
   const [updatesKey, setUpdatesKey] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [savingDescription, setSavingDescription] = useState(false);
 
   const refreshUpdates = useCallback(() => {
     setUpdatesKey((k) => k + 1);
   }, []);
+
+  useEffect(() => {
+    if (!task || isEditingTitle) return;
+    setTitleDraft(task.title);
+  }, [task, isEditingTitle]);
+
+  useEffect(() => {
+    if (!task || isEditingDescription) return;
+    setDescriptionDraft(task.description || "");
+  }, [task, isEditingDescription]);
 
   /* ---- Loading ---- */
   if (loading) {
@@ -191,6 +212,9 @@ export default function TaskDetailPage() {
   const canManageChecklist =
     user && PermissionService.canChangeTaskStatus(user, task);
   const canDelete = user && PermissionService.canDeleteTask(user);
+  const isAuthor = !!user && task.created_by_id === user.id;
+  const canEditTitle = !!canChangeStatus;
+  const canEditTaskMeta = isModerator || isAuthor;
   const overdue = isOverdue(task.deadline, task.status);
   const transitions = STATUS_TRANSITIONS[task.status] || [];
 
@@ -211,7 +235,7 @@ export default function TaskDetailPage() {
   }
 
   async function handleReassign(assigneeId: string) {
-    if (!shortId) return;
+    if (!shortId || !canEditTaskMeta) return;
     try {
       await api.updateTask(shortId, {
         assignee_id: assigneeId === "none" ? null : assigneeId,
@@ -224,7 +248,7 @@ export default function TaskDetailPage() {
   }
 
   async function handlePriorityChange(priority: string) {
-    if (!shortId) return;
+    if (!shortId || !canEditTaskMeta) return;
     try {
       await api.updateTask(shortId, {
         priority: priority as TaskPriority,
@@ -236,7 +260,7 @@ export default function TaskDetailPage() {
   }
 
   async function handleDeadlineChange(value: string) {
-    if (!shortId) return;
+    if (!shortId || !canEditTaskMeta) return;
     try {
       await api.updateTask(shortId, {
         deadline: value || null,
@@ -277,6 +301,89 @@ export default function TaskDetailPage() {
     }
   }
 
+  function handleStartTitleEdit() {
+    if (!canEditTitle) return;
+    setTitleDraft(task.title);
+    setIsEditingTitle(true);
+  }
+
+  function handleCancelTitleEdit() {
+    setTitleDraft(task.title);
+    setIsEditingTitle(false);
+  }
+
+  async function handleSaveTitle() {
+    if (!shortId || !canEditTitle || savingTitle) return;
+    const nextTitle = titleDraft.trim();
+
+    if (!nextTitle) {
+      toastError("Название задачи не может быть пустым");
+      return;
+    }
+
+    if (nextTitle === task.title) {
+      setIsEditingTitle(false);
+      return;
+    }
+
+    setSavingTitle(true);
+    try {
+      await api.updateTask(shortId, { title: nextTitle });
+      await refetch();
+      setIsEditingTitle(false);
+      toastSuccess("Название обновлено");
+    } catch {
+      toastError("Не удалось обновить название");
+    } finally {
+      setSavingTitle(false);
+    }
+  }
+
+  function handleStartDescriptionEdit() {
+    if (!canEditTaskMeta) return;
+    setDescriptionDraft(task.description || "");
+    setIsEditingDescription(true);
+  }
+
+  function handleCancelDescriptionEdit() {
+    setDescriptionDraft(task.description || "");
+    setIsEditingDescription(false);
+  }
+
+  async function handleSaveDescription() {
+    if (!shortId || !canEditTaskMeta || savingDescription) return;
+
+    const normalizedNext = descriptionDraft.trim() || null;
+    const normalizedCurrent = (task.description || "").trim() || null;
+    if (normalizedNext === normalizedCurrent) {
+      setIsEditingDescription(false);
+      return;
+    }
+
+    setSavingDescription(true);
+    try {
+      await api.updateTask(shortId, { description: normalizedNext });
+      await refetch();
+      setIsEditingDescription(false);
+      toastSuccess(normalizedNext ? "Описание обновлено" : "Описание очищено");
+    } catch {
+      toastError("Не удалось обновить описание");
+    } finally {
+      setSavingDescription(false);
+    }
+  }
+
+  function handleTitleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void handleSaveTitle();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      handleCancelTitleEdit();
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="max-w-4xl animate-fade-in-up">
@@ -291,9 +398,65 @@ export default function TaskDetailPage() {
 
         {/* ── Hero header ── */}
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <h1 className="text-2xl sm:text-3xl font-bold font-heading tracking-tight leading-tight">
-            {task.title}
-          </h1>
+          <div className="min-w-0 flex-1">
+            {canEditTitle && isEditingTitle ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  disabled={savingTitle}
+                  autoFocus
+                  className="h-11 text-xl sm:text-2xl font-bold font-heading tracking-tight"
+                  placeholder="Название задачи"
+                />
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSaveTitle()}
+                    disabled={savingTitle}
+                    className="min-w-9"
+                    aria-label="Сохранить название"
+                  >
+                    {savingTitle ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelTitleEdit}
+                    disabled={savingTitle}
+                    aria-label="Отменить редактирование названия"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold font-heading tracking-tight leading-tight">
+                  {task.title}
+                </h1>
+                {canEditTitle && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="mt-0.5 h-8 w-8 text-muted-foreground/70 hover:text-foreground"
+                    onClick={handleStartTitleEdit}
+                    aria-label="Редактировать название задачи"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
           <span className="self-start rounded-md bg-muted/50 px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70 sm:self-auto">
             #{task.short_id}
           </span>
@@ -303,8 +466,8 @@ export default function TaskDetailPage() {
         <div className="flex items-center gap-2.5 flex-wrap mb-6">
           <StatusBadge status={task.status} />
 
-          {/* Priority: inline-editable for moderator */}
-          {isModerator ? (
+          {/* Priority: inline-editable for moderator/author */}
+          {canEditTaskMeta ? (
             <Select
               value={task.priority}
               onValueChange={handlePriorityChange}
@@ -367,7 +530,7 @@ export default function TaskDetailPage() {
         </div>
 
         {/* ── Action bar ── */}
-        {(canChangeStatus || isModerator) && (
+        {(canChangeStatus || canEditTaskMeta) && (
           <div className="flex items-center gap-3 flex-wrap mb-8">
             {/* Status dropdown */}
             {canChangeStatus && transitions.length > 0 && (
@@ -401,8 +564,8 @@ export default function TaskDetailPage() {
               </DropdownMenu>
             )}
 
-            {/* Reassign (moderator only) */}
-            {isModerator && (
+            {/* Reassign (moderator/author) */}
+            {canEditTaskMeta && (
               <Select
                 value={task.assignee_id || "none"}
                 onValueChange={handleReassign}
@@ -522,7 +685,7 @@ export default function TaskDetailPage() {
               Дедлайн
             </dt>
             <dd>
-              {isModerator ? (
+              {canEditTaskMeta ? (
                 <DatePicker
                   value={task.deadline ? task.deadline.slice(0, 10) : ""}
                   onChange={handleDeadlineChange}
@@ -574,14 +737,65 @@ export default function TaskDetailPage() {
         </div>
 
         {/* ── Description ── */}
-        {task.description && (
+        {(task.description || canEditTaskMeta) && (
           <div className="mt-8 mb-2">
-            <h3 className="text-2xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
-              Описание
-            </h3>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 max-w-prose">
-              {task.description}
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-2xs uppercase tracking-wider text-muted-foreground font-medium">
+                Описание
+              </h3>
+              {canEditTaskMeta && !isEditingDescription && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={handleStartDescriptionEdit}
+                >
+                  <Pencil className="mr-1 h-3.5 w-3.5" />
+                  {task.description ? "Редактировать" : "Добавить"}
+                </Button>
+              )}
             </div>
+
+            {canEditTaskMeta && isEditingDescription ? (
+              <div className="space-y-2 max-w-prose">
+                <Textarea
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  rows={4}
+                  placeholder="Добавьте описание задачи..."
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSaveDescription()}
+                    disabled={savingDescription}
+                  >
+                    {savingDescription ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelDescriptionEdit}
+                    disabled={savingDescription}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 max-w-prose">
+                {task.description || (
+                  <span className="text-muted-foreground">Описание не добавлено</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 

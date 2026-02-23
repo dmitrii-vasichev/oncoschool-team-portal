@@ -19,6 +19,7 @@ from app.services.ai_service import AIService
 from app.services.in_app_notification_service import InAppNotificationService
 from app.services.meeting_service import MeetingService
 from app.services.meeting_status import compute_effective_status
+from app.services.permission_service import PermissionService
 from app.services.task_service import TaskService
 from app.services.zoom_service import sanitize_zoom_join_url
 
@@ -516,7 +517,7 @@ async def update_meeting(
     meeting_id: uuid.UUID,
     data: MeetingUpdate,
     request: Request,
-    member: TeamMember = Depends(require_moderator),
+    member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Update meeting details. If meeting_date changes and Zoom exists, update Zoom too."""
@@ -527,6 +528,24 @@ async def update_meeting(
     fields = data.model_dump(exclude_unset=True)
     if not fields:
         return _meeting_response(meeting)
+
+    is_moderator = PermissionService.is_moderator(member)
+    if not is_moderator:
+        if meeting.created_by_id != member.id:
+            raise HTTPException(status_code=403, detail="Нет прав на редактирование этой встречи")
+
+        allowed_fields = {"title"}
+        forbidden = set(fields.keys()) - allowed_fields
+        if forbidden:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Участник может менять только заголовок: {', '.join(sorted(forbidden))}",
+            )
+
+        new_title = (fields.get("title") or "").strip()
+        if not new_title:
+            raise HTTPException(status_code=400, detail="Заголовок встречи не может быть пустым")
+        fields["title"] = new_title
 
     # Handle participant_ids separately before updating other fields
     if "participant_ids" in fields:

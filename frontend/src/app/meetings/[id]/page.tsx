@@ -303,6 +303,8 @@ export default function MeetingDetailPage() {
   const isPastMeeting =
     meeting.effective_status === "completed" || meeting.effective_status === "cancelled";
   const isUpcomingMeeting = !isPastMeeting;
+  const canEditMeetingTitle =
+    !!user && (isModerator || meeting.created_by_id === user.id);
 
   const tabs: { id: TabId; label: string; icon: typeof FileText; count?: number }[] = [
     { id: "transcript", label: "Транскрипция", icon: MessageSquareText },
@@ -317,6 +319,7 @@ export default function MeetingDetailPage() {
       <MeetingHeader
         meeting={meeting}
         isModerator={isModerator}
+        canEditTitle={canEditMeetingTitle}
         onUpdateTitle={handleUpdateTitle}
         onUpdateStatus={handleUpdateStatus}
         onDelete={handleDelete}

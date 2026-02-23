@@ -18,20 +18,22 @@ class PermissionService:
         return PermissionService.is_moderator(member)
 
     @staticmethod
-    def can_assign_task(member: TeamMember) -> bool:
-        return PermissionService.is_moderator(member)
+    def can_assign_task(member: TeamMember, task: Task | None = None) -> bool:
+        if PermissionService.is_moderator(member):
+            return True
+        return task is not None and task.created_by_id == member.id
 
     @staticmethod
     def can_change_task_status(member: TeamMember, task: Task) -> bool:
         if PermissionService.is_moderator(member):
             return True
-        return task.assignee_id == member.id
+        return task.assignee_id == member.id or task.created_by_id == member.id
 
     @staticmethod
     def can_add_task_update(member: TeamMember, task: Task) -> bool:
         if PermissionService.is_moderator(member):
             return True
-        return task.assignee_id == member.id
+        return task.assignee_id == member.id or task.created_by_id == member.id
 
     @staticmethod
     def can_delete_task(member: TeamMember) -> bool:
