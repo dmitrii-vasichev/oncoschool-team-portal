@@ -590,9 +590,48 @@ export default function TaskDetailPage() {
               </div>
             )}
           </div>
-          <span className="self-start rounded-md bg-muted/50 px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70 sm:self-auto">
-            #{task.short_id}
-          </span>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="rounded-md bg-muted/50 px-1.5 py-0.5 font-mono text-2xs text-muted-foreground/70">
+              #{task.short_id}
+            </span>
+            {canDelete && (
+              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deleting}
+                        className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        aria-label="Удалить задачу"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Удалить задачу</TooltipContent>
+                </Tooltip>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Удалить задачу?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Это действие необратимо. Задача и все её обновления будут удалены.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Отмена</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Удалить
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         {/* ── Badges row ── */}
@@ -666,7 +705,7 @@ export default function TaskDetailPage() {
               type="button"
               variant={isReminderExpanded ? "secondary" : "outline"}
               size="sm"
-              className="h-7 gap-1.5 px-2.5 sm:ml-auto"
+              className="h-6 rounded-full gap-1.5 px-2.5 text-xs font-medium leading-none self-center sm:ml-auto"
               onClick={() => setIsReminderExpanded((prev) => !prev)}
               aria-expanded={isReminderExpanded}
               aria-label="Показать настройки напоминания"
@@ -837,43 +876,6 @@ export default function TaskDetailPage() {
               </Select>
             )}
 
-            {/* Delete */}
-            {canDelete && (
-              <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={deleting}
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive sm:ml-auto"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Удалить задачу</TooltipContent>
-                </Tooltip>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Удалить задачу?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Это действие необратимо. Задача и все её обновления будут удалены.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      Удалить
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
           </div>
         )}
 
