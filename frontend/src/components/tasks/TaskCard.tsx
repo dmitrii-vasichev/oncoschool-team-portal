@@ -62,7 +62,7 @@ export function TaskCard({ task }: { task: Task }) {
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p
-                  className={`min-h-[3.75rem] line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-tight font-heading font-semibold ${
+                  className={`h-[3.75rem] overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
                     overdue
                       ? "text-destructive group-hover:text-destructive"
                       : "group-hover:text-primary"
