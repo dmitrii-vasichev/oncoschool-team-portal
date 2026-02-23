@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, type KeyboardEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
+  Bell,
   Mic,
   CalendarDays,
   ArrowLeft,
@@ -175,6 +176,15 @@ function formatReminderDateTime(value: string): string {
   });
 }
 
+function formatReminderCompactDateTime(value: string): string {
+  return parseUTCDate(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /* ============================================
    Page Component
    ============================================ */
@@ -202,6 +212,7 @@ export default function TaskDetailPage() {
   const [reminderTime, setReminderTime] = useState("09:00");
   const [reminderComment, setReminderComment] = useState("");
   const [savingReminder, setSavingReminder] = useState(false);
+  const [isReminderExpanded, setIsReminderExpanded] = useState(false);
 
   const refreshUpdates = useCallback(() => {
     setUpdatesKey((k) => k + 1);
@@ -585,7 +596,7 @@ export default function TaskDetailPage() {
         </div>
 
         {/* ── Badges row ── */}
-        <div className="flex items-center gap-2.5 flex-wrap mb-6">
+        <div className="flex items-center gap-2.5 flex-wrap mb-4">
           <StatusBadge status={task.status} />
 
           {/* Priority: inline-editable for moderator/author */}
@@ -649,7 +660,122 @@ export default function TaskDetailPage() {
               Просрочено
             </Badge>
           )}
+
+          {(canManageReminder || task.reminder_at) && (
+            <Button
+              type="button"
+              variant={isReminderExpanded ? "secondary" : "outline"}
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 sm:ml-auto"
+              onClick={() => setIsReminderExpanded((prev) => !prev)}
+              aria-expanded={isReminderExpanded}
+              aria-label="Показать настройки напоминания"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              <span>Напоминание</span>
+              <span className="hidden sm:inline text-2xs text-muted-foreground">
+                {task.reminder_at
+                  ? formatReminderCompactDateTime(task.reminder_at)
+                  : "не задано"}
+              </span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${
+                  isReminderExpanded ? "rotate-180" : ""
+                }`}
+              />
+            </Button>
+          )}
         </div>
+
+        {(canManageReminder || task.reminder_at) && isReminderExpanded && (
+          <div className="mb-6 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Напоминание по задаче</h3>
+              {task.reminder_at && (
+                <span className="text-xs text-muted-foreground">
+                  {formatReminderDateTime(task.reminder_at)}
+                </span>
+              )}
+            </div>
+
+            {canManageReminder ? (
+              <div className="space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <DatePicker
+                    value={reminderDate}
+                    onChange={setReminderDate}
+                    placeholder="Дата напоминания"
+                    clearable={false}
+                    className="h-9 w-full sm:w-[240px]"
+                  />
+                  <TimePicker
+                    value={reminderTime}
+                    onChange={setReminderTime}
+                    placeholder="Время"
+                    minuteStep={5}
+                    className="h-9 w-full sm:w-[130px]"
+                  />
+                </div>
+
+                <Textarea
+                  value={reminderComment}
+                  onChange={(e) => setReminderComment(e.target.value)}
+                  rows={3}
+                  placeholder="Комментарий к напоминанию (опционально)"
+                />
+
+                {!task.assignee_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Сначала назначьте исполнителя, затем можно установить напоминание.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSaveReminder()}
+                    disabled={
+                      savingReminder ||
+                      !reminderDate ||
+                      !reminderTime ||
+                      !canSetReminderForCurrentTask
+                    }
+                  >
+                    {savingReminder ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Сохранить напоминание
+                  </Button>
+                  {task.reminder_at && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleClearReminder()}
+                      disabled={savingReminder}
+                    >
+                      Удалить
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1 text-sm">
+                <p className="text-foreground">
+                  {task.reminder_at
+                    ? `Запланировано на ${formatReminderDateTime(task.reminder_at)}`
+                    : "Напоминание не задано"}
+                </p>
+                {task.reminder_comment && (
+                  <p className="text-muted-foreground whitespace-pre-wrap">
+                    {task.reminder_comment}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Action bar ── */}
         {(canChangeStatus || canEditTaskMeta) && (
@@ -857,96 +983,6 @@ export default function TaskDetailPage() {
             </dd>
           </div>
         </div>
-
-        {(canManageReminder || task.reminder_at) && (
-          <div className="mt-8 rounded-xl border border-border/60 bg-muted/20 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">Напоминание по задаче</h3>
-              {task.reminder_at && (
-                <span className="text-xs text-muted-foreground">
-                  {formatReminderDateTime(task.reminder_at)}
-                </span>
-              )}
-            </div>
-
-            {canManageReminder ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
-                  <DatePicker
-                    value={reminderDate}
-                    onChange={setReminderDate}
-                    placeholder="Дата напоминания"
-                    clearable={false}
-                    className="w-full"
-                  />
-                  <TimePicker
-                    value={reminderTime}
-                    onChange={setReminderTime}
-                    placeholder="Время"
-                    minuteStep={5}
-                    className="h-10 w-full sm:w-[130px]"
-                  />
-                </div>
-
-                <Textarea
-                  value={reminderComment}
-                  onChange={(e) => setReminderComment(e.target.value)}
-                  rows={3}
-                  placeholder="Комментарий к напоминанию (опционально)"
-                />
-
-                {!task.assignee_id && (
-                  <p className="text-xs text-muted-foreground">
-                    Сначала назначьте исполнителя, затем можно установить напоминание.
-                  </p>
-                )}
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleSaveReminder()}
-                    disabled={
-                      savingReminder ||
-                      !reminderDate ||
-                      !reminderTime ||
-                      !canSetReminderForCurrentTask
-                    }
-                  >
-                    {savingReminder ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    Сохранить напоминание
-                  </Button>
-                  {task.reminder_at && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => void handleClearReminder()}
-                      disabled={savingReminder}
-                    >
-                      Удалить
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1 text-sm">
-                <p className="text-foreground">
-                  {task.reminder_at
-                    ? `Запланировано на ${formatReminderDateTime(task.reminder_at)}`
-                    : "Напоминание не задано"}
-                </p>
-                {task.reminder_comment && (
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {task.reminder_comment}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* ── Description ── */}
         {(task.description || canEditTaskMeta) && (
