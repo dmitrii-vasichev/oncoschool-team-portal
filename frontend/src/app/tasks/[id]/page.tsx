@@ -60,6 +60,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
+import { TimePicker } from "@/components/shared/TimePicker";
 import { TaskUpdates } from "@/components/tasks/TaskUpdates";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
 import { useTask } from "@/hooks/useTasks";
@@ -70,7 +71,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
 import type { TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/types";
-import { parseLocalDate } from "@/lib/dateUtils";
+import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
 
 /* ============================================
    Constants
@@ -124,6 +125,56 @@ function formatDateShort(dateStr: string): string {
   });
 }
 
+function formatLocalInputDate(dateValue: Date): string {
+  const year = dateValue.getFullYear();
+  const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+  const day = String(dateValue.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatLocalInputTime(dateValue: Date): string {
+  const hours = String(dateValue.getHours()).padStart(2, "0");
+  const minutes = String(dateValue.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function buildReminderIso(dateValue: string, timeValue: string): string | null {
+  const [yearRaw, monthRaw, dayRaw] = dateValue.split("-");
+  const [hoursRaw, minutesRaw] = timeValue.split(":");
+
+  const year = Number(yearRaw);
+  const month = Number(monthRaw);
+  const day = Number(dayRaw);
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+
+  if (
+    Number.isNaN(year) ||
+    Number.isNaN(month) ||
+    Number.isNaN(day) ||
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes)
+  ) {
+    return null;
+  }
+
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+  if (Number.isNaN(localDate.getTime())) {
+    return null;
+  }
+  return localDate.toISOString();
+}
+
+function formatReminderDateTime(value: string): string {
+  return parseUTCDate(value).toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /* ============================================
    Page Component
    ============================================ */
@@ -147,6 +198,10 @@ export default function TaskDetailPage() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderTime, setReminderTime] = useState("09:00");
+  const [reminderComment, setReminderComment] = useState("");
+  const [savingReminder, setSavingReminder] = useState(false);
 
   const refreshUpdates = useCallback(() => {
     setUpdatesKey((k) => k + 1);
@@ -161,6 +216,21 @@ export default function TaskDetailPage() {
     if (!task || isEditingDescription) return;
     setDescriptionDraft(task.description || "");
   }, [task, isEditingDescription]);
+
+  useEffect(() => {
+    if (!task) return;
+    if (!task.reminder_at) {
+      setReminderDate("");
+      setReminderTime("09:00");
+      setReminderComment(task.reminder_comment || "");
+      return;
+    }
+
+    const reminderDt = parseUTCDate(task.reminder_at);
+    setReminderDate(formatLocalInputDate(reminderDt));
+    setReminderTime(formatLocalInputTime(reminderDt));
+    setReminderComment(task.reminder_comment || "");
+  }, [task]);
 
   /* ---- Loading ---- */
   if (loading) {
@@ -215,6 +285,9 @@ export default function TaskDetailPage() {
   const isAuthor = !!user && task.created_by_id === user.id;
   const canEditTitle = !!canChangeStatus;
   const canEditTaskMeta = isModerator || isAuthor;
+  const canManageReminder =
+    !!user && PermissionService.canManageTaskReminder(user, task);
+  const canSetReminderForCurrentTask = canManageReminder && !!task.assignee_id;
   const overdue = isOverdue(task.deadline, task.status);
   const transitions = STATUS_TRANSITIONS[task.status] || [];
 
@@ -374,6 +447,51 @@ export default function TaskDetailPage() {
       toastError("Не удалось обновить описание");
     } finally {
       setSavingDescription(false);
+    }
+  }
+
+  async function handleSaveReminder() {
+    if (!shortId || !canManageReminder || savingReminder) return;
+    if (!reminderDate || !reminderTime) {
+      toastError("Укажите дату и время напоминания");
+      return;
+    }
+
+    const reminderIso = buildReminderIso(reminderDate, reminderTime);
+    if (!reminderIso) {
+      toastError("Неверный формат даты или времени");
+      return;
+    }
+
+    setSavingReminder(true);
+    try {
+      await api.updateTask(shortId, {
+        reminder_at: reminderIso,
+        reminder_comment: reminderComment.trim() || null,
+      });
+      await refetch();
+      toastSuccess("Напоминание сохранено");
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : "Не удалось сохранить напоминание");
+    } finally {
+      setSavingReminder(false);
+    }
+  }
+
+  async function handleClearReminder() {
+    if (!shortId || !canManageReminder || savingReminder) return;
+    setSavingReminder(true);
+    try {
+      await api.updateTask(shortId, {
+        reminder_at: null,
+        reminder_comment: null,
+      });
+      await refetch();
+      toastSuccess("Напоминание удалено");
+    } catch (e) {
+      toastError(e instanceof Error ? e.message : "Не удалось удалить напоминание");
+    } finally {
+      setSavingReminder(false);
     }
   }
 
@@ -739,6 +857,96 @@ export default function TaskDetailPage() {
             </dd>
           </div>
         </div>
+
+        {(canManageReminder || task.reminder_at) && (
+          <div className="mt-8 rounded-xl border border-border/60 bg-muted/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">Напоминание по задаче</h3>
+              {task.reminder_at && (
+                <span className="text-xs text-muted-foreground">
+                  {formatReminderDateTime(task.reminder_at)}
+                </span>
+              )}
+            </div>
+
+            {canManageReminder ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+                  <DatePicker
+                    value={reminderDate}
+                    onChange={setReminderDate}
+                    placeholder="Дата напоминания"
+                    clearable={false}
+                    className="w-full"
+                  />
+                  <TimePicker
+                    value={reminderTime}
+                    onChange={setReminderTime}
+                    placeholder="Время"
+                    minuteStep={5}
+                    className="h-10 w-full sm:w-[130px]"
+                  />
+                </div>
+
+                <Textarea
+                  value={reminderComment}
+                  onChange={(e) => setReminderComment(e.target.value)}
+                  rows={3}
+                  placeholder="Комментарий к напоминанию (опционально)"
+                />
+
+                {!task.assignee_id && (
+                  <p className="text-xs text-muted-foreground">
+                    Сначала назначьте исполнителя, затем можно установить напоминание.
+                  </p>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleSaveReminder()}
+                    disabled={
+                      savingReminder ||
+                      !reminderDate ||
+                      !reminderTime ||
+                      !canSetReminderForCurrentTask
+                    }
+                  >
+                    {savingReminder ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Сохранить напоминание
+                  </Button>
+                  {task.reminder_at && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleClearReminder()}
+                      disabled={savingReminder}
+                    >
+                      Удалить
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1 text-sm">
+                <p className="text-foreground">
+                  {task.reminder_at
+                    ? `Запланировано на ${formatReminderDateTime(task.reminder_at)}`
+                    : "Напоминание не задано"}
+                </p>
+                {task.reminder_comment && (
+                  <p className="text-muted-foreground whitespace-pre-wrap">
+                    {task.reminder_comment}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Description ── */}
         {(task.description || canEditTaskMeta) && (

@@ -130,6 +130,8 @@ class TaskEdit(BaseModel):
     priority: TaskPriorityType | None = None
     assignee_id: uuid.UUID | None = None
     deadline: date | None = None
+    reminder_at: datetime | None = None
+    reminder_comment: str | None = None
 
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -146,6 +148,9 @@ class TaskResponse(BaseModel):
     meeting_id: uuid.UUID | None
     source: str
     deadline: date | None
+    reminder_at: datetime | None
+    reminder_comment: str | None
+    reminder_sent_at: datetime | None
     completed_at: datetime | None
     created_at: datetime
     updated_at: datetime

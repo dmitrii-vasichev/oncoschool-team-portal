@@ -1,8 +1,9 @@
 import logging
 import re
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from html import escape
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
@@ -30,6 +31,7 @@ from app.bot.keyboards import (
     task_card_keyboard,
     task_list_keyboard,
 )
+from app.config import settings
 from app.db.models import Task, TeamMember
 from app.db.repositories import DepartmentRepository, TaskRepository, TeamMemberRepository
 from app.services.notification_service import NotificationService
@@ -112,6 +114,7 @@ TASK_EDIT_FIELD_LABELS = {
 }
 
 TASK_EDIT_CLEAR_VALUES = {"-", "none", "null", "clear", "нет", "очистить"}
+TASK_REMINDER_CLEAR_VALUES = TASK_EDIT_CLEAR_VALUES
 TASK_PRIORITY_ALIASES = {
     "low": "low",
     "medium": "medium",
@@ -132,6 +135,11 @@ class TaskCommandFSM(StatesGroup):
 
 class TaskEditFSM(StatesGroup):
     waiting_value = State()
+
+
+class TaskReminderFSM(StatesGroup):
+    waiting_datetime = State()
+    waiting_comment = State()
 
 
 NEW_TASK_PROMPT_TEXT = (
@@ -267,6 +275,67 @@ def _parse_deadline_input(raw_value: str) -> tuple[date | None, bool]:
         return date(year, month, day), True
     except ValueError:
         return None, False
+
+
+def _format_task_reminder_datetime(reminder_at: datetime | None) -> str:
+    if reminder_at is None:
+        return "—"
+    try:
+        tz = ZoneInfo(settings.TIMEZONE)
+    except Exception:
+        tz = ZoneInfo("Europe/Moscow")
+    local_dt = reminder_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+    return local_dt.strftime("%d.%m.%Y %H:%M")
+
+
+def _parse_reminder_datetime_input(raw_value: str) -> tuple[datetime | None, bool]:
+    value = (raw_value or "").strip().lower()
+    if value in TASK_REMINDER_CLEAR_VALUES:
+        return None, True
+
+    match = re.match(
+        r"^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s+(\d{1,2}):(\d{2})$",
+        value,
+    )
+    if not match:
+        return None, False
+
+    day = int(match.group(1))
+    month = int(match.group(2))
+    year_str = match.group(3)
+    hour = int(match.group(4))
+    minute = int(match.group(5))
+
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        return None, False
+
+    if year_str:
+        year = int(year_str)
+        if year < 100:
+            year += 2000
+    else:
+        year = date.today().year
+
+    try:
+        local_tz = ZoneInfo(settings.TIMEZONE)
+    except Exception:
+        local_tz = ZoneInfo("Europe/Moscow")
+
+    try:
+        local_dt = datetime(year, month, day, hour, minute, tzinfo=local_tz)
+    except ValueError:
+        return None, False
+
+    if not year_str and local_dt <= datetime.now(local_tz):
+        try:
+            local_dt = datetime(year + 1, month, day, hour, minute, tzinfo=local_tz)
+        except ValueError:
+            return None, False
+
+    reminder_at = local_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    if reminder_at <= datetime.utcnow() + timedelta(seconds=30):
+        return None, False
+    return reminder_at, True
 
 
 def _format_task_edit_panel(task: Task, *, editable_fields: list[str]) -> str:
@@ -454,6 +523,7 @@ def _format_task_detail(task) -> str:
     assignee_name = task.assignee.full_name if task.assignee else "—"
     creator_name = task.created_by.full_name if task.created_by else "—"
     deadline_str = task.deadline.strftime("%d.%m.%Y") if task.deadline else "—"
+    reminder_str = _format_task_reminder_datetime(task.reminder_at)
 
     text = (
         f"{source_icon}<b>#{task.short_id} · {task.title}</b>\n\n"
@@ -462,11 +532,33 @@ def _format_task_detail(task) -> str:
         f"👤 Исполнитель: {assignee_name}\n"
         f"📝 Создал: {creator_name}\n"
         f"📅 Дедлайн: {deadline_str}\n"
+        f"⏰ Напоминание: {reminder_str}\n"
         f"📆 Создана: {task.created_at.strftime('%d.%m.%Y %H:%M')}"
     )
+    if task.reminder_comment:
+        text += f"\n💬 Комментарий: {task.reminder_comment}"
+    if task.reminder_sent_at:
+        text += "\n✅ Напоминание отправлено"
     if task.description:
         text += f"\n\n📋 {task.description}"
     return text
+
+
+def _format_task_reminder_panel(task: Task) -> str:
+    lines = [
+        f"⏰ <b>Напоминание по задаче #{task.short_id}</b>",
+        "",
+        f"<b>{escape(task.title)}</b>",
+        "",
+        f"Текущее время: <b>{_format_task_reminder_datetime(task.reminder_at)}</b>",
+    ]
+    if task.reminder_comment:
+        lines.append(f"Комментарий: {escape(task.reminder_comment)}")
+    lines.extend([
+        "",
+        "Укажи дату/время и комментарий (опционально).",
+    ])
+    return "\n".join(lines)
 
 
 def _normalize_task_filter(task_filter: TaskListFilter) -> TaskListFilter:
@@ -976,6 +1068,42 @@ def _task_detail_keyboard(
         page=page,
         department_token=department_token,
     )
+
+
+def _task_reminder_keyboard(
+    *,
+    short_id: int,
+    has_reminder: bool,
+    context: TaskListContext | None = None,
+) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = [
+        [
+            InlineKeyboardButton(
+                text="📅 Дата и время",
+                callback_data=f"task_reminder_set:{short_id}",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="💬 Комментарий",
+                callback_data=f"task_reminder_comment:{short_id}",
+            )
+        ],
+    ]
+    if has_reminder:
+        rows.append([
+            InlineKeyboardButton(
+                text="🗑 Удалить напоминание",
+                callback_data=f"task_reminder_clear:{short_id}",
+            )
+        ])
+    rows.append([
+        InlineKeyboardButton(
+            text="↩️ Назад",
+            callback_data=_task_back_callback_data(short_id, context),
+        )
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 # ── /tasks — Мои задачи ──
@@ -1822,6 +1950,362 @@ async def fsm_task_edit_value(
         parse_mode="HTML",
         reply_markup=task_actions_keyboard(
             updated_task.short_id,
+            PermissionService.is_moderator(member),
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("task_reminder:"))
+async def cb_task_reminder_open(
+    callback: CallbackQuery,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    try:
+        short_id = int((callback.data or "").split(":", maxsplit=1)[1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный callback", show_alert=True)
+        return
+
+    context = _extract_list_context_from_markup(callback.message.reply_markup, member)
+
+    async with session_maker() as session:
+        task = await task_service.get_task_by_short_id(session, short_id)
+        if not task:
+            await callback.answer(f"Задача #{short_id} не найдена", show_alert=True)
+            return
+        if not await can_access_task(session, member, task):
+            await callback.answer("Нет доступа к задаче", show_alert=True)
+            return
+        if not PermissionService.can_manage_task_reminder(member, task):
+            await callback.answer(
+                "Напоминание может настраивать исполнитель или модератор для активной задачи",
+                show_alert=True,
+            )
+            return
+        if task.assignee_id is None and task.reminder_at is None:
+            await callback.answer(
+                "Сначала назначьте исполнителя, затем добавьте напоминание",
+                show_alert=True,
+            )
+            return
+
+    await callback.answer()
+    await _safe_edit_text(
+        callback.message,
+        _format_task_reminder_panel(task),
+        parse_mode="HTML",
+        reply_markup=_task_reminder_keyboard(
+            short_id=task.short_id,
+            has_reminder=task.reminder_at is not None,
+            context=context,
+        ),
+    )
+
+
+@router.callback_query(F.data.startswith("task_reminder_set:"))
+async def cb_task_reminder_set(
+    callback: CallbackQuery,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    state: FSMContext,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    try:
+        short_id = int((callback.data or "").split(":", maxsplit=1)[1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный callback", show_alert=True)
+        return
+
+    async with session_maker() as session:
+        task = await task_service.get_task_by_short_id(session, short_id)
+        if not task:
+            await callback.answer(f"Задача #{short_id} не найдена", show_alert=True)
+            return
+        if not await can_access_task(session, member, task):
+            await callback.answer("Нет доступа к задаче", show_alert=True)
+            return
+        if not PermissionService.can_manage_task_reminder(member, task):
+            await callback.answer("Нет прав на настройку напоминания", show_alert=True)
+            return
+        if task.assignee_id is None:
+            await callback.answer(
+                "Сначала назначьте исполнителя, затем установите напоминание",
+                show_alert=True,
+            )
+            return
+
+    await state.set_state(TaskReminderFSM.waiting_datetime)
+    await state.update_data(task_reminder_short_id=short_id)
+    await callback.answer()
+    await callback.message.answer(
+        "📅 Введите дату и время напоминания:\n"
+        "<code>ДД.ММ ЧЧ:ММ</code> или <code>ДД.ММ.ГГГГ ЧЧ:ММ</code>\n\n"
+        "Чтобы удалить напоминание: <code>-</code>, <code>none</code> или <code>нет</code>.\n"
+        "Для отмены: /cancel",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("task_reminder_comment:"))
+async def cb_task_reminder_comment(
+    callback: CallbackQuery,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    state: FSMContext,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    try:
+        short_id = int((callback.data or "").split(":", maxsplit=1)[1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный callback", show_alert=True)
+        return
+
+    async with session_maker() as session:
+        task = await task_service.get_task_by_short_id(session, short_id)
+        if not task:
+            await callback.answer(f"Задача #{short_id} не найдена", show_alert=True)
+            return
+        if not await can_access_task(session, member, task):
+            await callback.answer("Нет доступа к задаче", show_alert=True)
+            return
+        if not PermissionService.can_manage_task_reminder(member, task):
+            await callback.answer("Нет прав на настройку напоминания", show_alert=True)
+            return
+        if task.assignee_id is None:
+            await callback.answer(
+                "Сначала назначьте исполнителя, затем добавьте комментарий",
+                show_alert=True,
+            )
+            return
+
+    await state.set_state(TaskReminderFSM.waiting_comment)
+    await state.update_data(task_reminder_short_id=short_id)
+    await callback.answer()
+    await callback.message.answer(
+        "💬 Введите комментарий к напоминанию.\n"
+        "Чтобы очистить комментарий: <code>-</code>, <code>none</code> или <code>нет</code>.\n"
+        "Для отмены: /cancel",
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("task_reminder_clear:"))
+async def cb_task_reminder_clear(
+    callback: CallbackQuery,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> None:
+    if not callback.message:
+        await callback.answer("Сообщение больше недоступно", show_alert=True)
+        return
+
+    try:
+        short_id = int((callback.data or "").split(":", maxsplit=1)[1])
+    except (IndexError, ValueError):
+        await callback.answer("Некорректный callback", show_alert=True)
+        return
+
+    context = _extract_list_context_from_markup(callback.message.reply_markup, member)
+
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.get_task_by_short_id(session, short_id)
+            if not task:
+                await callback.answer(f"Задача #{short_id} не найдена", show_alert=True)
+                return
+            if not await can_access_task(session, member, task):
+                await callback.answer("Нет доступа к задаче", show_alert=True)
+                return
+            if not PermissionService.can_manage_task_reminder(member, task):
+                await callback.answer("Нет прав на настройку напоминания", show_alert=True)
+                return
+
+            task = await task_repo.update(
+                session,
+                task.id,
+                reminder_at=None,
+                reminder_comment=None,
+                reminder_sent_at=None,
+            )
+
+    await callback.answer("🗑 Напоминание удалено")
+    await _safe_edit_text(
+        callback.message,
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=_task_detail_keyboard(
+            task_id=task.short_id,
+            is_moderator=PermissionService.is_moderator(member),
+            context=context,
+        ),
+    )
+
+
+@router.message(TaskReminderFSM.waiting_datetime, Command("cancel"))
+@router.message(TaskReminderFSM.waiting_comment, Command("cancel"))
+async def fsm_cancel_task_reminder(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    await message.answer("❌ Настройка напоминания отменена")
+
+
+@router.message(TaskReminderFSM.waiting_datetime)
+async def fsm_task_reminder_datetime(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    state: FSMContext,
+) -> None:
+    state_data = await state.get_data()
+    short_id_raw = state_data.get("task_reminder_short_id")
+    try:
+        short_id = int(short_id_raw)
+    except (TypeError, ValueError):
+        await state.clear()
+        await message.answer("❌ Сессия напоминания устарела. Откройте задачу заново.")
+        return
+
+    raw_value = message.text.strip() if message.text else ""
+    if not raw_value:
+        await message.answer("❌ Введите дату и время или /cancel")
+        return
+
+    reminder_at, ok = _parse_reminder_datetime_input(raw_value)
+    if not ok:
+        await message.answer(
+            "❌ Формат: ДД.ММ ЧЧ:ММ или ДД.ММ.ГГГГ ЧЧ:ММ.\n"
+            "Время напоминания должно быть в будущем."
+        )
+        return
+
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.get_task_by_short_id(session, short_id)
+            if not task:
+                await state.clear()
+                await message.answer(f"❌ Задача #{short_id} не найдена")
+                return
+            if not await can_access_task(session, member, task):
+                await state.clear()
+                await message.answer("⛔ Нет доступа к задаче")
+                return
+            if not PermissionService.can_manage_task_reminder(member, task):
+                await state.clear()
+                await message.answer("⛔ Нет прав на настройку напоминания")
+                return
+            if reminder_at is not None and task.assignee_id is None:
+                await message.answer("❌ Сначала назначьте исполнителя задачи")
+                return
+
+            if reminder_at is None:
+                task = await task_repo.update(
+                    session,
+                    task.id,
+                    reminder_at=None,
+                    reminder_comment=None,
+                    reminder_sent_at=None,
+                )
+                success_text = "🗑 Напоминание удалено"
+            else:
+                task = await task_repo.update(
+                    session,
+                    task.id,
+                    reminder_at=reminder_at,
+                    reminder_sent_at=None,
+                )
+                success_text = (
+                    f"✅ Напоминание установлено: "
+                    f"{_format_task_reminder_datetime(reminder_at)}"
+                )
+
+    await state.clear()
+    await message.answer(success_text)
+    await message.answer(
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=task_actions_keyboard(
+            task.short_id,
+            PermissionService.is_moderator(member),
+        ),
+    )
+
+
+@router.message(TaskReminderFSM.waiting_comment)
+async def fsm_task_reminder_comment(
+    message: Message,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+    state: FSMContext,
+) -> None:
+    state_data = await state.get_data()
+    short_id_raw = state_data.get("task_reminder_short_id")
+    try:
+        short_id = int(short_id_raw)
+    except (TypeError, ValueError):
+        await state.clear()
+        await message.answer("❌ Сессия напоминания устарела. Откройте задачу заново.")
+        return
+
+    raw_value = message.text.strip() if message.text else ""
+    if not raw_value:
+        await message.answer("❌ Введите комментарий или /cancel")
+        return
+
+    normalized_comment = (
+        None if raw_value.lower() in TASK_REMINDER_CLEAR_VALUES else raw_value
+    )
+
+    async with session_maker() as session:
+        async with session.begin():
+            task = await task_service.get_task_by_short_id(session, short_id)
+            if not task:
+                await state.clear()
+                await message.answer(f"❌ Задача #{short_id} не найдена")
+                return
+            if not await can_access_task(session, member, task):
+                await state.clear()
+                await message.answer("⛔ Нет доступа к задаче")
+                return
+            if not PermissionService.can_manage_task_reminder(member, task):
+                await state.clear()
+                await message.answer("⛔ Нет прав на настройку напоминания")
+                return
+            if task.assignee_id is None:
+                await state.clear()
+                await message.answer("❌ Сначала назначьте исполнителя задачи")
+                return
+            if task.reminder_at is None:
+                await state.clear()
+                await message.answer("❌ Сначала установите дату и время напоминания")
+                return
+
+            task = await task_repo.update(
+                session,
+                task.id,
+                reminder_comment=normalized_comment,
+            )
+
+    await state.clear()
+    await message.answer(
+        "✅ Комментарий обновлён"
+        if normalized_comment
+        else "✅ Комментарий удалён"
+    )
+    await message.answer(
+        _format_task_detail(task),
+        parse_mode="HTML",
+        reply_markup=task_actions_keyboard(
+            task.short_id,
             PermissionService.is_moderator(member),
         ),
     )

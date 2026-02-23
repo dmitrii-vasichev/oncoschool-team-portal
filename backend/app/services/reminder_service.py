@@ -1,6 +1,7 @@
 import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -11,10 +12,12 @@ from sqlalchemy.orm import selectinload
 
 from app.bot.callbacks import (
     ALL_DEPARTMENTS_TOKEN,
+    TaskCardCallback,
     TaskListCallback,
     TaskListFilter,
     TaskListScope,
 )
+from app.config import settings
 from app.db.models import ReminderSettings, Task, TeamMember
 from app.db.repositories import (
     NotificationSubscriptionRepository,
@@ -26,6 +29,13 @@ from app.services.in_app_notification_service import InAppNotificationService
 logger = logging.getLogger(__name__)
 
 DAYS_RU = {1: "Пн", 2: "Вт", 3: "Ср", 4: "Чт", 5: "Пт", 6: "Сб", 7: "Вс"}
+TASK_STATUS_LABELS = {
+    "new": "Новая",
+    "in_progress": "В работе",
+    "review": "Ревью",
+    "done": "Готово",
+    "cancelled": "Отменена",
+}
 
 
 class ReminderService:
@@ -54,6 +64,14 @@ class ReminderService:
             "interval",
             minutes=1,
             id="check_reminders",
+            replace_existing=True,
+        )
+        # Check one-off task reminders every minute
+        self.scheduler.add_job(
+            self._check_task_reminders,
+            "interval",
+            minutes=1,
+            id="check_task_reminders",
             replace_existing=True,
         )
         # Check overdue tasks every hour
@@ -104,6 +122,100 @@ class ReminderService:
                         )
         except Exception as e:
             logger.error(f"Error in _check_and_send_reminders: {e}")
+
+    async def _check_task_reminders(self) -> None:
+        """Send one-off task reminders when their trigger time has come."""
+        try:
+            async with self.session_maker() as session:
+                now_utc = datetime.utcnow()
+                stmt = (
+                    select(Task)
+                    .options(selectinload(Task.assignee))
+                    .where(
+                        Task.reminder_at.is_not(None),
+                        Task.reminder_sent_at.is_(None),
+                        Task.reminder_at <= now_utc,
+                        Task.status.notin_(["done", "cancelled"]),
+                    )
+                )
+                result = await session.execute(stmt)
+                due_tasks = list(result.scalars().all())
+                if not due_tasks:
+                    return
+
+                touched = False
+                for task in due_tasks:
+                    assignee = task.assignee
+                    if not assignee or not assignee.telegram_id:
+                        logger.warning(
+                            "Skip task reminder for #%s: assignee/telegram_id missing",
+                            task.short_id,
+                        )
+                        task.reminder_sent_at = now_utc
+                        touched = True
+                        continue
+
+                    sent = await self._send_task_reminder(task, assignee)
+                    if sent:
+                        task.reminder_sent_at = datetime.utcnow()
+                        touched = True
+
+                if touched:
+                    await session.commit()
+        except Exception as e:
+            logger.error(f"Error in _check_task_reminders: {e}")
+
+    async def _send_task_reminder(self, task: Task, member: TeamMember) -> bool:
+        """Send a single task reminder message to assignee."""
+        reminder_dt_utc = task.reminder_at
+        if reminder_dt_utc is None:
+            return False
+
+        try:
+            tz = ZoneInfo(settings.TIMEZONE)
+        except Exception:
+            tz = ZoneInfo("Europe/Moscow")
+        reminder_local = reminder_dt_utc.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+
+        text_lines = [
+            "⏰ Напоминание по задаче",
+            "",
+            f"#{task.short_id} · {task.title}",
+            f"Статус: {TASK_STATUS_LABELS.get(task.status, task.status)}",
+            f"Время: {reminder_local.strftime('%d.%m.%Y %H:%M')}",
+        ]
+        if task.reminder_comment:
+            text_lines.append("")
+            text_lines.append(f"💬 Комментарий: {task.reminder_comment}")
+
+        markup = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="📋 Открыть задачу",
+                callback_data=TaskCardCallback(
+                    short_id=task.short_id,
+                    scope=TaskListScope.MY,
+                    task_filter=TaskListFilter.ALL,
+                    page=1,
+                    department_token=ALL_DEPARTMENTS_TOKEN,
+                ).pack(),
+            )
+        ]])
+
+        try:
+            await self.bot.send_message(
+                member.telegram_id,
+                "\n".join(text_lines),
+                reply_markup=markup,
+            )
+            return True
+        except Exception as e:
+            logger.warning(
+                "Failed to send task reminder #%s to %s: %s",
+                task.short_id,
+                member.telegram_id,
+                e,
+            )
+            return False
 
     async def _maybe_send_digest(
         self, session: AsyncSession, rs: ReminderSettings

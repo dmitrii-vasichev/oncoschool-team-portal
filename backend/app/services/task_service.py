@@ -129,6 +129,9 @@ class TaskService:
             task.id,
             status="done",
             completed_at=datetime.utcnow(),
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
         )
 
         # Auto task update
@@ -169,6 +172,10 @@ class TaskService:
         update_kwargs = {"status": new_status}
         if new_status == "done":
             update_kwargs["completed_at"] = datetime.utcnow()
+        if new_status in ("done", "cancelled"):
+            update_kwargs["reminder_at"] = None
+            update_kwargs["reminder_comment"] = None
+            update_kwargs["reminder_sent_at"] = None
 
         task = await self.task_repo.update(session, task.id, **update_kwargs)
 
@@ -205,7 +212,14 @@ class TaskService:
         if task.assignee_id == new_assignee_id:
             return task
 
-        task = await self.task_repo.update(session, task.id, assignee_id=new_assignee_id)
+        task = await self.task_repo.update(
+            session,
+            task.id,
+            assignee_id=new_assignee_id,
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
+        )
         await self.in_app_notifications.notify_task_assigned(
             session, task, member, assignee
         )

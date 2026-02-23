@@ -28,6 +28,12 @@ export class PermissionService {
     return task.assignee_id === member.id || task.created_by_id === member.id;
   }
 
+  static canManageTaskReminder(member: TeamMember, task: Task): boolean {
+    if (task.status === "done" || task.status === "cancelled") return false;
+    if (PermissionService.isModerator(member)) return true;
+    return task.assignee_id === member.id;
+  }
+
   static canDeleteTask(member: TeamMember): boolean {
     return PermissionService.isModerator(member);
   }

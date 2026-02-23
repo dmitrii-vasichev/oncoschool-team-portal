@@ -4,7 +4,10 @@ from app.db.models import Task, TeamMember
 class PermissionService:
     TASK_EDIT_BASE_FIELDS = {"status", "checklist", "title"}
     TASK_EDIT_AUTHOR_EXTRA_FIELDS = {"description", "priority", "deadline", "assignee_id"}
-    TASK_EDIT_MODERATOR_FIELDS = TASK_EDIT_BASE_FIELDS | TASK_EDIT_AUTHOR_EXTRA_FIELDS
+    TASK_EDIT_REMINDER_FIELDS = {"reminder_at", "reminder_comment"}
+    TASK_EDIT_MODERATOR_FIELDS = (
+        TASK_EDIT_BASE_FIELDS | TASK_EDIT_AUTHOR_EXTRA_FIELDS | TASK_EDIT_REMINDER_FIELDS
+    )
 
     @staticmethod
     def is_admin(member: TeamMember) -> bool:
@@ -44,6 +47,8 @@ class PermissionService:
         allowed_fields = set(PermissionService.TASK_EDIT_BASE_FIELDS)
         if task.created_by_id == member.id:
             allowed_fields |= PermissionService.TASK_EDIT_AUTHOR_EXTRA_FIELDS
+        if PermissionService.can_manage_task_reminder(member, task):
+            allowed_fields |= PermissionService.TASK_EDIT_REMINDER_FIELDS
         return allowed_fields
 
     @staticmethod
@@ -53,6 +58,14 @@ class PermissionService:
     @staticmethod
     def can_add_task_update(member: TeamMember, task: Task) -> bool:
         return "status" in PermissionService.allowed_task_edit_fields(member, task)
+
+    @staticmethod
+    def can_manage_task_reminder(member: TeamMember, task: Task) -> bool:
+        if task.status in ("done", "cancelled"):
+            return False
+        if PermissionService.is_moderator(member):
+            return True
+        return task.assignee_id == member.id
 
     @staticmethod
     def can_delete_task(member: TeamMember) -> bool:

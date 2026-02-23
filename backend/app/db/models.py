@@ -275,6 +275,9 @@ class Meeting(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        Index("idx_tasks_reminder_pending", "reminder_sent_at", "reminder_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -306,6 +309,9 @@ class Task(Base):
         String(20), default="text", server_default="text"
     )
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reminder_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reminder_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         server_default=func.now()

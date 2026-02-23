@@ -1,6 +1,6 @@
 import math
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel
@@ -32,6 +32,84 @@ class PaginatedTasksResponse(BaseModel):
     page: int
     per_page: int
     pages: int
+
+
+def _to_utc_naive(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _normalize_reminder_comment(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    normalized = raw_value.strip()
+    return normalized or None
+
+
+def _prepare_task_reminder_update(
+    *,
+    task: Task,
+    data: TaskEdit,
+    member: TeamMember,
+) -> dict:
+    payload = data.model_dump(exclude_unset=True)
+    has_reminder_at = "reminder_at" in payload
+    has_reminder_comment = "reminder_comment" in payload
+    if not has_reminder_at and not has_reminder_comment:
+        return {}
+
+    if not PermissionService.can_manage_task_reminder(member, task):
+        raise HTTPException(
+            status_code=403,
+            detail="Нет прав на настройку напоминания по этой задаче",
+        )
+
+    updates: dict = {}
+
+    if has_reminder_at:
+        reminder_at = payload.get("reminder_at")
+        if reminder_at is None:
+            updates["reminder_at"] = None
+            updates["reminder_comment"] = None
+            updates["reminder_sent_at"] = None
+            return updates
+
+        if task.assignee_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя установить напоминание для задачи без исполнителя",
+            )
+
+        reminder_at_utc = _to_utc_naive(reminder_at)
+        if reminder_at_utc <= datetime.utcnow() + timedelta(seconds=30):
+            raise HTTPException(
+                status_code=400,
+                detail="Время напоминания должно быть в будущем",
+            )
+        updates["reminder_at"] = reminder_at_utc
+        updates["reminder_sent_at"] = None
+
+        if has_reminder_comment:
+            updates["reminder_comment"] = _normalize_reminder_comment(
+                payload.get("reminder_comment")
+            )
+        return updates
+
+    if task.assignee_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Нельзя установить напоминание для задачи без исполнителя",
+        )
+    if task.reminder_at is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Сначала установите дату и время напоминания",
+        )
+    updates["reminder_comment"] = _normalize_reminder_comment(
+        payload.get("reminder_comment")
+    )
+    return updates
 
 
 @router.get("", response_model=PaginatedTasksResponse)
@@ -224,8 +302,18 @@ async def update_task(
                 session, task, member, data.status
             )
 
+        reminder_update_fields = _prepare_task_reminder_update(
+            task=task,
+            data=data,
+            member=member,
+        )
+
         # Handle other field updates
-        update_fields = data.model_dump(exclude_unset=True, exclude={"status"})
+        update_fields = data.model_dump(
+            exclude_unset=True,
+            exclude={"status", "reminder_at", "reminder_comment"},
+        )
+        update_fields.update(reminder_update_fields)
         if "title" in update_fields:
             new_title = (update_fields.get("title") or "").strip()
             if not new_title:
@@ -245,7 +333,14 @@ async def update_task(
                 old_assignee_id = task.assignee_id
                 from app.db.repositories import TaskRepository
                 task_repo = TaskRepository()
-                task = await task_repo.update(session, task.id, assignee_id=None)
+                task = await task_repo.update(
+                    session,
+                    task.id,
+                    assignee_id=None,
+                    reminder_at=None,
+                    reminder_comment=None,
+                    reminder_sent_at=None,
+                )
                 if old_assignee_id is not None:
                     await in_app_notification_service.notify_task_created_unassigned(
                         session, task, member

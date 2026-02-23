@@ -1,6 +1,6 @@
 import unittest
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -394,7 +394,147 @@ class TaskUpdatePermissionsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(response, updated_task)
         repo_update_mock.assert_awaited_once_with(
-            session, task.id, assignee_id=None
+            session,
+            task.id,
+            assignee_id=None,
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
         )
         notify_mock.assert_awaited_once_with(session, updated_task, member)
         session.commit.assert_awaited_once()
+
+    async def test_member_assignee_can_set_reminder(self) -> None:
+        member_id = uuid.uuid4()
+        task = SimpleNamespace(
+            id=uuid.uuid4(),
+            assignee_id=member_id,
+            created_by_id=uuid.uuid4(),
+            status="new",
+            assignee=None,
+            reminder_at=None,
+        )
+        updated_task = SimpleNamespace(id=task.id)
+        member = SimpleNamespace(id=member_id, role="member")
+        session = SimpleNamespace(commit=AsyncMock())
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(bot=None))
+        )
+        future_reminder = datetime.utcnow() + timedelta(hours=2)
+
+        with patch.object(
+            tasks_api.task_service,
+            "get_task_by_short_id",
+            AsyncMock(return_value=task),
+        ), patch.object(
+            tasks_api,
+            "can_access_task",
+            AsyncMock(return_value=True),
+        ), patch(
+            "app.db.repositories.TaskRepository.update",
+            AsyncMock(return_value=updated_task),
+        ) as repo_update_mock:
+            response = await tasks_api.update_task(
+                request=request,
+                short_id=101,
+                data=tasks_api.TaskEdit(
+                    reminder_at=future_reminder,
+                    reminder_comment="Проверить детали",
+                ),
+                member=member,
+                session=session,
+            )
+
+        self.assertIs(response, updated_task)
+        self.assertEqual(repo_update_mock.await_count, 1)
+        call_kwargs = repo_update_mock.await_args.kwargs
+        self.assertEqual(call_kwargs["reminder_comment"], "Проверить детали")
+        self.assertIsNone(call_kwargs["reminder_sent_at"])
+        self.assertIsInstance(call_kwargs["reminder_at"], datetime)
+        session.commit.assert_awaited_once()
+
+    async def test_member_author_cannot_set_reminder_if_not_assignee(self) -> None:
+        author_id = uuid.uuid4()
+        task = SimpleNamespace(
+            id=uuid.uuid4(),
+            assignee_id=uuid.uuid4(),
+            created_by_id=author_id,
+            status="new",
+            assignee=None,
+            reminder_at=None,
+        )
+        member = SimpleNamespace(id=author_id, role="member")
+        session = SimpleNamespace(commit=AsyncMock())
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(bot=None))
+        )
+
+        with patch.object(
+            tasks_api.task_service,
+            "get_task_by_short_id",
+            AsyncMock(return_value=task),
+        ), patch.object(
+            tasks_api,
+            "can_access_task",
+            AsyncMock(return_value=True),
+        ), patch(
+            "app.db.repositories.TaskRepository.update",
+            AsyncMock(),
+        ) as repo_update_mock:
+            with self.assertRaises(HTTPException) as ctx:
+                await tasks_api.update_task(
+                    request=request,
+                    short_id=101,
+                    data=tasks_api.TaskEdit(
+                        reminder_at=datetime.utcnow() + timedelta(hours=1)
+                    ),
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 403)
+        self.assertIn("reminder_at", str(ctx.exception.detail))
+        repo_update_mock.assert_not_awaited()
+        session.commit.assert_not_awaited()
+
+    async def test_member_cannot_set_reminder_comment_without_reminder_time(self) -> None:
+        member_id = uuid.uuid4()
+        task = SimpleNamespace(
+            id=uuid.uuid4(),
+            assignee_id=member_id,
+            created_by_id=uuid.uuid4(),
+            status="new",
+            assignee=None,
+            reminder_at=None,
+        )
+        member = SimpleNamespace(id=member_id, role="member")
+        session = SimpleNamespace(commit=AsyncMock())
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(bot=None))
+        )
+
+        with patch.object(
+            tasks_api.task_service,
+            "get_task_by_short_id",
+            AsyncMock(return_value=task),
+        ), patch.object(
+            tasks_api,
+            "can_access_task",
+            AsyncMock(return_value=True),
+        ), patch(
+            "app.db.repositories.TaskRepository.update",
+            AsyncMock(),
+        ) as repo_update_mock:
+            with self.assertRaises(HTTPException) as ctx:
+                await tasks_api.update_task(
+                    request=request,
+                    short_id=101,
+                    data=tasks_api.TaskEdit(reminder_comment="Комментарий"),
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("Сначала установите дату и время напоминания", str(ctx.exception.detail))
+        repo_update_mock.assert_not_awaited()
+        session.commit.assert_not_awaited()

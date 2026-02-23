@@ -102,6 +102,9 @@ export interface Task {
   meeting_id: string | null;
   source: TaskSource;
   deadline: string | null;
+  reminder_at: string | null;
+  reminder_comment: string | null;
+  reminder_sent_at: string | null;
   completed_at: string | null;
   created_at: string;
   updated_at: string;
@@ -461,6 +464,8 @@ export interface TaskEditRequest {
   priority?: TaskPriority;
   assignee_id?: string | null;
   deadline?: string | null;
+  reminder_at?: string | null;
+  reminder_comment?: string | null;
 }
 
 export interface TaskUpdateCreateRequest {

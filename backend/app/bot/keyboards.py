@@ -113,6 +113,7 @@ def task_actions_keyboard(task_id: int, is_moderator: bool) -> InlineKeyboardMar
             InlineKeyboardButton(text="📝 Апдейт", callback_data=f"task_update:{task_id}"),
         ],
         [
+            InlineKeyboardButton(text="⏰ Напоминание", callback_data=f"task_reminder:{task_id}"),
             InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"task_edit:{task_id}"),
         ],
     ]
