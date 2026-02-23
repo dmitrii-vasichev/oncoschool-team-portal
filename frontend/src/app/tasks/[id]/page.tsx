@@ -299,6 +299,7 @@ export default function TaskDetailPage() {
   const canManageReminder =
     !!user && PermissionService.canManageTaskReminder(user, task);
   const canSetReminderForCurrentTask = canManageReminder && !!task.assignee_id;
+  const hasReminder = Boolean(task.reminder_at);
   const overdue = isOverdue(task.deadline, task.status);
   const transitions = STATUS_TRANSITIONS[task.status] || [];
 
@@ -703,16 +704,26 @@ export default function TaskDetailPage() {
           {(canManageReminder || task.reminder_at) && (
             <Button
               type="button"
-              variant={isReminderExpanded ? "secondary" : "outline"}
+              variant="outline"
               size="sm"
-              className="h-6 rounded-full gap-1.5 px-2.5 text-xs font-medium leading-none self-center sm:ml-auto"
+              className={`group h-6 rounded-full gap-1.5 px-2.5 text-xs font-medium leading-none self-center sm:ml-auto ${
+                hasReminder
+                  ? "border-primary/45 bg-primary/12 text-primary hover:bg-primary/20 hover:text-primary"
+                  : "border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+              }`}
               onClick={() => setIsReminderExpanded((prev) => !prev)}
               aria-expanded={isReminderExpanded}
               aria-label="Показать настройки напоминания"
             >
               <Bell className="h-3.5 w-3.5" />
               <span>Напоминание</span>
-              <span className="hidden sm:inline text-2xs text-muted-foreground">
+              <span
+                className={`hidden sm:inline text-2xs transition-colors ${
+                  hasReminder
+                    ? "text-current opacity-80"
+                    : "text-muted-foreground group-hover:text-current"
+                }`}
+              >
                 {task.reminder_at
                   ? formatReminderCompactDateTime(task.reminder_at)
                   : "не задано"}
