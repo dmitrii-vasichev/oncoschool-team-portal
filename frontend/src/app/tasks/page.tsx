@@ -308,7 +308,7 @@ export default function TasksPage() {
       </div>
 
       {/* Mobile tabs */}
-      <div className="relative lg:hidden">
+      <div className="relative lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
         <div
           className="overflow-x-auto pb-1 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           data-no-transition
@@ -392,7 +392,9 @@ export default function TasksPage() {
 /* Column header shared by both mobile and desktop */
 function ColumnHeader({ status, count }: { status: TaskStatus; count: number }) {
   return (
-    <div className={`mb-3 rounded-xl p-1 ${COLUMN_BG[status]}`}>
+    <div
+      className={`sticky top-0 z-20 mb-3 rounded-xl p-1 bg-background/95 backdrop-blur-sm ${COLUMN_BG[status]}`}
+    >
       <div className="flex items-center justify-between rounded-lg bg-background/85 px-3 py-2 shadow-sm">
         <div className="flex items-center gap-2">
           <span className={`h-1.5 w-1.5 rounded-full ${COLUMN_DOT_COLORS[status]}`} />
@@ -411,9 +413,9 @@ function ColumnHeader({ status, count }: { status: TaskStatus; count: number }) 
 /* Mobile: static column without DnD */
 function StaticKanbanColumn({ status, tasks }: { status: TaskStatus; tasks: Task[] }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <ColumnHeader status={status} count={tasks.length} />
-      <div className="flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[calc(100vh-340px)] p-2 min-h-[80px]">
+      <div className="flex flex-col gap-2.5 p-2 min-h-[80px]">
         {tasks.length === 0 ? (
           <EmptyState variant="tasks" title="Нет задач" description="В этой колонке пока пусто" className="py-10" />
         ) : (
@@ -451,7 +453,7 @@ function KanbanColumn({
   onDrop: (e: React.DragEvent, status: TaskStatus) => void;
 }) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <ColumnHeader status={status} count={tasks.length} />
       <div
         onDragOver={onDragOver}
@@ -459,7 +461,7 @@ function KanbanColumn({
         onDragLeave={(e) => onDragLeave(e, status)}
         onDrop={(e) => onDrop(e, status)}
         className={`
-          flex-1 flex flex-col gap-2.5 overflow-y-auto max-h-[calc(100vh-340px)]
+          flex flex-col gap-2.5
           rounded-xl p-2 min-h-[80px] transition-colors duration-150
           ${isDragOver && draggedTaskId ? "bg-primary/5 ring-2 ring-primary/20 ring-inset" : ""}
         `}
