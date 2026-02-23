@@ -563,6 +563,87 @@ def _build_schedule_change_message_html(
     return "\n\n".join(sections)
 
 
+def _build_schedule_created_message_html(
+    *,
+    title: str,
+    next_occurrence_dt: datetime | None,
+    participants_mentions: str,
+) -> str:
+    safe_title = html.escape((title or "").strip() or "Встреча")
+    sections = [
+        "Внимание! ⚠️",
+        f"Создана новая встреча <b>{safe_title}</b>.",
+    ]
+
+    next_occurrence_label = _format_datetime_msk(next_occurrence_dt)
+    if next_occurrence_label:
+        sections.append(f"Дата/время: <b>{html.escape(next_occurrence_label)}</b>")
+    if participants_mentions:
+        sections.append(f"Участники: {participants_mentions}")
+
+    return "\n\n".join(sections)
+
+
+def _normalize_notification_participant_ids(
+    raw_participant_ids: list | None,
+) -> list[uuid.UUID]:
+    participant_ids: list[uuid.UUID] = []
+    for participant_id in raw_participant_ids or []:
+        if isinstance(participant_id, uuid.UUID):
+            participant_ids.append(participant_id)
+            continue
+        try:
+            participant_ids.append(uuid.UUID(str(participant_id)))
+        except (TypeError, ValueError):
+            continue
+    return participant_ids
+
+
+async def _notify_schedule_created(
+    request: Request,
+    session: AsyncSession,
+    *,
+    title: str,
+    next_occurrence_dt: datetime | None,
+    participant_ids: list[uuid.UUID],
+    telegram_targets: list | None,
+) -> None:
+    bot = getattr(request.app.state, "bot", None)
+    if not bot:
+        logger.warning("Telegram bot unavailable, skip schedule creation notification")
+        return
+
+    targets = _extract_unique_notification_targets(telegram_targets)
+    if not targets:
+        logger.info("No telegram targets configured for schedule creation notification")
+        return
+
+    participants_mentions = await _build_participants_mentions(session, participant_ids)
+    message_html = _build_schedule_created_message_html(
+        title=title,
+        next_occurrence_dt=next_occurrence_dt,
+        participants_mentions=participants_mentions,
+    )
+
+    for chat_id, thread_id in targets:
+        try:
+            kwargs = {
+                "chat_id": chat_id,
+                "text": message_html,
+                "parse_mode": "HTML",
+            }
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            await bot.send_message(**kwargs)
+        except Exception as e:
+            logger.warning(
+                "Failed to send schedule creation notification to chat %s thread %s: %s",
+                chat_id,
+                thread_id,
+                e,
+            )
+
+
 async def _notify_schedule_change(
     request: Request,
     session: AsyncSession,
@@ -593,15 +674,7 @@ async def _notify_schedule_change(
         if schedule is not None
         else list(previous_snapshot.get("participant_ids") or [])
     )
-    participant_ids: list[uuid.UUID] = []
-    for participant_id in participant_ids_raw:
-        if isinstance(participant_id, uuid.UUID):
-            participant_ids.append(participant_id)
-            continue
-        try:
-            participant_ids.append(uuid.UUID(str(participant_id)))
-        except (TypeError, ValueError):
-            continue
+    participant_ids = _normalize_notification_participant_ids(participant_ids_raw)
 
     participants_mentions = await _build_participants_mentions(session, participant_ids)
     message_html = _build_schedule_change_message_html(
@@ -907,6 +980,8 @@ async def create_schedule(
     session: AsyncSession = Depends(get_session),
 ):
     """Create a new meeting schedule (moderator only)."""
+    notify_participants = bool(data.notify_participants)
+
     if data.recurrence not in VALID_RECURRENCES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1069,7 +1144,36 @@ async def create_schedule(
     if schedule.recurrence != "on_demand":
         await _sync_next_scheduled_meeting(session, schedule, zoom_service)
 
+    notification_payload = None
+    if notify_participants:
+        notification_payload = {
+            "title": schedule.title,
+            "next_occurrence_dt": _calc_next_occurrence_datetime(schedule),
+            "participant_ids": _normalize_notification_participant_ids(
+                list(schedule.participant_ids or [])
+            ),
+            "telegram_targets": _copy_telegram_targets(schedule.telegram_targets),
+        }
+
     await session.commit()
+    if notify_participants and notification_payload:
+        try:
+            await _notify_schedule_created(
+                request,
+                session,
+                title=notification_payload["title"],
+                next_occurrence_dt=notification_payload["next_occurrence_dt"],
+                participant_ids=notification_payload["participant_ids"],
+                telegram_targets=notification_payload["telegram_targets"],
+            )
+        except Exception:
+            logger.warning(
+                "Unexpected error while notifying participants about schedule %s creation by %s",
+                schedule.id,
+                member.id,
+                exc_info=True,
+            )
+
     return _enrich_response(schedule)
 
 
