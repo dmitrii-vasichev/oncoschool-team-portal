@@ -57,6 +57,13 @@ docker compose up --build
 Backend: http://localhost:8000 (API docs: http://localhost:8000/docs)
 Frontend: http://localhost:3000
 
+## Документация
+
+- Карта документации: `docs/README.md`
+- Архив планов: `docs/plans/archive/`
+- Runbooks интеграций: `docs/runbooks/`
+- AI-гайды для интерфейсов: `docs/ai/`
+
 ## Учет изменений (Change Log)
 
 В проекте используется подход с change-фрагментами:
@@ -151,6 +158,11 @@ make change-build
 │   │   └── hooks/            # React-хуки
 │   ├── Dockerfile
 │   └── package.json
+├── docs/
+│   ├── README.md             # Карта документации
+│   ├── ai/                   # AI-гайды
+│   ├── runbooks/             # Операционные инструкции
+│   └── plans/archive/        # Исторические планы реализации
 ├── docker-compose.yml
 └── README.md
 ```

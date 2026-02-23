@@ -161,7 +161,7 @@ CREATE INDEX idx_meetings_zoom ON meetings(zoom_meeting_id);
 
 ```
 Прочитай PLAN.md и CLAUDE.md для контекста проекта. Затем прочитай этот план
-полностью (MEETINGS_OVERHAUL_PLAN.md).
+полностью (docs/plans/archive/MEETINGS_PLAN.md).
 
 === ФАЗА M1: Миграция БД + Zoom-сервис + Конфигурация ===
 
@@ -513,7 +513,7 @@ CREATE INDEX idx_meetings_zoom ON meetings(zoom_meeting_id);
 **Промпт для Claude Code:**
 
 ```
-Прочитай MEETINGS_OVERHAUL_PLAN.md, затем PLAN.md и CLAUDE.md.
+Прочитай docs/plans/archive/MEETINGS_PLAN.md, затем PLAN.md и CLAUDE.md.
 
 === ФАЗА M2: Расписание встреч — бэкенд ===
 
@@ -755,7 +755,7 @@ CREATE INDEX idx_meetings_zoom ON meetings(zoom_meeting_id);
 **Промпт для Claude Code:**
 
 ```
-Прочитай MEETINGS_OVERHAUL_PLAN.md.
+Прочитай docs/plans/archive/MEETINGS_PLAN.md.
 
 === ФАЗА M3: Переработка API встреч ===
 
@@ -854,11 +854,11 @@ CREATE INDEX idx_meetings_zoom ON meetings(zoom_meeting_id);
 **Промпт для Claude Code:**
 
 ```
-Прочитай MEETINGS_OVERHAUL_PLAN.md и .claude/frontend-design.md.
+Прочитай docs/plans/archive/MEETINGS_PLAN.md и docs/ai/frontend-design.md.
 
 === ФАЗА M4: Фронтенд — Расписание встреч ===
 
-ДИЗАЙН: Следуй гайдлайнам из .claude/frontend-design.md.
+ДИЗАЙН: Следуй гайдлайнам из docs/ai/frontend-design.md.
 Используй существующую дизайн-систему проекта (shadcn/ui, Tailwind, текущие цвета).
 
 1. ОБНОВИ frontend/src/lib/types.ts — добавь типы:
@@ -1056,7 +1056,7 @@ CREATE INDEX idx_meetings_zoom ON meetings(zoom_meeting_id);
 **Промпт для Claude Code:**
 
 ```
-Прочитай MEETINGS_OVERHAUL_PLAN.md и .claude/frontend-design.md.
+Прочитай docs/plans/archive/MEETINGS_PLAN.md и docs/ai/frontend-design.md.
 
 === ФАЗА M5: Карточка встречи ===
 
@@ -1215,7 +1215,7 @@ c) Нет summary, нет transcript:
 **Промпт для Claude Code:**
 
 ```
-Прочитай MEETINGS_OVERHAUL_PLAN.md.
+Прочитай docs/plans/archive/MEETINGS_PLAN.md.
 
 === ФАЗА M6: Интеграция и полировка ===
 

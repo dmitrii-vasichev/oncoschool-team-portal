@@ -503,7 +503,7 @@ UPDATE team_members SET role = 'admin' WHERE role = 'moderator';
 
 ```
 Прочитай CLAUDE.md и TEAM_PLAN.md для контекста.
-Прочитай .claude/frontend-design.md для дизайн-гайдлайнов.
+Прочитай docs/ai/frontend-design.md для дизайн-гайдлайнов.
 
 === ФАЗА T5: Frontend — Дерево команды + Карточки ===
 
