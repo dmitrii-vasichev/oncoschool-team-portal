@@ -1,0 +1,4 @@
+interface:
+  display_name: "Telegram Business Updates"
+  short_description: "Бизнес-анонсы для Telegram на русском"
+  default_prompt: "Преобразуй описание внедрённого функционала и изменений в готовое сообщение для бизнес-команды в Telegram на русском языке с HTML-тегами и акцентом на бизнес-ценность."

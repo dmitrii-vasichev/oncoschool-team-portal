@@ -389,7 +389,7 @@ def voice_task_confirm_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def voice_edit_fields_keyboard(*, is_moderator: bool) -> InlineKeyboardMarkup:
+def voice_edit_fields_keyboard(*, can_assign_to_others: bool) -> InlineKeyboardMarkup:
     """Клавиатура выбора поля для редактирования голосовой задачи."""
     rows = [
         [
@@ -397,7 +397,7 @@ def voice_edit_fields_keyboard(*, is_moderator: bool) -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="⚡ Приоритет", callback_data="voice_field:priority"),
         ],
     ]
-    if is_moderator:
+    if can_assign_to_others:
         rows.append([
             InlineKeyboardButton(text="👤 Исполнитель", callback_data="voice_field:assignee"),
             InlineKeyboardButton(text="📅 Дедлайн", callback_data="voice_field:deadline"),

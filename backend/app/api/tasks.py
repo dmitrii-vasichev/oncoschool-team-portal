@@ -234,7 +234,7 @@ async def create_task(
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Create a new task. If assignee != self, requires moderator role."""
+    """Create a new task."""
     try:
         task = await task_service.create_task(
             session,

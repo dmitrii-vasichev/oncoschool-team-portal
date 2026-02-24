@@ -10,7 +10,7 @@ export class PermissionService {
   }
 
   static canCreateTaskForOthers(member: TeamMember): boolean {
-    return PermissionService.isModerator(member);
+    return ["admin", "moderator", "member"].includes(member.role);
   }
 
   static canAssignTask(member: TeamMember, task?: Task): boolean {

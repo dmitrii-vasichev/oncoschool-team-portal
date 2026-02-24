@@ -17,6 +17,7 @@ class TaskPermissionServiceTests(unittest.TestCase):
         allowed = PermissionService.allowed_task_edit_fields(member, task)
 
         self.assertEqual(allowed, {"status", "checklist", "title", "reminder_at", "reminder_comment"})
+        self.assertTrue(PermissionService.can_create_task_for_others(member))
         self.assertTrue(PermissionService.can_edit_task(member, task))
         self.assertFalse(PermissionService.can_assign_task(member, task))
         self.assertTrue(PermissionService.can_change_task_status(member, task))
@@ -67,6 +68,7 @@ class TaskPermissionServiceTests(unittest.TestCase):
                 "reminder_comment",
             },
         )
+        self.assertTrue(PermissionService.can_create_task_for_others(member))
         self.assertTrue(PermissionService.can_edit_task(member, task))
         self.assertTrue(PermissionService.can_assign_task(member, task))
         self.assertTrue(PermissionService.can_change_task_status(member, task))
@@ -82,6 +84,7 @@ class TaskPermissionServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(PermissionService.allowed_task_edit_fields(member, task), set())
+        self.assertTrue(PermissionService.can_create_task_for_others(member))
         self.assertFalse(PermissionService.can_edit_task(member, task))
         self.assertFalse(PermissionService.can_assign_task(member, task))
         self.assertFalse(PermissionService.can_change_task_status(member, task))
@@ -97,3 +100,7 @@ class TaskPermissionServiceTests(unittest.TestCase):
         )
 
         self.assertFalse(PermissionService.can_manage_task_reminder(member, task))
+
+    def test_unknown_role_cannot_create_task_for_others(self) -> None:
+        guest = SimpleNamespace(id=uuid.uuid4(), role="guest")
+        self.assertFalse(PermissionService.can_create_task_for_others(guest))

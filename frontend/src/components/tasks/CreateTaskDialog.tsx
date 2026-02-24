@@ -87,12 +87,12 @@ export function CreateTaskDialog({
   onCreated: () => void;
 }) {
   const { toastSuccess, toastError } = useToast();
-  const isModerator = PermissionService.isModerator(currentUser);
+  const canAssignToOthers = PermissionService.canCreateTaskForOthers(currentUser);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [assigneeId, setAssigneeId] = useState<string>(
-    isModerator ? "" : currentUser.id
+    canAssignToOthers ? "" : currentUser.id
   );
   const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
@@ -102,7 +102,7 @@ export function CreateTaskDialog({
     setTitle("");
     setDescription("");
     setPriority("medium");
-    setAssigneeId(isModerator ? "" : currentUser.id);
+    setAssigneeId(canAssignToOthers ? "" : currentUser.id);
     setDeadline("");
     setError(null);
   }
@@ -227,7 +227,7 @@ export function CreateTaskDialog({
               />
             </div>
 
-            {isModerator && (
+            {canAssignToOthers && (
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Исполнитель</Label>
                 <Select

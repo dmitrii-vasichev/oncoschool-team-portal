@@ -24,7 +24,6 @@ from app.bot.callbacks import (
     TaskListScope,
     TaskRefreshListCallback,
 )
-from app.bot.filters import IsModeratorFilter
 from app.bot.keyboards import (
     TASK_FILTER_LABELS,
     task_actions_keyboard,
@@ -1330,11 +1329,15 @@ async def fsm_new_text(
         await state.clear()
 
 
-# ── /assign @username <текст> — Назначить задачу (МОДЕРАТОР) ──
+# ── /assign @username <текст> — Назначить задачу ──
 
 
-@router.message(Command("assign"), IsModeratorFilter())
+@router.message(Command("assign"))
 async def cmd_assign(message: Message, member: TeamMember, session_maker: async_sessionmaker, bot: Bot) -> None:
+    if not PermissionService.can_create_task_for_others(member):
+        await message.answer("⛔ У вас нет прав назначать задачи другим участникам")
+        return
+
     args = message.text.split(maxsplit=2)
     if len(args) < 3:
         await message.answer(
@@ -1391,7 +1394,10 @@ async def cmd_assign(message: Message, member: TeamMember, session_maker: async_
         f"#{task.short_id} · {task.title}\n"
         f"👤 Исполнитель: {assignee.full_name}\n"
         f"{prio} {task.priority}{deadline_str}",
-        reply_markup=task_actions_keyboard(task.short_id, True),
+        reply_markup=task_actions_keyboard(
+            task.short_id,
+            PermissionService.is_moderator(member),
+        ),
     )
 
 

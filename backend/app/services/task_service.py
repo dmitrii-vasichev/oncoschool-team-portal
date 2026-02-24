@@ -35,11 +35,11 @@ class TaskService:
     ) -> Task:
         """
         Create a task.
-        Member can only create for self. Moderator can assign to others.
+        Active project roles can assign tasks to other participants.
         """
         if assignee_id and assignee_id != creator.id:
             if not PermissionService.can_create_task_for_others(creator):
-                raise PermissionError("Только модератор может назначать задачи другим")
+                raise PermissionError("Нет прав на назначение задачи другому участнику")
 
         # Default assignee is creator
         if not assignee_id:

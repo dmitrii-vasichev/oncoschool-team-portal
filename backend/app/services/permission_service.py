@@ -18,11 +18,11 @@ class PermissionService:
         """admin is also a moderator — all existing checks keep working."""
         return member.role in ("admin", "moderator")
 
-    # ── Task permissions (moderator+) ──
+    # ── Task permissions ──
 
     @staticmethod
     def can_create_task_for_others(member: TeamMember) -> bool:
-        return PermissionService.is_moderator(member)
+        return member.role in ("admin", "moderator", "member")
 
     @staticmethod
     def can_assign_task(member: TeamMember, task: Task | None = None) -> bool:

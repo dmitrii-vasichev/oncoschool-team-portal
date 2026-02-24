@@ -18,6 +18,7 @@ COMMON_PRIVATE_COMMANDS: list[BotCommand] = [
     BotCommand(command="tasks", description="Мои задачи"),
     BotCommand(command="all", description="Задачи отдела / компании"),
     BotCommand(command="new", description="Создать задачу: /new <текст>"),
+    BotCommand(command="assign", description="Назначить задачу: /assign @user <текст>"),
     BotCommand(command="edit", description="Редактировать задачу: /edit <id>"),
     BotCommand(command="done", description="Завершить задачу: /done <id>"),
     BotCommand(command="status", description="Статус задачи: /status <id> <статус>"),
@@ -30,7 +31,6 @@ COMMON_PRIVATE_COMMANDS: list[BotCommand] = [
 ]
 
 MODERATOR_EXTRA_COMMANDS: list[BotCommand] = [
-    BotCommand(command="assign", description="Назначить задачу: /assign @user <текст>"),
     BotCommand(command="meetings", description="Список встреч"),
     BotCommand(command="stats", description="Статистика команды"),
     BotCommand(command="subscribe", description="Подписки на уведомления"),

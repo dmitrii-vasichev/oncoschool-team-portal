@@ -140,13 +140,17 @@ async def handle_voice(
     await progress_msg.edit_text(f"📝 Распознано: «{text}»\n\n⏳ Извлекаю задачу...")
 
     # Step 3: AI parse task from text
-    is_moderator = PermissionService.is_moderator(member)
+    can_assign_to_others = PermissionService.can_create_task_for_others(member)
 
     try:
         async with session_maker() as session:
             team_members = await member_repo.get_all_active(session)
             parsed = await ai_service.parse_task_from_text(
-                session, text, member.full_name, is_moderator, team_members,
+                session,
+                text,
+                member.full_name,
+                can_assign_to_others,
+                team_members,
             )
     except Exception as e:
         logger.error(f"AI parse voice task error: {e}")
@@ -167,7 +171,7 @@ async def handle_voice(
     assignee_id = None
     assignee_display_name = None
 
-    if is_moderator and parsed.assignee_name:
+    if can_assign_to_others and parsed.assignee_name:
         # Try to find in team members
         async with session_maker() as session:
             team_members = await member_repo.get_all_active(session)
@@ -176,7 +180,7 @@ async def handle_voice(
             assignee_id = str(matched.id)
             assignee_display_name = matched.full_name
 
-    # Member: always self; Moderator with no match: also self
+    # No match or no assignment right: keep assignee as author.
     if not assignee_id:
         assignee_id = str(member.id)
         assignee_display_name = member.full_name
@@ -286,7 +290,7 @@ async def cb_voice_edit(
     await callback.answer()
     await callback.message.edit_reply_markup(
         reply_markup=voice_edit_fields_keyboard(
-            is_moderator=PermissionService.is_moderator(member),
+            can_assign_to_others=PermissionService.can_create_task_for_others(member),
         )
     )
 
@@ -301,8 +305,8 @@ async def cb_voice_select_field(
     field = callback.data.split(":")[1]
 
     if field == "assignee":
-        if not PermissionService.is_moderator(member):
-            await callback.answer("⛔ Только модератор может менять исполнителя", show_alert=True)
+        if not PermissionService.can_create_task_for_others(member):
+            await callback.answer("⛔ У вас нет прав менять исполнителя", show_alert=True)
             return
 
         async with session_maker() as session:
@@ -346,8 +350,8 @@ async def cb_voice_select_assignee(
     state: FSMContext,
     session_maker: async_sessionmaker,
 ) -> None:
-    if not PermissionService.is_moderator(member):
-        await callback.answer("⛔ Только модератор может менять исполнителя", show_alert=True)
+    if not PermissionService.can_create_task_for_others(member):
+        await callback.answer("⛔ У вас нет прав менять исполнителя", show_alert=True)
         return
 
     assignee_id_raw = callback.data.split(":")[1]
@@ -388,7 +392,7 @@ async def cb_voice_back_fields(
     await callback.answer()
     await callback.message.edit_reply_markup(
         reply_markup=voice_edit_fields_keyboard(
-            is_moderator=PermissionService.is_moderator(member),
+            can_assign_to_others=PermissionService.can_create_task_for_others(member),
         )
     )
 
