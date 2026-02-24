@@ -8,11 +8,11 @@ from app.db.models import Meeting, MeetingParticipant
 from app.services.meeting_scheduler_service import MeetingSchedulerService
 
 
-def _build_scheduler() -> MeetingSchedulerService:
+def _build_scheduler(zoom_service=None) -> MeetingSchedulerService:
     return MeetingSchedulerService(
         bot=SimpleNamespace(send_message=AsyncMock()),
         session_maker=SimpleNamespace(),
-        zoom_service=None,
+        zoom_service=zoom_service,
     )
 
 
@@ -107,6 +107,76 @@ class MeetingSchedulerNextSlotVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(obj.meeting_id == meetings[0].id for obj in participants))
         self.assertEqual({obj.member_id for obj in participants}, {participant_one, participant_two})
 
+    async def test_ensure_next_occurrence_visible_creates_zoom_for_new_slot(self) -> None:
+        zoom_service = SimpleNamespace(
+            create_meeting=AsyncMock(
+                return_value={
+                    "id": "123456789",
+                    "join_url": "https://zoom.us/s/123456789?zak=host-token&pwd=abc",
+                }
+            )
+        )
+        scheduler = _build_scheduler(zoom_service=zoom_service)
+        now_utc = datetime(2026, 2, 23, 16, 1, tzinfo=timezone.utc)
+        schedule = SimpleNamespace(
+            id=uuid.uuid4(),
+            title="Планерка по контенту",
+            recurrence="weekly",
+            timezone="UTC",
+            day_of_week=1,
+            time_utc=time(15, 0),
+            duration_minutes=60,
+            one_time_date=None,
+            next_occurrence_at=None,
+            next_occurrence_time_override=None,
+            next_occurrence_skip=False,
+            last_triggered_date=date(2026, 2, 23),
+            participant_ids=[],
+            created_by_id=uuid.uuid4(),
+            is_active=True,
+            zoom_enabled=True,
+        )
+
+        added_objects: list[object] = []
+
+        def add_object(obj: object) -> None:
+            added_objects.append(obj)
+
+        async def flush_once() -> None:
+            for obj in added_objects:
+                if isinstance(obj, Meeting) and obj.id is None:
+                    obj.id = uuid.uuid4()
+
+        session = SimpleNamespace(
+            add=add_object,
+            flush=AsyncMock(side_effect=flush_once),
+        )
+
+        with (
+            patch.object(
+                scheduler,
+                "_has_scheduled_upcoming_occurrence",
+                AsyncMock(return_value=False),
+            ),
+            patch.object(
+                scheduler,
+                "_meeting_exists_for_occurrence",
+                AsyncMock(return_value=False),
+            ),
+        ):
+            created = await scheduler._ensure_next_occurrence_visible(
+                session,
+                schedule,
+                now_utc,
+            )
+
+        self.assertTrue(created)
+        meetings = [obj for obj in added_objects if isinstance(obj, Meeting)]
+        self.assertEqual(len(meetings), 1)
+        self.assertEqual(meetings[0].zoom_meeting_id, "123456789")
+        self.assertEqual(meetings[0].zoom_join_url, "https://zoom.us/j/123456789?pwd=abc")
+        zoom_service.create_meeting.assert_awaited_once()
+
     async def test_ensure_next_occurrence_visible_skips_when_upcoming_exists(self) -> None:
         scheduler = _build_scheduler()
         now_utc = datetime(2026, 2, 23, 16, 1, tzinfo=timezone.utc)
@@ -158,6 +228,118 @@ class MeetingSchedulerNextSlotVisibilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(added_objects, [])
         session.flush.assert_not_awaited()
         meeting_exists_mock.assert_not_awaited()
+
+    async def test_ensure_next_occurrence_visible_backfills_zoom_for_existing_upcoming(self) -> None:
+        zoom_service = SimpleNamespace(
+            create_meeting=AsyncMock(
+                return_value={
+                    "id": "789456123",
+                    "join_url": "https://zoom.us/j/789456123?pwd=token",
+                }
+            )
+        )
+        scheduler = _build_scheduler(zoom_service=zoom_service)
+        now_utc = datetime(2026, 2, 23, 16, 1, tzinfo=timezone.utc)
+        schedule = SimpleNamespace(
+            id=uuid.uuid4(),
+            title="Планерка по контенту",
+            recurrence="weekly",
+            timezone="UTC",
+            day_of_week=1,
+            time_utc=time(15, 0),
+            duration_minutes=60,
+            one_time_date=None,
+            next_occurrence_at=None,
+            next_occurrence_time_override=None,
+            next_occurrence_skip=False,
+            last_triggered_date=date(2026, 2, 23),
+            participant_ids=[],
+            created_by_id=uuid.uuid4(),
+            is_active=True,
+            zoom_enabled=True,
+        )
+        existing_meeting = SimpleNamespace(
+            id=uuid.uuid4(),
+            meeting_date=datetime(2026, 3, 2, 15, 0),
+            zoom_meeting_id=None,
+            zoom_join_url=None,
+        )
+        session = SimpleNamespace()
+
+        with (
+            patch.object(
+                scheduler,
+                "_has_scheduled_upcoming_occurrence",
+                AsyncMock(return_value=True),
+            ),
+            patch.object(
+                scheduler,
+                "_find_next_scheduled_upcoming_occurrence",
+                AsyncMock(return_value=existing_meeting),
+            ),
+        ):
+            changed = await scheduler._ensure_next_occurrence_visible(
+                session,
+                schedule,
+                now_utc,
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(existing_meeting.zoom_meeting_id, "789456123")
+        self.assertEqual(existing_meeting.zoom_join_url, "https://zoom.us/j/789456123?pwd=token")
+        zoom_service.create_meeting.assert_awaited_once()
+
+    async def test_ensure_next_occurrence_visible_backfills_join_url_from_zoom_id(self) -> None:
+        zoom_service = SimpleNamespace(create_meeting=AsyncMock())
+        scheduler = _build_scheduler(zoom_service=zoom_service)
+        now_utc = datetime(2026, 2, 23, 16, 1, tzinfo=timezone.utc)
+        schedule = SimpleNamespace(
+            id=uuid.uuid4(),
+            title="Планерка по контенту",
+            recurrence="weekly",
+            timezone="UTC",
+            day_of_week=1,
+            time_utc=time(15, 0),
+            duration_minutes=60,
+            one_time_date=None,
+            next_occurrence_at=None,
+            next_occurrence_time_override=None,
+            next_occurrence_skip=False,
+            last_triggered_date=date(2026, 2, 23),
+            participant_ids=[],
+            created_by_id=uuid.uuid4(),
+            is_active=True,
+            zoom_enabled=True,
+        )
+        existing_meeting = SimpleNamespace(
+            id=uuid.uuid4(),
+            meeting_date=datetime(2026, 3, 2, 15, 0),
+            zoom_meeting_id="987654321",
+            zoom_join_url=None,
+        )
+        session = SimpleNamespace()
+
+        with (
+            patch.object(
+                scheduler,
+                "_has_scheduled_upcoming_occurrence",
+                AsyncMock(return_value=True),
+            ),
+            patch.object(
+                scheduler,
+                "_find_next_scheduled_upcoming_occurrence",
+                AsyncMock(return_value=existing_meeting),
+            ),
+        ):
+            changed = await scheduler._ensure_next_occurrence_visible(
+                session,
+                schedule,
+                now_utc,
+            )
+
+        self.assertTrue(changed)
+        self.assertEqual(existing_meeting.zoom_join_url, "https://zoom.us/j/987654321")
+        zoom_service.create_meeting.assert_not_awaited()
 
     async def test_ensure_next_occurrence_visible_reconciles_stale_on_demand_slot(self) -> None:
         scheduler = _build_scheduler()

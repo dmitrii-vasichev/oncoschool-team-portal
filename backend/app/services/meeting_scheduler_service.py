@@ -356,28 +356,43 @@ class MeetingSchedulerService:
 
         return None
 
-    @staticmethod
+    @classmethod
     async def _has_scheduled_upcoming_occurrence(
+        cls,
         session,
         schedule_id: uuid.UUID,
         now_utc_naive: datetime,
     ) -> bool:
+        upcoming = await cls._find_next_scheduled_upcoming_occurrence(
+            session,
+            schedule_id,
+            now_utc_naive,
+        )
+        return upcoming is not None
+
+    @staticmethod
+    async def _find_next_scheduled_upcoming_occurrence(
+        session,
+        schedule_id: uuid.UUID,
+        now_utc_naive: datetime,
+    ) -> Meeting | None:
         end_time = Meeting.meeting_date + cast(
             func.concat(Meeting.duration_minutes, " minutes"),
             INTERVAL,
         )
         stmt = (
-            select(Meeting.id)
+            select(Meeting)
             .where(
                 Meeting.schedule_id == schedule_id,
                 Meeting.status == "scheduled",
                 Meeting.meeting_date.is_not(None),
                 end_time > now_utc_naive,
             )
+            .order_by(Meeting.meeting_date.asc(), Meeting.created_at.asc())
             .limit(1)
         )
         result = await session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        return result.scalars().first()
 
     @staticmethod
     async def _has_on_demand_template_meeting(
@@ -438,6 +453,71 @@ class MeetingSchedulerService:
 
         return changed
 
+    async def _ensure_visible_occurrence_zoom_metadata(
+        self,
+        schedule: MeetingSchedule,
+        meeting: Meeting,
+    ) -> bool:
+        if not getattr(schedule, "zoom_enabled", False):
+            return False
+
+        safe_join_url = self._resolve_zoom_join_url(
+            meeting.zoom_join_url,
+            meeting.zoom_meeting_id,
+        )
+        if safe_join_url and safe_join_url != meeting.zoom_join_url:
+            meeting.zoom_join_url = safe_join_url
+            logger.info(
+                "Backfilled Zoom join URL for schedule %s at %s",
+                schedule.id,
+                meeting.meeting_date,
+            )
+            return True
+
+        if meeting.zoom_meeting_id:
+            return False
+        if not meeting.meeting_date:
+            return False
+        if not self.zoom_service:
+            return False
+
+        meeting_date_utc = self._to_utc_aware(meeting.meeting_date)
+        try:
+            zoom_data = await self._create_zoom_meeting_with_retry(
+                schedule,
+                meeting_date_utc,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Failed to pre-create Zoom for schedule %s at %s: %s",
+                schedule.id,
+                meeting.meeting_date,
+                exc,
+            )
+            return False
+
+        zoom_meeting_id = str(zoom_data["id"]) if zoom_data and zoom_data.get("id") else None
+        zoom_join_url = self._resolve_zoom_join_url(
+            (zoom_data or {}).get("join_url"),
+            zoom_meeting_id,
+        )
+
+        changed = False
+        if zoom_meeting_id and meeting.zoom_meeting_id != zoom_meeting_id:
+            meeting.zoom_meeting_id = zoom_meeting_id
+            changed = True
+        if zoom_join_url and meeting.zoom_join_url != zoom_join_url:
+            meeting.zoom_join_url = zoom_join_url
+            changed = True
+
+        if changed:
+            logger.info(
+                "Pre-created Zoom metadata for schedule %s at %s",
+                schedule.id,
+                meeting.meeting_date,
+            )
+        return changed
+
     async def _ensure_next_occurrence_visible(
         self,
         session,
@@ -460,7 +540,19 @@ class MeetingSchedulerService:
             now_utc_naive,
         )
         if has_upcoming:
-            return False
+            if not getattr(schedule, "zoom_enabled", False):
+                return False
+            upcoming_meeting = await self._find_next_scheduled_upcoming_occurrence(
+                session,
+                schedule.id,
+                now_utc_naive,
+            )
+            if not upcoming_meeting:
+                return False
+            return await self._ensure_visible_occurrence_zoom_metadata(
+                schedule,
+                upcoming_meeting,
+            )
 
         next_occurrence_dt = self._calc_next_occurrence_datetime(schedule, now_utc)
         if not next_occurrence_dt:
@@ -477,12 +569,37 @@ class MeetingSchedulerService:
         if already_exists:
             return False
 
+        zoom_meeting_id = None
+        zoom_join_url = None
+        if getattr(schedule, "zoom_enabled", False) and self.zoom_service:
+            try:
+                zoom_data = await self._create_zoom_meeting_with_retry(
+                    schedule,
+                    next_occurrence_dt,
+                )
+                zoom_meeting_id = (
+                    str(zoom_data["id"]) if zoom_data and zoom_data.get("id") else None
+                )
+                zoom_join_url = self._resolve_zoom_join_url(
+                    (zoom_data or {}).get("join_url"),
+                    zoom_meeting_id,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to pre-create Zoom while creating upcoming slot for schedule %s at %s: %s",
+                    schedule.id,
+                    meeting_date_naive,
+                    exc,
+                )
+
         meeting = Meeting(
             title=schedule.title,
             meeting_date=meeting_date_naive,
             schedule_id=schedule.id,
             status="scheduled",
             duration_minutes=schedule.duration_minutes,
+            zoom_meeting_id=zoom_meeting_id,
+            zoom_join_url=zoom_join_url,
             created_by_id=schedule.created_by_id,
         )
         session.add(meeting)
