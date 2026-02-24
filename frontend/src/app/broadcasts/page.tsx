@@ -351,6 +351,7 @@ export default function BroadcastsPage() {
   const [participantGroupMode, setParticipantGroupMode] = useState<ParticipantGroupMode>("department");
   const [expandedParticipantGroups, setExpandedParticipantGroups] = useState<Record<string, boolean>>({});
   const [participantsPanelExpanded, setParticipantsPanelExpanded] = useState(false);
+  const [presetLibraryExpanded, setPresetLibraryExpanded] = useState(false);
   const [participantQuery, setParticipantQuery] = useState("");
   const [messageHtml, setMessageHtml] = useState("");
   const [imageMode, setImageMode] = useState<ImageMode>("none");
@@ -884,6 +885,7 @@ export default function BroadcastsPage() {
     }
     if (mode !== "preset") {
       setSelectedPresetId(null);
+      setPresetLibraryExpanded(false);
     }
   };
 
@@ -1708,9 +1710,6 @@ export default function BroadcastsPage() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-sm font-medium">{preset.alias}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Порядок: {preset.sort_order}
-                                  </p>
                                 </div>
                                 {isSelected && <Check className="h-4 w-4 text-primary" />}
                               </button>
@@ -1724,143 +1723,163 @@ export default function BroadcastsPage() {
 
                 {imageMode === "preset" && (
                   <div className="rounded-xl border border-border/60 bg-background p-3 space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <button
+                      type="button"
+                      onClick={() => setPresetLibraryExpanded((prev) => !prev)}
+                      className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-muted/15 px-3 py-2 text-left hover:bg-muted/30"
+                    >
+                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Библиотека картинок по умолчанию
-                      </p>
-                      <Badge variant="outline" className="rounded-md">
-                        {imagePresets.length}
-                      </Badge>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
-                      <Input
-                        value={presetAlias}
-                        onChange={(e) => setPresetAlias(e.target.value)}
-                        placeholder="Алиас, например: Новость-баннер"
-                      />
-                      <Input
-                        type="number"
-                        value={presetSortOrder}
-                        onChange={(e) => setPresetSortOrder(e.target.value)}
-                        placeholder="Порядок"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-lg"
-                        onClick={() => presetImageInputRef.current?.click()}
-                      >
-                        <ImagePlus className="mr-2 h-4 w-4" />
-                        Файл
-                      </Button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {presetImageFile ? (
-                        <span className="text-xs text-muted-foreground">
-                          {presetImageFile.name} · {formatFileSize(presetImageFile.size)}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Форматы: JPG, PNG, WEBP. Максимум: 10 МБ.
-                        </span>
-                      )}
-
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleCreatePreset}
-                        disabled={savingPreset}
-                      >
-                        {savingPreset ? (
-                          <>
-                            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                            Сохранение...
-                          </>
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="rounded-md">
+                          {imagePresets.length}
+                        </Badge>
+                        {presetLibraryExpanded ? "Свернуть" : "Развернуть"}
+                        {presetLibraryExpanded ? (
+                          <ChevronDown className="h-4 w-4 shrink-0" />
                         ) : (
-                          "Добавить в библиотеку"
+                          <ChevronRight className="h-4 w-4 shrink-0" />
                         )}
-                      </Button>
-                    </div>
+                      </span>
+                    </button>
 
-                    {imagePresets.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Пока нет сохраненных картинок.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {imagePresets.map((preset) => {
-                          const isSelected = selectedPresetId === preset.id;
-                          const busy = updatingPresetId === preset.id || deletingPresetId === preset.id;
-                          return (
-                            <div
-                              key={preset.id}
-                              className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 ${
-                                isSelected ? "border-primary/40 bg-primary/5" : "border-border/60"
-                              }`}
-                            >
-                              <div className="relative h-10 w-14 overflow-hidden rounded-md border border-border/60 bg-muted/20">
-                                <Image
-                                  src={preset.preview_url}
-                                  alt={preset.alias}
-                                  fill
-                                  unoptimized
-                                  className="object-cover"
-                                />
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">{preset.alias}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {preset.is_active ? "Активен" : "Отключен"} · порядок {preset.sort_order}
-                                </p>
-                              </div>
-                              {preset.is_active && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="rounded-md"
-                                  onClick={() => selectPreset(preset.id)}
-                                  disabled={busy}
+                    {presetLibraryExpanded ? (
+                      <>
+                        <div className="grid gap-2 sm:grid-cols-[1fr_120px_auto]">
+                          <Input
+                            value={presetAlias}
+                            onChange={(e) => setPresetAlias(e.target.value)}
+                            placeholder="Алиас, например: Новость-баннер"
+                          />
+                          <Input
+                            type="number"
+                            value={presetSortOrder}
+                            onChange={(e) => setPresetSortOrder(e.target.value)}
+                            placeholder="Порядок"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="rounded-lg"
+                            onClick={() => presetImageInputRef.current?.click()}
+                          >
+                            <ImagePlus className="mr-2 h-4 w-4" />
+                            Файл
+                          </Button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {presetImageFile ? (
+                            <span className="text-xs text-muted-foreground">
+                              {presetImageFile.name} · {formatFileSize(presetImageFile.size)}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Форматы: JPG, PNG, WEBP. Максимум: 10 МБ.
+                            </span>
+                          )}
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCreatePreset}
+                            disabled={savingPreset}
+                          >
+                            {savingPreset ? (
+                              <>
+                                <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                                Сохранение...
+                              </>
+                            ) : (
+                              "Добавить в библиотеку"
+                            )}
+                          </Button>
+                        </div>
+
+                        {imagePresets.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Пока нет сохраненных картинок.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {imagePresets.map((preset) => {
+                              const isSelected = selectedPresetId === preset.id;
+                              const busy = updatingPresetId === preset.id || deletingPresetId === preset.id;
+                              return (
+                                <div
+                                  key={preset.id}
+                                  className={`flex flex-wrap items-center gap-2 rounded-lg border p-2 ${
+                                    isSelected ? "border-primary/40 bg-primary/5" : "border-border/60"
+                                  }`}
                                 >
-                                  Выбрать
-                                </Button>
-                              )}
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant={preset.is_active ? "secondary" : "outline"}
-                                className="rounded-md"
-                                onClick={() => handleTogglePresetActive(preset, !preset.is_active)}
-                                disabled={busy}
-                              >
-                                {updatingPresetId === preset.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : preset.is_active ? (
-                                  "Выключить"
-                                ) : (
-                                  "Включить"
-                                )}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="rounded-md text-destructive hover:text-destructive"
-                                onClick={() => handleDeletePreset(preset)}
-                                disabled={busy}
-                              >
-                                {deletingPresetId === preset.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                )}
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                                  <div className="relative h-10 w-14 overflow-hidden rounded-md border border-border/60 bg-muted/20">
+                                    <Image
+                                      src={preset.preview_url}
+                                      alt={preset.alias}
+                                      fill
+                                      unoptimized
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{preset.alias}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {preset.is_active ? "Активен" : "Отключен"} · порядок {preset.sort_order}
+                                    </p>
+                                  </div>
+                                  {preset.is_active && (
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="rounded-md"
+                                      onClick={() => selectPreset(preset.id)}
+                                      disabled={busy}
+                                    >
+                                      Выбрать
+                                    </Button>
+                                  )}
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={preset.is_active ? "secondary" : "outline"}
+                                    className="rounded-md"
+                                    onClick={() => handleTogglePresetActive(preset, !preset.is_active)}
+                                    disabled={busy}
+                                  >
+                                    {updatingPresetId === preset.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : preset.is_active ? (
+                                      "Выключить"
+                                    ) : (
+                                      "Включить"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="rounded-md text-destructive hover:text-destructive"
+                                    onClick={() => handleDeletePreset(preset)}
+                                    disabled={busy}
+                                  >
+                                    {deletingPresetId === preset.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Блок свернут. Разверните его, чтобы управлять библиотекой картинок.
+                      </p>
                     )}
                   </div>
                 )}
