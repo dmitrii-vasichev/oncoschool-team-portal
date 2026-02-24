@@ -35,11 +35,16 @@ from app.db.repositories import (
 )
 from app.db.schemas import (
     AIProviderUpdate,
-    NotificationSubscriptionResponse,
     ReminderSettingsResponse,
     ReminderSettingsUpdate,
 )
 from app.services.ai_service import AIService
+from app.services.reminder_service import (
+    ALLOWED_TASK_OVERDUE_INTERVAL_HOURS,
+    DEFAULT_TASK_OVERDUE_INTERVAL_HOURS,
+    TASK_OVERDUE_NOTIFICATIONS_KEY,
+    ReminderService,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 sub_repo = NotificationSubscriptionRepository()
@@ -151,6 +156,10 @@ def _get_meeting_scheduler(request: Request):
     return scheduler
 
 
+def _get_reminder_service(request: Request):
+    return getattr(request.app.state, "reminder_service", None)
+
+
 # ── Notification Subscriptions ──
 
 EVENT_TYPES = [
@@ -165,10 +174,12 @@ EVENT_TYPES = [
 
 class SubscriptionsResponse(BaseModel):
     subscriptions: dict[str, bool]
+    task_overdue_interval_hours: int = DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
 
 
 class SubscriptionsUpdate(BaseModel):
     subscriptions: dict[str, bool]
+    task_overdue_interval_hours: int | None = None
 
 
 @router.get("/notifications", response_model=SubscriptionsResponse)
@@ -181,11 +192,19 @@ async def get_notifications(
     subs_map = {s.event_type: s.is_active for s in subs}
     # Fill in missing event types as False
     result = {et: subs_map.get(et, False) for et in EVENT_TYPES}
-    return SubscriptionsResponse(subscriptions=result)
+    interval_setting = await app_settings_repo.get(session, TASK_OVERDUE_NOTIFICATIONS_KEY)
+    interval_hours = ReminderService.interval_from_app_settings(
+        interval_setting.value if interval_setting else None
+    )
+    return SubscriptionsResponse(
+        subscriptions=result,
+        task_overdue_interval_hours=interval_hours,
+    )
 
 
 @router.put("/notifications", response_model=SubscriptionsResponse)
 async def update_notifications(
+    request: Request,
     data: SubscriptionsUpdate,
     member: TeamMember = Depends(require_moderator),
     session: AsyncSession = Depends(get_session),
@@ -197,13 +216,48 @@ async def update_notifications(
                 status_code=400, detail=f"Неизвестный тип события: {event_type}"
             )
         await sub_repo.upsert(session, member.id, event_type, is_active)
+
+    interval_hours: int | None = None
+    if data.task_overdue_interval_hours is not None:
+        interval_hours = ReminderService.normalize_task_overdue_interval_hours(
+            data.task_overdue_interval_hours
+        )
+        if interval_hours != data.task_overdue_interval_hours:
+            allowed = ", ".join(
+                str(value) for value in sorted(ALLOWED_TASK_OVERDUE_INTERVAL_HOURS)
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"Периодичность просроченных задач должна быть одной из: {allowed} часов.",
+            )
+
+        await app_settings_repo.set(
+            session,
+            TASK_OVERDUE_NOTIFICATIONS_KEY,
+            {"interval_hours": interval_hours},
+            updated_by_id=member.id,
+        )
+
     await session.commit()
+
+    if interval_hours is not None:
+        reminder_service = _get_reminder_service(request)
+        if reminder_service is not None:
+            reminder_service.set_task_overdue_interval_hours(interval_hours)
+    else:
+        interval_setting = await app_settings_repo.get(session, TASK_OVERDUE_NOTIFICATIONS_KEY)
+        interval_hours = ReminderService.interval_from_app_settings(
+            interval_setting.value if interval_setting else None
+        )
 
     # Return updated state
     subs = await sub_repo.get_by_member(session, member.id)
     subs_map = {s.event_type: s.is_active for s in subs}
     result = {et: subs_map.get(et, False) for et in EVENT_TYPES}
-    return SubscriptionsResponse(subscriptions=result)
+    return SubscriptionsResponse(
+        subscriptions=result,
+        task_overdue_interval_hours=interval_hours,
+    )
 
 
 # ── Reminder Settings ──

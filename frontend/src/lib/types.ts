@@ -332,6 +332,11 @@ export interface InAppNotificationListResponse {
   unread_count: number;
 }
 
+export interface NotificationSubscriptionsSettings {
+  subscriptions: Record<string, boolean>;
+  task_overdue_interval_hours: number;
+}
+
 export interface ReminderSettings {
   id: string;
   member_id: string;

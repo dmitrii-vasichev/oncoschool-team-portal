@@ -729,11 +729,18 @@ const EVENT_TYPES: Record<string, EventConfig> = {
   },
 };
 
+const TASK_OVERDUE_INTERVAL_OPTIONS = [
+  { value: "1", label: "Каждый час" },
+  { value: "12", label: "Каждые 12 часов" },
+  { value: "24", label: "Каждые 24 часа" },
+] as const;
+
 function NotificationsSection() {
   const { toastSuccess, toastError } = useToast();
   const [subscriptions, setSubscriptions] = useState<Record<string, boolean>>(
     {}
   );
+  const [taskOverdueIntervalHours, setTaskOverdueIntervalHours] = useState("1");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -741,7 +748,12 @@ function NotificationsSection() {
   useEffect(() => {
     api
       .getNotificationSubscriptions()
-      .then((data) => setSubscriptions(data.subscriptions))
+      .then((data) => {
+        setSubscriptions(data.subscriptions);
+        setTaskOverdueIntervalHours(
+          String(data.task_overdue_interval_hours ?? 1)
+        );
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -757,8 +769,13 @@ function NotificationsSection() {
     setSaving(true);
     setError(null);
     try {
-      const result = await api.updateNotificationSubscriptions(subscriptions);
+      const intervalHours = Number(taskOverdueIntervalHours) || 1;
+      const result = await api.updateNotificationSubscriptions({
+        subscriptions,
+        task_overdue_interval_hours: intervalHours,
+      });
       setSubscriptions(result.subscriptions);
+      setTaskOverdueIntervalHours(String(result.task_overdue_interval_hours ?? 1));
       toastSuccess("Подписки сохранены");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ошибка сохранения";
@@ -788,6 +805,7 @@ function NotificationsSection() {
   const meetingEvents = Object.entries(EVENT_TYPES).filter(
     ([, c]) => c.group === "meetings"
   );
+  const overdueSubscriptionEnabled = subscriptions.task_overdue || false;
 
   return (
     <div className="animate-fade-in-up stagger-2 rounded-2xl border border-border/60 bg-card overflow-hidden">
@@ -841,6 +859,38 @@ function NotificationsSection() {
               );
             })}
           </div>
+        </div>
+
+        <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">Периодичность напоминаний о просроченных задачах</p>
+              <p className="text-2xs text-muted-foreground">
+                Отправка выполняется по МСК, в начале часа.
+              </p>
+            </div>
+            <Select
+              value={taskOverdueIntervalHours}
+              onValueChange={setTaskOverdueIntervalHours}
+              disabled={!overdueSubscriptionEnabled}
+            >
+              <SelectTrigger className="h-9 w-full rounded-lg sm:w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TASK_OVERDUE_INTERVAL_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {!overdueSubscriptionEnabled && (
+            <p className="mt-2 text-2xs text-muted-foreground">
+              Включите переключатель «Просроченная задача», чтобы применять периодичность.
+            </p>
+          )}
         </div>
 
         {/* Divider */}

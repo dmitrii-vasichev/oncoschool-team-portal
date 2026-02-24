@@ -150,6 +150,7 @@ app.state.zoom_service = zoom_service
 
 # Schedulers
 reminder_service = ReminderService(bot=bot, session_maker=async_session)
+app.state.reminder_service = reminder_service
 meeting_scheduler = MeetingSchedulerService(
     bot=bot, session_maker=async_session, zoom_service=zoom_service
 )
@@ -165,6 +166,7 @@ broadcast_scheduler = BroadcastSchedulerService(
 async def _start_background_schedulers() -> None:
     """Ensure schedulers run for both `python -m app.main` and `uvicorn app.main:app`."""
     reminder_service.start()
+    await reminder_service.refresh_task_overdue_schedule_from_settings()
     meeting_scheduler.start()
     broadcast_scheduler.start()
     try:

@@ -20,6 +20,7 @@ from app.bot.callbacks import (
 from app.config import settings
 from app.db.models import ReminderSettings, Task, TeamMember
 from app.db.repositories import (
+    AppSettingsRepository,
     NotificationSubscriptionRepository,
     ReminderSettingsRepository,
     TaskRepository,
@@ -36,6 +37,9 @@ TASK_STATUS_LABELS = {
     "done": "Готово",
     "cancelled": "Отменена",
 }
+TASK_OVERDUE_NOTIFICATIONS_KEY = "task_overdue_notifications"
+DEFAULT_TASK_OVERDUE_INTERVAL_HOURS = 1
+ALLOWED_TASK_OVERDUE_INTERVAL_HOURS = {1, 12, 24}
 
 
 class ReminderService:
@@ -48,7 +52,9 @@ class ReminderService:
         self.reminder_repo = ReminderSettingsRepository()
         self.task_repo = TaskRepository()
         self.sub_repo = NotificationSubscriptionRepository()
+        self.app_settings_repo = AppSettingsRepository()
         self.in_app_notifications = InAppNotificationService()
+        self._task_overdue_interval_hours = DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
         # Track which members got digest today (member_id -> date)
         self._sent_today: dict[str, date] = {}
 
@@ -74,14 +80,8 @@ class ReminderService:
             id="check_task_reminders",
             replace_existing=True,
         )
-        # Check overdue tasks every hour
-        self.scheduler.add_job(
-            self._check_overdue_tasks,
-            "interval",
-            hours=1,
-            id="check_overdue",
-            replace_existing=True,
-        )
+        # Check overdue tasks by configured interval (aligned to HH:00)
+        self.set_task_overdue_interval_hours(DEFAULT_TASK_OVERDUE_INTERVAL_HOURS)
         # Create in-app alerts for deadline today/tomorrow and overdue transitions
         self.scheduler.add_job(
             self._check_in_app_deadlines,
@@ -106,6 +106,75 @@ class ReminderService:
         if self.scheduler.running:
             self.scheduler.shutdown(wait=False)
             logger.info("ReminderService scheduler stopped")
+
+    @staticmethod
+    def normalize_task_overdue_interval_hours(value: object | None) -> int:
+        """Normalize configured interval to supported values."""
+        try:
+            candidate = int(value) if value is not None else DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
+        except (TypeError, ValueError):
+            return DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
+        if candidate not in ALLOWED_TASK_OVERDUE_INTERVAL_HOURS:
+            return DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
+        return candidate
+
+    @classmethod
+    def interval_from_app_settings(cls, raw_value: dict | None) -> int:
+        """Extract interval from app_settings JSON payload."""
+        if not isinstance(raw_value, dict):
+            return DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
+        return cls.normalize_task_overdue_interval_hours(raw_value.get("interval_hours"))
+
+    def _build_task_overdue_trigger(
+        self, interval_hours: int
+    ) -> tuple[str, dict[str, int | str]]:
+        trigger_kwargs: dict[str, int | str] = {
+            "minute": 0,
+            "timezone": settings.TIMEZONE,
+        }
+        if interval_hours == 12:
+            trigger_kwargs["hour"] = "*/12"
+        elif interval_hours == 24:
+            trigger_kwargs["hour"] = 0
+        return "cron", trigger_kwargs
+
+    def set_task_overdue_interval_hours(self, interval_hours: int) -> int:
+        """
+        Reconfigure overdue checks to run at HH:00 with selected frequency.
+        Supported values: 1, 12, 24 hours.
+        """
+        normalized = self.normalize_task_overdue_interval_hours(interval_hours)
+        trigger, trigger_kwargs = self._build_task_overdue_trigger(normalized)
+        self.scheduler.add_job(
+            self._check_overdue_tasks,
+            trigger,
+            id="check_overdue",
+            replace_existing=True,
+            **trigger_kwargs,
+        )
+        self._task_overdue_interval_hours = normalized
+        logger.info(
+            "ReminderService overdue schedule set: every %s hour(s), aligned to HH:00",
+            normalized,
+        )
+        return normalized
+
+    async def refresh_task_overdue_schedule_from_settings(self) -> int:
+        """Load overdue interval from app settings and apply to scheduler."""
+        interval = DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
+        try:
+            async with self.session_maker() as session:
+                setting = await self.app_settings_repo.get(
+                    session,
+                    TASK_OVERDUE_NOTIFICATIONS_KEY,
+                )
+            interval = self.interval_from_app_settings(setting.value if setting else None)
+        except Exception as e:
+            logger.error(
+                "Failed to load overdue interval from app settings, using default: %s",
+                e,
+            )
+        return self.set_task_overdue_interval_hours(interval)
 
     async def _check_and_send_reminders(self) -> None:
         """Check all enabled reminders and send if time matches."""

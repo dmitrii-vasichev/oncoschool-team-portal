@@ -38,6 +38,7 @@ import type {
   TeamMemberUpdateRequest,
   MemberDeactivationPreviewResponse,
   InAppNotificationListResponse,
+  NotificationSubscriptionsSettings,
 } from "./types";
 
 class ApiClient {
@@ -824,20 +825,23 @@ class ApiClient {
 
   // ==================== Settings ====================
 
-  async getNotificationSubscriptions(): Promise<{ subscriptions: Record<string, boolean> }> {
-    return this.request<{ subscriptions: Record<string, boolean> }>(
+  async getNotificationSubscriptions(): Promise<NotificationSubscriptionsSettings> {
+    return this.request<NotificationSubscriptionsSettings>(
       "/api/settings/notifications"
     );
   }
 
   async updateNotificationSubscriptions(
-    subscriptions: Record<string, boolean>
-  ): Promise<{ subscriptions: Record<string, boolean> }> {
-    return this.request<{ subscriptions: Record<string, boolean> }>(
+    data: {
+      subscriptions: Record<string, boolean>;
+      task_overdue_interval_hours?: number;
+    }
+  ): Promise<NotificationSubscriptionsSettings> {
+    return this.request<NotificationSubscriptionsSettings>(
       "/api/settings/notifications",
       {
         method: "PUT",
-        body: JSON.stringify({ subscriptions }),
+        body: JSON.stringify(data),
       }
     );
   }
