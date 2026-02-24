@@ -96,6 +96,7 @@ PRIORITY_LABELS = {
 }
 
 TASK_LIST_TITLE_LIMIT = 64
+GROUP_CHAT_TYPES = {"group", "supergroup"}
 
 
 STATUS_USAGE_TEXT = (
@@ -765,6 +766,37 @@ def _department_token_from_id(department_id: uuid.UUID | None) -> str:
     return department_id.hex if department_id else ALL_DEPARTMENTS_TOKEN
 
 
+def _is_group_chat(message: Message) -> bool:
+    return message.chat.type in GROUP_CHAT_TYPES
+
+
+async def _send_private_task_controls(
+    *,
+    bot: Bot,
+    member: TeamMember,
+    task: Task,
+    is_moderator: bool,
+) -> bool:
+    if not member.telegram_id:
+        return False
+    try:
+        await bot.send_message(
+            member.telegram_id,
+            f"🔒 Управление задачей #{task.short_id} · {task.title}",
+            reply_markup=task_actions_keyboard(task.short_id, is_moderator),
+        )
+        return True
+    except Exception:
+        logger.warning(
+            "Failed to send private task controls to member_id=%s tg_id=%s task_id=%s",
+            member.id,
+            member.telegram_id,
+            task.id,
+            exc_info=True,
+        )
+        return False
+
+
 async def _create_task_for_member(
     *,
     message: Message,
@@ -810,10 +842,29 @@ async def _create_task_for_member(
         else ""
     )
 
-    await message.answer(
+    response_text = (
         "✅ Задача создана:\n\n"
         f"#{task.short_id} · {task.title}\n"
-        f"{prio} {task.priority}{deadline_str}{reminder_str}",
+        f"{prio} {task.priority}{deadline_str}{reminder_str}"
+    )
+
+    if _is_group_chat(message):
+        controls_sent = await _send_private_task_controls(
+            bot=bot,
+            member=member,
+            task=task,
+            is_moderator=is_mod,
+        )
+        privacy_note = (
+            "\n\n🔒 Кнопки управления отправил в личные сообщения."
+            if controls_sent
+            else "\n\nℹ️ Не удалось отправить кнопки в личку. Напишите боту /start в личном чате."
+        )
+        await message.answer(response_text + privacy_note)
+        return True
+
+    await message.answer(
+        response_text,
         reply_markup=task_actions_keyboard(task.short_id, is_mod),
     )
     return True
@@ -1713,7 +1764,7 @@ async def fsm_new_text(
 # ── Group mentions: "@bot <text>" -> create task ──
 
 
-@router.message(F.chat.type.in_({"group", "supergroup"}), F.text, ~F.text.startswith("/"))
+@router.message(F.chat.type.in_(GROUP_CHAT_TYPES), F.text, ~F.text.startswith("/"))
 async def handle_group_task_by_mention(
     message: Message,
     member: TeamMember,
@@ -1841,10 +1892,19 @@ async def handle_group_task_by_mention(
     if assignee_note:
         response_lines.append(f"ℹ️ {assignee_note}")
 
-    await message.reply(
-        "\n".join(response_lines),
-        reply_markup=task_actions_keyboard(task.short_id, is_mod),
+    controls_sent = await _send_private_task_controls(
+        bot=bot,
+        member=member,
+        task=task,
+        is_moderator=is_mod,
     )
+    response_lines.append(
+        "🔒 Кнопки управления отправил в личные сообщения."
+        if controls_sent
+        else "ℹ️ Не удалось отправить кнопки в личку. Напишите боту /start в личном чате."
+    )
+
+    await message.reply("\n".join(response_lines))
 
 
 # ── /assign @username <текст> — Назначить задачу ──
