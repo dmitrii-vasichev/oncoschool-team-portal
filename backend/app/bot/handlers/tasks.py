@@ -3,6 +3,7 @@ import re
 import uuid
 from datetime import date, datetime, timedelta
 from html import escape
+from typing import TypedDict
 from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
@@ -33,6 +34,7 @@ from app.bot.keyboards import (
 from app.config import settings
 from app.db.models import Task, TeamMember
 from app.db.repositories import DepartmentRepository, TaskRepository, TeamMemberRepository
+from app.services.ai_service import AIService
 from app.services.notification_service import NotificationService
 from app.services.permission_service import PermissionService
 from app.services.task_service import TaskService
@@ -50,6 +52,7 @@ task_service = TaskService()
 task_repo = TaskRepository()
 member_repo = TeamMemberRepository()
 department_repo = DepartmentRepository()
+ai_service = AIService()
 TASKS_PER_PAGE = 8
 TASK_BACK_CALLBACK_PREFIX = "tbk"
 LEGACY_TASK_BACK_CALLBACK_PREFIX = "task_back"
@@ -124,6 +127,22 @@ TASK_PRIORITY_ALIASES = {
     "высокий": "high",
     "срочный": "urgent",
 }
+AI_PRIORITY_VALUES = {"low", "medium", "high", "urgent"}
+INLINE_REMINDER_PATTERN = re.compile(
+    r"\bнапомни(?:ть)?\b[,:\s]*"
+    r"(?P<date>сегодня|завтра|послезавтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?)"
+    r"\s*(?:в|во)?\s*(?P<time>\d{1,2}:\d{2})",
+    re.IGNORECASE,
+)
+
+
+class ParsedTextTaskPayload(TypedDict):
+    title: str
+    description: str | None
+    priority: str
+    deadline: date | None
+    reminder_at: datetime | None
+    reminder_comment: str | None
 
 
 class TaskCommandFSM(StatesGroup):
@@ -142,8 +161,8 @@ class TaskReminderFSM(StatesGroup):
 
 
 NEW_TASK_PROMPT_TEXT = (
-    "📝 Введите текст новой задачи.\n"
-    "Модификаторы: !urgent !high !low @ДД.ММ\n"
+    "📝 Введите задачу обычным текстом — выделю заголовок, дедлайн и напоминание.\n"
+    "Можно использовать модификаторы: !urgent !high !low @ДД.ММ\n"
     "Для отмены отправьте /cancel"
 )
 
@@ -337,6 +356,158 @@ def _parse_reminder_datetime_input(raw_value: str) -> tuple[datetime | None, boo
     return reminder_at, True
 
 
+def _normalize_reminder_comment(raw_value: str | None) -> str | None:
+    if raw_value is None:
+        return None
+    normalized = raw_value.strip()
+    return normalized or None
+
+
+def _normalize_ai_priority(raw_value: str | None) -> str | None:
+    if not raw_value:
+        return None
+    normalized = raw_value.strip().lower()
+    return normalized if normalized in AI_PRIORITY_VALUES else None
+
+
+def _parse_iso_deadline(raw_value: str | None) -> date | None:
+    if not raw_value:
+        return None
+    value = raw_value.strip()
+    if not value:
+        return None
+    if "T" in value:
+        value = value.split("T", 1)[0]
+    elif " " in value:
+        value = value.split(" ", 1)[0]
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _parse_date_token(raw_value: str) -> date | None:
+    token = (raw_value or "").strip().lower()
+    if not token:
+        return None
+    if token == "сегодня":
+        return date.today()
+    if token == "завтра":
+        return date.today() + timedelta(days=1)
+    if token == "послезавтра":
+        return date.today() + timedelta(days=2)
+
+    parsed_deadline, ok = _parse_deadline_input(token)
+    if ok and parsed_deadline:
+        return parsed_deadline
+    return None
+
+
+def _extract_inline_reminder(raw_text: str) -> tuple[str, datetime | None]:
+    match = INLINE_REMINDER_PATTERN.search(raw_text or "")
+    if not match:
+        return raw_text, None
+
+    reminder_date = _parse_date_token(match.group("date"))
+    if not reminder_date:
+        return raw_text, None
+
+    reminder_raw = f"{reminder_date.strftime('%d.%m.%Y')} {match.group('time')}"
+    reminder_at, ok = _parse_reminder_datetime_input(reminder_raw)
+    if not ok or reminder_at is None:
+        return raw_text, None
+
+    cleaned = f"{raw_text[:match.start()]} {raw_text[match.end():]}"
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,.;")
+    return cleaned, reminder_at
+
+
+def _parse_ai_reminder_datetime(raw_value: str | None) -> datetime | None:
+    if not raw_value:
+        return None
+    value = raw_value.strip()
+    if not value:
+        return None
+
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed_dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+    if parsed_dt.tzinfo is None:
+        try:
+            local_tz = ZoneInfo(settings.TIMEZONE)
+        except Exception:
+            local_tz = ZoneInfo("Europe/Moscow")
+        parsed_dt = parsed_dt.replace(tzinfo=local_tz)
+
+    reminder_at = parsed_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    if reminder_at <= datetime.utcnow() + timedelta(seconds=30):
+        return None
+    return reminder_at
+
+
+async def _parse_task_creation_payload(
+    *,
+    raw_text: str,
+    member: TeamMember,
+    session_maker: async_sessionmaker,
+) -> ParsedTextTaskPayload:
+    text_without_inline_reminder, inline_reminder_at = _extract_inline_reminder(raw_text)
+    fallback = TaskService.parse_task_text(text_without_inline_reminder)
+
+    payload: ParsedTextTaskPayload = {
+        "title": (fallback.get("title") or "").strip(),
+        "description": None,
+        "priority": fallback.get("priority") or "medium",
+        "deadline": fallback.get("deadline"),
+        "reminder_at": inline_reminder_at,
+        "reminder_comment": None,
+    }
+
+    try:
+        async with session_maker() as session:
+            team_members = await member_repo.get_all_active(session)
+            parsed = await ai_service.parse_task_from_text(
+                session,
+                raw_text,
+                member.full_name,
+                PermissionService.can_create_task_for_others(member),
+                team_members,
+            )
+    except Exception as exc:
+        logger.warning("AI parse failed for text task, fallback parser is used: %s", exc)
+        return payload
+
+    ai_title = (parsed.title or "").strip()
+    if ai_title:
+        payload["title"] = ai_title
+
+    payload["description"] = _normalize_reminder_comment(parsed.description)
+
+    ai_priority = _normalize_ai_priority(parsed.priority)
+    if ai_priority:
+        payload["priority"] = ai_priority
+
+    ai_deadline = _parse_iso_deadline(parsed.deadline)
+    if ai_deadline:
+        payload["deadline"] = ai_deadline
+
+    ai_reminder_at = _parse_ai_reminder_datetime(parsed.reminder_at)
+    if ai_reminder_at:
+        payload["reminder_at"] = ai_reminder_at
+
+    ai_reminder_comment = _normalize_reminder_comment(parsed.reminder_comment)
+    if ai_reminder_comment:
+        payload["reminder_comment"] = ai_reminder_comment
+
+    if payload["reminder_at"] is None:
+        payload["reminder_comment"] = None
+
+    return payload
+
+
 def _format_task_edit_panel(task: Task, *, editable_fields: list[str]) -> str:
     lines = [
         f"✏️ Редактирование задачи <b>#{task.short_id}</b>",
@@ -406,7 +577,11 @@ async def _create_task_for_member(
     bot: Bot,
     raw_text: str,
 ) -> bool:
-    parsed = TaskService.parse_task_text(raw_text)
+    parsed = await _parse_task_creation_payload(
+        raw_text=raw_text,
+        member=member,
+        session_maker=session_maker,
+    )
     if not parsed["title"]:
         await message.answer("❌ Текст задачи не может быть пустым")
         return False
@@ -417,8 +592,11 @@ async def _create_task_for_member(
                 session,
                 title=parsed["title"],
                 creator=member,
+                description=parsed["description"],
                 priority=parsed["priority"],
                 deadline=parsed["deadline"],
+                reminder_at=parsed["reminder_at"],
+                reminder_comment=parsed["reminder_comment"],
                 source="text",
             )
 
@@ -428,11 +606,16 @@ async def _create_task_for_member(
     is_mod = PermissionService.is_moderator(member)
     prio = PRIORITY_EMOJI.get(task.priority, "")
     deadline_str = f"\n📅 Дедлайн: {task.deadline.strftime('%d.%m.%Y')}" if task.deadline else ""
+    reminder_str = (
+        f"\n⏰ Напоминание: {_format_task_reminder_datetime(task.reminder_at)}"
+        if task.reminder_at
+        else ""
+    )
 
     await message.answer(
         "✅ Задача создана:\n\n"
         f"#{task.short_id} · {task.title}\n"
-        f"{prio} {task.priority}{deadline_str}",
+        f"{prio} {task.priority}{deadline_str}{reminder_str}",
         reply_markup=task_actions_keyboard(task.short_id, is_mod),
     )
     return True
@@ -1342,12 +1525,20 @@ async def cmd_assign(message: Message, member: TeamMember, session_maker: async_
     if len(args) < 3:
         await message.answer(
             "Использование: /assign @username <текст задачи>\n\n"
-            "Модификаторы: !urgent !high !low @ДД.ММ"
+            "Можно писать обычным текстом, включая дедлайн и напоминание"
         )
         return
 
     username_raw = args[1].strip()
     raw_text = args[2].strip()
+    parsed = await _parse_task_creation_payload(
+        raw_text=raw_text,
+        member=member,
+        session_maker=session_maker,
+    )
+    if not parsed["title"]:
+        await message.answer("❌ Текст задачи не может быть пустым")
+        return
 
     # Strip @ from username
     username = username_raw.lstrip("@")
@@ -1366,19 +1557,16 @@ async def cmd_assign(message: Message, member: TeamMember, session_maker: async_
                 await message.answer(f"❌ Пользователь @{username} не найден в команде")
                 return
 
-            parsed = TaskService.parse_task_text(raw_text)
-
-            if not parsed["title"]:
-                await message.answer("❌ Текст задачи не может быть пустым")
-                return
-
             task = await task_service.create_task(
                 session,
                 title=parsed["title"],
                 creator=member,
                 assignee_id=assignee.id,
+                description=parsed["description"],
                 priority=parsed["priority"],
                 deadline=parsed["deadline"],
+                reminder_at=parsed["reminder_at"],
+                reminder_comment=parsed["reminder_comment"],
                 source="text",
             )
 
@@ -1388,12 +1576,17 @@ async def cmd_assign(message: Message, member: TeamMember, session_maker: async_
 
     prio = PRIORITY_EMOJI.get(task.priority, "")
     deadline_str = f"\n📅 Дедлайн: {task.deadline.strftime('%d.%m.%Y')}" if task.deadline else ""
+    reminder_str = (
+        f"\n⏰ Напоминание: {_format_task_reminder_datetime(task.reminder_at)}"
+        if task.reminder_at
+        else ""
+    )
 
     await message.answer(
         f"✅ Задача назначена:\n\n"
         f"#{task.short_id} · {task.title}\n"
         f"👤 Исполнитель: {assignee.full_name}\n"
-        f"{prio} {task.priority}{deadline_str}",
+        f"{prio} {task.priority}{deadline_str}{reminder_str}",
         reply_markup=task_actions_keyboard(
             task.short_id,
             PermissionService.is_moderator(member),

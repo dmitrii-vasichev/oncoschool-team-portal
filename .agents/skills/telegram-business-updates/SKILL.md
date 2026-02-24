@@ -33,7 +33,9 @@ description: Convert implemented functionality and release changes into ready-to
 - Подчеркивать выгоду для бизнеса: результат, контроль, сроки, дисциплину, снижение рисков.
 - Не выдумывать факты, которых нет во входных данных.
 - Держать длину основного текста в диапазоне 120-220 слов, если пользователь не запросил иначе.
-- Не использовать Markdown в финальном ответе; выдавать только обычный текст с HTML-тегами для Telegram.
+- Финальный результат всегда оборачивать в один Markdown fenced code block с языком `html` для удобного копирования кнопкой Copy.
+- Вне code block не добавлять пояснений, комментариев или служебного текста.
+- Внутри code block использовать только готовый Telegram-текст с HTML-тегами (без Markdown внутри).
 
 ## Поведение при нехватке данных
 
@@ -50,9 +52,9 @@ description: Convert implemented functionality and release changes into ready-to
 
 ## Обязательный формат результата
 
-Использовать структуру ниже без Markdown:
+Использовать структуру ниже внутри одного fenced code block:
 
-```text
+```html
 Готовый текст для отправки в Telegram (HTML):
 
 🚀 <b>Коллеги, внедрили новый функционал: ...</b>
@@ -77,7 +79,7 @@ description: Convert implemented functionality and release changes into ready-to
 
 Если пользователь просит краткую версию, добавлять в конце:
 
-```text
+```html
 Вариант 2 (короткий):
 ...
 ...

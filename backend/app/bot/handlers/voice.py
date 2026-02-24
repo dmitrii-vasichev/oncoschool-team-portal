@@ -1,7 +1,8 @@
 import logging
 import re
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -46,12 +47,54 @@ class VoiceTaskFSM(StatesGroup):
     editing_field = State()
 
 
+def _parse_ai_reminder_datetime(raw_value: str | None) -> datetime | None:
+    if not raw_value:
+        return None
+    value = raw_value.strip()
+    if not value:
+        return None
+
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed_dt = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+    if parsed_dt.tzinfo is None:
+        try:
+            local_tz = ZoneInfo(settings.TIMEZONE)
+        except Exception:
+            local_tz = ZoneInfo("Europe/Moscow")
+        parsed_dt = parsed_dt.replace(tzinfo=local_tz)
+
+    reminder_at = parsed_dt.astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+    if reminder_at <= datetime.utcnow() + timedelta(seconds=30):
+        return None
+    return reminder_at
+
+
+def _format_task_reminder_datetime(raw_value: str | None) -> str:
+    reminder_at = _parse_ai_reminder_datetime(raw_value)
+    if reminder_at is None:
+        return "—"
+    try:
+        tz = ZoneInfo(settings.TIMEZONE)
+    except Exception:
+        tz = ZoneInfo("Europe/Moscow")
+    local_dt = reminder_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+    return local_dt.strftime("%d.%m.%Y %H:%M")
+
+
 def _format_voice_preview(data: dict) -> str:
     """Format parsed voice task for preview message."""
     prio_emoji = PRIORITY_EMOJI.get(data.get("priority", "medium"), "🔵")
     assignee_name = data.get("assignee_display_name") or "Ты"
     deadline_str = data.get("deadline") or "—"
+    reminder_str = _format_task_reminder_datetime(data.get("reminder_at"))
     description = data.get("description") or "—"
+    reminder_comment = (data.get("reminder_comment") or "").strip()
+    if not reminder_comment:
+        reminder_comment = "—"
 
     return (
         f"🎤 <b>Задача из голосового:</b>\n\n"
@@ -59,7 +102,9 @@ def _format_voice_preview(data: dict) -> str:
         f"📝 {description}\n"
         f"👤 Исполнитель: {assignee_name}\n"
         f"{prio_emoji} Приоритет: {data.get('priority', 'medium')}\n"
-        f"📅 Дедлайн: {deadline_str}"
+        f"📅 Дедлайн: {deadline_str}\n"
+        f"⏰ Напоминание: {reminder_str}\n"
+        f"💬 Комментарий к напоминанию: {reminder_comment}"
     )
 
 
@@ -191,6 +236,8 @@ async def handle_voice(
         "description": parsed.description,
         "priority": parsed.priority,
         "deadline": parsed.deadline,
+        "reminder_at": parsed.reminder_at,
+        "reminder_comment": parsed.reminder_comment,
         "assignee_id": assignee_id,
         "assignee_display_name": assignee_display_name,
         "original_text": text,
@@ -236,6 +283,16 @@ async def cb_voice_create(
     if data.get("description"):
         description = f"{data['description']}\n\n{description}"
 
+    reminder_at = _parse_ai_reminder_datetime(data.get("reminder_at"))
+    reminder_comment_raw = data.get("reminder_comment")
+    reminder_comment = (
+        reminder_comment_raw.strip() if isinstance(reminder_comment_raw, str) else None
+    )
+    if reminder_comment == "":
+        reminder_comment = None
+    if reminder_at is None:
+        reminder_comment = None
+
     assignee_uuid = uuid.UUID(data["assignee_id"]) if data.get("assignee_id") else None
 
     try:
@@ -249,6 +306,8 @@ async def cb_voice_create(
                     description=description,
                     priority=data.get("priority", "medium"),
                     deadline=deadline,
+                    reminder_at=reminder_at,
+                    reminder_comment=reminder_comment,
                     source="voice",
                 )
 
@@ -269,12 +328,21 @@ async def cb_voice_create(
     deadline_str = (
         f"\n📅 Дедлайн: {task.deadline.strftime('%d.%m.%Y')}" if task.deadline else ""
     )
+    if task.reminder_at:
+        try:
+            tz = ZoneInfo(settings.TIMEZONE)
+        except Exception:
+            tz = ZoneInfo("Europe/Moscow")
+        reminder_local = task.reminder_at.replace(tzinfo=ZoneInfo("UTC")).astimezone(tz)
+        reminder_str = f"\n⏰ Напоминание: {reminder_local.strftime('%d.%m.%Y %H:%M')}"
+    else:
+        reminder_str = ""
 
     await callback.message.answer(
         f"✅ Задача #{task.short_id} создана из голосового!\n\n"
         f"📌 {task.title}\n"
         f"👤 Исполнитель: {assignee_name}\n"
-        f"{prio} {task.priority}{deadline_str}",
+        f"{prio} {task.priority}{deadline_str}{reminder_str}",
     )
 
 

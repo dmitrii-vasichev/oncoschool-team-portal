@@ -30,6 +30,8 @@ class TaskService:
         checklist: list[dict] | None = None,
         priority: str = "medium",
         deadline: date | None = None,
+        reminder_at: datetime | None = None,
+        reminder_comment: str | None = None,
         source: str = "text",
         meeting_id: uuid.UUID | None = None,
     ) -> Task:
@@ -50,6 +52,14 @@ class TaskService:
             if not assignee or not assignee.is_active:
                 raise ValueError("Исполнитель не найден или деактивирован")
 
+        normalized_reminder_comment = (
+            reminder_comment.strip() if isinstance(reminder_comment, str) else None
+        )
+        if normalized_reminder_comment == "":
+            normalized_reminder_comment = None
+        if reminder_at is None:
+            normalized_reminder_comment = None
+
         task = await self.task_repo.create(
             session,
             title=title,
@@ -60,6 +70,9 @@ class TaskService:
             created_by_id=creator.id,
             source=source,
             deadline=deadline,
+            reminder_at=reminder_at,
+            reminder_comment=normalized_reminder_comment,
+            reminder_sent_at=None,
             meeting_id=meeting_id,
         )
         if task.assignee_id and task.assignee_id != creator.id:
