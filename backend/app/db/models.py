@@ -501,6 +501,9 @@ class TelegramNotificationTarget(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    allow_incoming_tasks: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 

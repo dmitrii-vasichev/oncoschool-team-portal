@@ -22,6 +22,7 @@ from app.db.repositories import TeamMemberRepository
 from app.services.ai_service import AIService
 from app.services.notification_service import NotificationService
 from app.services.permission_service import PermissionService
+from app.services.telegram_target_access_service import is_chat_allowed_for_incoming_tasks
 from app.services.task_service import TaskService
 from app.services.voice_service import VoiceService
 
@@ -108,15 +109,16 @@ def _format_voice_preview(data: dict) -> str:
     )
 
 
-def _should_process_voice(message: Message) -> bool:
+async def _should_process_voice(
+    message: Message,
+    session_maker: async_sessionmaker,
+) -> bool:
     """Check if voice should be processed in this chat."""
     # Private chat — always process
     if message.chat.type == "private":
         return True
-    # Group chat — only in allowed chats
-    if message.chat.id in settings.ALLOWED_CHAT_IDS:
-        return True
-    return False
+    # Group chat — only in Telegram targets explicitly enabled for incoming tasks.
+    return await is_chat_allowed_for_incoming_tasks(session_maker, message.chat.id)
 
 
 def _find_assignee_in_team(
@@ -144,7 +146,7 @@ async def handle_voice(
     bot: Bot,
     state: FSMContext,
 ) -> None:
-    if not _should_process_voice(message):
+    if not await _should_process_voice(message, session_maker):
         return
 
     voice = message.voice or message.video_note

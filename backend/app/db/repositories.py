@@ -453,6 +453,17 @@ class TelegramTargetRepository:
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_active_chat_ids_for_incoming_tasks(self, session: AsyncSession) -> set[int]:
+        stmt = (
+            select(TelegramNotificationTarget.chat_id)
+            .where(
+                TelegramNotificationTarget.is_active.is_(True),
+                TelegramNotificationTarget.allow_incoming_tasks.is_(True),
+            )
+        )
+        result = await session.execute(stmt)
+        return {int(chat_id) for chat_id in result.scalars().all()}
+
     async def get_by_id(self, session: AsyncSession, target_id: uuid.UUID) -> TelegramNotificationTarget | None:
         return await session.get(TelegramNotificationTarget, target_id)
 

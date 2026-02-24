@@ -428,14 +428,24 @@ class ApiClient {
     return this.request<TelegramNotificationTarget[]>("/api/telegram-targets");
   }
 
-  async createTelegramTarget(data: { chat_id: number; thread_id?: number | null; label?: string | null }): Promise<TelegramNotificationTarget> {
+  async createTelegramTarget(data: {
+    chat_id: number;
+    thread_id?: number | null;
+    label?: string | null;
+    allow_incoming_tasks?: boolean;
+  }): Promise<TelegramNotificationTarget> {
     return this.request<TelegramNotificationTarget>("/api/telegram-targets", {
       method: "POST",
       body: JSON.stringify(data),
     });
   }
 
-  async updateTelegramTarget(id: string, data: { chat_id?: number; thread_id?: number | null; label?: string | null }): Promise<TelegramNotificationTarget> {
+  async updateTelegramTarget(id: string, data: {
+    chat_id?: number;
+    thread_id?: number | null;
+    label?: string | null;
+    allow_incoming_tasks?: boolean;
+  }): Promise<TelegramNotificationTarget> {
     return this.request<TelegramNotificationTarget>(`/api/telegram-targets/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),

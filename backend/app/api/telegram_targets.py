@@ -8,6 +8,7 @@ from app.db.database import get_session
 from app.db.models import TeamMember
 from app.db.repositories import TelegramTargetRepository
 from app.db.schemas import TelegramTargetCreate, TelegramTargetResponse
+from app.services.telegram_target_access_service import invalidate_incoming_task_chat_ids_cache
 
 router = APIRouter(prefix="/telegram-targets", tags=["telegram-targets"])
 
@@ -35,8 +36,10 @@ async def create_target(
         chat_id=data.chat_id,
         thread_id=data.thread_id,
         label=data.label,
+        allow_incoming_tasks=data.allow_incoming_tasks,
     )
     await session.commit()
+    invalidate_incoming_task_chat_ids_cache()
     return target
 
 
@@ -55,6 +58,7 @@ async def update_target(
     update_data = data.model_dump(exclude_unset=True)
     target = await target_repo.update(session, target_id, **update_data)
     await session.commit()
+    invalidate_incoming_task_chat_ids_cache()
     return target
 
 
@@ -71,3 +75,4 @@ async def delete_target(
 
     await target_repo.delete(session, target_id)
     await session.commit()
+    invalidate_incoming_task_chat_ids_cache()

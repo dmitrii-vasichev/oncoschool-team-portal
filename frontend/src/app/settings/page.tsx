@@ -388,7 +388,7 @@ function TelegramTargetsSection() {
               Telegram-группы для уведомлений
             </h2>
             <p className="text-xs text-muted-foreground">
-              Группы для отправки напоминаний о встречах
+              Группы для отправки уведомлений и (опционально) входящих задач через @бот
             </p>
           </div>
           <Button
@@ -438,6 +438,10 @@ function TelegramTargetsSection() {
                           <span>Тема: #{target.thread_id}</span>
                         </>
                       )}
+                      <span className="text-border">|</span>
+                      <span>
+                        Входящие задачи: {target.allow_incoming_tasks ? "вкл" : "выкл"}
+                      </span>
                     </div>
                   </div>
 
@@ -480,7 +484,8 @@ function TelegramTargetsSection() {
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
             <span>
               Чтобы узнать Chat ID группы, добавьте бота @userinfobot в группу
-              или перешлите сообщение из группы боту @JsonDumpBot.
+              или перешлите сообщение из группы боту @JsonDumpBot. Включайте
+              «Входящие задачи», только если в этой группе хотите создавать задачи через @бот.
             </span>
           </div>
         </div>
@@ -534,6 +539,9 @@ function TelegramTargetFormDialog({
     target?.thread_id ? String(target.thread_id) : ""
   );
   const [label, setLabel] = useState(target?.label ?? "");
+  const [allowIncomingTasks, setAllowIncomingTasks] = useState(
+    target?.allow_incoming_tasks ?? false
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -552,6 +560,7 @@ function TelegramTargetFormDialog({
         chat_id: chatIdNum,
         thread_id: threadId ? Number(threadId) : null,
         label: label.trim() || null,
+        allow_incoming_tasks: allowIncomingTasks,
       };
 
       if (isEdit && target) {
@@ -618,6 +627,22 @@ function TelegramTargetFormDialog({
             <p className="text-2xs text-muted-foreground mt-1">
               Укажите, если группа использует темы (topics)
             </p>
+          </div>
+
+          <div className="rounded-xl border border-border/60 bg-muted/20 p-3.5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label className="text-sm font-medium">Входящие задачи через @бот</Label>
+                <p className="text-2xs text-muted-foreground mt-1">
+                  Если включено, в этой группе можно ставить задачи с упоминанием бота.
+                </p>
+              </div>
+              <Switch
+                checked={allowIncomingTasks}
+                onCheckedChange={setAllowIncomingTasks}
+                disabled={saving}
+              />
+            </div>
           </div>
 
           {error && (

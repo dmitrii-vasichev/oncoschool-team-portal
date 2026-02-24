@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     # Telegram
     BOT_TOKEN: str
     ADMIN_TELEGRAM_IDS: list[int] = []
-    ALLOWED_CHAT_IDS: list[int] = []  # Group chats where bot handles voice and @mention task creation
     BOT_UI_VERSION: int = 0  # 0 = auto-compute from bot UI schema
 
     # Database

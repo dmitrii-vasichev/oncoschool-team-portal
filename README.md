@@ -107,7 +107,6 @@ make change-build
 | `ANTHROPIC_API_KEY` | Anthropic API key | нет |
 | `GOOGLE_API_KEY` | Google Gemini API key | нет |
 | `ADMIN_TELEGRAM_IDS` | Telegram ID администраторов через запятую | да |
-| `ALLOWED_CHAT_IDS` | ID групповых чатов для голосовых задач и создания задач по `@mention` бота | нет |
 | `JWT_SECRET` | Секрет для JWT (авто-генерация из BOT_TOKEN) | нет |
 | `TIMEZONE` | Часовой пояс (default: Europe/Moscow) | нет |
 | `CORS_ORIGINS` | JSON-массив разрешённых origins | нет |

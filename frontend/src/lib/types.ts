@@ -166,6 +166,7 @@ export interface TelegramNotificationTarget {
   chat_id: number;
   thread_id: number | null;
   label: string | null;
+  allow_incoming_tasks: boolean;
   is_active: boolean;
   created_at: string;
 }

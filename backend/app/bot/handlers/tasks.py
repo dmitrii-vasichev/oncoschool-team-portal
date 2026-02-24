@@ -39,6 +39,7 @@ from app.db.repositories import DepartmentRepository, TaskRepository, TeamMember
 from app.services.ai_service import AIService
 from app.services.notification_service import NotificationService
 from app.services.permission_service import PermissionService
+from app.services.telegram_target_access_service import is_chat_allowed_for_incoming_tasks
 from app.services.task_service import TaskService
 from app.services.task_visibility_service import (
     can_access_task,
@@ -240,12 +241,6 @@ def _strip_bot_username_mentions(raw_text: str, bot_username: str | None) -> str
         )
     cleaned = re.sub(r"\s+", " ", cleaned)
     return cleaned.strip(" \t\n\r,.;:!-")
-
-
-def _is_group_task_chat_allowed(chat_id: int) -> bool:
-    if not settings.ALLOWED_CHAT_IDS:
-        return False
-    return chat_id in settings.ALLOWED_CHAT_IDS
 
 
 def _group_task_dedupe_key(chat_id: int, sender_id: int, task_text: str) -> str:
@@ -1727,7 +1722,7 @@ async def handle_group_task_by_mention(
 ) -> None:
     if not message.text:
         return
-    if not _is_group_task_chat_allowed(message.chat.id):
+    if not await is_chat_allowed_for_incoming_tasks(session_maker, message.chat.id):
         return
 
     raw_text = message.text.strip()
