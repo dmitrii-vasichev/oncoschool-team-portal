@@ -197,7 +197,13 @@ export function MeetingHeader({
             {confirmDelete ? (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/10 px-3 py-1.5">
                 <span className="text-[11px] font-medium text-destructive sm:text-xs">
-                  {meeting.zoom_meeting_id ? "Удалить встречу и Zoom-конференцию?" : "Удалить встречу?"}
+                  {meeting.schedule_id
+                    ? meeting.zoom_meeting_id
+                      ? "Удалить всю серию встреч и связанные Zoom-конференции?"
+                      : "Удалить всю серию встреч?"
+                    : meeting.zoom_meeting_id
+                      ? "Удалить встречу и Zoom-конференцию?"
+                      : "Удалить встречу?"}
                 </span>
                 <button
                   onClick={() => setNotifyParticipantsDialogOpen(true)}
@@ -218,7 +224,7 @@ export function MeetingHeader({
               <button
                 onClick={() => setConfirmDelete(true)}
                 className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="Удалить встречу"
+                title={meeting.schedule_id ? "Удалить серию встреч" : "Удалить встречу"}
               >
                 <Trash2 className="h-4 w-4" />
               </button>

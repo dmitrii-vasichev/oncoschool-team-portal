@@ -114,14 +114,16 @@ export default function MeetingsPage() {
 
   const handleDeleteMeeting = useCallback(
     async (
-      meeting: { id: string },
+      meeting: { id: string; schedule_id: string | null },
       options?: { notifyParticipants?: boolean }
     ) => {
       try {
         await api.deleteMeeting(meeting.id, {
           notifyParticipants: options?.notifyParticipants,
         });
-        toastSuccess("Встреча удалена");
+        toastSuccess(
+          meeting.schedule_id ? "Серия встреч удалена" : "Встреча удалена"
+        );
         refetchUpcoming();
         refetchPast();
       } catch (e) {

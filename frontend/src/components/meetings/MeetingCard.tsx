@@ -158,7 +158,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                   }}
                   disabled={deleting}
                   className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-destructive bg-card/70 backdrop-blur-[1px] flex items-center justify-center disabled:opacity-50"
-                  title="Удалить встречу"
+                  title={meeting.schedule_id ? "Удалить серию встреч" : "Удалить встречу"}
                 >
                   {deleting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -310,7 +310,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
                   }}
                   disabled={deleting}
                   className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg text-muted-foreground hover:text-destructive bg-card/70 backdrop-blur-[1px] flex items-center justify-center disabled:opacity-50"
-                  title="Удалить встречу"
+                  title={meeting.schedule_id ? "Удалить серию встреч" : "Удалить встречу"}
                 >
                   {deleting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -463,10 +463,16 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
             <DialogHeader>
               <DialogTitle className="font-heading">Удалить встречу</DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground pt-1">
-                {meeting.zoom_meeting_id
-                  ? <>Встреча <span className="font-medium text-foreground">&laquo;{meeting.title || "Без названия"}&raquo;</span> и связанная Zoom-конференция будут удалены безвозвратно.</>
-                  : <>Встреча <span className="font-medium text-foreground">&laquo;{meeting.title || "Без названия"}&raquo;</span> будет удалена безвозвратно.</>
-                }
+                {meeting.schedule_id ? (
+                  <>
+                    Встреча <span className="font-medium text-foreground">&laquo;{meeting.title || "Без названия"}&raquo;</span>, связанное расписание и все запланированные экземпляры будут удалены безвозвратно
+                    {meeting.zoom_meeting_id ? ", включая связанные Zoom-конференции." : "."}
+                  </>
+                ) : meeting.zoom_meeting_id ? (
+                  <>Встреча <span className="font-medium text-foreground">&laquo;{meeting.title || "Без названия"}&raquo;</span> и связанная Zoom-конференция будут удалены безвозвратно.</>
+                ) : (
+                  <>Встреча <span className="font-medium text-foreground">&laquo;{meeting.title || "Без названия"}&raquo;</span> будет удалена безвозвратно.</>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="flex gap-2 justify-end pt-2">

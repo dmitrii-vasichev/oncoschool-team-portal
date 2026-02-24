@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_current_user, require_moderator
 from app.config import settings
 from app.db.database import get_session
-from app.db.models import MeetingSchedule, TeamMember
+from app.db.models import Meeting, MeetingSchedule, TeamMember
 from app.db.schemas import MeetingResponse, TaskResponse
 from app.db.repositories import MeetingRepository, TeamMemberRepository
 from app.services.ai_service import AIService
@@ -588,7 +588,7 @@ async def delete_meeting(
     member: TeamMember = Depends(require_moderator),
     session: AsyncSession = Depends(get_session),
 ):
-    """Delete a meeting. If Zoom meeting exists, delete from Zoom too."""
+    """Delete a meeting. For schedule meetings, remove the whole active series."""
     meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
@@ -608,32 +608,43 @@ async def delete_meeting(
             "telegram_targets": list(schedule.telegram_targets or []) if schedule else [],
         }
 
-    # For schedule-generated meetings, mark current occurrence as handled so
-    # background scheduler does not recreate the same meeting after manual delete.
+    meetings_to_delete = [meeting]
     if schedule and schedule.is_active:
+        # Deleting a meeting from active schedule means deleting the whole series.
+        schedule.is_active = False
         if schedule.recurrence == "on_demand":
             schedule.next_occurrence_at = None
             schedule.next_occurrence_skip = False
-        elif meeting.meeting_date:
-            occurrence_date = meeting.meeting_date.date()
-            if (
-                schedule.last_triggered_date is None
-                or schedule.last_triggered_date < occurrence_date
-            ):
-                schedule.last_triggered_date = occurrence_date
-            if schedule.recurrence == "one_time":
-                schedule.is_active = False
+        schedule.next_occurrence_time_override = None
 
-    # Delete from Zoom if possible
+        # Remove all scheduled instances for this series (including templates).
+        series_stmt = select(Meeting).where(
+            Meeting.schedule_id == schedule.id,
+            Meeting.status == "scheduled",
+        )
+        series_result = await session.execute(series_stmt)
+        series_meetings = list(series_result.scalars().all())
+        unique_meetings: dict[uuid.UUID, Meeting] = {meeting.id: meeting}
+        for series_meeting in series_meetings:
+            unique_meetings[series_meeting.id] = series_meeting
+        meetings_to_delete = list(unique_meetings.values())
+
     zoom_svc = _get_zoom_service(request)
-    if meeting.zoom_meeting_id and zoom_svc:
-        try:
-            await zoom_svc.delete_meeting(meeting.zoom_meeting_id)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f"Zoom delete failed: {e}")
+    if zoom_svc:
+        deleted_zoom_ids: set[str] = set()
+        for meeting_to_delete in meetings_to_delete:
+            zoom_meeting_id = (meeting_to_delete.zoom_meeting_id or "").strip()
+            if not zoom_meeting_id or zoom_meeting_id in deleted_zoom_ids:
+                continue
+            try:
+                await zoom_svc.delete_meeting(zoom_meeting_id)
+            except Exception as e:
+                logger.warning("Zoom delete failed for %s: %s", zoom_meeting_id, e)
+            deleted_zoom_ids.add(zoom_meeting_id)
 
-    await meeting_repo.delete(session, meeting_id)
+    for meeting_to_delete in meetings_to_delete:
+        await meeting_repo.delete(session, meeting_to_delete.id)
+
     await session.commit()
 
     if notify_participants and notification_payload:

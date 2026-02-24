@@ -223,7 +223,7 @@ export default function MeetingDetailPage() {
       await api.deleteMeeting(id, {
         notifyParticipants: options?.notifyParticipants,
       });
-      toastSuccess("Встреча удалена");
+      toastSuccess(meeting?.schedule_id ? "Серия встреч удалена" : "Встреча удалена");
       router.push("/meetings");
     } catch (e) {
       toastError(e instanceof Error ? e.message : "Ошибка удаления");
