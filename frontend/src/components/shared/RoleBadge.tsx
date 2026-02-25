@@ -1,5 +1,5 @@
 import type { MemberRole } from "@/lib/types";
-import { Crown, Shield, User } from "lucide-react";
+import { Crown, Shield, User, CircleHelp } from "lucide-react";
 
 const ROLE_CONFIG: Record<
   MemberRole,
@@ -25,8 +25,24 @@ const ROLE_CONFIG: Record<
   },
 };
 
-export function RoleBadge({ role }: { role: MemberRole }) {
-  const { label, icon: Icon, className } = ROLE_CONFIG[role];
+const UNKNOWN_ROLE_CONFIG = {
+  label: "Неизвестная роль",
+  icon: CircleHelp,
+  className: "bg-muted text-muted-foreground ring-1 ring-inset ring-border/70",
+};
+
+function resolveRole(role: MemberRole | string | null | undefined): MemberRole | null {
+  if (!role) return null;
+  return Object.prototype.hasOwnProperty.call(ROLE_CONFIG, role)
+    ? (role as MemberRole)
+    : null;
+}
+
+export function RoleBadge({ role }: { role: MemberRole | string | null | undefined }) {
+  const resolvedRole = resolveRole(role);
+  const { label, icon: Icon, className } = resolvedRole
+    ? ROLE_CONFIG[resolvedRole]
+    : UNKNOWN_ROLE_CONFIG;
 
   return (
     <span

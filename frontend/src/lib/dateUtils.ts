@@ -8,11 +8,15 @@
  * Adding `T00:00:00` (without `Z`) forces local interpretation.
  * Full ISO datetime strings (with time/timezone) pass through unchanged.
  */
-export function parseLocalDate(dateStr: string): Date {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    return new Date(dateStr + "T00:00:00");
+export function parseLocalDate(dateStr: string | null | undefined): Date {
+  if (typeof dateStr !== "string") return new Date(NaN);
+  const normalized = dateStr.trim();
+  if (!normalized) return new Date(NaN);
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return new Date(normalized + "T00:00:00");
   }
-  return new Date(dateStr);
+  return new Date(normalized);
 }
 
 /**
@@ -23,11 +27,15 @@ export function parseLocalDate(dateStr: string): Date {
  * indicator (no Z, no +/-offset), append "Z" so JavaScript interprets
  * it as UTC instead of the browser's local timezone.
  */
-export function parseUTCDate(dateStr: string): Date {
+export function parseUTCDate(dateStr: string | null | undefined): Date {
+  if (typeof dateStr !== "string") return new Date(NaN);
+  const normalized = dateStr.trim();
+  if (!normalized) return new Date(NaN);
+
   // Already has timezone info (Z or +/-offset) — parse as-is
-  if (/Z|[+-]\d{2}:\d{2}$/.test(dateStr)) {
-    return new Date(dateStr);
+  if (/Z|[+-]\d{2}:\d{2}$/.test(normalized)) {
+    return new Date(normalized);
   }
   // No timezone info — treat as UTC
-  return new Date(dateStr + "Z");
+  return new Date(normalized + "Z");
 }

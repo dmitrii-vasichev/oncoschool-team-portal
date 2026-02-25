@@ -9,6 +9,13 @@ interface FetchOptions {
   silent?: boolean;
 }
 
+function normalizeNotifications(rawItems: unknown): InAppNotification[] {
+  if (!Array.isArray(rawItems)) return [];
+  return rawItems.filter(
+    (item): item is InAppNotification => !!item && typeof item === "object"
+  );
+}
+
 export function useNotifications(limit = 30) {
   const [items, setItems] = useState<InAppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -23,8 +30,13 @@ export function useNotifications(limit = 30) {
     }
     try {
       const data = await api.getNotifications({ limit });
-      setItems(data.items);
-      setUnreadCount(data.unread_count);
+      const normalizedItems = normalizeNotifications(data?.items);
+      const normalizedUnreadCount =
+        typeof data?.unread_count === "number" && Number.isFinite(data.unread_count)
+          ? Math.max(0, Math.floor(data.unread_count))
+          : normalizedItems.reduce((acc, item) => acc + (item.is_read ? 0 : 1), 0);
+      setItems(normalizedItems);
+      setUnreadCount(normalizedUnreadCount);
     } catch (e) {
       if (!silent) {
         setError(e instanceof Error ? e.message : "Ошибка загрузки уведомлений");

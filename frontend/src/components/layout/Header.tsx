@@ -162,7 +162,9 @@ const EVENT_META: Record<
 };
 
 function formatRelativeDate(dateStr: string): string {
+  if (!dateStr) return "—";
   const date = parseUTCDate(dateStr);
+  if (Number.isNaN(date.getTime())) return "—";
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);

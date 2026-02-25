@@ -15,13 +15,21 @@ function extractMeetingIdFromPath(pathname: string): string | null {
 
 export function sanitizeZoomJoinUrl(
   rawUrl: string | null | undefined,
-  zoomMeetingId?: string | null
+  zoomMeetingId?: string | number | null
 ): string | null {
-  if (!rawUrl) return null;
+  if (typeof rawUrl !== "string") return null;
+  const normalizedUrl = rawUrl.trim();
+  if (!normalizedUrl) return null;
 
   try {
-    const parsed = new URL(rawUrl);
-    const meetingId = zoomMeetingId?.trim() || extractMeetingIdFromPath(parsed.pathname);
+    const parsed = new URL(normalizedUrl);
+    const rawMeetingId =
+      typeof zoomMeetingId === "string"
+        ? zoomMeetingId
+        : typeof zoomMeetingId === "number"
+          ? String(zoomMeetingId)
+          : "";
+    const meetingId = rawMeetingId.trim() || extractMeetingIdFromPath(parsed.pathname);
 
     if (meetingId) {
       parsed.pathname = `/j/${meetingId}`;
@@ -36,7 +44,6 @@ export function sanitizeZoomJoinUrl(
 
     return parsed.toString();
   } catch {
-    return rawUrl;
+    return normalizedUrl;
   }
 }
-
