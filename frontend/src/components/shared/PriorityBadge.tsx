@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  CircleHelp,
   AlertTriangle,
   ArrowUp,
   Minus,
@@ -46,15 +47,41 @@ const PRIORITY_CONFIG: Record<
   },
 };
 
-export function PriorityBadge({ priority }: { priority: TaskPriority }) {
-  const { icon: Icon, badgeClassName } = PRIORITY_CONFIG[priority];
+const UNKNOWN_PRIORITY_CONFIG = {
+  icon: CircleHelp,
+  badgeClassName: "bg-muted text-muted-foreground",
+  iconContainerClassName:
+    "bg-muted text-muted-foreground ring-1 ring-inset ring-border/70",
+};
+
+function resolvePriority(
+  priority: TaskPriority | string | null | undefined
+): TaskPriority | null {
+  if (!priority) return null;
+  return Object.prototype.hasOwnProperty.call(PRIORITY_CONFIG, priority)
+    ? (priority as TaskPriority)
+    : null;
+}
+
+export function PriorityBadge({
+  priority,
+}: {
+  priority: TaskPriority | string | null | undefined;
+}) {
+  const resolvedPriority = resolvePriority(priority);
+  const { icon: Icon, badgeClassName } = resolvedPriority
+    ? PRIORITY_CONFIG[resolvedPriority]
+    : UNKNOWN_PRIORITY_CONFIG;
+  const label = resolvedPriority
+    ? TASK_PRIORITY_LABELS[resolvedPriority]
+    : "Неизвестный";
 
   return (
     <span
       className={`badge-animated inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${badgeClassName}`}
     >
       <Icon className="h-3 w-3 shrink-0" />
-      {TASK_PRIORITY_LABELS[priority]}
+      {label}
     </span>
   );
 }
@@ -63,10 +90,16 @@ export function PriorityIcon({
   priority,
   className,
 }: {
-  priority: TaskPriority;
+  priority: TaskPriority | string | null | undefined;
   className?: string;
 }) {
-  const { icon: Icon, iconContainerClassName } = PRIORITY_CONFIG[priority];
+  const resolvedPriority = resolvePriority(priority);
+  const { icon: Icon, iconContainerClassName } = resolvedPriority
+    ? PRIORITY_CONFIG[resolvedPriority]
+    : UNKNOWN_PRIORITY_CONFIG;
+  const label = resolvedPriority
+    ? TASK_PRIORITY_LABELS[resolvedPriority]
+    : "Неизвестный";
 
   return (
     <Tooltip>
@@ -82,7 +115,7 @@ export function PriorityIcon({
         </span>
       </TooltipTrigger>
       <TooltipContent side="top">
-        Приоритет: {TASK_PRIORITY_LABELS[priority]}
+        Приоритет: {label}
       </TooltipContent>
     </Tooltip>
   );

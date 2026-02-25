@@ -56,8 +56,11 @@ import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
 // Helpers
 // ────────────────────────────────────────────
 
-function formatDate(dateStr: string): string {
-  return parseLocalDate(dateStr).toLocaleDateString("ru-RU", {
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const parsed = parseLocalDate(dateStr);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
   });
@@ -80,9 +83,12 @@ function isOverdue(task: Task): boolean {
 }
 
 function isStale(task: Task): boolean {
+  if (!task.updated_at) return false;
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  return new Date(task.updated_at) < threeDaysAgo;
+  const updatedAt = new Date(task.updated_at);
+  if (Number.isNaN(updatedAt.getTime())) return false;
+  return updatedAt < threeDaysAgo;
 }
 
 function normalizePersonName(
@@ -184,10 +190,14 @@ function TaskListItem({
     ) : task.source === "summary" ? (
       <FileText className="h-3 w-3 text-muted-foreground" />
     ) : null;
-  const checklist = task.checklist || [];
-  const completedChecklist = checklist.filter((item) => item.is_completed).length;
+  const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+  const completedChecklist = checklist.filter((item) => item?.is_completed).length;
+  const taskTitle =
+    typeof task.title === "string" && task.title.trim()
+      ? task.title
+      : "Без названия задачи";
   const { ref: titleRef, isTruncated: isTitleTruncated } =
-    useIsTruncated<HTMLSpanElement>(task.title);
+    useIsTruncated<HTMLSpanElement>(taskTitle);
   const titleClass = `text-sm font-heading font-semibold leading-tight line-clamp-2 ${
     overdue ? "text-destructive" : ""
   }`;
@@ -215,7 +225,7 @@ function TaskListItem({
                 <Tooltip delayDuration={0}>
                   <TooltipTrigger asChild>
                     <span ref={titleRef} className={titleClass}>
-                      {task.title}
+                      {taskTitle}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent
@@ -223,12 +233,12 @@ function TaskListItem({
                     align="start"
                     className="max-w-[320px] break-words"
                   >
-                    {task.title}
+                    {taskTitle}
                   </TooltipContent>
                 </Tooltip>
               ) : (
                 <span ref={titleRef} className={titleClass}>
-                  {task.title}
+                  {taskTitle}
                 </span>
               )}
             </div>
@@ -390,9 +400,13 @@ function UpcomingMeetingCard({
   const meetingTitle = meeting.title || "Встреча без названия";
   const { ref: titleRef, isTruncated: isTitleTruncated } =
     useIsTruncated<HTMLAnchorElement>(meetingTitle);
-  const meetingDate = meeting.meeting_date
+  const parsedMeetingDate = meeting.meeting_date
     ? parseUTCDate(meeting.meeting_date)
     : null;
+  const meetingDate =
+    parsedMeetingDate && !Number.isNaN(parsedMeetingDate.getTime())
+      ? parsedMeetingDate
+      : null;
 
   const dateStr = meetingDate
     ? meetingDate.toLocaleDateString("ru-RU", {
@@ -626,41 +640,48 @@ export default function DashboardPage() {
         const unassignedData = results[7] as { items: Task[] } | null;
 
         const hasError = results.some((r) => r === null);
+        const myTaskItems = Array.isArray(myTasksData?.items)
+          ? myTasksData.items.filter(Boolean)
+          : [];
+        const departmentTaskItems = Array.isArray(departmentTasksData?.items)
+          ? departmentTasksData.items.filter(Boolean)
+          : [];
+        const myMeetings = Array.isArray(myMeetingsData)
+          ? myMeetingsData.filter(Boolean)
+          : [];
+        const myPastMeetings = Array.isArray(myPastMeetingsData)
+          ? myPastMeetingsData.filter(Boolean)
+          : [];
+        const departmentMeetings = Array.isArray(deptMeetingsData)
+          ? deptMeetingsData.filter(Boolean)
+          : [];
+        const members = Array.isArray(teamData) ? teamData.filter(Boolean) : [];
+        const unassignedItems = Array.isArray(unassignedData?.items)
+          ? unassignedData.items.filter(Boolean)
+          : [];
 
         setDashboardTasksAnalytics(dashboardData);
-        setTeamMembers(teamData ?? []);
+        setTeamMembers(members);
 
         // Keep full lists for derived slices (overdue/stale/preview)
-        if (myTasksData) {
-          setMyTasks(myTasksData.items);
-          setMyOverdueTasks(myTasksData.items.filter(isOverdue));
-        } else {
-          setMyTasks([]);
-          setMyOverdueTasks([]);
-        }
+        setMyTasks(myTaskItems);
+        setMyOverdueTasks(myTaskItems.filter(isOverdue));
 
         // Department tasks
-        if (departmentTasksData) {
-          setDepartmentTasks(departmentTasksData.items);
-          setDepartmentOverdueTasks(departmentTasksData.items.filter(isOverdue));
-        } else {
-          setDepartmentTasks([]);
-          setDepartmentOverdueTasks([]);
-        }
+        setDepartmentTasks(departmentTaskItems);
+        setDepartmentOverdueTasks(departmentTaskItems.filter(isOverdue));
 
         // Upcoming meetings (top 3, but keep total count for badge)
-        setMyUpcomingMeetings(myMeetingsData ? myMeetingsData.slice(0, 3) : []);
-        setMyUpcomingMeetingsTotal(myMeetingsData ? myMeetingsData.length : 0);
-        setMyPastMeetingsTotal(myPastMeetingsData ? myPastMeetingsData.length : 0);
-        setDepartmentUpcomingMeetings(deptMeetingsData ? (deptMeetingsData as Meeting[]).slice(0, 3) : []);
-        setDepartmentUpcomingMeetingsTotal(deptMeetingsData ? (deptMeetingsData as Meeting[]).length : 0);
+        setMyUpcomingMeetings(myMeetings.slice(0, 3));
+        setMyUpcomingMeetingsTotal(myMeetings.length);
+        setMyPastMeetingsTotal(myPastMeetings.length);
+        setDepartmentUpcomingMeetings(departmentMeetings.slice(0, 3));
+        setDepartmentUpcomingMeetingsTotal(departmentMeetings.length);
 
         // Moderator data
         if (isModerator) {
           setUnassignedTasks(
-            unassignedData
-              ? unassignedData.items.filter((t) => !t.assignee_id).slice(0, 5)
-              : []
+            unassignedItems.filter((t) => !t.assignee_id).slice(0, 5)
           );
         } else {
           setUnassignedTasks([]);

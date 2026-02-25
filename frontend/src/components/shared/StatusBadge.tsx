@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
+  CircleHelp,
   CirclePlus,
   Clock3,
   Search,
@@ -54,15 +55,38 @@ const STATUS_CONFIG: Record<
   },
 };
 
-export function StatusBadge({ status }: { status: TaskStatus }) {
-  const { icon: Icon, badgeClassName } = STATUS_CONFIG[status];
+const UNKNOWN_STATUS_CONFIG = {
+  icon: CircleHelp,
+  badgeClassName:
+    "bg-muted text-muted-foreground ring-1 ring-inset ring-border/70",
+  iconContainerClassName:
+    "bg-muted text-muted-foreground ring-1 ring-inset ring-border/70",
+};
+
+function resolveStatus(status: TaskStatus | string | null | undefined): TaskStatus | null {
+  if (!status) return null;
+  return Object.prototype.hasOwnProperty.call(STATUS_CONFIG, status)
+    ? (status as TaskStatus)
+    : null;
+}
+
+export function StatusBadge({
+  status,
+}: {
+  status: TaskStatus | string | null | undefined;
+}) {
+  const resolvedStatus = resolveStatus(status);
+  const { icon: Icon, badgeClassName } = resolvedStatus
+    ? STATUS_CONFIG[resolvedStatus]
+    : UNKNOWN_STATUS_CONFIG;
+  const label = resolvedStatus ? TASK_STATUS_LABELS[resolvedStatus] : "Неизвестно";
 
   return (
     <span
       className={`badge-animated inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badgeClassName}`}
     >
       <Icon className="h-3 w-3 shrink-0" />
-      {TASK_STATUS_LABELS[status]}
+      {label}
     </span>
   );
 }
@@ -71,10 +95,14 @@ export function StatusIcon({
   status,
   className,
 }: {
-  status: TaskStatus;
+  status: TaskStatus | string | null | undefined;
   className?: string;
 }) {
-  const { icon: Icon, iconContainerClassName } = STATUS_CONFIG[status];
+  const resolvedStatus = resolveStatus(status);
+  const { icon: Icon, iconContainerClassName } = resolvedStatus
+    ? STATUS_CONFIG[resolvedStatus]
+    : UNKNOWN_STATUS_CONFIG;
+  const label = resolvedStatus ? TASK_STATUS_LABELS[resolvedStatus] : "Неизвестно";
 
   return (
     <Tooltip>
@@ -90,7 +118,7 @@ export function StatusIcon({
         </span>
       </TooltipTrigger>
       <TooltipContent side="top">
-        Статус: {TASK_STATUS_LABELS[status]}
+        Статус: {label}
       </TooltipContent>
     </Tooltip>
   );
