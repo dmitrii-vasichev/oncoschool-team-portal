@@ -418,7 +418,10 @@ async def analytics_overview(
     created_bucket = func.date_trunc("month", Task.created_at)
     created_stmt = _apply_task_scope(
         select(created_bucket.label("bucket"), func.count(Task.id).label("count"))
-        .where(Task.created_at >= month_window_start)
+        .where(
+            Task.created_at >= month_window_start,
+            Task.status.notin_(TASK_EXCLUDED_FROM_TOTAL_STATUSES),
+        )
         .group_by(created_bucket)
         .order_by(created_bucket),
         filters=scope_filters,
@@ -434,6 +437,7 @@ async def analytics_overview(
     completed_stmt = _apply_task_scope(
         select(completed_bucket.label("bucket"), func.count(Task.id).label("count"))
         .where(
+            Task.status == "done",
             Task.completed_at.is_not(None),
             Task.completed_at >= month_window_start,
         )
