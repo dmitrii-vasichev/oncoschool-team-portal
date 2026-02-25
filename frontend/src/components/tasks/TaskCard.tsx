@@ -18,6 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useIsTruncated } from "@/hooks/useIsTruncated";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/lib/types";
 import { parseLocalDate } from "@/lib/dateUtils";
@@ -43,10 +44,17 @@ export function TaskCard({ task }: { task: Task }) {
   const completedChecklistCount = checklist.filter((item) => item.is_completed).length;
   const checklistPreview = checklist.slice(0, 2);
   const checklistHiddenCount = Math.max(0, checklist.length - checklistPreview.length);
+  const { ref: titleRef, isTruncated: isTitleTruncated } =
+    useIsTruncated<HTMLParagraphElement>(task.title);
 
   const cardClass = overdue
     ? "border-destructive/35 bg-destructive/[0.05] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset] hover:bg-destructive/[0.08] hover:border-destructive/45"
     : "bg-card border-border/50 hover:border-primary/20";
+  const titleClass = `h-[3.75rem] overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
+    overdue
+      ? "text-destructive group-hover:text-destructive"
+      : "group-hover:text-primary"
+  }`;
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -66,26 +74,26 @@ export function TaskCard({ task }: { task: Task }) {
             {/* Header: title + status/priority icons */}
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1 space-y-0.5">
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <p
-                      className={`h-[3.75rem] overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
-                        overdue
-                          ? "text-destructive group-hover:text-destructive"
-                          : "group-hover:text-primary"
-                      }`}
+                {isTitleTruncated ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <p ref={titleRef} className={titleClass}>
+                        {task.title}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="top"
+                      align="start"
+                      className="max-w-[320px] break-words"
                     >
                       {task.title}
-                    </p>
-                  </TooltipTrigger>
-                  <TooltipContent
-                    side="top"
-                    align="start"
-                    className="max-w-[320px] break-words"
-                  >
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <p ref={titleRef} className={titleClass}>
                     {task.title}
-                  </TooltipContent>
-                </Tooltip>
+                  </p>
+                )}
 
                 <div className="flex h-3.5 items-center gap-1">
                   {task.source === "voice" && (

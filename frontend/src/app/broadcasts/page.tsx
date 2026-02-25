@@ -1243,14 +1243,21 @@ export default function BroadcastsPage() {
                       return (
                         <label
                           key={target.id}
-                          className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted"
+                          className={`group flex cursor-pointer items-center gap-3 rounded-xl border px-2.5 py-2 transition-all ${
+                            checked
+                              ? "border-primary/35 bg-primary/[0.08] shadow-sm"
+                              : "border-transparent hover:border-border/70 hover:bg-muted/60"
+                          }`}
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleTarget(target.id)}
-                            className="h-4 w-4 rounded border-border"
+                            className="peer sr-only"
                           />
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background text-transparent transition-all group-hover:border-primary/35 group-hover:bg-primary/5 peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card">
+                            <Check className="h-3.5 w-3.5 scale-75 opacity-0 transition-all duration-200 peer-checked:scale-100 peer-checked:opacity-100" />
+                          </span>
                           <span className="text-sm">{target.label || `Chat ${target.chat_id}`}</span>
                           {target.thread_id ? (
                             <span className="text-xs text-muted-foreground">· topic {target.thread_id}</span>

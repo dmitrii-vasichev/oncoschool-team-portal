@@ -38,6 +38,7 @@ import {
 import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDepartments } from "@/hooks/useDepartments";
+import { useIsTruncated } from "@/hooks/useIsTruncated";
 import { PermissionService } from "@/lib/permissions";
 import { getAccessibleDepartments } from "@/lib/departmentAccess";
 import { api } from "@/lib/api";
@@ -174,6 +175,11 @@ function TaskListItem({
     ) : null;
   const checklist = task.checklist || [];
   const completedChecklist = checklist.filter((item) => item.is_completed).length;
+  const { ref: titleRef, isTruncated: isTitleTruncated } =
+    useIsTruncated<HTMLSpanElement>(task.title);
+  const titleClass = `text-sm font-heading font-semibold leading-tight line-clamp-2 ${
+    overdue ? "text-destructive" : ""
+  }`;
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -192,24 +198,26 @@ function TaskListItem({
           <div className="flex-1 min-w-0">
             <div className="min-w-0 flex items-start gap-1.5">
               {sourceIcon}
-              <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>
-                  <span
-                    className={`text-sm font-heading font-semibold leading-tight line-clamp-2 ${
-                      overdue ? "text-destructive" : ""
-                    }`}
+              {isTitleTruncated ? (
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <span ref={titleRef} className={titleClass}>
+                      {task.title}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="max-w-[320px] break-words"
                   >
                     {task.title}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent
-                  side="top"
-                  align="start"
-                  className="max-w-[320px] break-words"
-                >
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <span ref={titleRef} className={titleClass}>
                   {task.title}
-                </TooltipContent>
-              </Tooltip>
+                </span>
+              )}
             </div>
             <div className="mt-2 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
             {overdue && (
@@ -363,6 +371,8 @@ function UpcomingMeetingCard({
     meeting.zoom_meeting_id
   );
   const meetingTitle = meeting.title || "Встреча без названия";
+  const { ref: titleRef, isTruncated: isTitleTruncated } =
+    useIsTruncated<HTMLAnchorElement>(meetingTitle);
   const meetingDate = meeting.meeting_date
     ? parseUTCDate(meeting.meeting_date)
     : null;
@@ -388,23 +398,34 @@ function UpcomingMeetingCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <Tooltip delayDuration={0}>
-            <TooltipTrigger asChild>
-              <Link
-                href={`/meetings/${meeting.id}`}
-                className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
+          {isTitleTruncated ? (
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Link
+                  ref={titleRef}
+                  href={`/meetings/${meeting.id}`}
+                  className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
+                >
+                  {meetingTitle}
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                align="start"
+                className="max-w-[320px] break-words"
               >
                 {meetingTitle}
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent
-              side="top"
-              align="start"
-              className="max-w-[320px] break-words"
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Link
+              ref={titleRef}
+              href={`/meetings/${meeting.id}`}
+              className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
             >
               {meetingTitle}
-            </TooltipContent>
-          </Tooltip>
+            </Link>
+          )}
           <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
             <CalendarDays className="h-3 w-3 shrink-0" />
             {dateStr} · {timeStr}

@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { useIsTruncated } from "@/hooks/useIsTruncated";
 import type { Meeting, TeamMember } from "@/lib/types";
 import { DAY_OF_WEEK_SHORT, RECURRENCE_LABELS } from "@/lib/types";
 import { parseUTCDate } from "@/lib/dateUtils";
@@ -114,6 +115,10 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
   const recurrenceKey = (meeting.schedule_recurrence || "one_time") as keyof typeof RECURRENCE_LABELS;
   const recurrenceLabel = RECURRENCE_LABELS[recurrenceKey] || "Разовая встреча";
   const meetingTitle = meeting.title || "Встреча без названия";
+  const { ref: meetingTitleRef, isTruncated: isMeetingTitleTruncated } =
+    useIsTruncated<HTMLHeadingElement>(meetingTitle);
+  const meetingTitleClass =
+    "min-w-0 flex-1 font-heading font-semibold text-[15px] leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10";
 
   const upcomingMeta = useMemo(() => {
     if (!meeting.meeting_date) {
@@ -186,20 +191,26 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
 
                 <div className={`flex-1 min-w-0 ${isModerator && onDelete ? "pr-9 sm:pr-11" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <Tooltip delayDuration={0}>
-                      <TooltipTrigger asChild>
-                        <h3 className="min-w-0 flex-1 font-heading font-semibold text-[15px] leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10">
+                    {isMeetingTitleTruncated ? (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <h3 ref={meetingTitleRef} className={meetingTitleClass}>
+                            {meetingTitle}
+                          </h3>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="start"
+                          className="max-w-[320px] break-words"
+                        >
                           {meetingTitle}
-                        </h3>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        align="start"
-                        className="max-w-[320px] break-words"
-                      >
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <h3 ref={meetingTitleRef} className={meetingTitleClass}>
                         {meetingTitle}
-                      </TooltipContent>
-                    </Tooltip>
+                      </h3>
+                    )}
 
                     {(isCancelled || isInProgress) && (
                       <span
@@ -349,20 +360,26 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
 
                 <div className={`flex-1 min-w-0 ${isModerator && onDelete ? "pr-9 sm:pr-11" : ""}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <Tooltip delayDuration={0}>
-                      <TooltipTrigger asChild>
-                        <h3 className="min-w-0 flex-1 font-heading font-semibold text-[15px] leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10">
+                    {isMeetingTitleTruncated ? (
+                      <Tooltip delayDuration={0}>
+                        <TooltipTrigger asChild>
+                          <h3 ref={meetingTitleRef} className={meetingTitleClass}>
+                            {meetingTitle}
+                          </h3>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="start"
+                          className="max-w-[320px] break-words"
+                        >
                           {meetingTitle}
-                        </h3>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        align="start"
-                        className="max-w-[320px] break-words"
-                      >
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <h3 ref={meetingTitleRef} className={meetingTitleClass}>
                         {meetingTitle}
-                      </TooltipContent>
-                    </Tooltip>
+                      </h3>
+                    )}
 
                     {(isCancelled || isInProgress) && (
                       <span

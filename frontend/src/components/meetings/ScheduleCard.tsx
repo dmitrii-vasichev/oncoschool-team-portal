@@ -19,6 +19,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import { useIsTruncated } from "@/hooks/useIsTruncated";
 import type { MeetingSchedule, TeamMember } from "@/lib/types";
 import {
   DAY_OF_WEEK_SHORT,
@@ -72,6 +73,11 @@ export function ScheduleCard({
       : [schedule.reminder_minutes_before]
   ).slice().sort((a, b) => b - a);
   const reminderSummary = reminderOffsets.map(formatReminderOffset).join(", ");
+  const scheduleTitle = schedule.title;
+  const { ref: titleRef, isTruncated: isTitleTruncated } =
+    useIsTruncated<HTMLHeadingElement>(scheduleTitle);
+  const titleClass =
+    "font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10";
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
@@ -113,18 +119,22 @@ export function ScheduleCard({
           {/* Content */}
           <div className={`flex-1 min-w-0 ${isModerator ? "pr-14 sm:pr-[4.5rem]" : ""}`}>
             <TooltipProvider delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <h3
-                    className="font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10"
-                  >
-                    {schedule.title}
-                  </h3>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[280px] break-words">
-                  {schedule.title}
-                </TooltipContent>
-              </Tooltip>
+              {isTitleTruncated ? (
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <h3 ref={titleRef} className={titleClass}>
+                      {scheduleTitle}
+                    </h3>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[280px] break-words">
+                    {scheduleTitle}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <h3 ref={titleRef} className={titleClass}>
+                  {scheduleTitle}
+                </h3>
+              )}
             </TooltipProvider>
 
             {/* Time and recurrence block */}
