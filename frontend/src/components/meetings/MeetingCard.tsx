@@ -28,6 +28,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -148,7 +149,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
   }, [meeting.meeting_date]);
 
   return (
-    <>
+    <TooltipProvider delayDuration={0}>
       {variant === "upcoming" ? (
         <Link href={`/meetings/${meeting.id}`} className="group block h-full">
           <div className="group relative h-full min-h-[236px] sm:min-h-[228px] overflow-hidden rounded-2xl border border-border/60 bg-card hover:shadow-md hover:border-border/80 transition-all duration-200">
@@ -554,7 +555,7 @@ export function MeetingCard({ meeting, variant, members = [], isModerator, onDel
           void handleDelete(false);
         }}
       />
-    </>
+    </TooltipProvider>
   );
 }
 
