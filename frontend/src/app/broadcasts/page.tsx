@@ -167,6 +167,10 @@ function stripHtmlTags(value: string): string {
     .trim();
 }
 
+function normalizeMessageHtml(value: string): string {
+  return value.replace(/\r\n?/g, "\n").trim();
+}
+
 function normalizeTelegramUsername(value: string | null | undefined): string | null {
   if (!value) return null;
   const cleaned = value.trim().replace(/^@+/, "");
@@ -441,7 +445,7 @@ export default function BroadcastsPage() {
   }, [mentionableMembers]);
 
   const composedMessageHtml = useMemo(() => {
-    return messageHtml.trim();
+    return normalizeMessageHtml(messageHtml);
   }, [messageHtml]);
 
   const activeImagePresets = useMemo(
@@ -467,7 +471,8 @@ export default function BroadcastsPage() {
       : null;
 
   const messageLimit = hasImageAttachment ? MAX_TELEGRAM_CAPTION_LEN : MAX_TELEGRAM_MESSAGE_LEN;
-  const messageTooLong = composedMessageHtml.length > messageLimit;
+  const composedMessageLength = composedMessageHtml.length;
+  const messageTooLong = composedMessageLength > messageLimit;
 
   const departmentById = useMemo(() => {
     return new Map(departments.map((department) => [department.id, department]));
@@ -1447,7 +1452,7 @@ export default function BroadcastsPage() {
                     Сообщение
                   </Label>
                   <div className={`text-xs ${messageTooLong ? "text-destructive" : "text-muted-foreground"}`}>
-                    {composedMessageHtml.length} / {messageLimit}
+                    {composedMessageLength} / {messageLimit}
                   </div>
                 </div>
 

@@ -63,8 +63,12 @@ def _to_utc_naive(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _normalize_message_html(message_html: str) -> str:
+    return (message_html or "").replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _validate_message_html(message_html: str) -> str:
-    message = (message_html or "").strip()
+    message = _normalize_message_html(message_html).strip()
     if not message:
         raise HTTPException(status_code=400, detail="Текст сообщения не может быть пустым")
     if len(message) > MAX_TELEGRAM_MESSAGE_LEN:
@@ -226,9 +230,10 @@ async def _send_to_chat(
     image_path: str | None = None,
     storage_service=None,
 ) -> tuple[bool, str | None]:
+    normalized_message = _normalize_message_html(message_html)
     try:
         if image_payload is not None:
-            if len(message_html) > MAX_TELEGRAM_CAPTION_LEN:
+            if len(normalized_message) > MAX_TELEGRAM_CAPTION_LEN:
                 return (
                     False,
                     "С картинкой Telegram ограничивает подпись 1024 символами",
@@ -236,7 +241,7 @@ async def _send_to_chat(
             kwargs = {
                 "chat_id": int(chat_id),
                 "photo": BufferedInputFile(image_payload, filename=image_filename),
-                "caption": message_html,
+                "caption": normalized_message,
                 "parse_mode": "HTML",
             }
             if thread_id:
@@ -245,7 +250,7 @@ async def _send_to_chat(
             return True, None
 
         if image_path:
-            if len(message_html) > MAX_TELEGRAM_CAPTION_LEN:
+            if len(normalized_message) > MAX_TELEGRAM_CAPTION_LEN:
                 return (
                     False,
                     "С картинкой Telegram ограничивает подпись 1024 символами",
@@ -254,7 +259,7 @@ async def _send_to_chat(
             kwargs = {
                 "chat_id": int(chat_id),
                 "photo": photo,
-                "caption": message_html,
+                "caption": normalized_message,
                 "parse_mode": "HTML",
             }
             if thread_id:
@@ -264,7 +269,7 @@ async def _send_to_chat(
 
         kwargs = {
             "chat_id": int(chat_id),
-            "text": message_html,
+            "text": normalized_message,
             "parse_mode": "HTML",
         }
         if thread_id:
