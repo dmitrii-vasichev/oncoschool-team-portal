@@ -29,7 +29,12 @@ import { StatusIcon } from "@/components/shared/StatusBadge";
 import { PriorityIcon } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/components/shared/Toast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDepartments } from "@/hooks/useDepartments";
@@ -187,13 +192,24 @@ function TaskListItem({
           <div className="flex-1 min-w-0">
             <div className="min-w-0 flex items-start gap-1.5">
               {sourceIcon}
-              <span
-                className={`text-sm font-heading font-semibold leading-tight line-clamp-2 ${
-                  overdue ? "text-destructive" : ""
-                }`}
-              >
-                {task.title}
-              </span>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <span
+                    className={`text-sm font-heading font-semibold leading-tight line-clamp-2 ${
+                      overdue ? "text-destructive" : ""
+                    }`}
+                  >
+                    {task.title}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  className="max-w-[320px] break-words"
+                >
+                  {task.title}
+                </TooltipContent>
+              </Tooltip>
             </div>
             <div className="mt-2 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
             {overdue && (
@@ -346,6 +362,7 @@ function UpcomingMeetingCard({
     meeting.zoom_join_url,
     meeting.zoom_meeting_id
   );
+  const meetingTitle = meeting.title || "Встреча без названия";
   const meetingDate = meeting.meeting_date
     ? parseUTCDate(meeting.meeting_date)
     : null;
@@ -371,12 +388,23 @@ function UpcomingMeetingCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/meetings/${meeting.id}`}
-            className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
-          >
-            {meeting.title || "Встреча без названия"}
-          </Link>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Link
+                href={`/meetings/${meeting.id}`}
+                className="text-sm font-heading font-semibold truncate block group-hover:text-primary transition-colors"
+              >
+                {meetingTitle}
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent
+              side="top"
+              align="start"
+              className="max-w-[320px] break-words"
+            >
+              {meetingTitle}
+            </TooltipContent>
+          </Tooltip>
           <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
             <CalendarDays className="h-3 w-3 shrink-0" />
             {dateStr} · {timeStr}

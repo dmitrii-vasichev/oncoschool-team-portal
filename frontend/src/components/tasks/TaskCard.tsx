@@ -12,7 +12,12 @@ import {
 import { PriorityIcon } from "@/components/shared/PriorityBadge";
 import { StatusIcon } from "@/components/shared/StatusBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/lib/types";
 import { parseLocalDate } from "@/lib/dateUtils";
@@ -61,16 +66,26 @@ export function TaskCard({ task }: { task: Task }) {
             {/* Header: title + status/priority icons */}
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1 space-y-0.5">
-                <p
-                  className={`h-[3.75rem] overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
-                    overdue
-                      ? "text-destructive group-hover:text-destructive"
-                      : "group-hover:text-primary"
-                  }`}
-                  title={task.title}
-                >
-                  {task.title}
-                </p>
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <p
+                      className={`h-[3.75rem] overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
+                        overdue
+                          ? "text-destructive group-hover:text-destructive"
+                          : "group-hover:text-primary"
+                      }`}
+                    >
+                      {task.title}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="start"
+                    className="max-w-[320px] break-words"
+                  >
+                    {task.title}
+                  </TooltipContent>
+                </Tooltip>
 
                 <div className="flex h-3.5 items-center gap-1">
                   {task.source === "voice" && (

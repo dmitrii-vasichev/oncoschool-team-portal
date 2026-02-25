@@ -112,12 +112,11 @@ export function ScheduleCard({
 
           {/* Content */}
           <div className={`flex-1 min-w-0 ${isModerator ? "pr-14 sm:pr-[4.5rem]" : ""}`}>
-            <TooltipProvider delayDuration={150}>
+            <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <h3
                     className="font-heading font-semibold text-sm leading-5 text-foreground line-clamp-1 min-h-5 sm:line-clamp-2 sm:min-h-10"
-                    title={schedule.title}
                   >
                     {schedule.title}
                   </h3>
