@@ -1456,6 +1456,7 @@ function RemindersSection() {
       {editMember && (
         <ReminderEditDialog
           member={editMember}
+          allMembers={members}
           reminder={editMemberId ? reminders[editMemberId] ?? null : null}
           onClose={() => setEditMemberId(null)}
           onSaved={fetchReminders}
@@ -1471,15 +1472,18 @@ function RemindersSection() {
 
 function ReminderEditDialog({
   member,
+  allMembers,
   reminder,
   onClose,
   onSaved,
 }: {
   member: TeamMember;
+  allMembers: TeamMember[];
   reminder: ReminderSettings | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { toastSuccess, toastError } = useToast();
   const [isEnabled, setIsEnabled] = useState(reminder?.is_enabled ?? false);
   const [time, setTime] = useState(
     reminder?.reminder_time?.slice(0, 5) ?? "09:00"
@@ -1522,8 +1526,19 @@ function ReminderEditDialog({
   const [draggingTaskLineField, setDraggingTaskLineField] = useState<ReminderTaskLineFieldKey | null>(null);
   const [dragOverTaskLineField, setDragOverTaskLineField] = useState<ReminderTaskLineFieldKey | null>(null);
   const [isTaskLineFormatExpanded, setIsTaskLineFormatExpanded] = useState(false);
+  const [isApplySettingsExpanded, setIsApplySettingsExpanded] = useState(false);
+  const [selectedApplyMemberIds, setSelectedApplyMemberIds] = useState<string[]>([]);
+  const [applyTimeSettings, setApplyTimeSettings] = useState(true);
+  const [applyDaysSettings, setApplyDaysSettings] = useState(true);
+  const [applyDigestSettings, setApplyDigestSettings] = useState(true);
+  const [applyTaskLineSettings, setApplyTaskLineSettings] = useState(true);
+  const [applyingSettings, setApplyingSettings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const otherMembers = useMemo(
+    () => allMembers.filter((candidate) => candidate.id !== member.id),
+    [allMembers, member.id]
+  );
   const localTimeInfo = useMemo(() => getLocalTimeFromMoscow(time), [time]);
   const hasAnyDigestSectionEnabled =
     includeOverdue || includeUpcoming || includeInProgress || includeNew;
@@ -1532,6 +1547,11 @@ function ReminderEditDialog({
     taskLineShowTitle ||
     taskLineShowDeadline ||
     taskLineShowPriority;
+  const hasAnyApplySettingSelected =
+    applyTimeSettings ||
+    applyDaysSettings ||
+    applyDigestSettings ||
+    applyTaskLineSettings;
   const digestSectionEnabledMap: Record<ReminderDigestSectionKey, boolean> = {
     overdue: includeOverdue,
     upcoming: includeUpcoming,
@@ -1714,6 +1734,147 @@ function ReminderEditDialog({
     []
   );
 
+  const toggleApplyMember = (memberId: string) => {
+    setSelectedApplyMemberIds((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
+
+  const setAllApplySettings = (value: boolean) => {
+    setApplyTimeSettings(value);
+    setApplyDaysSettings(value);
+    setApplyDigestSettings(value);
+    setApplyTaskLineSettings(value);
+  };
+
+  const buildReminderPayload = useCallback(
+    () => ({
+      is_enabled: isEnabled,
+      reminder_time: time + ":00",
+      days_of_week: days,
+      include_overdue: includeOverdue,
+      include_upcoming: includeUpcoming,
+      include_in_progress: includeInProgress,
+      include_new: includeNew,
+      digest_sections_order: digestSectionsOrder,
+      task_line_show_number: taskLineShowNumber,
+      task_line_show_title: taskLineShowTitle,
+      task_line_show_deadline: taskLineShowDeadline,
+      task_line_show_priority: taskLineShowPriority,
+      task_line_fields_order: taskLineFieldsOrder,
+    }),
+    [
+      isEnabled,
+      time,
+      days,
+      includeOverdue,
+      includeUpcoming,
+      includeInProgress,
+      includeNew,
+      digestSectionsOrder,
+      taskLineShowNumber,
+      taskLineShowTitle,
+      taskLineShowDeadline,
+      taskLineShowPriority,
+      taskLineFieldsOrder,
+    ]
+  );
+
+  const buildApplyPayload = useCallback(() => {
+    const payload: Partial<ReminderSettings> = {};
+    if (applyTimeSettings) {
+      payload.reminder_time = time + ":00";
+    }
+    if (applyDaysSettings) {
+      payload.days_of_week = days;
+    }
+    if (applyDigestSettings) {
+      payload.include_overdue = includeOverdue;
+      payload.include_upcoming = includeUpcoming;
+      payload.include_in_progress = includeInProgress;
+      payload.include_new = includeNew;
+      payload.digest_sections_order = digestSectionsOrder;
+    }
+    if (applyTaskLineSettings) {
+      payload.task_line_show_number = taskLineShowNumber;
+      payload.task_line_show_title = taskLineShowTitle;
+      payload.task_line_show_deadline = taskLineShowDeadline;
+      payload.task_line_show_priority = taskLineShowPriority;
+      payload.task_line_fields_order = taskLineFieldsOrder;
+    }
+    return payload;
+  }, [
+    applyTimeSettings,
+    applyDaysSettings,
+    applyDigestSettings,
+    applyTaskLineSettings,
+    time,
+    days,
+    includeOverdue,
+    includeUpcoming,
+    includeInProgress,
+    includeNew,
+    digestSectionsOrder,
+    taskLineShowNumber,
+    taskLineShowTitle,
+    taskLineShowDeadline,
+    taskLineShowPriority,
+    taskLineFieldsOrder,
+  ]);
+
+  const applySettingsToMembers = async (targetMemberIds: string[]) => {
+    const uniqueIds = Array.from(new Set(targetMemberIds));
+    if (uniqueIds.length === 0) {
+      setError("Выберите хотя бы одного участника для применения настроек");
+      return;
+    }
+    if (!hasAnyApplySettingSelected) {
+      setError("Выберите хотя бы один блок настроек для применения");
+      return;
+    }
+    if (applyTaskLineSettings && !hasAnyTaskLineFieldEnabled) {
+      setError("Выберите хотя бы один элемент строки задачи");
+      return;
+    }
+
+    setApplyingSettings(true);
+    setError(null);
+    try {
+      const payload = buildApplyPayload();
+      if (Object.keys(payload).length === 0) {
+        setError("Не удалось сформировать данные для применения");
+        return;
+      }
+      const results = await Promise.allSettled(
+        uniqueIds.map((memberId) => api.updateReminderSettings(memberId, payload))
+      );
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled"
+      ).length;
+      const failedCount = uniqueIds.length - successCount;
+
+      if (successCount > 0) {
+        onSaved();
+      }
+
+      if (failedCount === 0) {
+        toastSuccess(`Настройки применены для ${successCount} участн.`);
+      } else {
+        toastError(
+          `Настройки применены: ${successCount}, с ошибками: ${failedCount}`
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Ошибка применения настроек";
+      setError(msg);
+      toastError(msg);
+    } finally {
+      setApplyingSettings(false);
+    }
+  };
+
   const handleReminderEnabledToggle = (value: boolean) => {
     if (value) {
       if (!hasAnyDigestSectionEnabled) {
@@ -1734,21 +1895,7 @@ function ReminderEditDialog({
     setSaving(true);
     setError(null);
     try {
-      await api.updateReminderSettings(member.id, {
-        is_enabled: isEnabled,
-        reminder_time: time + ":00",
-        days_of_week: days,
-        include_overdue: includeOverdue,
-        include_upcoming: includeUpcoming,
-        include_in_progress: includeInProgress,
-        include_new: includeNew,
-        digest_sections_order: digestSectionsOrder,
-        task_line_show_number: taskLineShowNumber,
-        task_line_show_title: taskLineShowTitle,
-        task_line_show_deadline: taskLineShowDeadline,
-        task_line_show_priority: taskLineShowPriority,
-        task_line_fields_order: taskLineFieldsOrder,
-      });
+      await api.updateReminderSettings(member.id, buildReminderPayload());
       onSaved();
       onClose();
     } catch (e) {
@@ -1849,7 +1996,7 @@ function ReminderEditDialog({
                   variant="outline"
                   size="sm"
                   className="h-7 rounded-lg px-3 text-xs"
-                  disabled={saving}
+                  disabled={saving || applyingSettings}
                   onClick={() => setAllDigestSections(true)}
                 >
                   Включить всё
@@ -1859,7 +2006,7 @@ function ReminderEditDialog({
                   variant="outline"
                   size="sm"
                   className="h-7 rounded-lg px-3 text-xs"
-                  disabled={saving}
+                  disabled={saving || applyingSettings}
                   onClick={() => setAllDigestSections(false)}
                 >
                   Выключить всё
@@ -1929,7 +2076,7 @@ function ReminderEditDialog({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 rounded-lg text-muted-foreground"
-                        disabled={isFirst || saving}
+                        disabled={isFirst || saving || applyingSettings}
                         onClick={() => moveDigestSection(sectionKey, -1)}
                       >
                         <ArrowUp className="h-3.5 w-3.5" />
@@ -1939,7 +2086,7 @@ function ReminderEditDialog({
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 rounded-lg text-muted-foreground"
-                        disabled={isLast || saving}
+                        disabled={isLast || saving || applyingSettings}
                         onClick={() => moveDigestSection(sectionKey, 1)}
                       >
                         <ArrowDown className="h-3.5 w-3.5" />
@@ -1994,7 +2141,7 @@ function ReminderEditDialog({
                     variant="outline"
                     size="sm"
                     className="h-7 rounded-lg px-3 text-xs"
-                    disabled={saving}
+                    disabled={saving || applyingSettings}
                     onClick={() => setAllTaskLineFields(true)}
                   >
                     Включить всё
@@ -2004,7 +2151,7 @@ function ReminderEditDialog({
                     variant="outline"
                     size="sm"
                     className="h-7 rounded-lg px-3 text-xs"
-                    disabled={saving}
+                    disabled={saving || applyingSettings}
                     onClick={() => setAllTaskLineFields(false)}
                   >
                     Выключить всё
@@ -2073,7 +2220,7 @@ function ReminderEditDialog({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 rounded-lg text-muted-foreground"
-                          disabled={isFirst || saving}
+                          disabled={isFirst || saving || applyingSettings}
                           onClick={() => moveTaskLineField(fieldKey, -1)}
                         >
                           <ArrowUp className="h-3.5 w-3.5" />
@@ -2083,7 +2230,7 @@ function ReminderEditDialog({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 rounded-lg text-muted-foreground"
-                          disabled={isLast || saving}
+                          disabled={isLast || saving || applyingSettings}
                           onClick={() => moveTaskLineField(fieldKey, 1)}
                         >
                           <ArrowDown className="h-3.5 w-3.5" />
@@ -2119,6 +2266,216 @@ function ReminderEditDialog({
             )}
           </div>
 
+          {/* Divider */}
+          <div className="h-px bg-border/60" />
+
+          {/* Apply my settings */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Применить мои настройки
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 rounded-lg px-3 text-xs"
+                onClick={() => setIsApplySettingsExpanded((prev) => !prev)}
+              >
+                {isApplySettingsExpanded ? "Скрыть" : "Выбрать участников"}
+                {isApplySettingsExpanded ? (
+                  <ChevronUp className="h-3.5 w-3.5 ml-1.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 ml-1.5" />
+                )}
+              </Button>
+            </div>
+
+            {isApplySettingsExpanded ? (
+              <div className="space-y-3 rounded-xl border border-border/60 bg-muted/15 p-3">
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-2xs text-muted-foreground">
+                    Применить текущие параметры этой карточки к другим участникам.
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-lg px-2.5 text-xs"
+                      disabled={applyingSettings || saving}
+                      onClick={() => setAllApplySettings(true)}
+                    >
+                      Все блоки
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-lg px-2.5 text-xs"
+                      disabled={applyingSettings || saving}
+                      onClick={() => setAllApplySettings(false)}
+                    >
+                      Очистить блоки
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1 rounded-lg border border-border/60 bg-card p-2">
+                  <p className="px-1 pb-1 text-2xs text-muted-foreground">
+                    Что применить:
+                  </p>
+                  <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyTimeSettings}
+                      onChange={() => setApplyTimeSettings((prev) => !prev)}
+                      className="h-4 w-4 accent-primary"
+                      disabled={applyingSettings || saving}
+                    />
+                    <span className="text-sm">Время отправки</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyDaysSettings}
+                      onChange={() => setApplyDaysSettings((prev) => !prev)}
+                      className="h-4 w-4 accent-primary"
+                      disabled={applyingSettings || saving}
+                    />
+                    <span className="text-sm">Дни недели</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyDigestSettings}
+                      onChange={() => setApplyDigestSettings((prev) => !prev)}
+                      className="h-4 w-4 accent-primary"
+                      disabled={applyingSettings || saving}
+                    />
+                    <span className="text-sm">Что включить в дайджест + порядок блоков</span>
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={applyTaskLineSettings}
+                      onChange={() => setApplyTaskLineSettings((prev) => !prev)}
+                      className="h-4 w-4 accent-primary"
+                      disabled={applyingSettings || saving}
+                    />
+                    <span className="text-sm">Формат строки задачи</span>
+                  </label>
+                </div>
+
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-2xs text-muted-foreground">
+                    Кому применить:
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 rounded-lg px-2.5 text-xs"
+                      disabled={otherMembers.length === 0 || applyingSettings || saving}
+                      onClick={() =>
+                        setSelectedApplyMemberIds(
+                          otherMembers.map((candidate) => candidate.id)
+                        )
+                      }
+                    >
+                      Выбрать всех
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 rounded-lg px-2.5 text-xs"
+                      disabled={selectedApplyMemberIds.length === 0 || applyingSettings || saving}
+                      onClick={() => setSelectedApplyMemberIds([])}
+                    >
+                      Очистить
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60 bg-card p-2 space-y-1">
+                  {otherMembers.length === 0 ? (
+                    <p className="px-2 py-3 text-xs text-muted-foreground">
+                      Нет других участников для применения.
+                    </p>
+                  ) : (
+                    otherMembers.map((candidate) => {
+                      const checked = selectedApplyMemberIds.includes(candidate.id);
+                      return (
+                        <label
+                          key={candidate.id}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleApplyMember(candidate.id)}
+                            className="h-4 w-4 accent-primary"
+                            disabled={applyingSettings || saving}
+                          />
+                          <span className="text-sm">{candidate.full_name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-2xs text-muted-foreground">
+                    Выбрано участников: {selectedApplyMemberIds.length}
+                  </p>
+                  <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-lg px-3 text-xs"
+                      disabled={
+                        selectedApplyMemberIds.length === 0 ||
+                        !hasAnyApplySettingSelected ||
+                        applyingSettings ||
+                        saving
+                      }
+                      onClick={() => applySettingsToMembers(selectedApplyMemberIds)}
+                    >
+                      {applyingSettings ? "Применяем..." : "Применить выбранным"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-8 rounded-lg px-3 text-xs"
+                      disabled={
+                        allMembers.length === 0 ||
+                        !hasAnyApplySettingSelected ||
+                        applyingSettings ||
+                        saving
+                      }
+                      onClick={() =>
+                        applySettingsToMembers(
+                          allMembers.map((candidate) => candidate.id)
+                        )
+                      }
+                    >
+                      {applyingSettings ? "Применяем..." : "Применить всем"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border/40 bg-muted/30 px-3 py-2.5">
+                <p className="text-2xs text-muted-foreground">
+                  Откройте секцию, чтобы применить текущие настройки другим участникам или всем сразу.
+                </p>
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3">
               <p className="text-sm text-destructive">{error}</p>
@@ -2130,14 +2487,14 @@ function ReminderEditDialog({
               variant="outline"
               className="w-full rounded-xl sm:w-auto"
               onClick={onClose}
-              disabled={saving}
+              disabled={saving || applyingSettings}
             >
               Отмена
             </Button>
             <Button
               className="w-full rounded-xl sm:w-auto"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || applyingSettings}
             >
               {saving ? (
                 <>
