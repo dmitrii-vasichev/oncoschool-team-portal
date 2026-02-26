@@ -541,7 +541,6 @@ class ReminderService:
                                     field_flags=task_line_field_flags,
                                     field_order=task_line_fields_order,
                                     overdue_deadline=False,
-                                    deadline_icon="🗓",
                                 )
                             )
                         )

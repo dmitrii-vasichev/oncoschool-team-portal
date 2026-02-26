@@ -202,7 +202,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         sent_text = service._send_safe.await_args.args[1]
         sent_kwargs = service._send_safe.await_args.kwargs
         self.assertIn(
-            "#777 · Проверить &lt;b&gt;контракт&lt;/b&gt; &amp; согласовать · 🗓 26.02 · ⚡ high",
+            "#777 · Проверить &lt;b&gt;контракт&lt;/b&gt; &amp; согласовать · 📅 26.02 · ⚡ high",
             sent_text,
         )
         self.assertEqual(sent_kwargs.get("parse_mode"), "HTML")
@@ -251,7 +251,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         sent_text = service._send_safe.await_args.args[1]
         self.assertIn("⏰ Дедлайны сегодня (1)", sent_text)
         self.assertIn("#410", sent_text)
-        self.assertIn("🗓 26.02", sent_text)
+        self.assertIn("📅 26.02", sent_text)
         self.assertIn("⚡ high", sent_text)
         self.assertNotIn("Ближайшие по дедлайну", sent_text)
 
@@ -298,7 +298,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(service._send_safe.await_count, 1)
         sent_text = service._send_safe.await_args.args[1]
         self.assertIn("Только заголовок и дедлайн", sent_text)
-        self.assertIn("🗓 26.02", sent_text)
+        self.assertIn("📅 26.02", sent_text)
         self.assertNotIn("#920", sent_text)
         self.assertNotIn("⚡ urgent", sent_text)
 
