@@ -658,8 +658,7 @@ class ReminderService:
                 if not task.deadline:
                     continue
                 deadline_value = task.deadline.strftime("%d.%m")
-                prefix = "был " if overdue_deadline else ""
-                parts.append(f"{deadline_icon} {prefix}{deadline_value}")
+                parts.append(f"{deadline_icon} {deadline_value}")
             elif field_key == "priority":
                 parts.append(f"⚡ {task.priority}")
 

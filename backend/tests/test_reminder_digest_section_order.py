@@ -104,6 +104,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(new_idx, in_progress_idx)
         self.assertLess(in_progress_idx, upcoming_idx)
         self.assertLess(upcoming_idx, overdue_idx)
+        self.assertNotIn("был ", sent_text)
         self.assertEqual(sent_kwargs.get("parse_mode"), "HTML")
 
     async def test_send_daily_digest_applies_task_line_format(self) -> None:
