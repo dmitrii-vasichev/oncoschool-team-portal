@@ -478,6 +478,23 @@ class ReminderSettings(Base):
         default=lambda: ["overdue", "upcoming", "in_progress", "new"],
         server_default='{"overdue","upcoming","in_progress","new"}',
     )
+    task_line_show_number: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
+    task_line_show_title: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
+    task_line_show_deadline: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
+    task_line_show_priority: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
+    task_line_fields_order: Mapped[list[str]] = mapped_column(
+        ARRAY(String),
+        default=lambda: ["number", "title", "deadline", "priority"],
+        server_default='{"number","title","deadline","priority"}',
+    )
     configured_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("team_members.id"), nullable=True
     )

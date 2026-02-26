@@ -27,6 +27,10 @@ import {
   GripVertical,
   ArrowUp,
   ArrowDown,
+  Hash,
+  Type,
+  CalendarDays,
+  Flag,
 } from "lucide-react";
 import { ModeratorGuard } from "@/components/shared/ModeratorGuard";
 import { Button } from "@/components/ui/button";
@@ -59,6 +63,7 @@ import { PermissionService } from "@/lib/permissions";
 import type {
   AISettingsResponse,
   ReminderDigestSectionKey,
+  ReminderTaskLineFieldKey,
   ReminderSettings,
   TeamMember,
   TelegramNotificationTarget,
@@ -1060,6 +1065,71 @@ function normalizeDigestSectionsOrder(
   return normalized;
 }
 
+const DEFAULT_TASK_LINE_FIELDS_ORDER: ReminderTaskLineFieldKey[] = [
+  "number",
+  "title",
+  "deadline",
+  "priority",
+];
+
+const TASK_LINE_FIELD_META: Record<
+  ReminderTaskLineFieldKey,
+  {
+    label: string;
+    icon: typeof AlertTriangle;
+    iconClassName: string;
+  }
+> = {
+  number: {
+    label: "Номер задачи",
+    icon: Hash,
+    iconClassName: "text-muted-foreground",
+  },
+  title: {
+    label: "Название задачи",
+    icon: Type,
+    iconClassName: "text-foreground/80",
+  },
+  deadline: {
+    label: "Дата дедлайна",
+    icon: CalendarDays,
+    iconClassName: "text-muted-foreground",
+  },
+  priority: {
+    label: "Приоритет",
+    icon: Flag,
+    iconClassName: "text-primary",
+  },
+};
+
+function normalizeTaskLineFieldsOrder(
+  value: ReminderTaskLineFieldKey[] | string[] | null | undefined
+): ReminderTaskLineFieldKey[] {
+  if (!Array.isArray(value)) {
+    return [...DEFAULT_TASK_LINE_FIELDS_ORDER];
+  }
+
+  const allowed = new Set<ReminderTaskLineFieldKey>(DEFAULT_TASK_LINE_FIELDS_ORDER);
+  const normalized: ReminderTaskLineFieldKey[] = [];
+
+  for (const rawKey of value) {
+    if (typeof rawKey !== "string") continue;
+    if (!allowed.has(rawKey as ReminderTaskLineFieldKey)) continue;
+    const key = rawKey as ReminderTaskLineFieldKey;
+    if (!normalized.includes(key)) {
+      normalized.push(key);
+    }
+  }
+
+  for (const key of DEFAULT_TASK_LINE_FIELDS_ORDER) {
+    if (!normalized.includes(key)) {
+      normalized.push(key);
+    }
+  }
+
+  return normalized;
+}
+
 const MOSCOW_TIMEZONE = "Europe/Moscow";
 
 function getTimezoneOffsetMinutes(timeZone: string, date: Date): number {
@@ -1367,7 +1437,7 @@ function RemindersSection() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="shrink-0 rounded-lg text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100"
+                    className="shrink-0 rounded-lg text-xs text-muted-foreground hover:text-foreground"
                     onClick={() => setEditMemberId(member.id)}
                   >
                     <Settings className="h-3.5 w-3.5 mr-1" />
@@ -1432,17 +1502,68 @@ function ReminderEditDialog({
   >(() => normalizeDigestSectionsOrder(reminder?.digest_sections_order));
   const [draggingSection, setDraggingSection] = useState<ReminderDigestSectionKey | null>(null);
   const [dragOverSection, setDragOverSection] = useState<ReminderDigestSectionKey | null>(null);
+  const [taskLineShowNumber, setTaskLineShowNumber] = useState(
+    reminder?.task_line_show_number ?? true
+  );
+  const [taskLineShowTitle, setTaskLineShowTitle] = useState(
+    reminder?.task_line_show_title ?? true
+  );
+  const [taskLineShowDeadline, setTaskLineShowDeadline] = useState(
+    reminder?.task_line_show_deadline ?? true
+  );
+  const [taskLineShowPriority, setTaskLineShowPriority] = useState(
+    reminder?.task_line_show_priority ?? true
+  );
+  const [taskLineFieldsOrder, setTaskLineFieldsOrder] = useState<
+    ReminderTaskLineFieldKey[]
+  >(() => normalizeTaskLineFieldsOrder(reminder?.task_line_fields_order));
+  const [draggingTaskLineField, setDraggingTaskLineField] = useState<ReminderTaskLineFieldKey | null>(null);
+  const [dragOverTaskLineField, setDragOverTaskLineField] = useState<ReminderTaskLineFieldKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const localTimeInfo = useMemo(() => getLocalTimeFromMoscow(time), [time]);
   const hasAnyDigestSectionEnabled =
     includeOverdue || includeUpcoming || includeInProgress || includeNew;
+  const hasAnyTaskLineFieldEnabled =
+    taskLineShowNumber ||
+    taskLineShowTitle ||
+    taskLineShowDeadline ||
+    taskLineShowPriority;
   const digestSectionEnabledMap: Record<ReminderDigestSectionKey, boolean> = {
     overdue: includeOverdue,
     upcoming: includeUpcoming,
     in_progress: includeInProgress,
     new: includeNew,
   };
+  const taskLineFieldEnabledMap: Record<ReminderTaskLineFieldKey, boolean> = {
+    number: taskLineShowNumber,
+    title: taskLineShowTitle,
+    deadline: taskLineShowDeadline,
+    priority: taskLineShowPriority,
+  };
+  const taskLinePreview = useMemo(() => {
+    const sampleByField: Record<ReminderTaskLineFieldKey, string> = {
+      number: "#245",
+      title: "Подготовить отчет",
+      deadline: "📅 28.02",
+      priority: "⚡ high",
+    };
+    const parts = taskLineFieldsOrder
+      .filter((field) => {
+        if (field === "number") return taskLineShowNumber;
+        if (field === "title") return taskLineShowTitle;
+        if (field === "deadline") return taskLineShowDeadline;
+        return taskLineShowPriority;
+      })
+      .map((field) => sampleByField[field]);
+    return parts.length > 0 ? parts.join(" · ") : "Подготовить отчет";
+  }, [
+    taskLineFieldsOrder,
+    taskLineShowNumber,
+    taskLineShowTitle,
+    taskLineShowDeadline,
+    taskLineShowPriority,
+  ]);
 
   const toggleDay = (day: number) => {
     setDays((prev) =>
@@ -1458,12 +1579,28 @@ function ReminderEditDialog({
     }
   }, [hasAnyDigestSectionEnabled, isEnabled]);
 
+  useEffect(() => {
+    if (!hasAnyTaskLineFieldEnabled && isEnabled) {
+      setIsEnabled(false);
+    }
+  }, [hasAnyTaskLineFieldEnabled, isEnabled]);
+
   const setAllDigestSections = (value: boolean) => {
     setIncludeOverdue(value);
     setIncludeUpcoming(value);
     setIncludeInProgress(value);
     setIncludeNew(value);
     setIsEnabled(value);
+  };
+
+  const setAllTaskLineFields = (value: boolean) => {
+    setTaskLineShowNumber(value);
+    setTaskLineShowTitle(value);
+    setTaskLineShowDeadline(value);
+    setTaskLineShowPriority(value);
+    if (value) {
+      setIsEnabled(true);
+    }
   };
 
   const setDigestSectionEnabled = (
@@ -1520,15 +1657,77 @@ function ReminderEditDialog({
     []
   );
 
-  const handleReminderEnabledToggle = (value: boolean) => {
-    if (value && !hasAnyDigestSectionEnabled) {
-      setAllDigestSections(true);
+  const setTaskLineFieldEnabled = (
+    field: ReminderTaskLineFieldKey,
+    value: boolean
+  ) => {
+    if (field === "number") {
+      setTaskLineShowNumber(value);
       return;
+    }
+    if (field === "title") {
+      setTaskLineShowTitle(value);
+      return;
+    }
+    if (field === "deadline") {
+      setTaskLineShowDeadline(value);
+      return;
+    }
+    setTaskLineShowPriority(value);
+  };
+
+  const moveTaskLineField = useCallback(
+    (field: ReminderTaskLineFieldKey, direction: -1 | 1) => {
+      setTaskLineFieldsOrder((prev) => {
+        const currentIndex = prev.indexOf(field);
+        if (currentIndex < 0) return prev;
+        const nextIndex = currentIndex + direction;
+        if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+        const reordered = [...prev];
+        reordered.splice(currentIndex, 1);
+        reordered.splice(nextIndex, 0, field);
+        return reordered;
+      });
+    },
+    []
+  );
+
+  const moveTaskLineFieldBefore = useCallback(
+    (
+      draggedField: ReminderTaskLineFieldKey,
+      targetField: ReminderTaskLineFieldKey
+    ) => {
+      if (draggedField === targetField) return;
+      setTaskLineFieldsOrder((prev) => {
+        const fromIndex = prev.indexOf(draggedField);
+        const toIndex = prev.indexOf(targetField);
+        if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return prev;
+        const reordered = [...prev];
+        reordered.splice(fromIndex, 1);
+        reordered.splice(toIndex, 0, draggedField);
+        return reordered;
+      });
+    },
+    []
+  );
+
+  const handleReminderEnabledToggle = (value: boolean) => {
+    if (value) {
+      if (!hasAnyDigestSectionEnabled) {
+        setAllDigestSections(true);
+      }
+      if (!hasAnyTaskLineFieldEnabled) {
+        setAllTaskLineFields(true);
+      }
     }
     setIsEnabled(value);
   };
 
   const handleSave = async () => {
+    if (!hasAnyTaskLineFieldEnabled) {
+      setError("Выберите хотя бы один элемент строки задачи");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -1541,6 +1740,11 @@ function ReminderEditDialog({
         include_in_progress: includeInProgress,
         include_new: includeNew,
         digest_sections_order: digestSectionsOrder,
+        task_line_show_number: taskLineShowNumber,
+        task_line_show_title: taskLineShowTitle,
+        task_line_show_deadline: taskLineShowDeadline,
+        task_line_show_priority: taskLineShowPriority,
+        task_line_fields_order: taskLineFieldsOrder,
       });
       onSaved();
       onClose();
@@ -1750,6 +1954,138 @@ function ReminderEditDialog({
               <p className="px-3 pt-1 text-2xs text-muted-foreground">
                 Перетаскивайте блоки или используйте стрелки, чтобы задать порядок в сообщении.
               </p>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="h-px bg-border/60" />
+
+          {/* Task line format */}
+          <div className="space-y-3">
+            <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Формат строки задачи
+              </Label>
+              <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-lg px-3 text-xs"
+                  disabled={saving}
+                  onClick={() => setAllTaskLineFields(true)}
+                >
+                  Включить всё
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 rounded-lg px-3 text-xs"
+                  disabled={saving}
+                  onClick={() => setAllTaskLineFields(false)}
+                >
+                  Выключить всё
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              {taskLineFieldsOrder.map((fieldKey, index) => {
+                const fieldMeta = TASK_LINE_FIELD_META[fieldKey];
+                const Icon = fieldMeta.icon;
+                const isChecked = taskLineFieldEnabledMap[fieldKey];
+                const isFirst = index === 0;
+                const isLast = index === taskLineFieldsOrder.length - 1;
+                const isDragTarget =
+                  dragOverTaskLineField === fieldKey &&
+                  draggingTaskLineField !== fieldKey;
+
+                return (
+                  <div
+                    key={fieldKey}
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggingTaskLineField(fieldKey);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", fieldKey);
+                    }}
+                    onDragOver={(event) => {
+                      if (!draggingTaskLineField || draggingTaskLineField === fieldKey) return;
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDragOverTaskLineField(fieldKey);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const draggedRaw = event.dataTransfer.getData("text/plain");
+                      if (
+                        !DEFAULT_TASK_LINE_FIELDS_ORDER.includes(
+                          draggedRaw as ReminderTaskLineFieldKey
+                        )
+                      ) {
+                        setDraggingTaskLineField(null);
+                        setDragOverTaskLineField(null);
+                        return;
+                      }
+                      const draggedField = draggedRaw as ReminderTaskLineFieldKey;
+                      moveTaskLineFieldBefore(draggedField, fieldKey);
+                      setDraggingTaskLineField(null);
+                      setDragOverTaskLineField(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingTaskLineField(null);
+                      setDragOverTaskLineField(null);
+                    }}
+                    className={`flex items-center justify-between rounded-xl px-3 py-2.5 transition-colors ${
+                      isDragTarget
+                        ? "bg-primary/10"
+                        : "hover:bg-muted/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/70 cursor-grab active:cursor-grabbing" />
+                      <Icon className={`h-3.5 w-3.5 ${fieldMeta.iconClassName}`} />
+                      <span className="text-sm">{fieldMeta.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg text-muted-foreground"
+                        disabled={isFirst || saving}
+                        onClick={() => moveTaskLineField(fieldKey, -1)}
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-lg text-muted-foreground"
+                        disabled={isLast || saving}
+                        onClick={() => moveTaskLineField(fieldKey, 1)}
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </Button>
+                      <Switch
+                        checked={isChecked}
+                        onCheckedChange={(value) =>
+                          setTaskLineFieldEnabled(fieldKey, value)
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="px-3 pt-1 space-y-1.5">
+                <p className="text-2xs text-muted-foreground">
+                  Управляйте составом строки задачи и порядком блоков в каждом разделе дайджеста.
+                </p>
+                <p className="text-2xs text-muted-foreground">
+                  Пример: <span className="font-mono">{taskLinePreview}</span>
+                </p>
+              </div>
             </div>
           </div>
 

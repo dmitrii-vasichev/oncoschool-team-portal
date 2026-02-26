@@ -14,6 +14,7 @@ UpdateTypeType = Literal["progress", "status_change", "comment", "blocker", "com
 TelegramBroadcastStatusType = Literal["scheduled", "sent", "failed", "cancelled"]
 MeetingReminderZoomMissingBehaviorType = Literal["hide", "fallback"]
 ReminderDigestSectionKeyType = Literal["overdue", "upcoming", "in_progress", "new"]
+ReminderTaskLineFieldKeyType = Literal["number", "title", "deadline", "priority"]
 
 
 # ── TeamMember ──
@@ -456,6 +457,13 @@ class ReminderSettingsCreate(BaseModel):
     digest_sections_order: list[ReminderDigestSectionKeyType] = Field(
         default_factory=lambda: ["overdue", "upcoming", "in_progress", "new"]
     )
+    task_line_show_number: bool = True
+    task_line_show_title: bool = True
+    task_line_show_deadline: bool = True
+    task_line_show_priority: bool = True
+    task_line_fields_order: list[ReminderTaskLineFieldKeyType] = Field(
+        default_factory=lambda: ["number", "title", "deadline", "priority"]
+    )
 
 
 class ReminderSettingsUpdate(BaseModel):
@@ -468,6 +476,11 @@ class ReminderSettingsUpdate(BaseModel):
     include_in_progress: bool | None = None
     include_new: bool | None = None
     digest_sections_order: list[ReminderDigestSectionKeyType] | None = None
+    task_line_show_number: bool | None = None
+    task_line_show_title: bool | None = None
+    task_line_show_deadline: bool | None = None
+    task_line_show_priority: bool | None = None
+    task_line_fields_order: list[ReminderTaskLineFieldKeyType] | None = None
 
 
 class ReminderSettingsResponse(BaseModel):
@@ -484,6 +497,11 @@ class ReminderSettingsResponse(BaseModel):
     include_in_progress: bool
     include_new: bool
     digest_sections_order: list[ReminderDigestSectionKeyType]
+    task_line_show_number: bool
+    task_line_show_title: bool
+    task_line_show_deadline: bool
+    task_line_show_priority: bool
+    task_line_fields_order: list[ReminderTaskLineFieldKeyType]
     configured_by_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime

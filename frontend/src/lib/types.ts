@@ -344,6 +344,12 @@ export type ReminderDigestSectionKey =
   | "in_progress"
   | "new";
 
+export type ReminderTaskLineFieldKey =
+  | "number"
+  | "title"
+  | "deadline"
+  | "priority";
+
 export interface ReminderSettings {
   id: string;
   member_id: string;
@@ -356,6 +362,11 @@ export interface ReminderSettings {
   include_in_progress: boolean;
   include_new: boolean;
   digest_sections_order: ReminderDigestSectionKey[];
+  task_line_show_number: boolean;
+  task_line_show_title: boolean;
+  task_line_show_deadline: boolean;
+  task_line_show_priority: boolean;
+  task_line_fields_order: ReminderTaskLineFieldKey[];
   configured_by_id: string | null;
   created_at: string;
   updated_at: string;

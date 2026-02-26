@@ -44,6 +44,8 @@ DEFAULT_TASK_OVERDUE_DAILY_TIME_MSK = "09:00"
 ALLOWED_TASK_OVERDUE_INTERVAL_HOURS = {1, 24}
 DIGEST_SECTION_ORDER_DEFAULT = ("overdue", "upcoming", "in_progress", "new")
 ALLOWED_DIGEST_SECTION_KEYS = set(DIGEST_SECTION_ORDER_DEFAULT)
+TASK_LINE_FIELD_ORDER_DEFAULT = ("number", "title", "deadline", "priority")
+ALLOWED_TASK_LINE_FIELD_KEYS = set(TASK_LINE_FIELD_ORDER_DEFAULT)
 
 
 def normalize_digest_sections_order(value: object | None) -> list[str]:
@@ -63,6 +65,29 @@ def normalize_digest_sections_order(value: object | None) -> list[str]:
         seen.add(key)
 
     for key in DIGEST_SECTION_ORDER_DEFAULT:
+        if key not in seen:
+            ordered.append(key)
+
+    return ordered
+
+
+def normalize_task_line_fields_order(value: object | None) -> list[str]:
+    """Normalize digest task line fields order to known keys with fallback."""
+    if not isinstance(value, (list, tuple)):
+        return list(TASK_LINE_FIELD_ORDER_DEFAULT)
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw_key in value:
+        if not isinstance(raw_key, str):
+            continue
+        key = raw_key.strip()
+        if key not in ALLOWED_TASK_LINE_FIELD_KEYS or key in seen:
+            continue
+        ordered.append(key)
+        seen.add(key)
+
+    for key in TASK_LINE_FIELD_ORDER_DEFAULT:
         if key not in seen:
             ordered.append(key)
 
@@ -441,6 +466,15 @@ class ReminderService:
         sections = []
         sections.append(f"📊 Ежедневный дайджест — {today.strftime('%d.%m.%Y')}")
         section_blocks: dict[str, str] = {}
+        task_line_fields_order = normalize_task_line_fields_order(
+            getattr(rs, "task_line_fields_order", None)
+        )
+        task_line_field_flags = {
+            "number": bool(getattr(rs, "task_line_show_number", True)),
+            "title": bool(getattr(rs, "task_line_show_title", True)),
+            "deadline": bool(getattr(rs, "task_line_show_deadline", True)),
+            "priority": bool(getattr(rs, "task_line_show_priority", True)),
+        }
 
         # Overdue tasks
         if rs.include_overdue:
@@ -451,8 +485,14 @@ class ReminderService:
             if overdue:
                 lines = ["\n🔴 Просроченные ({}):" .format(len(overdue))]
                 for t in overdue:
-                    dl = t.deadline.strftime("%d.%m") if t.deadline else ""
-                    lines.append(f"  #{t.short_id} · {t.title} · 📅 был {dl} · ⚡ {t.priority}")
+                    lines.append(
+                        self._format_digest_task_line(
+                            task=t,
+                            field_flags=task_line_field_flags,
+                            field_order=task_line_fields_order,
+                            overdue_deadline=True,
+                        )
+                    )
                 section_blocks["overdue"] = "\n".join(lines)
 
         # Upcoming tasks (next 3 days)
@@ -465,8 +505,14 @@ class ReminderService:
             if upcoming:
                 lines = ["\n📅 Ближайшие (3 дня):"]
                 for t in upcoming:
-                    dl = t.deadline.strftime("%d.%m") if t.deadline else ""
-                    lines.append(f"  #{t.short_id} · {t.title} · 📅 {dl} · ⚡ {t.priority}")
+                    lines.append(
+                        self._format_digest_task_line(
+                            task=t,
+                            field_flags=task_line_field_flags,
+                            field_order=task_line_fields_order,
+                            overdue_deadline=False,
+                        )
+                    )
                 section_blocks["upcoming"] = "\n".join(lines)
 
         # In progress
@@ -475,7 +521,14 @@ class ReminderService:
             if in_progress:
                 lines = ["\n🔄 В работе ({}):" .format(len(in_progress))]
                 for t in in_progress:
-                    lines.append(f"  #{t.short_id} · {t.title} · ⚡ {t.priority}")
+                    lines.append(
+                        self._format_digest_task_line(
+                            task=t,
+                            field_flags=task_line_field_flags,
+                            field_order=task_line_fields_order,
+                            overdue_deadline=False,
+                        )
+                    )
                 section_blocks["in_progress"] = "\n".join(lines)
 
         # New tasks
@@ -484,7 +537,14 @@ class ReminderService:
             if new_tasks:
                 lines = ["\n🆕 Новые ({}):" .format(len(new_tasks))]
                 for t in new_tasks:
-                    lines.append(f"  #{t.short_id} · {t.title} · ⚡ {t.priority}")
+                    lines.append(
+                        self._format_digest_task_line(
+                            task=t,
+                            field_flags=task_line_field_flags,
+                            field_order=task_line_fields_order,
+                            overdue_deadline=False,
+                        )
+                    )
                 section_blocks["new"] = "\n".join(lines)
 
         section_order = normalize_digest_sections_order(
@@ -510,6 +570,35 @@ class ReminderService:
 
         text = "\n".join(sections)
         await self._send_safe(member.telegram_id, text, digest_markup)
+
+    @staticmethod
+    def _format_digest_task_line(
+        task: Task,
+        field_flags: dict[str, bool],
+        field_order: list[str],
+        overdue_deadline: bool,
+    ) -> str:
+        parts: list[str] = []
+        for field_key in field_order:
+            if not field_flags.get(field_key, False):
+                continue
+            if field_key == "number":
+                parts.append(f"#{task.short_id}")
+            elif field_key == "title":
+                parts.append(task.title)
+            elif field_key == "deadline":
+                if not task.deadline:
+                    continue
+                deadline_value = task.deadline.strftime("%d.%m")
+                prefix = "был " if overdue_deadline else ""
+                parts.append(f"📅 {prefix}{deadline_value}")
+            elif field_key == "priority":
+                parts.append(f"⚡ {task.priority}")
+
+        if not parts:
+            parts.append(task.title)
+
+        return "  " + " · ".join(parts)
 
     async def _check_overdue_tasks(self) -> None:
         """Notify subscribers about overdue tasks (hourly check)."""
