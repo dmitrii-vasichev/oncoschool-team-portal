@@ -1,6 +1,7 @@
 import logging
 import re
 from datetime import date, datetime, timedelta
+from html import escape
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -466,14 +467,19 @@ class ReminderService:
 
         if not active_tasks:
             text = (
-                f"📊 Ежедневный дайджест — {today.strftime('%d.%m.%Y')}\n\n"
+                f"📊 <b>Ежедневный дайджест — {today.strftime('%d.%m.%Y')}</b>\n\n"
                 "У тебя нет активных задач. Отличная работа! 🎉"
             )
-            await self._send_safe(member.telegram_id, text, digest_markup)
+            await self._send_safe(
+                member.telegram_id,
+                text,
+                digest_markup,
+                parse_mode="HTML",
+            )
             return
 
         sections = []
-        sections.append(f"📊 Ежедневный дайджест — {today.strftime('%d.%m.%Y')}")
+        sections.append(f"📊 <b>Ежедневный дайджест — {today.strftime('%d.%m.%Y')}</b>")
         section_blocks: dict[str, str] = {}
         task_line_fields_order = normalize_task_line_fields_order(
             getattr(rs, "task_line_fields_order", None)
@@ -508,14 +514,16 @@ class ReminderService:
         # Overdue tasks
         if rs.include_overdue:
             if overdue:
-                lines = ["\n🔴 Просроченные ({}):" .format(len(overdue))]
+                lines = ["\n<b>🔴 Просроченные ({}):</b>".format(len(overdue))]
                 for t in overdue:
                     lines.append(
-                        self._format_digest_task_line(
-                            task=t,
-                            field_flags=task_line_field_flags,
-                            field_order=task_line_fields_order,
-                            overdue_deadline=True,
+                        escape(
+                            self._format_digest_task_line(
+                                task=t,
+                                field_flags=task_line_field_flags,
+                                field_order=task_line_fields_order,
+                                overdue_deadline=True,
+                            )
                         )
                     )
                 section_blocks["overdue"] = "\n".join(lines)
@@ -524,18 +532,32 @@ class ReminderService:
         if rs.include_upcoming:
             if upcoming:
                 if upcoming_days == 0:
-                    lines = ["\n📅 Дедлайн истекает сегодня ({}):".format(len(upcoming))]
-                else:
-                    lines = ["\n📅 Ближайшие по дедлайну ({} дн.):".format(upcoming_days)]
-                for t in upcoming:
-                    lines.append(
-                        self._format_digest_task_line(
-                            task=t,
-                            field_flags=task_line_field_flags,
-                            field_order=task_line_fields_order,
-                            overdue_deadline=False,
+                    lines = ["\n<b>⏰ Дедлайны сегодня ({})</b>".format(len(upcoming))]
+                    for t in upcoming:
+                        lines.append(
+                            escape(
+                                self._format_digest_task_line(
+                                    task=t,
+                                    field_flags=task_line_field_flags,
+                                    field_order=task_line_fields_order,
+                                    overdue_deadline=False,
+                                    deadline_icon="🗓",
+                                )
+                            )
                         )
-                    )
+                else:
+                    lines = ["\n<b>📅 Ближайшие по дедлайну ({} дн.):</b>".format(upcoming_days)]
+                    for t in upcoming:
+                        lines.append(
+                            escape(
+                                self._format_digest_task_line(
+                                    task=t,
+                                    field_flags=task_line_field_flags,
+                                    field_order=task_line_fields_order,
+                                    overdue_deadline=False,
+                                )
+                            )
+                        )
                 section_blocks["upcoming"] = "\n".join(lines)
 
         # In progress
@@ -544,14 +566,16 @@ class ReminderService:
                 t for t in remaining_active_tasks if t.status == "in_progress"
             ]
             if in_progress:
-                lines = ["\n🔄 В работе ({}):" .format(len(in_progress))]
+                lines = ["\n<b>🔄 В работе ({}):</b>".format(len(in_progress))]
                 for t in in_progress:
                     lines.append(
-                        self._format_digest_task_line(
-                            task=t,
-                            field_flags=task_line_field_flags,
-                            field_order=task_line_fields_order,
-                            overdue_deadline=False,
+                        escape(
+                            self._format_digest_task_line(
+                                task=t,
+                                field_flags=task_line_field_flags,
+                                field_order=task_line_fields_order,
+                                overdue_deadline=False,
+                            )
                         )
                     )
                 section_blocks["in_progress"] = "\n".join(lines)
@@ -560,14 +584,16 @@ class ReminderService:
         if rs.include_new:
             new_tasks = [t for t in remaining_active_tasks if t.status == "new"]
             if new_tasks:
-                lines = ["\n🆕 Новые ({}):" .format(len(new_tasks))]
+                lines = ["\n<b>🆕 Новые ({}):</b>".format(len(new_tasks))]
                 for t in new_tasks:
                     lines.append(
-                        self._format_digest_task_line(
-                            task=t,
-                            field_flags=task_line_field_flags,
-                            field_order=task_line_fields_order,
-                            overdue_deadline=False,
+                        escape(
+                            self._format_digest_task_line(
+                                task=t,
+                                field_flags=task_line_field_flags,
+                                field_order=task_line_fields_order,
+                                overdue_deadline=False,
+                            )
                         )
                     )
                 section_blocks["new"] = "\n".join(lines)
@@ -591,10 +617,17 @@ class ReminderService:
         total = len(active_tasks)
         done_count = len(completed_yesterday)
 
-        sections.append(f"\nВсего активных: {total} | Завершено вчера: {done_count} 💪")
+        sections.append(
+            f"\n<b>Всего активных:</b> {total} | <b>Завершено вчера:</b> {done_count} 💪"
+        )
 
         text = "\n".join(sections)
-        await self._send_safe(member.telegram_id, text, digest_markup)
+        await self._send_safe(
+            member.telegram_id,
+            text,
+            digest_markup,
+            parse_mode="HTML",
+        )
 
     @staticmethod
     def _task_unique_key(task: Task) -> str:
@@ -612,6 +645,7 @@ class ReminderService:
         field_flags: dict[str, bool],
         field_order: list[str],
         overdue_deadline: bool,
+        deadline_icon: str = "📅",
     ) -> str:
         parts: list[str] = []
         for field_key in field_order:
@@ -626,7 +660,7 @@ class ReminderService:
                     continue
                 deadline_value = task.deadline.strftime("%d.%m")
                 prefix = "был " if overdue_deadline else ""
-                parts.append(f"📅 {prefix}{deadline_value}")
+                parts.append(f"{deadline_icon} {prefix}{deadline_value}")
             elif field_key == "priority":
                 parts.append(f"⚡ {task.priority}")
 
@@ -722,10 +756,21 @@ class ReminderService:
             logger.error(f"Error in _cleanup_orphan_avatars: {e}")
 
     async def _send_safe(
-        self, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None
+        self,
+        chat_id: int,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+        parse_mode: str | None = None,
     ) -> None:
         """Send message, suppress errors."""
         try:
-            await self.bot.send_message(chat_id, text, reply_markup=reply_markup)
+            send_kwargs: dict[str, object] = {
+                "chat_id": chat_id,
+                "text": text,
+                "reply_markup": reply_markup,
+            }
+            if parse_mode:
+                send_kwargs["parse_mode"] = parse_mode
+            await self.bot.send_message(**send_kwargs)
         except Exception as e:
             logger.warning(f"Failed to send reminder to {chat_id}: {e}")

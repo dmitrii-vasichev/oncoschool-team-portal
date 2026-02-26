@@ -90,6 +90,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(service._send_safe.await_count, 1)
         sent_text = service._send_safe.await_args.args[1]
+        sent_kwargs = service._send_safe.await_args.kwargs
 
         new_idx = sent_text.find("🆕 Новые")
         in_progress_idx = sent_text.find("🔄 В работе")
@@ -103,6 +104,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(new_idx, in_progress_idx)
         self.assertLess(in_progress_idx, upcoming_idx)
         self.assertLess(upcoming_idx, overdue_idx)
+        self.assertEqual(sent_kwargs.get("parse_mode"), "HTML")
 
     async def test_send_daily_digest_applies_task_line_format(self) -> None:
         service = ReminderService(bot=AsyncMock(), session_maker=AsyncMock())
@@ -156,6 +158,55 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertLess(title_idx, priority_idx)
         self.assertLess(priority_idx, deadline_idx)
 
+    async def test_send_daily_digest_escapes_html_sensitive_task_text(self) -> None:
+        service = ReminderService(bot=AsyncMock(), session_maker=AsyncMock())
+        service.task_repo = SimpleNamespace(get_by_assignee=AsyncMock())
+        service._send_safe = AsyncMock()
+
+        today = date(2026, 2, 26)
+        tasks = [
+            SimpleNamespace(
+                short_id=777,
+                title="Проверить <b>контракт</b> & согласовать",
+                priority="high",
+                status="new",
+                deadline=today,
+                completed_at=None,
+            ),
+        ]
+        service.task_repo.get_by_assignee.return_value = tasks
+
+        member = SimpleNamespace(id=uuid.uuid4(), telegram_id=123456)
+        reminder_settings = SimpleNamespace(
+            include_overdue=False,
+            include_upcoming=True,
+            include_in_progress=False,
+            include_new=False,
+            upcoming_days=0,
+            digest_sections_order=["upcoming", "overdue", "in_progress", "new"],
+            task_line_show_number=True,
+            task_line_show_title=True,
+            task_line_show_deadline=True,
+            task_line_show_priority=True,
+            task_line_fields_order=["number", "title", "deadline", "priority"],
+        )
+
+        await service._send_daily_digest(
+            session=AsyncMock(),
+            member=member,
+            rs=reminder_settings,
+            today=today,
+        )
+
+        self.assertEqual(service._send_safe.await_count, 1)
+        sent_text = service._send_safe.await_args.args[1]
+        sent_kwargs = service._send_safe.await_args.kwargs
+        self.assertIn(
+            "#777 · Проверить &lt;b&gt;контракт&lt;/b&gt; &amp; согласовать · 🗓 26.02 · ⚡ high",
+            sent_text,
+        )
+        self.assertEqual(sent_kwargs.get("parse_mode"), "HTML")
+
     async def test_send_daily_digest_upcoming_zero_uses_today_label(self) -> None:
         service = ReminderService(bot=AsyncMock(), session_maker=AsyncMock())
         service.task_repo = SimpleNamespace(get_by_assignee=AsyncMock())
@@ -198,8 +249,58 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(service._send_safe.await_count, 1)
         sent_text = service._send_safe.await_args.args[1]
-        self.assertIn("Дедлайн истекает сегодня", sent_text)
+        self.assertIn("⏰ Дедлайны сегодня (1)", sent_text)
+        self.assertIn("#410", sent_text)
+        self.assertIn("🗓 26.02", sent_text)
+        self.assertIn("⚡ high", sent_text)
         self.assertNotIn("Ближайшие по дедлайну", sent_text)
+
+    async def test_send_daily_digest_today_respects_field_flags_and_order(self) -> None:
+        service = ReminderService(bot=AsyncMock(), session_maker=AsyncMock())
+        service.task_repo = SimpleNamespace(get_by_assignee=AsyncMock())
+        service._send_safe = AsyncMock()
+
+        today = date(2026, 2, 26)
+        tasks = [
+            SimpleNamespace(
+                short_id=920,
+                title="Только заголовок и дедлайн",
+                priority="urgent",
+                status="new",
+                deadline=today,
+                completed_at=None,
+            ),
+        ]
+        service.task_repo.get_by_assignee.return_value = tasks
+
+        member = SimpleNamespace(id=uuid.uuid4(), telegram_id=123456)
+        reminder_settings = SimpleNamespace(
+            include_overdue=False,
+            include_upcoming=True,
+            include_in_progress=False,
+            include_new=False,
+            upcoming_days=0,
+            digest_sections_order=["upcoming", "overdue", "in_progress", "new"],
+            task_line_show_number=False,
+            task_line_show_title=True,
+            task_line_show_deadline=True,
+            task_line_show_priority=False,
+            task_line_fields_order=["title", "deadline", "number", "priority"],
+        )
+
+        await service._send_daily_digest(
+            session=AsyncMock(),
+            member=member,
+            rs=reminder_settings,
+            today=today,
+        )
+
+        self.assertEqual(service._send_safe.await_count, 1)
+        sent_text = service._send_safe.await_args.args[1]
+        self.assertIn("Только заголовок и дедлайн", sent_text)
+        self.assertIn("🗓 26.02", sent_text)
+        self.assertNotIn("#920", sent_text)
+        self.assertNotIn("⚡ urgent", sent_text)
 
     async def test_send_daily_digest_does_not_duplicate_tasks_in_later_sections(self) -> None:
         service = ReminderService(bot=AsyncMock(), session_maker=AsyncMock())
