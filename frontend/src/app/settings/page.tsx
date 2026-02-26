@@ -1501,12 +1501,12 @@ function ReminderEditDialog({
               <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Что включить в дайджест
               </Label>
-              <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
+              <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:shrink-0 sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 rounded-lg px-2 text-xs"
+                  className="h-7 rounded-lg px-3 text-xs"
                   disabled={saving}
                   onClick={() => setAllDigestSections(true)}
                 >
@@ -1516,7 +1516,7 @@ function ReminderEditDialog({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 rounded-lg px-2 text-xs"
+                  className="h-7 rounded-lg px-3 text-xs"
                   disabled={saving}
                   onClick={() => setAllDigestSections(false)}
                 >
