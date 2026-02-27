@@ -48,7 +48,14 @@ class ApiClient {
     "GET",
     "HEAD",
     "OPTIONS",
+    "PUT",
   ]);
+  private readonly maxNetworkRetries: Record<string, number> = {
+    GET: 1,
+    HEAD: 1,
+    OPTIONS: 1,
+    PUT: 2,
+  };
 
   private getApiBases(): string[] {
     return getApiBaseCandidates(this.activeApiBaseUrl);
@@ -120,7 +127,8 @@ class ApiClient {
     }
 
     let res: Response;
-    let retried = false;
+    let retryAttempt = 0;
+    const maxRetries = this.maxNetworkRetries[method] ?? 0;
     while (true) {
       try {
         res = await this.fetchWithApiFallback(path, {
@@ -131,14 +139,15 @@ class ApiClient {
         break;
       } catch (error) {
         if (
-          retried ||
           !this.retryableMethods.has(method) ||
+          retryAttempt >= maxRetries ||
           !this.isTransientNetworkError(error)
         ) {
           throw error;
         }
-        retried = true;
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        const delayMs = 1000 * (retryAttempt + 1);
+        retryAttempt += 1;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
 
