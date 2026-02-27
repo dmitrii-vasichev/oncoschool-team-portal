@@ -28,6 +28,7 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Hash,
   Type,
@@ -60,6 +61,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TimePicker } from "@/components/shared/TimePicker";
 import { api } from "@/lib/api";
 import { useTeam } from "@/hooks/useTeam";
+import { useDepartments } from "@/hooks/useDepartments";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PermissionService } from "@/lib/permissions";
 import type {
@@ -1082,6 +1084,21 @@ const DEFAULT_TASK_LINE_FIELDS_ORDER: ReminderTaskLineFieldKey[] = [
   "priority",
 ];
 
+interface ApplyMembersGroup {
+  id: string;
+  name: string;
+  color: string | null;
+  sortOrder: number;
+  members: TeamMember[];
+}
+
+const APPLY_GROUP_UNASSIGNED = "__apply_unassigned__";
+const APPLY_GROUP_UNKNOWN_DEPARTMENT = "__apply_unknown_department__";
+
+function sortMembersByFullName(a: TeamMember, b: TeamMember) {
+  return a.full_name.localeCompare(b.full_name, "ru", { sensitivity: "base" });
+}
+
 const TASK_LINE_FIELD_META: Record<
   ReminderTaskLineFieldKey,
   {
@@ -1492,6 +1509,7 @@ function ReminderEditDialog({
   onSaved: () => void;
 }) {
   const { toastSuccess, toastError } = useToast();
+  const { departments } = useDepartments();
   const [isEnabled, setIsEnabled] = useState(reminder?.is_enabled ?? false);
   const [time, setTime] = useState(
     reminder?.reminder_time?.slice(0, 5) ?? "09:00"
@@ -1547,9 +1565,66 @@ function ReminderEditDialog({
   const [applyingSettings, setApplyingSettings] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedApplyGroupIds, setExpandedApplyGroupIds] = useState<Record<string, boolean>>({});
   const otherMembers = useMemo(
     () => allMembers.filter((candidate) => candidate.id !== member.id),
     [allMembers, member.id]
+  );
+  const departmentById = useMemo(
+    () => new Map(departments.map((department) => [department.id, department])),
+    [departments]
+  );
+  const applyMemberGroups = useMemo(() => {
+    const grouped = new Map<string, ApplyMembersGroup>();
+
+    for (const candidate of otherMembers) {
+      let groupId = APPLY_GROUP_UNASSIGNED;
+      let groupName = "Без отдела";
+      let groupColor: string | null = "#6B7280";
+      let groupSortOrder = Number.MAX_SAFE_INTEGER;
+
+      if (candidate.department_id) {
+        const department = departmentById.get(candidate.department_id);
+        if (department) {
+          groupId = department.id;
+          groupName = department.name;
+          groupColor = department.color;
+          groupSortOrder = department.sort_order;
+        } else {
+          groupId = APPLY_GROUP_UNKNOWN_DEPARTMENT;
+          groupName = "Отдел не найден";
+          groupColor = "#9CA3AF";
+          groupSortOrder = Number.MAX_SAFE_INTEGER - 1;
+        }
+      }
+
+      const existingGroup = grouped.get(groupId);
+      if (existingGroup) {
+        existingGroup.members.push(candidate);
+      } else {
+        grouped.set(groupId, {
+          id: groupId,
+          name: groupName,
+          color: groupColor,
+          sortOrder: groupSortOrder,
+          members: [candidate],
+        });
+      }
+    }
+
+    return Array.from(grouped.values())
+      .map((group) => ({
+        ...group,
+        members: [...group.members].sort(sortMembersByFullName),
+      }))
+      .sort((a, b) => {
+        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+        return a.name.localeCompare(b.name, "ru", { sensitivity: "base" });
+      });
+  }, [departmentById, otherMembers]);
+  const selectedApplyMemberIdSet = useMemo(
+    () => new Set(selectedApplyMemberIds),
+    [selectedApplyMemberIds]
   );
   const localTimeInfo = useMemo(() => getLocalTimeFromMoscow(time), [time]);
   const hasAnyDigestSectionEnabled =
@@ -1619,6 +1694,23 @@ function ReminderEditDialog({
       setIsEnabled(false);
     }
   }, [hasAnyTaskLineFieldEnabled, isEnabled]);
+
+  useEffect(() => {
+    setExpandedApplyGroupIds((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const group of applyMemberGroups) {
+        if (group.id in prev) {
+          next[group.id] = prev[group.id];
+          continue;
+        }
+        next[group.id] =
+          group.members.some((candidate) =>
+            selectedApplyMemberIdSet.has(candidate.id)
+          ) || applyMemberGroups.length <= 4;
+      }
+      return next;
+    });
+  }, [applyMemberGroups, selectedApplyMemberIdSet]);
 
   const setAllDigestSections = (value: boolean) => {
     setIncludeOverdue(value);
@@ -1752,6 +1844,13 @@ function ReminderEditDialog({
         ? prev.filter((id) => id !== memberId)
         : [...prev, memberId]
     );
+  };
+
+  const toggleApplyGroup = (groupId: string) => {
+    setExpandedApplyGroupIds((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
   };
 
   const setAllApplySettings = (value: boolean) => {
@@ -2411,7 +2510,7 @@ function ReminderEditDialog({
                       type="checkbox"
                       checked={applyTimeSettings}
                       onChange={() => setApplyTimeSettings((prev) => !prev)}
-                      className="h-4 w-4 accent-primary"
+                      className="h-4 w-4 shrink-0 accent-primary"
                       disabled={applyingSettings || saving}
                     />
                     <span className="text-sm">Время отправки</span>
@@ -2421,7 +2520,7 @@ function ReminderEditDialog({
                       type="checkbox"
                       checked={applyDaysSettings}
                       onChange={() => setApplyDaysSettings((prev) => !prev)}
-                      className="h-4 w-4 accent-primary"
+                      className="h-4 w-4 shrink-0 accent-primary"
                       disabled={applyingSettings || saving}
                     />
                     <span className="text-sm">Дни недели</span>
@@ -2431,17 +2530,17 @@ function ReminderEditDialog({
                       type="checkbox"
                       checked={applyDigestSettings}
                       onChange={() => setApplyDigestSettings((prev) => !prev)}
-                      className="h-4 w-4 accent-primary"
+                      className="h-4 w-4 shrink-0 accent-primary"
                       disabled={applyingSettings || saving}
                     />
-                    <span className="text-sm">Что включить в дайджест + порядок блоков + дни дедлайна</span>
+                    <span className="text-sm">Что включить в дайджест</span>
                   </label>
                   <label className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={applyTaskLineSettings}
                       onChange={() => setApplyTaskLineSettings((prev) => !prev)}
-                      className="h-4 w-4 accent-primary"
+                      className="h-4 w-4 shrink-0 accent-primary"
                       disabled={applyingSettings || saving}
                     />
                     <span className="text-sm">Формат строки задачи</span>
@@ -2480,30 +2579,78 @@ function ReminderEditDialog({
                   </div>
                 </div>
 
-                <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60 bg-card p-2 space-y-1">
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60 bg-card p-2">
                   {otherMembers.length === 0 ? (
                     <p className="px-2 py-3 text-xs text-muted-foreground">
                       Нет других участников для применения.
                     </p>
                   ) : (
-                    otherMembers.map((candidate) => {
-                      const checked = selectedApplyMemberIds.includes(candidate.id);
-                      return (
-                        <label
-                          key={candidate.id}
-                          className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleApplyMember(candidate.id)}
-                            className="h-4 w-4 accent-primary"
-                            disabled={applyingSettings || saving}
-                          />
-                          <span className="text-sm">{candidate.full_name}</span>
-                        </label>
-                      );
-                    })
+                    <div className="space-y-1.5">
+                      {applyMemberGroups.map((group) => {
+                        const expanded =
+                          expandedApplyGroupIds[group.id] ?? applyMemberGroups.length <= 4;
+                        const selectedCount = group.members.filter((candidate) =>
+                          selectedApplyMemberIdSet.has(candidate.id)
+                        ).length;
+
+                        return (
+                          <div
+                            key={group.id}
+                            className="overflow-hidden rounded-lg border border-border/60 bg-background/80"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleApplyGroup(group.id)}
+                              className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left hover:bg-muted/30"
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                {expanded ? (
+                                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                )}
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      group.color || "hsl(var(--muted-foreground))",
+                                  }}
+                                />
+                                <span className="truncate text-sm font-medium">
+                                  {group.name}
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-xs text-muted-foreground">
+                                {selectedCount}/{group.members.length}
+                              </span>
+                            </button>
+
+                            {expanded ? (
+                              <div className="space-y-1 border-t border-border/50 p-1.5">
+                                {group.members.map((candidate) => {
+                                  const checked = selectedApplyMemberIdSet.has(candidate.id);
+                                  return (
+                                    <label
+                                      key={candidate.id}
+                                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/40 cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={() => toggleApplyMember(candidate.id)}
+                                        className="h-4 w-4 shrink-0 accent-primary"
+                                        disabled={applyingSettings || saving}
+                                      />
+                                      <span className="text-sm">{candidate.full_name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
