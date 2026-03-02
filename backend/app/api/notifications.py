@@ -20,7 +20,7 @@ LEGACY_TITLE_TEMPLATES: dict[str, str] = {
     "task_deadline_today": "Дедлайн сегодня по задаче «{task_title}»",
     "task_overdue_started": "Задача «{task_title}» стала просроченной",
     "task_status_changed_by_other": "Статус задачи «{task_title}» изменён",
-    "task_review_requested": "Задача «{task_title}» переведена в ревью",
+    "task_review_requested": "Задача «{task_title}» переведена на согласование",
     "task_created_unassigned": "Задача «{task_title}» без исполнителя",
 }
 

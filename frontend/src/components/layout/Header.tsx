@@ -156,7 +156,7 @@ const EVENT_META: Record<
   task_deadline_today: { icon: AlertTriangle, label: "Дедлайн" },
   task_overdue_started: { icon: AlertTriangle, label: "Просрочка" },
   task_status_changed_by_other: { icon: RefreshCw, label: "Статус" },
-  task_review_requested: { icon: CheckSquare, label: "Ревью" },
+  task_review_requested: { icon: CheckSquare, label: "На согласовании" },
   task_created_unassigned: { icon: AlertTriangle, label: "Без исполнителя" },
   meeting_created: { icon: CalendarDays, label: "Встреча" },
 };

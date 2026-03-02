@@ -314,7 +314,7 @@ async def cmd_stats(
         f"<b>Задачи ({total}):</b>\n"
         f"  🆕 Новые: {new_count}\n"
         f"  ▶️ В работе: {in_progress}\n"
-        f"  👀 Ревью: {review}\n"
+        f"  👀 На согласовании: {review}\n"
         f"  ✅ Готово: {done}\n"
         f"  ❌ Отменено: {cancelled}\n"
         f"  🔴 Просрочено: {overdue}\n\n"

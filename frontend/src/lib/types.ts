@@ -21,7 +21,7 @@ export type TelegramBroadcastStatus = "scheduled" | "sent" | "failed" | "cancell
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   new: "Новые",
   in_progress: "В работе",
-  review: "Ревью",
+  review: "На согласовании",
   done: "Готово",
   cancelled: "Отменено",
 };

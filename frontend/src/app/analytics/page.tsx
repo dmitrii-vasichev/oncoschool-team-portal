@@ -445,10 +445,10 @@ export default function AnalyticsPage() {
 
     if (overview.tasks_review >= overview.tasks_in_progress && overview.tasks_review > 0) {
       result.push({
-        title: "Узкое место на этапе ревью",
-        description: `В ревью ${overview.tasks_review}, в работе ${overview.tasks_in_progress}.`,
+        title: "Узкое место на этапе согласования",
+        description: `На согласовании ${overview.tasks_review}, в работе ${overview.tasks_in_progress}.`,
         action:
-          "Выделите отдельные ревью-слоты и ограничьте входящий поток задач до разгрузки очереди.",
+          "Выделите отдельные слоты согласования и ограничьте входящий поток задач до разгрузки очереди.",
       });
     }
 
@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
     {
       title: "Контур борда",
       description:
-        "Блок «Статусы борда» показывает, где копится очередь внутри Kanban-цикла (new → in_progress → review → done).",
+        "Блок «Статусы борда» показывает, где копится очередь внутри Kanban-цикла (Новые → В работе → На согласовании → Готово).",
       usage:
         "Используйте его ежедневно на standup для оперативного управления потоком задач.",
       extension:

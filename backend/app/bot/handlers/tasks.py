@@ -83,7 +83,7 @@ STATUS_EMOJI = {
 STATUS_LABELS = {
     "new": "Новая",
     "in_progress": "В работе",
-    "review": "Ревью",
+    "review": "На согласовании",
     "done": "Готово",
     "cancelled": "Отменена",
 }
@@ -3023,7 +3023,7 @@ async def cb_task_review(callback: CallbackQuery, member: TeamMember, session_ma
                 session, task, member, old_status, "review"
             )
 
-    await callback.answer("👀 Задача на ревью!")
+    await callback.answer("👀 Задача на согласовании!")
     await _safe_edit_text(
         callback.message,
         _format_task_detail(task),

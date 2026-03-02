@@ -32,7 +32,7 @@ TASK_FILTER_LABELS: dict[TaskListFilter, str] = {
     TaskListFilter.ACTIVE: "Активные",
     TaskListFilter.NEW: "Новые",
     TaskListFilter.IN_PROGRESS: "В работе",
-    TaskListFilter.REVIEW: "Ревью",
+    TaskListFilter.REVIEW: "На согласовании",
     TaskListFilter.DONE: "Готово",
     TaskListFilter.CANCELLED: "Отменено",
 }
@@ -109,7 +109,7 @@ def task_actions_keyboard(task_id: int, is_moderator: bool) -> InlineKeyboardMar
             InlineKeyboardButton(text="▶️ В работу", callback_data=f"task_inprogress:{task_id}"),
         ],
         [
-            InlineKeyboardButton(text="👀 Ревью", callback_data=f"task_review:{task_id}"),
+            InlineKeyboardButton(text="👀 На согласование", callback_data=f"task_review:{task_id}"),
             InlineKeyboardButton(text="📝 Апдейт", callback_data=f"task_update:{task_id}"),
         ],
         [

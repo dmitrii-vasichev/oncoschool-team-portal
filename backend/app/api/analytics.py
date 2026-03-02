@@ -21,7 +21,7 @@ TASK_EXCLUDED_FROM_TOTAL_STATUSES = ["cancelled"]
 BOARD_STATUS_ORDER = [
     ("new", "Новые"),
     ("in_progress", "В работе"),
-    ("review", "Ревью"),
+    ("review", "На согласовании"),
     ("done", "Готово"),
 ]
 MONTH_SHORT_RU = {

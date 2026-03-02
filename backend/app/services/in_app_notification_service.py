@@ -12,7 +12,7 @@ from app.db.repositories import InAppNotificationRepository, TeamMemberRepositor
 STATUS_LABELS = {
     "new": "Новая",
     "in_progress": "В работе",
-    "review": "Ревью",
+    "review": "На согласовании",
     "done": "Готово",
     "cancelled": "Отменена",
 }
@@ -89,7 +89,7 @@ class InAppNotificationService:
                     recipient_id=moderator.id,
                     actor_id=changed_by.id,
                     event_type="task_review_requested",
-                    title=f"Задача «{task_title}» переведена в ревью",
+                    title=f"Задача «{task_title}» переведена на согласование",
                     body=task.title,
                     priority="high",
                     action_url=f"/tasks/{task.short_id}",

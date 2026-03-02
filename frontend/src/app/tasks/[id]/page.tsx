@@ -87,7 +87,7 @@ const STATUS_TRANSITIONS: Record<
     { status: "cancelled", label: "Отменить", icon: XCircle },
   ],
   in_progress: [
-    { status: "review", label: "На ревью", icon: Eye },
+    { status: "review", label: "На согласование", icon: Eye },
     { status: "done", label: "Готово", icon: Check },
   ],
   review: [
