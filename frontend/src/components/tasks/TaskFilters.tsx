@@ -22,6 +22,7 @@ export interface TaskFilterValues {
   source: string;
   department_id: string;
   assignee_id: string;
+  created_by_id: string;
 }
 
 const EMPTY_FILTERS: TaskFilterValues = {
@@ -30,6 +31,7 @@ const EMPTY_FILTERS: TaskFilterValues = {
   source: "",
   department_id: "",
   assignee_id: "",
+  created_by_id: "",
 };
 
 const PRIORITY_DOT_COLORS: Record<string, string> = {
@@ -67,7 +69,7 @@ export function TaskFilters({
   showDepartmentFilter = true,
 }: TaskFiltersProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
-  const assigneeOptions = useMemo(
+  const memberOptions = useMemo(
     () =>
       filters.department_id
         ? members.filter((m) => m.department_id === filters.department_id)
@@ -105,6 +107,13 @@ export function TaskFilters({
           : member?.full_name || "Исполнитель",
     });
   }
+  if (filters.created_by_id) {
+    const member = members.find((m) => m.id === filters.created_by_id);
+    activeFilters.push({
+      key: "created_by_id",
+      label: member?.full_name || "Автор",
+    });
+  }
 
   function removeFilter(key: keyof TaskFilterValues) {
     onFiltersChange({ ...filters, [key]: "" });
@@ -113,7 +122,7 @@ export function TaskFilters({
   return (
     <div className="flex-1 space-y-3">
       {/* Main filter row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:flex-nowrap">
         {/* Search */}
         <div className="relative group w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary" />
@@ -154,6 +163,7 @@ export function TaskFilters({
           className={`
             w-full flex-col gap-2
             sm:w-auto sm:flex-row sm:flex-wrap sm:items-center
+            lg:min-w-0 lg:w-full lg:flex-nowrap lg:overflow-x-auto lg:pb-1
             ${filtersExpanded ? "flex" : "hidden lg:flex"}
           `}
         >
@@ -164,7 +174,7 @@ export function TaskFilters({
               onFiltersChange({ ...filters, priority: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger className="h-10 w-full bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[150px]">
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[150px]">
               <SelectValue placeholder="Приоритет" />
             </SelectTrigger>
             <SelectContent>
@@ -191,7 +201,7 @@ export function TaskFilters({
               onFiltersChange({ ...filters, source: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger className="h-10 w-full bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[150px]">
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[150px]">
               <SelectValue placeholder="Источник" />
             </SelectTrigger>
             <SelectContent>
@@ -222,15 +232,24 @@ export function TaskFilters({
                       m.id === filters.assignee_id &&
                       m.department_id === nextDepartmentId
                   );
+                const shouldResetAuthor =
+                  Boolean(nextDepartmentId) &&
+                  Boolean(filters.created_by_id) &&
+                  !members.some(
+                    (m) =>
+                      m.id === filters.created_by_id &&
+                      m.department_id === nextDepartmentId
+                  );
 
                 onFiltersChange({
                   ...filters,
                   department_id: nextDepartmentId,
                   assignee_id: shouldResetAssignee ? "" : filters.assignee_id,
+                  created_by_id: shouldResetAuthor ? "" : filters.created_by_id,
                 });
               }}
             >
-              <SelectTrigger className="h-10 w-full bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[180px]">
+              <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[180px]">
                 <SelectValue placeholder="Отдел" />
               </SelectTrigger>
               <SelectContent>
@@ -254,7 +273,7 @@ export function TaskFilters({
               })
             }
           >
-            <SelectTrigger className="h-10 w-full bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px]">
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px]">
               <SelectValue placeholder="Исполнитель" />
             </SelectTrigger>
             <SelectContent>
@@ -262,8 +281,34 @@ export function TaskFilters({
               <SelectItem value="unassigned">
                 <span className="text-muted-foreground">Не назначен</span>
               </SelectItem>
-              {assigneeOptions.map((m) => (
+              {memberOptions.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
+                  <span className="flex items-center gap-2">
+                    <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
+                    <span className="truncate">{m.full_name}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Author */}
+          <Select
+            value={filters.created_by_id || "all"}
+            onValueChange={(v) =>
+              onFiltersChange({
+                ...filters,
+                created_by_id: v === "all" ? "" : v,
+              })
+            }
+          >
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px]">
+              <SelectValue placeholder="Автор" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все авторы</SelectItem>
+              {memberOptions.map((m) => (
+                <SelectItem key={`author-${m.id}`} value={m.id}>
                   <span className="flex items-center gap-2">
                     <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
                     <span className="truncate">{m.full_name}</span>

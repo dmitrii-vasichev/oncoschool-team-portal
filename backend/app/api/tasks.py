@@ -115,6 +115,7 @@ def _prepare_task_reminder_update(
 @router.get("", response_model=PaginatedTasksResponse)
 async def list_tasks(
     assignee_id: uuid.UUID | None = Query(None),
+    created_by_id: uuid.UUID | None = Query(None),
     department_id: uuid.UUID | None = Query(None),
     status_filter: str | None = Query(None, alias="status"),
     priority: str | None = Query(None),
@@ -157,6 +158,8 @@ async def list_tasks(
     # Filters
     if assignee_id:
         base_stmt = base_stmt.where(Task.assignee_id == assignee_id)
+    if created_by_id:
+        base_stmt = base_stmt.where(Task.created_by_id == created_by_id)
     if status_filter:
         statuses = [s.strip() for s in status_filter.split(",")]
         base_stmt = base_stmt.where(Task.status.in_(statuses))

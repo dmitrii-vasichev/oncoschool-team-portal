@@ -91,6 +91,9 @@ export default function TasksPage() {
       if (filters.assignee_id && filters.assignee_id !== "unassigned") {
         params.assignee_id = filters.assignee_id;
       }
+      if (filters.created_by_id) {
+        params.created_by_id = filters.created_by_id;
+      }
       const [tasksRes, membersRes] = await Promise.all([
         api.getTasks(params),
         api.getTeam().catch(() => [] as TeamMember[]),
@@ -109,6 +112,7 @@ export default function TasksPage() {
   }, [
     accessibleDepartmentIds,
     filters.assignee_id,
+    filters.created_by_id,
     filters.department_id,
     toastError,
     user?.id,
@@ -157,6 +161,9 @@ export default function TasksPage() {
         } else if (t.assignee_id !== filters.assignee_id) {
           return false;
         }
+      }
+      if (filters.created_by_id && t.created_by_id !== filters.created_by_id) {
+        return false;
       }
       return true;
     });
