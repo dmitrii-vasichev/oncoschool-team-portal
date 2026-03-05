@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Search, X, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -53,8 +56,6 @@ interface ActiveFilter {
   label: string;
 }
 
-type MemberFilterMode = "assignee" | "author";
-
 interface TaskFiltersProps {
   filters: TaskFilterValues;
   onFiltersChange: (filters: TaskFilterValues) => void;
@@ -71,7 +72,6 @@ export function TaskFilters({
   showDepartmentFilter = true,
 }: TaskFiltersProps) {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
-  const [memberFilterMode, setMemberFilterMode] = useState<MemberFilterMode>("assignee");
   const memberOptions = useMemo(
     () =>
       filters.department_id
@@ -79,19 +79,11 @@ export function TaskFilters({
         : members,
     [filters.department_id, members]
   );
-  const selectedMemberFilterValue =
-    memberFilterMode === "author"
-      ? filters.created_by_id || "all"
-      : filters.assignee_id || "all";
-
-  useEffect(() => {
-    if (filters.created_by_id && !filters.assignee_id) {
-      setMemberFilterMode("author");
-      return;
-    }
-    if (filters.assignee_id && !filters.created_by_id) {
-      setMemberFilterMode("assignee");
-    }
+  const selectedMemberFilterValue = useMemo(() => {
+    if (filters.created_by_id) return `author:${filters.created_by_id}`;
+    if (filters.assignee_id === "unassigned") return "assignee:unassigned";
+    if (filters.assignee_id) return `assignee:${filters.assignee_id}`;
+    return "all";
   }, [filters.assignee_id, filters.created_by_id]);
 
   const activeFilters: ActiveFilter[] = [];
@@ -136,43 +128,49 @@ export function TaskFilters({
     onFiltersChange({ ...filters, [key]: "" });
   }
 
-  function handleMemberModeChange(nextModeRaw: string) {
-    const nextMode = nextModeRaw as MemberFilterMode;
-    const previousValue =
-      memberFilterMode === "author" ? filters.created_by_id : filters.assignee_id;
-    const transferableValue =
-      previousValue && previousValue !== "unassigned" ? previousValue : "";
-
-    setMemberFilterMode(nextMode);
-    onFiltersChange({
-      ...filters,
-      assignee_id: nextMode === "assignee" ? transferableValue : "",
-      created_by_id: nextMode === "author" ? transferableValue : "",
-    });
-  }
-
   function handleMemberValueChange(value: string) {
-    if (memberFilterMode === "author") {
+    if (value === "all") {
       onFiltersChange({
         ...filters,
         assignee_id: "",
-        created_by_id: value === "all" ? "" : value,
+        created_by_id: "",
       });
       return;
     }
+
+    if (value === "assignee:unassigned") {
+      onFiltersChange({
+        ...filters,
+        assignee_id: "unassigned",
+        created_by_id: "",
+      });
+      return;
+    }
+
+    if (value.startsWith("assignee:")) {
+      onFiltersChange({
+        ...filters,
+        assignee_id: value.slice("assignee:".length),
+        created_by_id: "",
+      });
+      return;
+    }
+
     onFiltersChange({
       ...filters,
-      created_by_id: "",
-      assignee_id: value === "all" ? "" : value,
+      assignee_id: "",
+      created_by_id: value.startsWith("author:")
+        ? value.slice("author:".length)
+        : "",
     });
   }
 
   return (
     <div className="flex-1 space-y-3">
       {/* Main filter row */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:flex-nowrap">
         {/* Search */}
-        <div className="relative group w-full sm:w-auto">
+        <div className="relative group w-full lg:w-[220px] lg:shrink-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary" />
           <Input
             placeholder="Найти задачу..."
@@ -180,7 +178,7 @@ export function TaskFilters({
             onChange={(e) =>
               onFiltersChange({ ...filters, search: e.target.value })
             }
-            className="h-10 w-full bg-card pl-9 shadow-sm focus:border-primary/40 focus:shadow-md sm:w-52 lg:w-44 xl:w-56"
+            className="h-10 w-full bg-card pl-9 shadow-sm focus:border-primary/40 focus:shadow-md"
           />
           {filters.search && (
             <button
@@ -211,7 +209,7 @@ export function TaskFilters({
           className={`
             w-full flex-col gap-2
             sm:w-auto sm:flex-row sm:flex-wrap sm:items-center
-            lg:min-w-0 lg:w-full lg:flex-wrap min-[1200px]:flex-nowrap
+            lg:flex-1 lg:min-w-0 lg:w-auto lg:flex-nowrap
             ${filtersExpanded ? "flex" : "hidden lg:flex"}
           `}
         >
@@ -222,7 +220,7 @@ export function TaskFilters({
               onFiltersChange({ ...filters, priority: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[140px] lg:w-[128px] xl:w-[150px]">
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[140px] lg:w-[138px]">
               <SelectValue placeholder="Приоритет" />
             </SelectTrigger>
             <SelectContent>
@@ -249,7 +247,7 @@ export function TaskFilters({
               onFiltersChange({ ...filters, source: v === "all" ? "" : v })
             }
           >
-            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[140px] lg:w-[128px] xl:w-[150px]">
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[140px] lg:w-[138px]">
               <SelectValue placeholder="Источник" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +295,7 @@ export function TaskFilters({
                 });
               }}
             >
-              <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px] lg:w-[148px] xl:w-[180px]">
+              <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px] lg:w-[160px]">
                 <SelectValue placeholder="Отдел" />
               </SelectTrigger>
               <SelectContent>
@@ -311,47 +309,46 @@ export function TaskFilters({
             </Select>
           )}
 
-          {/* Member mode */}
-          <Select
-            value={memberFilterMode}
-            onValueChange={handleMemberModeChange}
-          >
-            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[140px] lg:w-[124px] xl:w-[140px]">
-              <SelectValue placeholder="Роль" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="assignee">Исполнитель</SelectItem>
-              <SelectItem value="author">Автор</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {/* Member filter */}
+          {/* Member filter (assignee + author in one dropdown) */}
           <Select
             value={selectedMemberFilterValue}
             onValueChange={handleMemberValueChange}
           >
-            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[170px] lg:w-[148px] xl:w-[170px]">
-              <SelectValue
-                placeholder={memberFilterMode === "author" ? "Автор" : "Исполнитель"}
-              />
+            <SelectTrigger className="h-10 w-full shrink-0 bg-card border-border/60 shadow-sm data-[state=open]:border-primary/40 data-[state=open]:shadow-md sm:w-[190px] lg:w-[180px]">
+              <SelectValue placeholder="Участник" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">
-                {memberFilterMode === "author" ? "Все авторы" : "Все исполнители"}
-              </SelectItem>
-              {memberFilterMode === "assignee" && (
-                <SelectItem value="unassigned">
+              <SelectItem value="all">Все участники</SelectItem>
+              <SelectSeparator />
+
+              <SelectGroup>
+                <SelectLabel>Исполнитель</SelectLabel>
+                <SelectItem value="assignee:unassigned">
                   <span className="text-muted-foreground">Не назначен</span>
                 </SelectItem>
-              )}
-              {memberOptions.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  <span className="flex items-center gap-2">
-                    <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
-                    <span className="truncate">{m.full_name}</span>
-                  </span>
-                </SelectItem>
-              ))}
+                {memberOptions.map((m) => (
+                  <SelectItem key={`assignee:${m.id}`} value={`assignee:${m.id}`}>
+                    <span className="flex items-center gap-2">
+                      <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
+                      <span className="truncate">{m.full_name}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+
+              <SelectSeparator />
+
+              <SelectGroup>
+                <SelectLabel>Автор</SelectLabel>
+                {memberOptions.map((m) => (
+                  <SelectItem key={`author:${m.id}`} value={`author:${m.id}`}>
+                    <span className="flex items-center gap-2">
+                      <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
+                      <span className="truncate">{m.full_name}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>
