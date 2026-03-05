@@ -286,7 +286,7 @@ export default function TasksPage() {
   return (
     <div className="space-y-5 animate-in fade-in duration-300">
       {/* Header: filters + create button */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-3 min-[1400px]:flex-row min-[1400px]:items-start min-[1400px]:justify-between">
         <TaskFilters
           filters={filters}
           onFiltersChange={setFilters}
@@ -297,7 +297,7 @@ export default function TasksPage() {
         <Button
           size="sm"
           onClick={() => setCreateOpen(true)}
-          className="w-full rounded-xl gap-1.5 sm:w-auto lg:shrink-0"
+          className="w-full rounded-xl gap-1.5 sm:w-auto min-[1400px]:shrink-0"
         >
           <Plus className="h-3.5 w-3.5" />
           Новая задача
