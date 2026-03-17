@@ -24,6 +24,11 @@ def _get_fernet() -> Fernet:
     return _fernet
 
 
+def is_encryption_configured() -> bool:
+    """Check if TELEGRAM_ENCRYPTION_KEY is set (without raising)."""
+    return bool(settings.TELEGRAM_ENCRYPTION_KEY)
+
+
 def encrypt(plaintext: str) -> str:
     """Encrypt a plaintext string, return base64-encoded ciphertext."""
     return _get_fernet().encrypt(plaintext.encode()).decode()

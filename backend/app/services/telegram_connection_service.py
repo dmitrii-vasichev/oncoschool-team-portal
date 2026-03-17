@@ -10,7 +10,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.repositories import TelegramSessionRepository
-from app.utils.encryption import decrypt, encrypt
+from app.utils.encryption import decrypt, encrypt, is_encryption_configured
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,9 @@ class TelegramConnectionService:
 
     async def get_status(self, session: AsyncSession) -> dict:
         """Get current connection status with masked credentials."""
+        if not is_encryption_configured():
+            return {"status": "not_configured"}
+
         ts = await _repo.get(session)
         if not ts:
             return {"status": "disconnected"}
@@ -78,10 +81,16 @@ class TelegramConnectionService:
 
         Returns: {"status": "code_required"} or {"status": "error", "error_message": "..."}
         """
+        if not is_encryption_configured():
+            return {
+                "status": "error",
+                "error_message": "Encryption key not configured on the server.",
+            }
+
         try:
             from pyrogram import Client
         except ImportError:
-            return {"status": "error", "message": "Pyrofork not installed"}
+            return {"status": "error", "error_message": "Pyrofork not installed"}
 
         global _client, _client_connected
 

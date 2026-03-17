@@ -26,7 +26,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { api } from "@/lib/api";
 import type { TelegramConnectionStatus } from "@/lib/types";
 
-type ConnectionPhase = "loading" | "disconnected" | "connecting" | "code_entry" | "connected" | "error";
+type ConnectionPhase = "loading" | "disconnected" | "connecting" | "code_entry" | "connected" | "error" | "not_configured";
 
 /**
  * Telegram Connection management for admin settings.
@@ -54,7 +54,9 @@ export function TelegramConnectionSection() {
     try {
       const data = await api.getTelegramConnectionStatus();
       setStatus(data);
-      if (data.status === "connected") {
+      if (data.status === "not_configured") {
+        setPhase("not_configured");
+      } else if (data.status === "connected") {
         setPhase("connected");
       } else if (data.status === "code_required") {
         setPhase("code_entry");
@@ -195,6 +197,12 @@ export function TelegramConnectionSection() {
             Подключён
           </Badge>
         )}
+        {phase === "not_configured" && (
+          <Badge variant="secondary" className="gap-1 text-muted-foreground">
+            <WifiOff className="h-3 w-3" />
+            Не настроен
+          </Badge>
+        )}
         {(phase === "disconnected" || phase === "error") && (
           <Badge variant="secondary" className="gap-1 text-muted-foreground">
             <WifiOff className="h-3 w-3" />
@@ -204,6 +212,25 @@ export function TelegramConnectionSection() {
       </div>
 
       <div className="p-6 space-y-4">
+        {/* ── Not configured state ── */}
+        {phase === "not_configured" && (
+          <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <span className="font-medium text-amber-700 dark:text-amber-400">
+                Требуется настройка сервера
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">
+              Для работы Telegram-подключения необходимо задать переменную окружения{" "}
+              <code className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                TELEGRAM_ENCRYPTION_KEY
+              </code>{" "}
+              на сервере.
+            </p>
+          </div>
+        )}
+
         {/* ── Connected state ── */}
         {phase === "connected" && status && (
           <div className="space-y-4">

@@ -808,7 +808,7 @@ export interface AIFeatureConfig {
 // ── Telegram Connection ──
 
 export interface TelegramConnectionStatus {
-  status: "connected" | "disconnected" | "error" | "code_required" | "password_required";
+  status: "connected" | "disconnected" | "error" | "code_required" | "password_required" | "not_configured";
   phone?: string;
   error_message?: string;
   connected_at?: string;
