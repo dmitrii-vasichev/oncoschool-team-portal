@@ -94,7 +94,7 @@ export function AnalysisTab() {
     }
 
     if (errors.length > 0) {
-      const msg = errors.join("; ");
+      const msg = Array.from(new Set(errors)).join("; ");
       setLoadError(msg);
       toastErrorRef.current(msg);
     }
