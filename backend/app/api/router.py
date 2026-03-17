@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.admin import router as admin_router
+from app.api.content import content_router
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
 from app.api.broadcasts import router as broadcasts_router
@@ -29,3 +30,4 @@ api_router.include_router(analytics_router)
 api_router.include_router(telegram_targets_router)
 api_router.include_router(broadcasts_router)
 api_router.include_router(admin_router)
+api_router.include_router(content_router)
