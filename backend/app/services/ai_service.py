@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.models import TeamMember
-from app.db.repositories import AppSettingsRepository
+from app.db.repositories import AIFeatureConfigRepository, AppSettingsRepository
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +215,13 @@ class AIService:
                 lambda model: GeminiProvider(settings.GOOGLE_API_KEY, model)
             )
 
-    async def _get_current_provider(self, session: AsyncSession) -> AIProvider:
-        """Read current provider from app_settings and instantiate.
+    async def _get_current_provider(
+        self, session: AsyncSession, feature_key: str | None = None
+    ) -> AIProvider:
+        """Read current provider and instantiate.
+
+        If feature_key is given, reads from ai_feature_config table (with default fallback).
+        Otherwise falls back to legacy app_settings for backward compatibility.
 
         Falls back to first available provider when the configured one
         has no API key (e.g. seed defaults to anthropic but only openai key is set).
@@ -224,16 +229,29 @@ class AIService:
         if not self.provider_factories:
             raise ValueError("Нет доступных AI-провайдеров (не заданы API ключи)")
 
-        settings_repo = AppSettingsRepository()
-        setting = await settings_repo.get(session, "ai_provider")
-        if not setting:
-            raise ValueError("AI provider not configured in app_settings")
+        provider_name = None
+        model = None
 
-        provider_name = setting.value["provider"]
-        model = setting.value["model"]
+        # Try per-feature config first
+        if feature_key:
+            config_repo = AIFeatureConfigRepository()
+            config = await config_repo.get_with_default_fallback(session, feature_key)
+            if config and config.provider:
+                provider_name = config.provider
+                model = config.model
+
+        # Fall back to legacy app_settings
+        if not provider_name:
+            settings_repo = AppSettingsRepository()
+            setting = await settings_repo.get(session, "ai_provider")
+            if not setting:
+                raise ValueError("AI provider not configured")
+            provider_name = setting.value["provider"]
+            model = setting.value["model"]
 
         if provider_name not in self.provider_factories:
             fallback_name = next(iter(self.provider_factories))
+            settings_repo = AppSettingsRepository()
             config_setting = await settings_repo.get(session, "ai_providers_config")
             fallback_model = model
             if config_setting and fallback_name in config_setting.value:
@@ -244,10 +262,6 @@ class AIService:
                 "автоматически переключено на %s/%s. "
                 "Проверьте конфигурацию AI-провайдера!",
                 provider_name, fallback_name, fallback_model,
-            )
-            await settings_repo.set(
-                session, "ai_provider",
-                {"provider": fallback_name, "model": fallback_model},
             )
             provider_name, model = fallback_name, fallback_model
 
@@ -450,7 +464,7 @@ class AIService:
         team_members: list[TeamMember],
     ) -> ParsedMeeting:
         """Parse Zoom Summary via current AI provider."""
-        provider = await self._get_current_provider(session)
+        provider = await self._get_current_provider(session, feature_key="meetings_summary")
         if (
             isinstance(provider, OpenAIProvider)
             and provider.model != MEETING_SUMMARY_OPENAI_MODEL
@@ -555,3 +569,14 @@ class AIService:
         except (json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to parse AI response as ParsedVoiceTask: {e}\nResponse: {response}")
             raise ValueError(f"AI вернул некорректный ответ: {e}")
+
+    async def complete_for_feature(
+        self,
+        session: AsyncSession,
+        feature_key: str,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> str:
+        """Generic completion using a per-feature AI provider. Used by Content module."""
+        provider = await self._get_current_provider(session, feature_key=feature_key)
+        return await self._complete_with_retry(provider, system_prompt, user_prompt)
