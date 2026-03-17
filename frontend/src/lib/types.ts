@@ -680,3 +680,210 @@ export const TELEGRAM_BROADCAST_STATUS_LABELS: Record<TelegramBroadcastStatus, s
   failed: "Ошибка",
   cancelled: "Отменено",
 };
+
+// ============================================
+// Content Module — Enums & Types
+// ============================================
+
+export type ContentSubSection = "telegram_analysis";
+export type ContentRole = "operator" | "editor";
+export type AnalysisContentType = "posts" | "comments" | "all";
+export type AnalysisStatus = "preparing" | "downloading" | "analyzing" | "completed" | "failed";
+
+export const CONTENT_ROLE_LABELS: Record<ContentRole, string> = {
+  operator: "Оператор",
+  editor: "Редактор",
+};
+
+export const ANALYSIS_CONTENT_TYPE_LABELS: Record<AnalysisContentType, string> = {
+  posts: "Посты",
+  comments: "Комментарии",
+  all: "Всё",
+};
+
+export const ANALYSIS_STATUS_LABELS: Record<AnalysisStatus, string> = {
+  preparing: "Подготовка",
+  downloading: "Загрузка",
+  analyzing: "Анализ",
+  completed: "Завершён",
+  failed: "Ошибка",
+};
+
+// ── Content Module Models ──
+
+export interface TelegramChannel {
+  id: string;
+  username: string;
+  display_name: string;
+  created_at: string;
+}
+
+export interface ChannelContentStats extends TelegramChannel {
+  total_count: number;
+  post_count: number;
+  comment_count: number;
+  earliest_date: string | null;
+  latest_date: string | null;
+}
+
+export interface DataInventoryResponse {
+  channels: ChannelContentStats[];
+  total_posts: number;
+  total_comments: number;
+}
+
+export interface AnalysisPrompt {
+  id: string;
+  title: string;
+  description: string | null;
+  text: string;
+  created_by_id: string;
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AnalysisRun {
+  id: string;
+  channels: unknown[];
+  date_from: string;
+  date_to: string;
+  content_type: string;
+  prompt_id: string | null;
+  prompt_snapshot: string;
+  ai_provider: string | null;
+  ai_model: string | null;
+  result_markdown: string | null;
+  status: AnalysisStatus;
+  error_message: string | null;
+  run_by_id: string;
+  run_by_name: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface AnalysisHistoryResponse {
+  items: AnalysisRun[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface ChannelPrepareSummary {
+  channel_id: string;
+  channel_name: string;
+  existing_count: number;
+  estimated_missing: number | null;
+}
+
+export interface AnalysisPrepareResponse {
+  channels: ChannelPrepareSummary[];
+  total_existing: number;
+  total_estimated_missing: number | null;
+  telegram_connected: boolean;
+}
+
+// ── Content Access ──
+
+export interface ContentAccess {
+  id: string;
+  sub_section: ContentSubSection;
+  member_id: string | null;
+  member_name: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  role: ContentRole;
+}
+
+// ── AI Feature Config ──
+
+export interface AIFeatureConfig {
+  feature_key: string;
+  display_name: string;
+  provider: string | null;
+  model: string | null;
+  updated_by_id: string | null;
+}
+
+// ── Telegram Connection ──
+
+export interface TelegramConnectionStatus {
+  status: "connected" | "disconnected" | "error" | "code_required" | "password_required";
+  phone?: string;
+  error_message?: string;
+  connected_at?: string;
+}
+
+// ── Analysis SSE Events ──
+
+export interface AnalysisProgressEvent {
+  phase: "downloading" | "analyzing" | "completed" | "error";
+  channel?: string;
+  progress?: number;
+  chunk?: number;
+  total_chunks?: number;
+  run_id?: string;
+  error?: string;
+}
+
+// ── Content Module Request Types ──
+
+export interface TelegramChannelCreateRequest {
+  username: string;
+  display_name: string;
+}
+
+export interface TelegramChannelUpdateRequest {
+  display_name: string;
+}
+
+export interface AnalysisPromptCreateRequest {
+  title: string;
+  description?: string | null;
+  text: string;
+}
+
+export interface AnalysisPromptUpdateRequest {
+  title?: string;
+  description?: string | null;
+  text?: string;
+}
+
+export interface AnalysisPrepareRequest {
+  channel_ids: string[];
+  date_from: string;
+  date_to: string;
+  content_type: AnalysisContentType;
+}
+
+export interface AnalysisRunRequest {
+  channel_ids: string[];
+  date_from: string;
+  date_to: string;
+  content_type: AnalysisContentType;
+  prompt_id?: string | null;
+  prompt_text?: string | null;
+}
+
+export interface ContentAccessGrantRequest {
+  sub_section: ContentSubSection;
+  member_id?: string | null;
+  department_id?: string | null;
+  role: ContentRole;
+}
+
+export interface TelegramConnectRequest {
+  api_id: string;
+  api_hash: string;
+  phone: string;
+}
+
+export interface TelegramVerifyRequest {
+  code: string;
+  password?: string | null;
+}
+
+export interface AIFeatureConfigUpdateRequest {
+  provider?: string | null;
+  model?: string | null;
+}

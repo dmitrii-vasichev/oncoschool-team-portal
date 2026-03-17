@@ -16,9 +16,11 @@ import {
   ChevronsRight,
   Menu,
   GraduationCap,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useContentAccess } from "@/hooks/useContentAccess";
 import { PermissionService } from "@/lib/permissions";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { RoleBadge } from "@/components/shared/RoleBadge";
@@ -65,7 +67,8 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   moderatorOnly?: boolean;
-  section: "main" | "manage";
+  contentAccess?: boolean;
+  section: "main" | "content" | "manage";
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -74,6 +77,13 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/meetings", label: "Встречи", icon: CalendarDays, section: "main" },
   { href: "/analytics", label: "Аналитика", icon: BarChart3, section: "main" },
   { href: "/team", label: "Команда", icon: Users, section: "main" },
+  {
+    href: "/content/telegram-analysis",
+    label: "Telegram-анализ",
+    icon: Search,
+    contentAccess: true,
+    section: "content",
+  },
   {
     href: "/broadcasts",
     label: "Рассылки",
@@ -114,6 +124,7 @@ export function MobileMenuTrigger() {
 function SidebarInner({ collapsed }: { collapsed: boolean }) {
   const pathname = usePathname();
   const { user, logout } = useCurrentUser();
+  const { hasAccess: hasContentAccess } = useContentAccess();
 
   if (!user) return null;
 
@@ -121,6 +132,11 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
 
   const mainItems = NAV_ITEMS.filter(
     (i) => i.section === "main" && (!i.moderatorOnly || isModerator)
+  );
+  const contentItems = NAV_ITEMS.filter(
+    (i) =>
+      i.section === "content" &&
+      (!i.contentAccess || hasContentAccess("telegram_analysis"))
   );
   const manageItems = NAV_ITEMS.filter(
     (i) => i.section === "manage" && (!i.moderatorOnly || isModerator)
@@ -208,6 +224,32 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
             <NavLink key={item.href} item={item} />
           ))}
         </nav>
+
+        {/* Content section */}
+        {contentItems.length > 0 && (
+          <>
+            <div className={cn("my-3", collapsed ? "mx-2" : "mx-3")}>
+              <div className="h-px bg-border/60" />
+            </div>
+            {!collapsed && (
+              <div className="px-4 mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+                  Контент
+                </span>
+              </div>
+            )}
+            <nav
+              className={cn(
+                "flex flex-col gap-1",
+                collapsed ? "px-2" : "px-3"
+              )}
+            >
+              {contentItems.map((item) => (
+                <NavLink key={item.href} item={item} />
+              ))}
+            </nav>
+          </>
+        )}
 
         {/* Moderator section */}
         {manageItems.length > 0 && (
