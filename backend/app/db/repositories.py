@@ -1,6 +1,7 @@
 import logging
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy import select, update, delete, func, or_, and_, cast
 from sqlalchemy.dialects.postgresql import INTERVAL
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +13,14 @@ logger = logging.getLogger(__name__)
 from datetime import datetime
 
 from app.db.models import (
+    AIFeatureConfig,
+    AnalysisPrompt,
+    AnalysisRun,
+    AnalysisStatus,
     AppSettings,
+    ContentAccess,
+    ContentRole,
+    ContentSubSection,
     Department,
     InAppNotification,
     Meeting,
@@ -25,7 +33,10 @@ from app.db.models import (
     TeamMember,
     TelegramBroadcast,
     TelegramBroadcastImagePreset,
+    TelegramChannel,
+    TelegramContent,
     TelegramNotificationTarget,
+    TelegramSession,
 )
 
 
@@ -877,3 +888,373 @@ class AppSettingsRepository:
             session.add(setting)
         await session.flush()
         return setting
+
+
+# =============================================
+# Content module repositories
+# =============================================
+
+
+class TelegramSessionRepository:
+    async def get(self, session: AsyncSession) -> TelegramSession | None:
+        return await session.get(TelegramSession, 1)
+
+    async def upsert(self, session: AsyncSession, **kwargs) -> TelegramSession:
+        ts = await self.get(session)
+        if ts:
+            for key, value in kwargs.items():
+                setattr(ts, key, value)
+        else:
+            ts = TelegramSession(id=1, **kwargs)
+            session.add(ts)
+        await session.flush()
+        return ts
+
+
+class TelegramChannelRepository:
+    async def get_all(self, session: AsyncSession) -> list[TelegramChannel]:
+        stmt = select(TelegramChannel).order_by(TelegramChannel.display_name)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_by_id(self, session: AsyncSession, channel_id: uuid.UUID) -> TelegramChannel | None:
+        return await session.get(TelegramChannel, channel_id)
+
+    async def get_by_username(self, session: AsyncSession, username: str) -> TelegramChannel | None:
+        stmt = select(TelegramChannel).where(
+            func.lower(TelegramChannel.username) == username.lower()
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create(self, session: AsyncSession, **kwargs) -> TelegramChannel:
+        channel = TelegramChannel(**kwargs)
+        session.add(channel)
+        await session.flush()
+        return channel
+
+    async def update(self, session: AsyncSession, channel_id: uuid.UUID, **kwargs) -> TelegramChannel | None:
+        channel = await self.get_by_id(session, channel_id)
+        if not channel:
+            return None
+        for key, value in kwargs.items():
+            setattr(channel, key, value)
+        await session.flush()
+        return channel
+
+    async def delete(self, session: AsyncSession, channel_id: uuid.UUID) -> bool:
+        stmt = delete(TelegramChannel).where(TelegramChannel.id == channel_id)
+        result = await session.execute(stmt)
+        return result.rowcount > 0
+
+    async def get_with_content_stats(self, session: AsyncSession) -> list[dict]:
+        """Return channels with aggregated content statistics."""
+        stmt = (
+            select(
+                TelegramChannel.id,
+                TelegramChannel.username,
+                TelegramChannel.display_name,
+                TelegramChannel.created_at,
+                func.count(TelegramContent.id).label("total_count"),
+                func.count(TelegramContent.id).filter(
+                    TelegramContent.content_type == "post"
+                ).label("post_count"),
+                func.count(TelegramContent.id).filter(
+                    TelegramContent.content_type == "comment"
+                ).label("comment_count"),
+                func.min(TelegramContent.message_date).label("earliest_date"),
+                func.max(TelegramContent.message_date).label("latest_date"),
+            )
+            .outerjoin(TelegramContent, TelegramChannel.id == TelegramContent.channel_id)
+            .group_by(TelegramChannel.id)
+            .order_by(TelegramChannel.display_name)
+        )
+        result = await session.execute(stmt)
+        return [dict(row._mapping) for row in result.all()]
+
+
+class TelegramContentRepository:
+    async def bulk_insert(self, session: AsyncSession, items: list[dict]) -> int:
+        """Insert multiple content items, skipping duplicates. Returns count inserted."""
+        if not items:
+            return 0
+        inserted = 0
+        for item in items:
+            existing = await session.execute(
+                select(TelegramContent.id).where(
+                    TelegramContent.channel_id == item["channel_id"],
+                    TelegramContent.telegram_message_id == item["telegram_message_id"],
+                )
+            )
+            if existing.scalar_one_or_none() is None:
+                session.add(TelegramContent(**item))
+                inserted += 1
+        if inserted:
+            await session.flush()
+        return inserted
+
+    async def get_existing_message_ids(
+        self,
+        session: AsyncSession,
+        channel_id: uuid.UUID,
+        date_from: datetime,
+        date_to: datetime,
+    ) -> set[int]:
+        """Return set of telegram_message_ids already stored for channel+date range."""
+        stmt = select(TelegramContent.telegram_message_id).where(
+            TelegramContent.channel_id == channel_id,
+            TelegramContent.message_date >= date_from,
+            TelegramContent.message_date <= date_to,
+        )
+        result = await session.execute(stmt)
+        return {row[0] for row in result.all()}
+
+    async def get_by_channel_and_date_range(
+        self,
+        session: AsyncSession,
+        channel_ids: list[uuid.UUID],
+        date_from: datetime,
+        date_to: datetime,
+        content_type: str | None = None,
+    ) -> list[TelegramContent]:
+        """Get content for given channels and date range, optionally filtered by type."""
+        stmt = (
+            select(TelegramContent)
+            .where(
+                TelegramContent.channel_id.in_(channel_ids),
+                TelegramContent.message_date >= date_from,
+                TelegramContent.message_date <= date_to,
+            )
+            .order_by(TelegramContent.message_date)
+        )
+        if content_type and content_type != "all":
+            stmt = stmt.where(TelegramContent.content_type == content_type)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def count_by_channel_and_date_range(
+        self,
+        session: AsyncSession,
+        channel_id: uuid.UUID,
+        date_from: datetime,
+        date_to: datetime,
+        content_type: str | None = None,
+    ) -> int:
+        """Count content items for a channel in date range."""
+        stmt = (
+            select(func.count())
+            .select_from(TelegramContent)
+            .where(
+                TelegramContent.channel_id == channel_id,
+                TelegramContent.message_date >= date_from,
+                TelegramContent.message_date <= date_to,
+            )
+        )
+        if content_type and content_type != "all":
+            stmt = stmt.where(TelegramContent.content_type == content_type)
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0)
+
+    async def delete_expired(self, session: AsyncSession, retention_days: int = 90) -> int:
+        """Delete content older than retention_days (based on loaded_at). Returns count."""
+        stmt = delete(TelegramContent).where(
+            TelegramContent.loaded_at < func.now() - cast(
+                func.concat(str(retention_days), " days"), INTERVAL
+            )
+        )
+        result = await session.execute(stmt)
+        await session.flush()
+        return int(result.rowcount or 0)
+
+
+class AnalysisPromptRepository:
+    async def get_all(self, session: AsyncSession) -> list[AnalysisPrompt]:
+        stmt = (
+            select(AnalysisPrompt)
+            .options(selectinload(AnalysisPrompt.created_by))
+            .order_by(AnalysisPrompt.created_at.desc())
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_by_id(self, session: AsyncSession, prompt_id: uuid.UUID) -> AnalysisPrompt | None:
+        stmt = (
+            select(AnalysisPrompt)
+            .options(selectinload(AnalysisPrompt.created_by))
+            .where(AnalysisPrompt.id == prompt_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def create(self, session: AsyncSession, **kwargs) -> AnalysisPrompt:
+        prompt = AnalysisPrompt(**kwargs)
+        session.add(prompt)
+        await session.flush()
+        return prompt
+
+    async def update(self, session: AsyncSession, prompt_id: uuid.UUID, **kwargs) -> AnalysisPrompt | None:
+        prompt = await self.get_by_id(session, prompt_id)
+        if not prompt:
+            return None
+        for key, value in kwargs.items():
+            setattr(prompt, key, value)
+        await session.flush()
+        return prompt
+
+    async def delete(self, session: AsyncSession, prompt_id: uuid.UUID) -> bool:
+        stmt = delete(AnalysisPrompt).where(AnalysisPrompt.id == prompt_id)
+        result = await session.execute(stmt)
+        return result.rowcount > 0
+
+
+class AnalysisRunRepository:
+    async def create(self, session: AsyncSession, **kwargs) -> AnalysisRun:
+        run = AnalysisRun(**kwargs)
+        session.add(run)
+        await session.flush()
+        return run
+
+    async def get_by_id(self, session: AsyncSession, run_id: uuid.UUID) -> AnalysisRun | None:
+        stmt = (
+            select(AnalysisRun)
+            .options(selectinload(AnalysisRun.run_by), selectinload(AnalysisRun.prompt))
+            .where(AnalysisRun.id == run_id)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def update_status(
+        self,
+        session: AsyncSession,
+        run_id: uuid.UUID,
+        status: AnalysisStatus,
+        **kwargs,
+    ) -> AnalysisRun | None:
+        run = await session.get(AnalysisRun, run_id)
+        if not run:
+            return None
+        run.status = status
+        for key, value in kwargs.items():
+            setattr(run, key, value)
+        await session.flush()
+        return run
+
+    async def get_history(
+        self,
+        session: AsyncSession,
+        *,
+        page: int = 1,
+        per_page: int = 20,
+    ) -> tuple[list[AnalysisRun], int]:
+        """Return paginated history of analysis runs and total count."""
+        count_stmt = select(func.count()).select_from(AnalysisRun)
+        count_result = await session.execute(count_stmt)
+        total = int(count_result.scalar_one() or 0)
+
+        stmt = (
+            select(AnalysisRun)
+            .options(selectinload(AnalysisRun.run_by), selectinload(AnalysisRun.prompt))
+            .order_by(AnalysisRun.created_at.desc())
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all()), total
+
+
+class ContentAccessRepository:
+    async def get_access_for_member(
+        self,
+        session: AsyncSession,
+        member_id: uuid.UUID,
+        department_ids: list[uuid.UUID],
+        sub_section: ContentSubSection | None = None,
+    ) -> list[ContentAccess]:
+        """Get all content access grants matching member directly or via departments."""
+        conditions = [
+            or_(
+                ContentAccess.member_id == member_id,
+                ContentAccess.department_id.in_(department_ids) if department_ids else sa.false(),
+            )
+        ]
+        if sub_section:
+            conditions.append(ContentAccess.sub_section == sub_section)
+        stmt = (
+            select(ContentAccess)
+            .options(selectinload(ContentAccess.member), selectinload(ContentAccess.department))
+            .where(*conditions)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def grant(self, session: AsyncSession, **kwargs) -> ContentAccess:
+        access = ContentAccess(**kwargs)
+        session.add(access)
+        await session.flush()
+        return access
+
+    async def revoke(self, session: AsyncSession, access_id: uuid.UUID) -> bool:
+        stmt = delete(ContentAccess).where(ContentAccess.id == access_id)
+        result = await session.execute(stmt)
+        return result.rowcount > 0
+
+    async def get_all(
+        self,
+        session: AsyncSession,
+        sub_section: ContentSubSection | None = None,
+    ) -> list[ContentAccess]:
+        stmt = (
+            select(ContentAccess)
+            .options(selectinload(ContentAccess.member), selectinload(ContentAccess.department))
+            .order_by(ContentAccess.created_at)
+        )
+        if sub_section:
+            stmt = stmt.where(ContentAccess.sub_section == sub_section)
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+
+class AIFeatureConfigRepository:
+    async def get_by_feature_key(
+        self, session: AsyncSession, feature_key: str
+    ) -> AIFeatureConfig | None:
+        stmt = select(AIFeatureConfig).where(AIFeatureConfig.feature_key == feature_key)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_with_default_fallback(
+        self, session: AsyncSession, feature_key: str
+    ) -> AIFeatureConfig | None:
+        """Get config for feature_key; if provider is null, fall back to 'default' row."""
+        config = await self.get_by_feature_key(session, feature_key)
+        if config and config.provider:
+            return config
+        return await self.get_by_feature_key(session, "default")
+
+    async def get_all(self, session: AsyncSession) -> list[AIFeatureConfig]:
+        stmt = select(AIFeatureConfig).order_by(
+            # default first, then alphabetical
+            sa.case(
+                (AIFeatureConfig.feature_key == "default", 0),
+                else_=1,
+            ),
+            AIFeatureConfig.display_name,
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def upsert(
+        self,
+        session: AsyncSession,
+        feature_key: str,
+        **kwargs,
+    ) -> AIFeatureConfig:
+        config = await self.get_by_feature_key(session, feature_key)
+        if config:
+            for key, value in kwargs.items():
+                setattr(config, key, value)
+        else:
+            config = AIFeatureConfig(feature_key=feature_key, **kwargs)
+            session.add(config)
+        await session.flush()
+        return config

@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_KEY: str = ""
 
+    # Content module — Telegram userbot encryption
+    TELEGRAM_ENCRYPTION_KEY: str = ""
+
     # General
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Moscow"
