@@ -4,7 +4,7 @@
   "prd": "docs/prd-content-telegram-analysis.md",
   "plan": "docs/plans/2026-03-17-content-telegram-analysis.md",
   "status": "in_progress",
-  "current_phase": "C7",
+  "current_phase": "C8",
   "phases": {
     "C1": { "issue": 2, "branch": "feature/2-content-db-models", "status": "merged", "pr": 10 },
     "C2": { "issue": 3, "branch": "feature/3-ai-config-content-access", "status": "merged", "pr": 11 },
@@ -12,7 +12,7 @@
     "C4": { "issue": 5, "branch": "feature/5-channels-prompts-api", "status": "merged", "pr": 13 },
     "C5": { "issue": 6, "branch": "feature/6-download-analysis-service", "status": "merged", "pr": 16 },
     "C6": { "issue": 7, "branch": "feature/7-frontend-foundation", "status": "merged", "pr": 17 },
-    "C7": { "issue": 8, "branch": "feature/8-admin-settings-ui", "status": "pending" },
+    "C7": { "issue": 8, "branch": "feature/8-admin-settings-ui", "status": "merged", "pr": 18 },
     "C8": { "issue": 9, "branch": "feature/9-telegram-analysis-ui", "status": "pending" }
   },
   "created_at": "2026-03-17",
