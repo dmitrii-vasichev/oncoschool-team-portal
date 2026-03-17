@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Play,
   Search,
@@ -8,6 +8,8 @@ import {
   Info,
   FileText,
   Calendar,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +43,7 @@ export function AnalysisTab() {
   const [channels, setChannels] = useState<TelegramChannel[]>([]);
   const [prompts, setPrompts] = useState<AnalysisPrompt[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Form
   const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
@@ -60,24 +63,48 @@ export function AnalysisTab() {
   // SSE stream
   const stream = useAnalysisStream();
 
-  // Fetch channels and prompts
+  // Stable ref for toast to avoid re-triggering the effect
+  const toastErrorRef = useRef(toastError);
+  toastErrorRef.current = toastError;
+
+  // Fetch channels and prompts independently
+  const fetchData = useCallback(async () => {
+    setLoadingData(true);
+    setLoadError(null);
+
+    const [chResult, prResult] = await Promise.allSettled([
+      api.getChannels(),
+      api.getPrompts(),
+    ]);
+
+    if (chResult.status === "fulfilled") {
+      setChannels(chResult.value);
+    }
+    if (prResult.status === "fulfilled") {
+      setPrompts(prResult.value);
+    }
+
+    // Collect errors
+    const errors: string[] = [];
+    if (chResult.status === "rejected") {
+      errors.push(chResult.reason instanceof Error ? chResult.reason.message : "Ошибка загрузки каналов");
+    }
+    if (prResult.status === "rejected") {
+      errors.push(prResult.reason instanceof Error ? prResult.reason.message : "Ошибка загрузки промптов");
+    }
+
+    if (errors.length > 0) {
+      const msg = errors.join("; ");
+      setLoadError(msg);
+      toastErrorRef.current(msg);
+    }
+
+    setLoadingData(false);
+  }, []);
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ch, pr] = await Promise.all([
-          api.getChannels(),
-          api.getPrompts(),
-        ]);
-        setChannels(ch);
-        setPrompts(pr);
-      } catch {
-        toastError("Не удалось загрузить данные");
-      } finally {
-        setLoadingData(false);
-      }
-    };
     fetchData();
-  }, [toastError]);
+  }, [fetchData]);
 
   // Set default dates (last 30 days)
   useEffect(() => {
@@ -163,6 +190,28 @@ export function AnalysisTab() {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Show error with retry if both channels and prompts failed to load
+  if (loadError && channels.length === 0 && prompts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <AlertTriangle className="h-8 w-8 text-destructive" />
+        <div className="text-center space-y-1">
+          <p className="text-sm font-medium">Не удалось загрузить данные</p>
+          <p className="text-xs text-muted-foreground max-w-md">{loadError}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-xl gap-2"
+          onClick={fetchData}
+        >
+          <RefreshCw className="h-4 w-4" />
+          Повторить
+        </Button>
       </div>
     );
   }
