@@ -10,7 +10,7 @@ drops idle connections after ~60s).
 
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any, Callable, Coroutine
 
 from app.db.database import async_session
@@ -119,7 +119,7 @@ class AnalysisService:
                     await self._run_repo.update_status(
                         session, run_id, AnalysisStatus.completed,
                         result_markdown=result,
-                        completed_at=datetime.now(timezone.utc),
+                        completed_at=datetime.utcnow(),
                     )
                     await session.commit()
                     return result
@@ -218,7 +218,7 @@ class AnalysisService:
                 await self._run_repo.update_status(
                     session, run_id, AnalysisStatus.completed,
                     result_markdown=final_result,
-                    completed_at=datetime.now(timezone.utc),
+                    completed_at=datetime.utcnow(),
                 )
                 await session.commit()
 
@@ -244,7 +244,7 @@ class AnalysisService:
                     await self._run_repo.update_status(
                         session, run_id, AnalysisStatus.failed,
                         error_message=str(e)[:1000],
-                        completed_at=datetime.now(timezone.utc),
+                        completed_at=datetime.utcnow(),
                     )
                     await session.commit()
             except Exception:
