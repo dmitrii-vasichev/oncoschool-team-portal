@@ -3,7 +3,7 @@
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, get_current_user_from_query
 from app.db.database import get_session
 from app.db.models import ContentSubSection, TeamMember
 from app.services.content_access_service import ContentAccessService
@@ -14,6 +14,27 @@ def require_content_operator(sub_section: ContentSubSection):
 
     async def _dep(
         member: TeamMember = Depends(get_current_user),
+        session: AsyncSession = Depends(get_session),
+    ) -> TeamMember:
+        has = await ContentAccessService.is_operator_or_editor(session, member, sub_section)
+        if not has:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Нет доступа к этому разделу",
+            )
+        return member
+
+    return _dep
+
+
+def require_content_operator_query(sub_section: ContentSubSection):
+    """Same as require_content_operator but reads JWT from query param `token`.
+
+    Used for SSE endpoints where EventSource cannot send Authorization header.
+    """
+
+    async def _dep(
+        member: TeamMember = Depends(get_current_user_from_query),
         session: AsyncSession = Depends(get_session),
     ) -> TeamMember:
         has = await ContentAccessService.is_operator_or_editor(session, member, sub_section)

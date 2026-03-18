@@ -54,7 +54,14 @@ export function AnalysisProgress({
   totalChunks,
   error,
 }: AnalysisProgressProps) {
-  if (!phase) return null;
+  if (!phase) {
+    return (
+      <div className="rounded-xl border border-border/60 bg-card p-5 flex items-center gap-3">
+        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+        <span className="text-sm text-muted-foreground">Подключение...</span>
+      </div>
+    );
+  }
 
   const config = PHASE_CONFIG[phase];
   const Icon = config.icon;

@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import require_content_operator
+from app.api.deps import require_content_operator, require_content_operator_query
 from app.api.schemas.content import (
     AnalysisHistoryResponse,
     AnalysisPrepareRequest,
@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analysis", tags=["content-analysis"])
 
 _operator = require_content_operator(ContentSubSection.telegram_analysis)
+_operator_query = require_content_operator_query(ContentSubSection.telegram_analysis)
 _run_repo = AnalysisRunRepository()
 _prompt_repo = AnalysisPromptRepository()
 
@@ -265,7 +266,7 @@ async def _run_analysis_background(
 @router.get("/{run_id}/stream")
 async def stream_analysis_progress(
     run_id: uuid.UUID,
-    member: TeamMember = Depends(_operator),
+    member: TeamMember = Depends(_operator_query),
     session: AsyncSession = Depends(get_session),
 ):
     """SSE endpoint for real-time analysis progress."""

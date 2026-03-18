@@ -40,7 +40,19 @@ export function HistoryTab() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [viewRun, setViewRun] = useState<AnalysisRun | null>(null);
+  const [channelNames, setChannelNames] = useState<Record<string, string>>({});
   const perPage = 10;
+
+  // Load channel names for UUID → name resolution
+  useEffect(() => {
+    api.getChannels().then((channels) => {
+      const map: Record<string, string> = {};
+      for (const ch of channels) {
+        map[ch.id] = ch.display_name;
+      }
+      setChannelNames(map);
+    }).catch(() => {});
+  }, []);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -154,30 +166,37 @@ export function HistoryTab() {
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1">
                       {Array.isArray(run.channels) &&
-                        run.channels.map((ch: unknown, i: number) => (
-                          <Badge
-                            key={i}
-                            variant="secondary"
-                            className="text-2xs"
-                          >
-                            {typeof ch === "string"
-                              ? ch
-                              : typeof ch === "object" && ch !== null && "name" in ch
-                                ? String((ch as { name: string }).name)
-                                : `#${i + 1}`}
-                          </Badge>
-                        ))}
+                        run.channels.map((ch: unknown, i: number) => {
+                          const chStr = typeof ch === "string" ? ch : String(ch);
+                          const name = channelNames[chStr] || chStr.slice(0, 8) + "…";
+                          return (
+                            <Badge
+                              key={i}
+                              variant="secondary"
+                              className="text-2xs"
+                            >
+                              {name}
+                            </Badge>
+                          );
+                        })}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                     {run.date_from} — {run.date_to}
                   </td>
                   <td className="px-4 py-3">
-                    <Badge
-                      className={`text-xs ${STATUS_COLORS[run.status] || ""}`}
-                    >
-                      {ANALYSIS_STATUS_LABELS[run.status] || run.status}
-                    </Badge>
+                    <div className="space-y-1">
+                      <Badge
+                        className={`text-xs ${STATUS_COLORS[run.status] || ""}`}
+                      >
+                        {ANALYSIS_STATUS_LABELS[run.status] || run.status}
+                      </Badge>
+                      {run.status === "failed" && run.error_message && (
+                        <p className="text-2xs text-destructive/70 max-w-[200px] truncate" title={run.error_message}>
+                          {run.error_message}
+                        </p>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {run.run_by_name || "—"}
