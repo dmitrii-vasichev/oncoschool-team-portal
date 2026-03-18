@@ -1009,6 +1009,14 @@ class TelegramContentRepository:
         result = await session.execute(stmt)
         return {row[0] for row in result.all()}
 
+    @staticmethod
+    def _normalize_content_type(content_type: str | None) -> str | None:
+        """Normalize API content_type ('posts'/'comments') to enum values ('post'/'comment')."""
+        if not content_type or content_type == "all":
+            return None
+        mapping = {"posts": "post", "comments": "comment"}
+        return mapping.get(content_type, content_type)
+
     async def get_by_channel_and_date_range(
         self,
         session: AsyncSession,
@@ -1027,8 +1035,9 @@ class TelegramContentRepository:
             )
             .order_by(TelegramContent.message_date)
         )
-        if content_type and content_type != "all":
-            stmt = stmt.where(TelegramContent.content_type == content_type)
+        ct = self._normalize_content_type(content_type)
+        if ct:
+            stmt = stmt.where(TelegramContent.content_type == ct)
         result = await session.execute(stmt)
         return list(result.scalars().all())
 
@@ -1050,8 +1059,9 @@ class TelegramContentRepository:
                 TelegramContent.message_date <= date_to,
             )
         )
-        if content_type and content_type != "all":
-            stmt = stmt.where(TelegramContent.content_type == content_type)
+        ct = self._normalize_content_type(content_type)
+        if ct:
+            stmt = stmt.where(TelegramContent.content_type == ct)
         result = await session.execute(stmt)
         return int(result.scalar_one() or 0)
 

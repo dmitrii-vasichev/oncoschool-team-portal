@@ -112,6 +112,15 @@ class TestCodePatterns(unittest.TestCase):
             source = f.read()
 
         self.assertIn("_make_naive(message.date)", source)
+        self.assertIn("_make_naive(reply.date)", source)
+
+    def test_discussion_replies_used(self):
+        """Comments must be fetched via get_discussion_replies, not get_chat_history."""
+        with open(SERVICE_PATH) as f:
+            source = f.read()
+
+        self.assertIn("get_discussion_replies", source)
+        self.assertIn("COMMENT_ID_OFFSET", source)
 
 
 if __name__ == "__main__":

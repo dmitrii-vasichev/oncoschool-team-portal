@@ -2,6 +2,11 @@
 
 Handles: per-channel locking, rate limiting, deduplication, progress callbacks.
 
+Channels vs comments:
+- Channel POSTS are fetched via `get_chat_history(channel_username)`.
+- Channel COMMENTS live in a linked discussion group and are fetched via
+  `get_discussion_replies(channel_username, post_message_id)` for each post.
+
 IMPORTANT: DB sessions are opened/closed for each DB operation to avoid
 holding connections idle during long Telegram API calls (Supabase PgBouncer
 drops idle connections after ~60s).
@@ -24,10 +29,17 @@ logger = logging.getLogger(__name__)
 
 # Rate limiting
 BATCH_SIZE = 100
-BATCH_DELAY_SEC = 2.0
+BATCH_DELAY_SEC = 1.0
+COMMENTS_DELAY_SEC = 1.5  # delay between fetching comments for each post
 
 # Max retries after FloodWait
 MAX_FLOOD_RETRIES = 2
+
+# Offset for comment IDs to avoid collision with channel post IDs.
+# Channel posts and discussion group replies have independent ID spaces,
+# so a post ID=5 and a reply ID=5 would collide in our unique constraint
+# (channel_id, telegram_message_id). We store replies as original_id + offset.
+COMMENT_ID_OFFSET = 2_000_000_000
 
 ProgressCallback = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
 
@@ -194,10 +206,13 @@ class TelegramDownloadService:
         content_type: str,
         progress_callback: ProgressCallback | None,
     ) -> int:
-        """Download posts/comments from a single channel.
+        """Download posts and/or comments from a single channel.
 
-        Uses short-lived DB sessions: one for reading existing IDs,
-        one per batch for inserts. No session held during Telegram API calls.
+        - Posts are fetched via get_chat_history(channel).
+        - Comments are fetched via get_discussion_replies(channel, post_id)
+          for each post in the date range.
+
+        Uses short-lived DB sessions for each DB operation.
         """
         # Get existing message IDs to skip duplicates (short session)
         async with async_session() as session:
@@ -214,101 +229,156 @@ class TelegramDownloadService:
             })
 
         clean_username = username.lstrip("@")
+        downloaded_posts = 0
+        downloaded_comments = 0
+
+        # Phase 1: Download posts (needed for both "posts" and "comments" modes,
+        # because we need post IDs to fetch their discussion replies)
+        need_posts = content_type in ("all", "posts")
+        need_comments = content_type in ("all", "comments")
+
+        posts_in_range = await self._download_posts(
+            client=client,
+            channel_db_id=channel_db_id,
+            username=clean_username,
+            display_name=display_name,
+            dt_from=dt_from,
+            dt_to=dt_to,
+            existing_ids=existing_ids,
+            save_posts=need_posts,
+            progress_callback=progress_callback,
+        )
+        if need_posts:
+            downloaded_posts = posts_in_range["saved"]
+
+        # Phase 2: Download comments for each post
+        if need_comments and posts_in_range["post_ids"]:
+            if progress_callback:
+                await progress_callback({
+                    "phase": "downloading",
+                    "channel": display_name,
+                    "progress": downloaded_posts,
+                    "detail": f"Fetching comments for {len(posts_in_range['post_ids'])} posts...",
+                })
+
+            downloaded_comments = await self._download_comments(
+                client=client,
+                channel_db_id=channel_db_id,
+                username=clean_username,
+                display_name=display_name,
+                post_ids=posts_in_range["post_ids"],
+                existing_ids=existing_ids,
+                progress_callback=progress_callback,
+                base_count=downloaded_posts,
+            )
+
+        total = downloaded_posts + downloaded_comments
+
+        if progress_callback:
+            parts = []
+            if need_posts:
+                parts.append(f"{downloaded_posts} posts")
+            if need_comments:
+                parts.append(f"{downloaded_comments} comments")
+            parts.append(f"{posts_in_range['scanned']} scanned")
+            await progress_callback({
+                "phase": "downloading",
+                "channel": display_name,
+                "progress": total,
+                "detail": f"Completed: {', '.join(parts)}",
+            })
+
+        logger.info(
+            "Downloaded %d from @%s (posts=%d, comments=%d, scanned=%d)",
+            total, username, downloaded_posts, downloaded_comments,
+            posts_in_range["scanned"],
+        )
+        return total
+
+    async def _download_posts(
+        self,
+        client,
+        channel_db_id: uuid.UUID,
+        username: str,
+        display_name: str,
+        dt_from: datetime,
+        dt_to: datetime,
+        existing_ids: set[int],
+        save_posts: bool,
+        progress_callback: ProgressCallback | None,
+    ) -> dict:
+        """Download channel posts. Returns {saved, scanned, post_ids}.
+
+        post_ids is a list of (message_id, has_text) tuples for posts in range —
+        needed for fetching comments even when save_posts=False.
+        """
         messages_batch: list[dict] = []
-        downloaded = 0
-        skipped = 0
-        seen_total = 0
+        saved = 0
+        scanned = 0
         skipped_no_text = 0
-        skipped_type_filter = 0
+        post_ids: list[int] = []
 
-        # Use offset_date to start iteration from dt_to + 1 day instead of
-        # iterating from the very latest message. This avoids scanning
-        # thousands of newer messages and hitting FloodWait before reaching
-        # the target date range.
         offset_date = dt_to + timedelta(days=1)
-
         flood_retries = 0
 
         while True:
             try:
                 async for message in client.get_chat_history(
-                    clean_username, offset_date=offset_date
+                    username, offset_date=offset_date
                 ):
-                    seen_total += 1
-
-                    # Normalize message date (Pyrofork may return tz-aware UTC)
+                    scanned += 1
                     msg_date = self._make_naive(message.date)
 
-                    # Stop if message is older than our range
                     if msg_date and msg_date < dt_from:
                         break
-
-                    # Skip if message is newer than our range (shouldn't happen
-                    # with offset_date, but guard anyway)
                     if msg_date and msg_date > dt_to:
                         continue
 
-                    # Skip if no text content
+                    # Remember post ID for comment fetching
+                    post_ids.append(message.id)
+
+                    if not save_posts:
+                        continue
+
                     if not message.text and not message.caption:
                         skipped_no_text += 1
                         continue
 
-                    # Skip duplicates
                     if message.id in existing_ids:
-                        skipped += 1
-                        continue
-
-                    # Determine content type
-                    msg_type = ContentType.post
-                    if message.reply_to_message_id:
-                        msg_type = ContentType.comment
-
-                    # Filter by content_type
-                    if content_type == "posts" and msg_type != ContentType.post:
-                        skipped_type_filter += 1
-                        continue
-                    if content_type == "comments" and msg_type != ContentType.comment:
-                        skipped_type_filter += 1
                         continue
 
                     text = message.text or message.caption or ""
-
                     messages_batch.append({
                         "channel_id": channel_db_id,
                         "telegram_message_id": message.id,
-                        "content_type": msg_type,
+                        "content_type": ContentType.post,
                         "text": text,
                         "message_date": msg_date,
                     })
 
-                    # Bulk insert when batch is full (short session per batch)
                     if len(messages_batch) >= BATCH_SIZE:
                         async with async_session() as session:
                             inserted = await self._content_repo.bulk_insert(session, messages_batch)
                             await session.commit()
-                        downloaded += inserted
+                        saved += inserted
                         messages_batch.clear()
 
                         if progress_callback:
                             await progress_callback({
                                 "phase": "downloading",
                                 "channel": display_name,
-                                "progress": downloaded,
-                                "detail": f"Downloaded {downloaded} messages (skipped {skipped} duplicates)",
+                                "progress": saved,
+                                "detail": f"Downloaded {saved} posts...",
                             })
-
-                        # Rate limiting (no DB session held during sleep)
                         await asyncio.sleep(BATCH_DELAY_SEC)
 
-                # Insert remaining messages (short session)
+                # Flush remaining
                 if messages_batch:
                     async with async_session() as session:
                         inserted = await self._content_repo.bulk_insert(session, messages_batch)
                         await session.commit()
-                    downloaded += inserted
+                    saved += inserted
                     messages_batch.clear()
-
-                # Iteration completed successfully — exit the retry loop
                 break
 
             except Exception as e:
@@ -317,48 +387,140 @@ class TelegramDownloadService:
                     flood_retries += 1
                     wait_time = getattr(e, "value", 60)
                     logger.warning(
-                        "FloodWait for channel %s (attempt %d/%d): sleeping %s seconds",
+                        "FloodWait fetching posts from @%s (attempt %d/%d): %ds",
                         username, flood_retries, MAX_FLOOD_RETRIES, wait_time,
                     )
                     if progress_callback:
                         await progress_callback({
                             "phase": "downloading",
                             "channel": display_name,
-                            "progress": downloaded,
-                            "detail": f"Rate limited — waiting {wait_time}s (attempt {flood_retries}/{MAX_FLOOD_RETRIES})",
+                            "progress": saved,
+                            "detail": f"Rate limited — waiting {wait_time}s",
                         })
                     await asyncio.sleep(wait_time)
-                    # Retry the entire iteration
                     continue
                 else:
-                    logger.error(
-                        "Error downloading channel %s: %s (type=%s, seen=%d, downloaded=%d)",
-                        username, e, error_name, seen_total, downloaded,
-                    )
+                    logger.error("Error downloading posts from @%s: %s", username, e)
                     raise
 
-        detail_parts = [f"{downloaded} new"]
-        if skipped:
-            detail_parts.append(f"{skipped} duplicates")
-        if skipped_no_text:
-            detail_parts.append(f"{skipped_no_text} without text")
-        if skipped_type_filter:
-            detail_parts.append(f"{skipped_type_filter} filtered by type")
-        detail_parts.append(f"{seen_total} scanned")
+        logger.info(
+            "Posts from @%s: saved=%d, scanned=%d, no_text=%d, posts_in_range=%d",
+            username, saved, scanned, skipped_no_text, len(post_ids),
+        )
+        return {"saved": saved, "scanned": scanned, "post_ids": post_ids}
 
-        if progress_callback:
-            await progress_callback({
-                "phase": "downloading",
-                "channel": display_name,
-                "progress": downloaded,
-                "detail": f"Completed: {', '.join(detail_parts)}",
-            })
+    async def _download_comments(
+        self,
+        client,
+        channel_db_id: uuid.UUID,
+        username: str,
+        display_name: str,
+        post_ids: list[int],
+        existing_ids: set[int],
+        progress_callback: ProgressCallback | None,
+        base_count: int = 0,
+    ) -> int:
+        """Download discussion replies (comments) for each post in the channel.
+
+        Uses get_discussion_replies() to fetch comments from the linked group.
+        Comment IDs are stored with COMMENT_ID_OFFSET to avoid collision with post IDs.
+        """
+        messages_batch: list[dict] = []
+        total_saved = 0
+        posts_with_comments = 0
+        posts_without_discussion = 0
+
+        for idx, post_id in enumerate(post_ids):
+            try:
+                comment_count = 0
+                async for reply in client.get_discussion_replies(username, post_id):
+                    # Skip non-text replies
+                    if not reply.text and not reply.caption:
+                        continue
+
+                    msg_date = self._make_naive(reply.date)
+
+                    # Use offset ID to avoid collision with channel post IDs
+                    stored_id = reply.id + COMMENT_ID_OFFSET
+                    if stored_id in existing_ids:
+                        continue
+
+                    text = reply.text or reply.caption or ""
+                    messages_batch.append({
+                        "channel_id": channel_db_id,
+                        "telegram_message_id": stored_id,
+                        "content_type": ContentType.comment,
+                        "text": text,
+                        "message_date": msg_date,
+                    })
+                    comment_count += 1
+
+                if comment_count > 0:
+                    posts_with_comments += 1
+
+                # Flush batch
+                if len(messages_batch) >= BATCH_SIZE:
+                    async with async_session() as session:
+                        inserted = await self._content_repo.bulk_insert(session, messages_batch)
+                        await session.commit()
+                    total_saved += inserted
+                    messages_batch.clear()
+
+                    if progress_callback:
+                        await progress_callback({
+                            "phase": "downloading",
+                            "channel": display_name,
+                            "progress": base_count + total_saved,
+                            "detail": f"Comments: {total_saved} from {idx + 1}/{len(post_ids)} posts",
+                        })
+
+                # Rate limiting between posts
+                if (idx + 1) % 5 == 0:
+                    await asyncio.sleep(COMMENTS_DELAY_SEC)
+
+            except Exception as e:
+                error_name = type(e).__name__
+                if "FloodWait" in error_name:
+                    wait_time = getattr(e, "value", 60)
+                    logger.warning(
+                        "FloodWait fetching comments for post %d in @%s: %ds",
+                        post_id, username, wait_time,
+                    )
+                    if progress_callback:
+                        await progress_callback({
+                            "phase": "downloading",
+                            "channel": display_name,
+                            "progress": base_count + total_saved,
+                            "detail": f"Rate limited — waiting {wait_time}s",
+                        })
+                    await asyncio.sleep(wait_time)
+                    # Continue to next post instead of retrying
+                elif "MsgIdInvalid" in error_name or "DISCUSSION" in str(e).upper():
+                    # Post has no discussion thread / comments disabled
+                    posts_without_discussion += 1
+                    continue
+                else:
+                    # Log and continue — don't fail entire download for one post
+                    logger.warning(
+                        "Error fetching comments for post %d in @%s: %s (%s)",
+                        post_id, username, e, error_name,
+                    )
+                    continue
+
+        # Flush remaining
+        if messages_batch:
+            async with async_session() as session:
+                inserted = await self._content_repo.bulk_insert(session, messages_batch)
+                await session.commit()
+            total_saved += inserted
 
         logger.info(
-            "Downloaded %d from @%s (no_text=%d, type_filtered=%d, duplicates=%d, scanned=%d)",
-            downloaded, username, skipped_no_text, skipped_type_filter, skipped, seen_total,
+            "Comments from @%s: saved=%d, posts_checked=%d, "
+            "posts_with_comments=%d, posts_without_discussion=%d",
+            username, total_saved, len(post_ids),
+            posts_with_comments, posts_without_discussion,
         )
-        return downloaded
+        return total_saved
 
 
 class ChannelLockError(Exception):
