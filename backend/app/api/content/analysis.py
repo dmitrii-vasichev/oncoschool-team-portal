@@ -170,7 +170,7 @@ async def run_analysis(
         telegram_service=request.app.state.telegram_connection_service,
     )
 
-    return {"run_id": str(run_id)}
+    return {"id": str(run_id)}
 
 
 async def _run_analysis_background(
