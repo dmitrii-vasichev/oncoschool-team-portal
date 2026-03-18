@@ -121,23 +121,6 @@ async def run_analysis(
     if not prompt_text:
         raise HTTPException(status_code=400, detail="Either prompt_id or prompt_text is required")
 
-    # Check if there's data to analyze (existing content or Telegram connection for download)
-    telegram_service = request.app.state.telegram_connection_service
-    download_service = TelegramDownloadService(telegram_service)
-    prep = await download_service.prepare_analysis(
-        session,
-        channel_ids=body.channel_ids,
-        date_from=body.date_from,
-        date_to=body.date_to,
-        content_type=body.content_type,
-    )
-    if prep["total_existing"] == 0 and not prep["telegram_connected"]:
-        raise HTTPException(
-            status_code=400,
-            detail="No content in database and Telegram is not connected. "
-                   "Connect Telegram in Settings to download channel data.",
-        )
-
     # Create analysis run record
     channel_ids_str = [str(cid) for cid in body.channel_ids]
     async with session.begin_nested():

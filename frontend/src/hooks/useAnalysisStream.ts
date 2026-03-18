@@ -103,6 +103,7 @@ export function useAnalysisStream(): AnalysisStreamState {
       };
 
       es.onerror = () => {
+        setPhase("error");
         setError("Connection lost");
         stop();
       };
