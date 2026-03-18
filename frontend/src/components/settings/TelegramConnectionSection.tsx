@@ -296,7 +296,13 @@ export function TelegramConnectionSection() {
             <Button
               variant="outline"
               className="rounded-xl"
-              onClick={() => {
+              onClick={async () => {
+                try {
+                  await api.disconnectTelegram();
+                } catch {
+                  // ignore — just clear local state
+                }
+                setStatus(null);
                 setPhase("disconnected");
                 setCode("");
                 setPassword("");
