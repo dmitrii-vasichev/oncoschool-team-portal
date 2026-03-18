@@ -227,12 +227,18 @@ class AnalysisService:
 
         except Exception as e:
             logger.error("Analysis %s failed: %s", run_id, e)
-            await self._run_repo.update_status(
-                session, run_id, AnalysisStatus.failed,
-                error_message=str(e)[:1000],
-                completed_at=datetime.now(timezone.utc),
-            )
-            await session.commit()
+            # Session may be in a broken state — rollback before updating
+            try:
+                await session.rollback()
+                await self._run_repo.update_status(
+                    session, run_id, AnalysisStatus.failed,
+                    error_message=str(e)[:1000],
+                    completed_at=datetime.now(timezone.utc),
+                )
+                await session.commit()
+            except Exception:
+                logger.warning("Failed to update run status via existing session, will retry with fresh session")
+                # Let the outer handler in analysis.py create a fresh session
             if progress_callback:
                 await progress_callback({
                     "phase": "error",

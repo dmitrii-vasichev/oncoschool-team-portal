@@ -173,52 +173,63 @@ async def _run_analysis_background(
         await queue.put(event)
 
     try:
-        async with async_session() as session:
-            # Phase 1: Download
-            download_service = TelegramDownloadService(telegram_service)
+        # Phase 1: Download — use dedicated session so errors don't poison analysis
+        try:
+            async with async_session() as dl_session:
+                download_service = TelegramDownloadService(telegram_service)
 
-            await _run_repo.update_status(session, run_id, AnalysisStatus.downloading)
-            await session.commit()
+                await _run_repo.update_status(dl_session, run_id, AnalysisStatus.downloading)
+                await dl_session.commit()
 
-            try:
-                download_result = await download_service.download_missing(
-                    session,
-                    channel_ids=channel_ids,
-                    date_from=date_from,
-                    date_to=date_to,
-                    content_type=content_type,
-                    progress_callback=progress_callback,
-                )
-                await session.commit()
+                try:
+                    download_result = await download_service.download_missing(
+                        dl_session,
+                        channel_ids=channel_ids,
+                        date_from=date_from,
+                        date_to=date_to,
+                        content_type=content_type,
+                        progress_callback=progress_callback,
+                    )
+                    await dl_session.commit()
 
-                await progress_callback({
-                    "phase": "downloading",
-                    "detail": f"Download complete: {download_result['total_downloaded']} new messages",
-                    "progress": 100,
-                })
-            except ChannelLockError as e:
-                await _run_repo.update_status(
-                    session, run_id, AnalysisStatus.failed,
-                    error_message=str(e),
-                )
-                await session.commit()
-                await progress_callback({"phase": "error", "detail": str(e)})
-                return
-            except ValueError as e:
-                # Telegram not connected — proceed with existing content only
-                logger.warning("Download skipped: %s. Proceeding with existing content.", e)
-                await progress_callback({
-                    "phase": "downloading",
-                    "detail": f"Download skipped: {e}. Using existing content.",
-                    "progress": 100,
-                })
+                    await progress_callback({
+                        "phase": "downloading",
+                        "detail": f"Download complete: {download_result['total_downloaded']} new messages",
+                        "progress": 100,
+                    })
+                except ChannelLockError as e:
+                    await dl_session.rollback()
+                    await _run_repo.update_status(
+                        dl_session, run_id, AnalysisStatus.failed,
+                        error_message=str(e),
+                    )
+                    await dl_session.commit()
+                    await progress_callback({"phase": "error", "detail": str(e)})
+                    return
+                except ValueError as e:
+                    # Telegram not connected — proceed with existing content only
+                    await dl_session.rollback()
+                    logger.warning("Download skipped: %s. Proceeding with existing content.", e)
+                    await progress_callback({
+                        "phase": "downloading",
+                        "detail": f"Download skipped: {e}. Using existing content.",
+                        "progress": 100,
+                    })
+                except Exception:
+                    await dl_session.rollback()
+                    raise
+        except ChannelLockError:
+            return  # Already handled above
+        except ValueError:
+            pass  # Already handled above — continue to analysis
 
-            # Phase 2: Analysis
+        # Phase 2: Analysis — fresh session, isolated from download errors
+        async with async_session() as an_session:
             ai_service = AIService()
             analysis_service = AnalysisService(ai_service)
 
             await analysis_service.run_analysis(
-                session,
+                an_session,
                 run_id=run_id,
                 channel_ids=channel_ids,
                 date_from=date_from,
@@ -231,12 +242,12 @@ async def _run_analysis_background(
     except Exception as e:
         logger.exception("Background analysis %s failed", run_id)
         try:
-            async with async_session() as session:
+            async with async_session() as err_session:
                 await _run_repo.update_status(
-                    session, run_id, AnalysisStatus.failed,
+                    err_session, run_id, AnalysisStatus.failed,
                     error_message=str(e)[:1000],
                 )
-                await session.commit()
+                await err_session.commit()
         except Exception:
             logger.exception("Failed to update run status after error")
 

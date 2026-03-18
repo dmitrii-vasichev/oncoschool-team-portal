@@ -249,9 +249,18 @@ class TelegramDownloadService:
                         "detail": f"Rate limited — waiting {wait_time}s",
                     })
                 await asyncio.sleep(wait_time)
-                # Don't re-raise — partial download is still useful
+                # Commit what was downloaded so far
+                try:
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
             else:
                 logger.error("Error downloading channel %s: %s", channel.username, e)
+                # Rollback to clean session state before re-raising
+                try:
+                    await session.rollback()
+                except Exception:
+                    pass
                 raise
 
         if progress_callback:
