@@ -6,7 +6,7 @@ Handles: per-channel locking, rate limiting, deduplication, progress callbacks.
 import asyncio
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, Callable, Coroutine
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -106,8 +106,8 @@ class TelegramDownloadService:
         if not client:
             raise ValueError("Telegram not connected. Connect via Settings first.")
 
-        dt_from = datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc)
-        dt_to = datetime.combine(date_to, datetime.max.time(), tzinfo=timezone.utc)
+        dt_from = datetime.combine(date_from, datetime.min.time())
+        dt_to = datetime.combine(date_to, datetime.max.time())
 
         results = {}
         total_downloaded = 0
