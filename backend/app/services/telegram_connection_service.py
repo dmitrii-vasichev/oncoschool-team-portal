@@ -121,7 +121,6 @@ class TelegramConnectionService:
                 name="oncoschool_userbot",
                 api_id=int(api_id),
                 api_hash=api_hash,
-                phone_number=phone,
                 in_memory=True,
             )
 
