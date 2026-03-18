@@ -132,6 +132,10 @@ export function TelegramConnectionSection() {
         setPhone("");
         setCode("");
         setPassword("");
+      } else if (result.status === "code_required") {
+        // Code expired — new code was sent automatically
+        setCode("");
+        toastError(result.error_message || "Код истёк. Новый код отправлен.");
       } else if (result.status === "password_required") {
         setNeedsPassword(true);
         toastError("Требуется пароль двухфакторной аутентификации");

@@ -167,7 +167,9 @@ class TelegramConnectionService:
     ) -> dict:
         """Complete Telegram authorization with code (and optional 2FA password).
 
-        Returns: {"status": "connected"} or {"status": "password_required"} or {"status": "error", "error_message": "..."}
+        Returns: {"status": "connected"} or {"status": "password_required"}
+        or {"status": "code_required", "error_message": "..."} (code resent)
+        or {"status": "error", "error_message": "..."}
         """
         global _client, _client_connected
 
@@ -175,22 +177,45 @@ class TelegramConnectionService:
             return {"status": "error", "error_message": "No pending connection. Initiate connection first."}
 
         client = self._pending_client
+        phone = self._pending_phone
 
         try:
             try:
+                logger.info(
+                    "Attempting sign_in for %s (hash=%s…)",
+                    _mask_phone(phone),
+                    (self._pending_phone_code_hash or "")[:8],
+                )
                 signed_in = await client.sign_in(
-                    phone_number=self._pending_phone,
+                    phone_number=phone,
                     phone_code_hash=self._pending_phone_code_hash,
                     phone_code=code,
                 )
             except Exception as e:
                 error_name = type(e).__name__
-                if "SessionPasswordNeeded" in error_name or "password" in str(e).lower():
+                error_str = str(e)
+
+                # Handle 2FA
+                if "SessionPasswordNeeded" in error_name or "password" in error_str.lower():
                     if password:
-                        # Try with 2FA password
                         signed_in = await client.check_password(password)
                     else:
                         return {"status": "password_required"}
+
+                # Handle expired code — resend automatically
+                elif "PHONE_CODE_EXPIRED" in error_str:
+                    logger.warning("Code expired, resending for %s", _mask_phone(phone))
+                    try:
+                        sent_code = await client.send_code(phone)
+                        self._pending_phone_code_hash = sent_code.phone_code_hash
+                        logger.info("New code sent, hash=%s…", sent_code.phone_code_hash[:8])
+                        return {
+                            "status": "code_required",
+                            "error_message": "Код истёк. Новый код отправлен — введите его.",
+                        }
+                    except Exception as resend_err:
+                        logger.error("Failed to resend code: %s", resend_err)
+                        raise e  # raise original error
                 else:
                     raise
 
