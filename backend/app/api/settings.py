@@ -38,6 +38,7 @@ from app.db.schemas import (
     ReminderSettingsResponse,
     ReminderSettingsUpdate,
 )
+from app.services.ai_config_service import AIFeatureConfigService
 from app.services.ai_service import AIService
 from app.services.reminder_service import (
     ALLOWED_TASK_OVERDUE_INTERVAL_HOURS,
@@ -692,8 +693,18 @@ async def get_ai_settings(
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
-    """Get current AI provider and available options."""
-    info = await ai_service.get_current_provider_info(session)
+    """Get current AI provider and available options.
+
+    Reads from ai_feature_config 'default' row (new table), with fallback to app_settings.
+    """
+    # Try new per-feature config first
+    provider, model = await AIFeatureConfigService.get_provider_for_feature(session, "default")
+    if not provider:
+        # Fallback to legacy app_settings
+        info = await ai_service.get_current_provider_info(session)
+        provider = info["provider"]
+        model = info["model"]
+
     available = ai_service.get_available_providers()
 
     # Get providers config
@@ -701,8 +712,8 @@ async def get_ai_settings(
     providers_config = config_setting.value if config_setting else None
 
     return AISettingsResponse(
-        current_provider=info["provider"],
-        current_model=info["model"],
+        current_provider=provider or "not configured",
+        current_model=model or "",
         available_providers=available,
         providers_config=providers_config,
     )
@@ -714,7 +725,10 @@ async def update_ai_settings(
     member: TeamMember = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ):
-    """Change AI provider and model. Admin only."""
+    """Change AI provider and model. Admin only.
+
+    Writes to both ai_feature_config (default row) AND app_settings (backward compat for bot).
+    """
     # Validate provider is available
     available = ai_service.get_available_providers()
     if data.provider not in available:
@@ -735,12 +749,19 @@ async def update_ai_settings(
                        f"Доступные: {', '.join(valid_models)}",
             )
 
+    # Write to legacy app_settings (backward compat for bot commands)
     await app_settings_repo.set(
         session,
         "ai_provider",
         {"provider": data.provider, "model": data.model},
         updated_by_id=member.id,
     )
+
+    # Write to new ai_feature_config (default row)
+    await AIFeatureConfigService.update_config(
+        session, "default", data.provider, data.model, member.id
+    )
+
     await session.commit()
 
     # Return updated state

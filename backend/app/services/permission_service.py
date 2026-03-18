@@ -108,3 +108,14 @@ class PermissionService:
     @staticmethod
     def can_configure_reminders(member: TeamMember) -> bool:
         return PermissionService.is_moderator(member)
+
+    # ── Content module (requires DB check via ContentAccessService) ──
+
+    @staticmethod
+    def can_access_content(member: TeamMember) -> bool:
+        """Quick check: admins always have content access.
+
+        For non-admins, a full DB check via ContentAccessService.can_access_any_content()
+        is required. This static method covers the fast path only.
+        """
+        return PermissionService.is_admin(member)

@@ -69,4 +69,14 @@ export class PermissionService {
   static canConfigureReminders(member: TeamMember): boolean {
     return PermissionService.isModerator(member);
   }
+
+  /**
+   * Check if member can potentially access content module.
+   * Admins always have access; for others, actual access is checked
+   * via ContentAccessService on the backend (useContentAccess hook).
+   */
+  static canAccessContent(member: TeamMember): boolean {
+    // Admins always have implicit access
+    return PermissionService.isAdmin(member);
+  }
 }

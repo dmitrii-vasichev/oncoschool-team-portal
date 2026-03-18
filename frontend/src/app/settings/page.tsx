@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  Bot,
   Bell,
   Clock,
   Loader2,
@@ -10,9 +9,6 @@ import {
   Users,
   Settings,
   Info,
-  Sparkles,
-  Zap,
-  BrainCircuit,
   CheckCircle2,
   AlertTriangle,
   CalendarPlus,
@@ -59,13 +55,15 @@ import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TimePicker } from "@/components/shared/TimePicker";
+import { AIFeatureConfigSection } from "@/components/settings/AIFeatureConfigSection";
+import { TelegramConnectionSection } from "@/components/settings/TelegramConnectionSection";
+import { ContentAccessSection } from "@/components/settings/ContentAccessSection";
 import { api } from "@/lib/api";
 import { useTeam } from "@/hooks/useTeam";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PermissionService } from "@/lib/permissions";
 import type {
-  AISettingsResponse,
   ReminderDigestSectionKey,
   ReminderTaskLineFieldKey,
   ReminderSettings,
@@ -83,249 +81,14 @@ export default function SettingsPage() {
   return (
     <ModeratorGuard>
       <div className="max-w-3xl space-y-8 animate-in fade-in duration-300">
-        {isAdmin && <AIModelSection />}
+        {isAdmin && <AIFeatureConfigSection />}
         <NotificationsSection />
         {isAdmin && <TelegramTargetsSection />}
+        {isAdmin && <TelegramConnectionSection />}
+        {isAdmin && <ContentAccessSection />}
         {canConfigureReminders && <RemindersSection />}
       </div>
     </ModeratorGuard>
-  );
-}
-
-// ============================================
-// AI Model Section
-// ============================================
-
-const PROVIDER_CONFIG: Record<
-  string,
-  { label: string; icon: typeof Sparkles; color: string; gradient: string }
-> = {
-  anthropic: {
-    label: "Anthropic",
-    icon: BrainCircuit,
-    color: "hsl(24, 70%, 50%)",
-    gradient: "from-amber-500/10 to-orange-500/10",
-  },
-  openai: {
-    label: "OpenAI",
-    icon: Sparkles,
-    color: "hsl(152, 55%, 38%)",
-    gradient: "from-emerald-500/10 to-teal-500/10",
-  },
-  gemini: {
-    label: "Gemini",
-    icon: Zap,
-    color: "hsl(220, 65%, 55%)",
-    gradient: "from-blue-500/10 to-indigo-500/10",
-  },
-};
-
-function AIModelSection() {
-  const { toastSuccess, toastError } = useToast();
-  const [settings, setSettings] = useState<AISettingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState("");
-  const [selectedModel, setSelectedModel] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .getAiSettings()
-      .then((data) => {
-        setSettings(data);
-        setSelectedProvider(data.current_provider);
-        setSelectedModel(data.current_model);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const modelsForProvider = (provider: string): string[] => {
-    if (!settings?.providers_config) return [];
-    return settings.providers_config[provider]?.models || [];
-  };
-
-  const handleProviderChange = (provider: string) => {
-    setSelectedProvider(provider);
-    if (settings?.providers_config) {
-      const config = settings.providers_config[provider];
-      setSelectedModel(config?.default || config?.models?.[0] || "");
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await api.updateAiSettings({
-        provider: selectedProvider,
-        model: selectedModel,
-      });
-      setSettings(result);
-      toastSuccess("AI-модель сохранена");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Ошибка сохранения";
-      setError(msg);
-      toastError(msg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const hasChanges =
-    settings &&
-    (selectedProvider !== settings.current_provider ||
-      selectedModel !== settings.current_model);
-
-  if (loading) {
-    return (
-      <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
-        <Skeleton className="h-6 w-48" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="h-10 w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  const allProviders = ["anthropic", "openai", "gemini"];
-
-  return (
-    <div className="animate-fade-in-up stagger-1 rounded-2xl border border-border/60 bg-card overflow-hidden">
-      {/* Section header */}
-      <div className="flex items-center gap-3 p-6 pb-0">
-        <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-          <Bot className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <h2 className="font-heading font-semibold text-base">
-            AI-модель для парсинга
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Выберите провайдера и модель для обработки summary
-          </p>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-5">
-        {/* Provider cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {allProviders.map((provider) => {
-            const config = PROVIDER_CONFIG[provider];
-            const isAvailable = settings?.available_providers?.[provider];
-            const isSelected = selectedProvider === provider;
-            const Icon = config.icon;
-
-            return (
-              <button
-                key={provider}
-                disabled={!isAvailable}
-                onClick={() => handleProviderChange(provider)}
-                className={`
-                  relative overflow-hidden rounded-xl border-2 p-4 text-left
-                  transition-all duration-200
-                  ${
-                    isSelected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : isAvailable
-                        ? "border-border/60 bg-card hover:border-border hover:shadow-sm"
-                        : "border-border/30 bg-muted/30 opacity-50 cursor-not-allowed"
-                  }
-                `}
-              >
-                {/* Decorative gradient */}
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-0 ${isSelected ? "opacity-100" : ""}`}
-                />
-
-                <div className="relative">
-                  <div
-                    className="h-8 w-8 rounded-lg flex items-center justify-center mb-2"
-                    style={{ backgroundColor: `${config.color}18` }}
-                  >
-                    <Icon
-                      className="h-4 w-4"
-                      style={{ color: config.color }}
-                    />
-                  </div>
-                  <p className="font-heading font-semibold text-sm">
-                    {config.label}
-                  </p>
-                  {!isAvailable && (
-                    <p className="text-2xs text-muted-foreground mt-1">
-                      Нет API-ключа
-                    </p>
-                  )}
-                  {isSelected && isAvailable && (
-                    <div className="absolute top-0 right-0">
-                      <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                        <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Model selection */}
-        <div>
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Модель
-          </Label>
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="mt-1.5 rounded-xl">
-              <SelectValue placeholder="Выберите модель" />
-            </SelectTrigger>
-            <SelectContent>
-              {modelsForProvider(selectedProvider).map((model) => (
-                <SelectItem key={model} value={model}>
-                  {model}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Whisper note */}
-        <div className="flex items-start gap-2.5 text-xs text-muted-foreground bg-muted/40 p-3.5 rounded-xl border border-border/40">
-          <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
-          <span>
-            Whisper (распознавание голоса) всегда использует OpenAI независимо от
-            выбранного провайдера.
-          </span>
-        </div>
-
-        {error && (
-          <div className="rounded-xl bg-destructive/10 border border-destructive/20 p-3">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        )}
-
-        <Button
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
-          className="w-full rounded-xl"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Сохранение...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Сохранить
-            </>
-          )}
-        </Button>
-      </div>
-    </div>
   );
 }
 

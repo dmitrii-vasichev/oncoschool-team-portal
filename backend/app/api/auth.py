@@ -137,17 +137,10 @@ def verify_telegram_webapp_init_data(
 # --- Dependencies ---
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    session: AsyncSession = Depends(get_session),
-) -> TeamMember:
-    """Extract and validate JWT token, return TeamMember."""
+async def _resolve_member_from_jwt(token: str, session: AsyncSession) -> TeamMember:
+    """Decode JWT and return the corresponding TeamMember."""
     try:
-        payload = jwt.decode(
-            credentials.credentials,
-            settings.jwt_secret_key,
-            algorithms=[ALGORITHM],
-        )
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[ALGORITHM])
         member_id = uuid.UUID(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, ValueError):
         raise HTTPException(
@@ -162,6 +155,25 @@ async def get_current_user(
             detail="Пользователь не найден или деактивирован",
         )
     return member
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    session: AsyncSession = Depends(get_session),
+) -> TeamMember:
+    """Extract and validate JWT token from Authorization header."""
+    return await _resolve_member_from_jwt(credentials.credentials, session)
+
+
+async def get_current_user_from_query(
+    token: str,
+    session: AsyncSession = Depends(get_session),
+) -> TeamMember:
+    """Extract and validate JWT token from query parameter.
+
+    Used for SSE endpoints where EventSource cannot send custom headers.
+    """
+    return await _resolve_member_from_jwt(token, session)
 
 
 async def require_moderator(

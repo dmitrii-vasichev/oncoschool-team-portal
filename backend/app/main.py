@@ -29,9 +29,11 @@ from app.bot.middlewares import AuthMiddleware
 from app.config import settings
 from app.db.database import async_session
 from app.services.broadcast_scheduler_service import BroadcastSchedulerService
+from app.services.content_cleanup_service import ContentCleanupService
 from app.services.meeting_scheduler_service import MeetingSchedulerService
 from app.services.reminder_service import ReminderService
 from app.services.supabase_storage import SupabaseStorageService
+from app.services.telegram_connection_service import TelegramConnectionService
 from app.services.zoom_service import ZoomService
 
 logging.basicConfig(level=logging.INFO)
@@ -161,6 +163,14 @@ broadcast_scheduler = BroadcastSchedulerService(
     storage_service=storage_service,
 )
 
+# Telegram Connection (Pyrofork userbot — optional, for content module)
+telegram_connection_service = TelegramConnectionService()
+app.state.telegram_connection_service = telegram_connection_service
+
+# Content cleanup (data retention — deletes content older than 90 days)
+content_cleanup = ContentCleanupService(session_maker=async_session)
+app.state.content_cleanup = content_cleanup
+
 
 @app.on_event("startup")
 async def _start_background_schedulers() -> None:
@@ -169,6 +179,15 @@ async def _start_background_schedulers() -> None:
     await reminder_service.refresh_task_overdue_schedule_from_settings()
     meeting_scheduler.start()
     broadcast_scheduler.start()
+    content_cleanup.start()
+    try:
+        async with async_session() as db_session:
+            connected = await telegram_connection_service.ensure_connected(db_session)
+            if connected:
+                logger.info("Telegram userbot session restored on startup")
+    except Exception:
+        logger.exception("Failed to restore Telegram userbot session on startup")
+
     try:
         created_slots = await meeting_scheduler.ensure_upcoming_slots_now()
         if created_slots:
@@ -182,6 +201,7 @@ async def _stop_background_schedulers() -> None:
     reminder_service.stop()
     meeting_scheduler.stop()
     broadcast_scheduler.stop()
+    content_cleanup.stop()
 
 
 @app.get("/health")

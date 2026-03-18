@@ -39,6 +39,26 @@ import type {
   MemberDeactivationPreviewResponse,
   InAppNotificationListResponse,
   NotificationSubscriptionsSettings,
+  // Content module types
+  TelegramChannel,
+  TelegramChannelCreateRequest,
+  TelegramChannelUpdateRequest,
+  DataInventoryResponse,
+  AnalysisPrompt,
+  AnalysisPromptCreateRequest,
+  AnalysisPromptUpdateRequest,
+  AnalysisPrepareRequest,
+  AnalysisPrepareResponse,
+  AnalysisRunRequest,
+  AnalysisRun,
+  AnalysisHistoryResponse,
+  AIFeatureConfig,
+  AIFeatureConfigUpdateRequest,
+  ContentAccess,
+  ContentAccessGrantRequest,
+  TelegramConnectionStatus,
+  TelegramConnectRequest,
+  TelegramVerifyRequest,
 } from "./types";
 
 class ApiClient {
@@ -944,6 +964,177 @@ class ApiClient {
     return this.request<{ updated: number }>("/api/settings/reminders/bulk", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  // ==================== Content: Telegram Channels ====================
+
+  async getChannels(): Promise<TelegramChannel[]> {
+    return this.request<TelegramChannel[]>("/api/content/telegram/channels");
+  }
+
+  async createChannel(data: TelegramChannelCreateRequest): Promise<TelegramChannel> {
+    return this.request<TelegramChannel>("/api/content/telegram/channels", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateChannel(id: string, data: TelegramChannelUpdateRequest): Promise<TelegramChannel> {
+    return this.request<TelegramChannel>(`/api/content/telegram/channels/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteChannel(id: string): Promise<void> {
+    return this.request<void>(`/api/content/telegram/channels/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getDataInventory(): Promise<DataInventoryResponse> {
+    return this.request<DataInventoryResponse>("/api/content/telegram/data-inventory");
+  }
+
+  // ==================== Content: Analysis Prompts ====================
+
+  async getPrompts(): Promise<AnalysisPrompt[]> {
+    return this.request<AnalysisPrompt[]>("/api/content/telegram/prompts");
+  }
+
+  async createPrompt(data: AnalysisPromptCreateRequest): Promise<AnalysisPrompt> {
+    return this.request<AnalysisPrompt>("/api/content/telegram/prompts", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePrompt(id: string, data: AnalysisPromptUpdateRequest): Promise<AnalysisPrompt> {
+    return this.request<AnalysisPrompt>(`/api/content/telegram/prompts/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePrompt(id: string): Promise<void> {
+    return this.request<void>(`/api/content/telegram/prompts/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  // ==================== Content: Analysis ====================
+
+  async prepareAnalysis(data: AnalysisPrepareRequest): Promise<AnalysisPrepareResponse> {
+    return this.request<AnalysisPrepareResponse>("/api/content/telegram/analysis/prepare", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async runAnalysis(data: AnalysisRunRequest): Promise<{ id: string }> {
+    return this.request<{ id: string }>("/api/content/telegram/analysis/run", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAnalysisHistory(params?: { page?: number; per_page?: number }): Promise<AnalysisHistoryResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.per_page) searchParams.set("per_page", String(params.per_page));
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    return this.request<AnalysisHistoryResponse>(`/api/content/telegram/analysis/history${query}`);
+  }
+
+  async getAnalysisResult(runId: string): Promise<AnalysisRun> {
+    return this.request<AnalysisRun>(`/api/content/telegram/analysis/${runId}`);
+  }
+
+  async downloadAnalysisResult(runId: string): Promise<Blob> {
+    const token = this.getToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const res = await this.fetchWithApiFallback(
+      `/api/content/telegram/analysis/${runId}/download`,
+      { method: "GET", headers }
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || `HTTP ${res.status}`);
+    }
+    return res.blob();
+  }
+
+  /**
+   * Stream analysis progress via SSE.
+   * Returns an EventSource that emits AnalysisProgressEvent messages.
+   */
+  streamAnalysisProgress(runId: string): EventSource {
+    const token = this.getToken();
+    const apiBases = this.getApiBases();
+    const apiBase = apiBases[0];
+    const url = `${apiBase}/api/content/telegram/analysis/${runId}/stream${token ? `?token=${encodeURIComponent(token)}` : ""}`;
+    return new EventSource(url);
+  }
+
+  // ==================== Admin: AI Feature Config ====================
+
+  async getAIFeatureConfigs(): Promise<AIFeatureConfig[]> {
+    return this.request<AIFeatureConfig[]>("/api/admin/ai-config");
+  }
+
+  async updateAIFeatureConfig(featureKey: string, data: AIFeatureConfigUpdateRequest): Promise<AIFeatureConfig> {
+    return this.request<AIFeatureConfig>(`/api/admin/ai-config/${featureKey}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ==================== Admin: Content Access ====================
+
+  async getContentAccess(): Promise<ContentAccess[]> {
+    return this.request<ContentAccess[]>("/api/admin/content-access");
+  }
+
+  async grantContentAccess(data: ContentAccessGrantRequest): Promise<ContentAccess> {
+    return this.request<ContentAccess>("/api/admin/content-access", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async revokeContentAccess(accessId: string): Promise<void> {
+    return this.request<void>(`/api/admin/content-access/${accessId}`, {
+      method: "DELETE",
+    });
+  }
+
+  // ==================== Admin: Telegram Connection ====================
+
+  async getTelegramConnectionStatus(): Promise<TelegramConnectionStatus> {
+    return this.request<TelegramConnectionStatus>("/api/admin/telegram/status");
+  }
+
+  async connectTelegram(data: TelegramConnectRequest): Promise<TelegramConnectionStatus> {
+    return this.request<TelegramConnectionStatus>("/api/admin/telegram/connect", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async verifyTelegramCode(data: TelegramVerifyRequest): Promise<TelegramConnectionStatus> {
+    return this.request<TelegramConnectionStatus>("/api/admin/telegram/verify", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async disconnectTelegram(): Promise<void> {
+    return this.request<void>("/api/admin/telegram/disconnect", {
+      method: "POST",
     });
   }
 }

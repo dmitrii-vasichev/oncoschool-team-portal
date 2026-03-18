@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
@@ -21,4 +22,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["python", "-m", "app.main"]
+CMD ["sh", "-c", "alembic upgrade head && python -m app.main"]

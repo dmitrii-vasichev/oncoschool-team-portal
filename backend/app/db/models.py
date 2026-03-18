@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import date, datetime, time
 from typing import Any
@@ -6,7 +7,9 @@ from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
+    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -19,6 +22,41 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+
+
+# --- Content module enums ---
+
+class ContentType(str, enum.Enum):
+    """Type of a single Telegram message (post vs comment)."""
+    post = "post"
+    comment = "comment"
+
+
+class AnalysisContentType(str, enum.Enum):
+    """Content scope for an analysis run."""
+    posts = "posts"
+    comments = "comments"
+    all = "all"
+
+
+class AnalysisStatus(str, enum.Enum):
+    """Status of an analysis run."""
+    preparing = "preparing"
+    downloading = "downloading"
+    analyzing = "analyzing"
+    completed = "completed"
+    failed = "failed"
+
+
+class ContentSubSection(str, enum.Enum):
+    """Content module sub-sections (extensible)."""
+    telegram_analysis = "telegram_analysis"
+
+
+class ContentRole(str, enum.Enum):
+    """Role within a Content sub-section."""
+    operator = "operator"
+    editor = "editor"
 
 
 class Base(DeclarativeBase):
@@ -604,3 +642,188 @@ class AppSettings(Base):
 
     # Relationships
     updated_by: Mapped["TeamMember | None"] = relationship()
+
+
+# =============================================
+# Content module models
+# =============================================
+
+
+class TelegramSession(Base):
+    """Single-row table storing encrypted Telegram userbot credentials and session."""
+    __tablename__ = "telegram_session"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    api_id_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_hash_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    session_string_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default="disconnected", server_default="disconnected"
+    )  # connected | disconnected | error
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+
+class TelegramChannel(Base):
+    """A monitored Telegram channel for content extraction."""
+    __tablename__ = "telegram_channels"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    username: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    content: Mapped[list["TelegramContent"]] = relationship(
+        back_populates="channel", cascade="all, delete-orphan"
+    )
+
+
+class TelegramContent(Base):
+    """A single Telegram post or comment stored for analysis."""
+    __tablename__ = "telegram_content"
+    __table_args__ = (
+        UniqueConstraint("channel_id", "telegram_message_id", name="uq_channel_message"),
+        Index("idx_telegram_content_channel_date", "channel_id", "message_date"),
+        Index("idx_telegram_content_loaded_at", "loaded_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    channel_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("telegram_channels.id", ondelete="CASCADE"), nullable=False
+    )
+    telegram_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    content_type: Mapped[ContentType] = mapped_column(
+        Enum(ContentType, native_enum=False, create_constraint=False),
+        nullable=False,
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    message_date: Mapped[datetime] = mapped_column(nullable=False)
+    loaded_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # Relationships
+    channel: Mapped["TelegramChannel"] = relationship(back_populates="content")
+
+
+class AnalysisPrompt(Base):
+    """A reusable prompt template for LLM analysis."""
+    __tablename__ = "analysis_prompts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("team_members.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    created_by: Mapped["TeamMember"] = relationship(foreign_keys=[created_by_id])
+
+
+class AnalysisRun(Base):
+    """A single analysis execution: download + LLM processing."""
+    __tablename__ = "analysis_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    channels: Mapped[list] = mapped_column(JSONB, nullable=False)  # list of channel IDs
+    date_from: Mapped[date] = mapped_column(Date, nullable=False)
+    date_to: Mapped[date] = mapped_column(Date, nullable=False)
+    content_type: Mapped[AnalysisContentType] = mapped_column(
+        Enum(AnalysisContentType, native_enum=False, create_constraint=False),
+        nullable=False,
+    )
+    prompt_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("analysis_prompts.id", ondelete="SET NULL"), nullable=True
+    )
+    prompt_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
+    ai_provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    result_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[AnalysisStatus] = mapped_column(
+        Enum(AnalysisStatus, native_enum=False, create_constraint=False),
+        default=AnalysisStatus.preparing,
+        server_default="preparing",
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    run_by_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("team_members.id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    # Relationships
+    prompt: Mapped["AnalysisPrompt | None"] = relationship(foreign_keys=[prompt_id])
+    run_by: Mapped["TeamMember"] = relationship(foreign_keys=[run_by_id])
+
+
+class ContentAccess(Base):
+    """Access grant for a Content sub-section (per user or per department)."""
+    __tablename__ = "content_access"
+    __table_args__ = (
+        CheckConstraint(
+            "member_id IS NOT NULL OR department_id IS NOT NULL",
+            name="ck_content_access_target",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    sub_section: Mapped[ContentSubSection] = mapped_column(
+        Enum(ContentSubSection, native_enum=False, create_constraint=False),
+        nullable=False,
+    )
+    member_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=True
+    )
+    department_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("departments.id", ondelete="CASCADE"), nullable=True
+    )
+    role: Mapped[ContentRole] = mapped_column(
+        Enum(ContentRole, native_enum=False, create_constraint=False),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    # Relationships
+    member: Mapped["TeamMember | None"] = relationship(foreign_keys=[member_id])
+    department: Mapped["Department | None"] = relationship(foreign_keys=[department_id])
+
+
+class AIFeatureConfig(Base):
+    """Per-feature AI provider/model configuration (replaces single-provider app_settings)."""
+    __tablename__ = "ai_feature_config"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    feature_key: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    display_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
