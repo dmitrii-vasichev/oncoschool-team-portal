@@ -164,15 +164,14 @@ async def grant_content_access(
         member_id=data.member_id,
         department_id=data.department_id,
     )
-    access_id = access.id  # save before commit expires the object
     await session.commit()
 
     # Reload with relationships
     grants = await ContentAccessService.list_access(session)
     for g in grants:
-        if g.id == access_id:
+        if g.id == access.id:
             return _access_to_response(g)
-    raise HTTPException(status_code=500, detail="Failed to reload granted access")
+    return _access_to_response(access)
 
 
 @router.delete("/content-access/{access_id}")

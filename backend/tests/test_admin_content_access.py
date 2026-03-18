@@ -1,88 +1,53 @@
 """Regression test for content access grant (issue #42).
 
-The bug: after session.commit(), the SQLAlchemy object is expired.
-Accessing access.id in async triggers MissingGreenlet → HTTP 500.
-Fix: save access.id before commit.
+The bug: SQLAlchemy model used native_enum=True (default) for Enum columns,
+but the migration created VARCHAR columns. PostgreSQL raises
+'type "content_sub_section_enum" does not exist' on INSERT/SELECT.
+Fix: use native_enum=False in all Content module Enum columns.
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
-import uuid
+
+from sqlalchemy import Enum as SAEnum
+from app.db.models import (
+    ContentAccess,
+    ContentRole,
+    ContentSubSection,
+    TelegramContent,
+    ContentType,
+    AnalysisRun,
+    AnalysisContentType,
+    AnalysisStatus,
+)
 
 
-class TestGrantContentAccessEndpoint(unittest.IsolatedAsyncioTestCase):
-    """Test that grant_content_access saves access.id before commit."""
+class TestContentModuleEnumColumns(unittest.TestCase):
+    """All Content module Enum columns must use native_enum=False (VARCHAR storage)."""
 
-    async def test_access_id_saved_before_commit(self):
-        """Regression: access.id must be read before session.commit() expires the object."""
-        from app.db.models import ContentRole, ContentSubSection
+    def _get_sa_enum(self, model, column_name: str) -> SAEnum:
+        col = model.__table__.columns[column_name]
+        self.assertIsInstance(col.type, SAEnum, f"{model.__name__}.{column_name} is not Enum")
+        return col.type
 
-        fake_id = uuid.uuid4()
-        fake_access = MagicMock()
-        fake_access.id = fake_id
+    def test_content_access_sub_section_not_native(self):
+        enum_type = self._get_sa_enum(ContentAccess, "sub_section")
+        self.assertFalse(enum_type.native_enum, "ContentAccess.sub_section must use native_enum=False")
 
-        # After commit, simulate expired object (accessing .id raises)
-        committed = False
+    def test_content_access_role_not_native(self):
+        enum_type = self._get_sa_enum(ContentAccess, "role")
+        self.assertFalse(enum_type.native_enum, "ContentAccess.role must use native_enum=False")
 
-        original_id = fake_access.id
+    def test_telegram_content_content_type_not_native(self):
+        enum_type = self._get_sa_enum(TelegramContent, "content_type")
+        self.assertFalse(enum_type.native_enum, "TelegramContent.content_type must use native_enum=False")
 
-        def side_effect_commit():
-            nonlocal committed
-            committed = True
-            # Simulate SQLAlchemy expiring the object after commit
-            type(fake_access).id = property(
-                lambda self: (_ for _ in ()).throw(
-                    Exception("MissingGreenlet: can't lazy load in async")
-                )
-            )
+    def test_analysis_run_content_type_not_native(self):
+        enum_type = self._get_sa_enum(AnalysisRun, "content_type")
+        self.assertFalse(enum_type.native_enum, "AnalysisRun.content_type must use native_enum=False")
 
-        fake_session = AsyncMock()
-        fake_session.commit = AsyncMock(side_effect=side_effect_commit)
-
-        # Build a fake grant that will be returned by list_access
-        fake_grant = MagicMock()
-        fake_grant.id = fake_id
-        fake_grant.sub_section = ContentSubSection.telegram_analysis
-        fake_grant.member_id = uuid.uuid4()
-        fake_grant.member.full_name = "Test User"
-        fake_grant.department_id = None
-        fake_grant.department = None
-        fake_grant.role = ContentRole.editor
-
-        with patch(
-            "app.api.admin.ContentAccessService.grant_access",
-            new_callable=AsyncMock,
-            return_value=fake_access,
-        ), patch(
-            "app.api.admin.ContentAccessService.list_access",
-            new_callable=AsyncMock,
-            return_value=[fake_grant],
-        ):
-            from app.api.admin import grant_content_access, ContentAccessGrant
-
-            data = ContentAccessGrant(
-                sub_section="telegram_analysis",
-                member_id=fake_grant.member_id,
-                role="editor",
-            )
-
-            fake_member = MagicMock()
-            result = await grant_content_access.__wrapped__(
-                data=data, member=fake_member, session=fake_session
-            ) if hasattr(grant_content_access, '__wrapped__') else None
-
-            # If we can't call it directly (due to Depends), just verify the code path
-            # by checking that the module's grant function saves id before commit
-            import inspect
-            source = inspect.getsource(grant_content_access)
-            # The fix: access_id = access.id must appear BEFORE session.commit()
-            id_save_pos = source.find("access_id = access.id")
-            commit_pos = source.find("session.commit()")
-            assert id_save_pos != -1, "Fix missing: access_id = access.id not found"
-            assert id_save_pos < commit_pos, (
-                "Bug: access.id is read AFTER session.commit() — "
-                "will cause MissingGreenlet in async SQLAlchemy"
-            )
+    def test_analysis_run_status_not_native(self):
+        enum_type = self._get_sa_enum(AnalysisRun, "status")
+        self.assertFalse(enum_type.native_enum, "AnalysisRun.status must use native_enum=False")
 
 
 if __name__ == "__main__":

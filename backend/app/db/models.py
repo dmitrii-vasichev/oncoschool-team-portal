@@ -705,7 +705,7 @@ class TelegramContent(Base):
     )
     telegram_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     content_type: Mapped[ContentType] = mapped_column(
-        Enum(ContentType, name="content_type_enum", create_constraint=False),
+        Enum(ContentType, native_enum=False, create_constraint=False),
         nullable=False,
     )
     text: Mapped[str] = mapped_column(Text, nullable=False)
@@ -749,7 +749,7 @@ class AnalysisRun(Base):
     date_from: Mapped[date] = mapped_column(Date, nullable=False)
     date_to: Mapped[date] = mapped_column(Date, nullable=False)
     content_type: Mapped[AnalysisContentType] = mapped_column(
-        Enum(AnalysisContentType, name="analysis_content_type_enum", create_constraint=False),
+        Enum(AnalysisContentType, native_enum=False, create_constraint=False),
         nullable=False,
     )
     prompt_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -760,7 +760,7 @@ class AnalysisRun(Base):
     ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
     result_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[AnalysisStatus] = mapped_column(
-        Enum(AnalysisStatus, name="analysis_status_enum", create_constraint=False),
+        Enum(AnalysisStatus, native_enum=False, create_constraint=False),
         default=AnalysisStatus.preparing,
         server_default="preparing",
     )
@@ -790,7 +790,7 @@ class ContentAccess(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     sub_section: Mapped[ContentSubSection] = mapped_column(
-        Enum(ContentSubSection, name="content_sub_section_enum", create_constraint=False),
+        Enum(ContentSubSection, native_enum=False, create_constraint=False),
         nullable=False,
     )
     member_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -800,7 +800,7 @@ class ContentAccess(Base):
         ForeignKey("departments.id", ondelete="CASCADE"), nullable=True
     )
     role: Mapped[ContentRole] = mapped_column(
-        Enum(ContentRole, name="content_role_enum", create_constraint=False),
+        Enum(ContentRole, native_enum=False, create_constraint=False),
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
