@@ -56,6 +56,8 @@ import { useToast } from "@/components/shared/Toast";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { TimePicker } from "@/components/shared/TimePicker";
 import { AIFeatureConfigSection } from "@/components/settings/AIFeatureConfigSection";
+import { GetCourseSection } from "@/components/settings/GetCourseSection";
+import { ReportScheduleSection } from "@/components/settings/ReportScheduleSection";
 import { TelegramConnectionSection } from "@/components/settings/TelegramConnectionSection";
 import { ContentAccessSection } from "@/components/settings/ContentAccessSection";
 import { api } from "@/lib/api";
@@ -82,6 +84,8 @@ export default function SettingsPage() {
     <ModeratorGuard>
       <div className="max-w-3xl space-y-8 animate-in fade-in duration-300">
         {isAdmin && <AIFeatureConfigSection />}
+        {isAdmin && <GetCourseSection />}
+        {isAdmin && <ReportScheduleSection />}
         <NotificationsSection />
         {isAdmin && <TelegramTargetsSection />}
         {isAdmin && <TelegramConnectionSection />}
@@ -96,12 +100,15 @@ export default function SettingsPage() {
 // Telegram Targets Section
 // ============================================
 
+type TargetTabType = "meeting" | "report";
+
 function TelegramTargetsSection() {
   const { toastSuccess, toastError } = useToast();
   const [targets, setTargets] = useState<TelegramNotificationTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [editTarget, setEditTarget] = useState<TelegramNotificationTarget | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<TargetTabType>("meeting");
   const [deleteTarget, setDeleteTarget] = useState<TelegramNotificationTarget | null>(null);
 
   const fetchTargets = useCallback(async () => {
@@ -119,6 +126,17 @@ function TelegramTargetsSection() {
   useEffect(() => {
     fetchTargets();
   }, [fetchTargets]);
+
+  const meetingTargets = useMemo(
+    () => targets.filter((t) => t.type === "meeting" || t.type === null),
+    [targets]
+  );
+  const reportTargets = useMemo(
+    () => targets.filter((t) => t.type === "report:getcourse"),
+    [targets]
+  );
+
+  const filteredTargets = activeTab === "meeting" ? meetingTargets : reportTargets;
 
   const handleDelete = async (target: TelegramNotificationTarget) => {
     try {
@@ -180,18 +198,45 @@ function TelegramTargetsSection() {
           </Button>
         </div>
 
+        <div className="px-6 pt-4">
+          <div className="flex gap-1 rounded-lg bg-muted/50 p-1">
+            <button
+              onClick={() => setActiveTab("meeting")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "meeting"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Встречи ({meetingTargets.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("report")}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "report"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Отчёты ({reportTargets.length})
+            </button>
+          </div>
+        </div>
+
         <div className="p-6 space-y-3">
-          {targets.length === 0 ? (
+          {filteredTargets.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-6 text-center">
               <MessageCircle className="h-7 w-7 text-muted-foreground/40 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">Нет настроенных групп</p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                Добавьте Telegram-группы для отправки напоминаний
+                {activeTab === "meeting"
+                  ? "Добавьте Telegram-группы для напоминаний о встречах"
+                  : "Добавьте Telegram-группы для отправки ежедневных отчётов"}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {targets.map((target) => (
+              {filteredTargets.map((target) => (
                 <div
                   key={target.id}
                   className="group flex items-center gap-3 p-3.5 rounded-xl border border-border/60 hover:shadow-sm hover:border-border"
@@ -214,10 +259,14 @@ function TelegramTargetsSection() {
                           <span>Тема: #{target.thread_id}</span>
                         </>
                       )}
-                      <span className="text-border">|</span>
-                      <span>
-                        Входящие задачи: {target.allow_incoming_tasks ? "вкл" : "выкл"}
-                      </span>
+                      {activeTab === "meeting" && (
+                        <>
+                          <span className="text-border">|</span>
+                          <span>
+                            Входящие задачи: {target.allow_incoming_tasks ? "вкл" : "выкл"}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -260,8 +309,8 @@ function TelegramTargetsSection() {
             <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
             <span>
               Чтобы узнать Chat ID группы, добавьте бота @userinfobot в группу
-              или перешлите сообщение из группы боту @JsonDumpBot. Включайте
-              «Входящие задачи», только если в этой группе хотите создавать задачи через @бот.
+              или перешлите сообщение из группы боту @JsonDumpBot.
+              {activeTab === "meeting" && " Включайте «Входящие задачи», только если в этой группе хотите создавать задачи через @бот."}
             </span>
           </div>
         </div>
@@ -271,6 +320,7 @@ function TelegramTargetsSection() {
       {showForm && (
         <TelegramTargetFormDialog
           target={editTarget}
+          defaultType={activeTab === "report" ? "report:getcourse" : "meeting"}
           onClose={() => {
             setShowForm(false);
             setEditTarget(null);
@@ -301,10 +351,12 @@ function TelegramTargetsSection() {
 
 function TelegramTargetFormDialog({
   target,
+  defaultType,
   onClose,
   onSaved,
 }: {
   target: TelegramNotificationTarget | null;
+  defaultType?: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -332,10 +384,12 @@ function TelegramTargetFormDialog({
     setError(null);
 
     try {
+      const targetType = target?.type ?? defaultType ?? "meeting";
       const data = {
         chat_id: chatIdNum,
         thread_id: threadId ? Number(threadId) : null,
         label: label.trim() || null,
+        type: targetType,
         allow_incoming_tasks: allowIncomingTasks,
       };
 

@@ -58,26 +58,42 @@ export function useContentAccess(): ContentAccessState {
         const accessList = await api.getContentAccess();
         setGrants(accessList);
       } else {
-        // Non-admins: try to access the channels endpoint to check access
-        // If they get 403, they have no access
+        // Non-admins: probe endpoints to detect access per sub-section
+        const detectedGrants: ContentAccess[] = [];
+
+        // Check telegram_analysis access
         try {
           await api.getChannels();
-          // If no error, user has at least operator access to telegram_analysis
-          setGrants([
-            {
-              id: "self",
-              sub_section: "telegram_analysis",
-              member_id: user.id,
-              member_name: user.full_name,
-              department_id: null,
-              department_name: null,
-              role: "operator", // Minimum known role
-            },
-          ]);
+          detectedGrants.push({
+            id: "self-telegram",
+            sub_section: "telegram_analysis",
+            member_id: user.id,
+            member_name: user.full_name,
+            department_id: null,
+            department_name: null,
+            role: "operator",
+          });
         } catch {
-          // 403 = no access, which is expected
-          setGrants([]);
+          // 403 = no access
         }
+
+        // Check reports access
+        try {
+          await api.getReportSummary(1);
+          detectedGrants.push({
+            id: "self-reports",
+            sub_section: "reports",
+            member_id: user.id,
+            member_name: user.full_name,
+            department_id: null,
+            department_name: null,
+            role: "operator",
+          });
+        } catch {
+          // 403 = no access
+        }
+
+        setGrants(detectedGrants);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch content access");

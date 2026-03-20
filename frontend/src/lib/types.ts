@@ -166,6 +166,7 @@ export interface TelegramNotificationTarget {
   chat_id: number;
   thread_id: number | null;
   label: string | null;
+  type: string | null;
   allow_incoming_tasks: boolean;
   is_active: boolean;
   created_at: string;
@@ -463,6 +464,63 @@ export interface MeetingWithTasksResponse {
 }
 
 // ============================================
+// Reports
+// ============================================
+
+export interface DailyMetric {
+  id: string;
+  metric_date: string;
+  source: string;
+  users_count: number;
+  payments_count: number;
+  payments_sum: number;
+  orders_count: number;
+  orders_sum: number;
+  collected_at: string;
+  collected_by_id: string | null;
+}
+
+export interface DailyMetricWithDelta extends DailyMetric {
+  delta_users: number | null;
+  delta_payments_count: number | null;
+  delta_payments_sum: number | null;
+  delta_orders_count: number | null;
+  delta_orders_sum: number | null;
+}
+
+export interface ReportSummary {
+  days: number;
+  date_from: string;
+  date_to: string;
+  total_users: number;
+  total_payments_count: number;
+  total_payments_sum: number;
+  total_orders_count: number;
+  total_orders_sum: number;
+  avg_users_per_day: number;
+  avg_payments_sum_per_day: number;
+  avg_orders_sum_per_day: number;
+  metrics: DailyMetric[];
+}
+
+export interface CollectResponse {
+  status: "started" | "completed" | "already_exists";
+  metric: DailyMetric | null;
+}
+
+export interface ReportSchedule {
+  time: string;
+  timezone: string;
+  enabled: boolean;
+}
+
+export interface GetCourseCredentials {
+  configured: boolean;
+  base_url: string | null;
+  updated_at: string | null;
+}
+
+// ============================================
 // API Request/Response types
 // ============================================
 
@@ -685,7 +743,7 @@ export const TELEGRAM_BROADCAST_STATUS_LABELS: Record<TelegramBroadcastStatus, s
 // Content Module — Enums & Types
 // ============================================
 
-export type ContentSubSection = "telegram_analysis";
+export type ContentSubSection = "telegram_analysis" | "reports";
 export type ContentRole = "operator" | "editor";
 export type AnalysisContentType = "posts" | "comments" | "all";
 export type AnalysisStatus = "preparing" | "downloading" | "analyzing" | "completed" | "failed";

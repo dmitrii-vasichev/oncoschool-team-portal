@@ -59,6 +59,13 @@ import type {
   TelegramConnectionStatus,
   TelegramConnectRequest,
   TelegramVerifyRequest,
+  // Reports
+  DailyMetric,
+  DailyMetricWithDelta,
+  ReportSummary,
+  CollectResponse,
+  ReportSchedule,
+  GetCourseCredentials,
 } from "./types";
 
 class ApiClient {
@@ -463,6 +470,7 @@ class ApiClient {
     chat_id: number;
     thread_id?: number | null;
     label?: string | null;
+    type?: string | null;
     allow_incoming_tasks?: boolean;
   }): Promise<TelegramNotificationTarget> {
     return this.request<TelegramNotificationTarget>("/api/telegram-targets", {
@@ -475,6 +483,7 @@ class ApiClient {
     chat_id?: number;
     thread_id?: number | null;
     label?: string | null;
+    type?: string | null;
     allow_incoming_tasks?: boolean;
   }): Promise<TelegramNotificationTarget> {
     return this.request<TelegramNotificationTarget>(`/api/telegram-targets/${id}`, {
@@ -1078,6 +1087,58 @@ class ApiClient {
     const apiBase = apiBases[0];
     const url = `${apiBase}/api/content/telegram/analysis/${runId}/stream${token ? `?token=${encodeURIComponent(token)}` : ""}`;
     return new EventSource(url);
+  }
+
+  // ==================== Reports ====================
+
+  async getReportToday(): Promise<DailyMetricWithDelta> {
+    return this.request<DailyMetricWithDelta>("/api/reports/getcourse/today");
+  }
+
+  async getReportRange(dateFrom?: string, dateTo?: string): Promise<DailyMetric[]> {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<DailyMetric[]>(`/api/reports/getcourse/range${query}`);
+  }
+
+  async getReportSummary(days?: number): Promise<ReportSummary> {
+    const params = new URLSearchParams();
+    if (days) params.set("days", String(days));
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<ReportSummary>(`/api/reports/getcourse/summary${query}`);
+  }
+
+  async collectReport(date: string): Promise<CollectResponse> {
+    return this.request<CollectResponse>("/api/reports/getcourse/collect", {
+      method: "POST",
+      body: JSON.stringify({ date }),
+    });
+  }
+
+  // ==================== Settings: Reports ====================
+
+  async getGetCourseCredentials(): Promise<GetCourseCredentials> {
+    return this.request<GetCourseCredentials>("/api/settings/getcourse-credentials");
+  }
+
+  async updateGetCourseCredentials(data: { base_url: string; api_key: string }): Promise<GetCourseCredentials> {
+    return this.request<GetCourseCredentials>("/api/settings/getcourse-credentials", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getReportSchedule(): Promise<ReportSchedule> {
+    return this.request<ReportSchedule>("/api/settings/report-schedule");
+  }
+
+  async updateReportSchedule(data: ReportSchedule): Promise<ReportSchedule> {
+    return this.request<ReportSchedule>("/api/settings/report-schedule", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
   }
 
   // ==================== Admin: AI Feature Config ====================
