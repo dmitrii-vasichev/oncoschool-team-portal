@@ -3,6 +3,8 @@
 **Date:** 2026-03-20
 **PRD:** docs/prd-reports-and-rebranding.md
 **Covers:** FR-1, FR-2, FR-3, FR-6, FR-11
+**Issues:** #60, #61, #62, #63, #64, #65, #66, #67
+**Project Board:** #14 (Oncoschool Portal)
 
 ## Task Dependency Order
 
