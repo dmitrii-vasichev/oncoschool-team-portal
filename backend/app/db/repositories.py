@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
-from datetime import datetime
+from datetime import date, datetime
 
 from app.db.models import (
     AIFeatureConfig,
@@ -19,9 +19,10 @@ from app.db.models import (
     AnalysisStatus,
     AppSettings,
     ContentAccess,
-    ContentRole,
     ContentSubSection,
+    DailyMetric,
     Department,
+    GetCourseCredentials,
     InAppNotification,
     Meeting,
     MeetingParticipant,
@@ -460,6 +461,20 @@ class TelegramTargetRepository:
         stmt = (
             select(TelegramNotificationTarget)
             .where(TelegramNotificationTarget.is_active.is_(True))
+            .order_by(TelegramNotificationTarget.created_at)
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_active_by_type(
+        self, session: AsyncSession, target_type: str
+    ) -> list[TelegramNotificationTarget]:
+        stmt = (
+            select(TelegramNotificationTarget)
+            .where(
+                TelegramNotificationTarget.is_active.is_(True),
+                TelegramNotificationTarget.type == target_type,
+            )
             .order_by(TelegramNotificationTarget.created_at)
         )
         result = await session.execute(stmt)
@@ -1268,3 +1283,99 @@ class AIFeatureConfigRepository:
             session.add(config)
         await session.flush()
         return config
+
+
+# =============================================
+# Reports module repositories
+# =============================================
+
+
+class DailyMetricRepository:
+    async def get_by_date(
+        self, session: AsyncSession, source: str, metric_date: date
+    ) -> DailyMetric | None:
+        stmt = select(DailyMetric).where(
+            DailyMetric.source == source,
+            DailyMetric.metric_date == metric_date,
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_range(
+        self, session: AsyncSession, source: str, date_from: date, date_to: date
+    ) -> list[DailyMetric]:
+        stmt = (
+            select(DailyMetric)
+            .where(
+                DailyMetric.source == source,
+                DailyMetric.metric_date >= date_from,
+                DailyMetric.metric_date <= date_to,
+            )
+            .order_by(DailyMetric.metric_date.asc())
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_latest(
+        self, session: AsyncSession, source: str
+    ) -> DailyMetric | None:
+        stmt = (
+            select(DailyMetric)
+            .where(DailyMetric.source == source)
+            .order_by(DailyMetric.metric_date.desc())
+            .limit(1)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def upsert(
+        self, session: AsyncSession, source: str, metric_date: date, **metrics
+    ) -> DailyMetric:
+        existing = await self.get_by_date(session, source, metric_date)
+        if existing:
+            for key, value in metrics.items():
+                setattr(existing, key, value)
+            await session.flush()
+            return existing
+        metric = DailyMetric(source=source, metric_date=metric_date, **metrics)
+        session.add(metric)
+        await session.flush()
+        return metric
+
+    async def delete_older_than(
+        self, session: AsyncSession, source: str, before_date: date
+    ) -> int:
+        stmt = delete(DailyMetric).where(
+            DailyMetric.source == source,
+            DailyMetric.metric_date < before_date,
+        )
+        result = await session.execute(stmt)
+        return int(result.rowcount or 0)
+
+
+class GetCourseCredentialsRepository:
+    async def get(self, session: AsyncSession) -> GetCourseCredentials | None:
+        return await session.get(GetCourseCredentials, 1)
+
+    async def upsert(
+        self,
+        session: AsyncSession,
+        base_url: str,
+        api_key_encrypted: str,
+        updated_by_id: uuid.UUID | None = None,
+    ) -> GetCourseCredentials:
+        creds = await self.get(session)
+        if creds:
+            creds.base_url = base_url
+            creds.api_key_encrypted = api_key_encrypted
+            creds.updated_by_id = updated_by_id
+        else:
+            creds = GetCourseCredentials(
+                id=1,
+                base_url=base_url,
+                api_key_encrypted=api_key_encrypted,
+                updated_by_id=updated_by_id,
+            )
+            session.add(creds)
+        await session.flush()
+        return creds

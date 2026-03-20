@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -9,10 +10,12 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     Enum,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     Time,
@@ -51,10 +54,12 @@ class AnalysisStatus(str, enum.Enum):
 class ContentSubSection(str, enum.Enum):
     """Content module sub-sections (extensible)."""
     telegram_analysis = "telegram_analysis"
+    reports = "reports"
 
 
 class ContentRole(str, enum.Enum):
     """Role within a Content sub-section."""
+    viewer = "viewer"
     operator = "operator"
     editor = "editor"
 
@@ -562,6 +567,9 @@ class TelegramNotificationTarget(Base):
     chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    type: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, default="meeting", server_default="meeting"
+    )
     allow_incoming_tasks: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false"
     )
@@ -808,6 +816,49 @@ class ContentAccess(Base):
     # Relationships
     member: Mapped["TeamMember | None"] = relationship(foreign_keys=[member_id])
     department: Mapped["Department | None"] = relationship(foreign_keys=[department_id])
+
+
+class DailyMetric(Base):
+    """Daily business metrics from GetCourse (or other sources)."""
+    __tablename__ = "daily_metrics"
+    __table_args__ = (
+        UniqueConstraint("source", "metric_date", name="uq_daily_metrics_source_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    metric_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="getcourse")
+    users_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    payments_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    payments_sum: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    orders_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    orders_sum: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    collected_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    collected_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    collected_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[collected_by_id])
+
+
+class GetCourseCredentials(Base):
+    """Single-row table for encrypted GetCourse API credentials."""
+    __tablename__ = "getcourse_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    base_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    api_key_encrypted: Mapped[str] = mapped_column(String(1000), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id"), nullable=True
+    )
+
+    updated_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[updated_by_id])
 
 
 class AIFeatureConfig(Base):
