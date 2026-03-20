@@ -36,6 +36,7 @@ async def create_target(
         chat_id=data.chat_id,
         thread_id=data.thread_id,
         label=data.label,
+        type=data.type,
         allow_incoming_tasks=data.allow_incoming_tasks,
     )
     await session.commit()
