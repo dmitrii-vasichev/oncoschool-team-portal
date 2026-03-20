@@ -177,6 +177,45 @@ Access: reports endpoints require `reports` viewer access. Settings endpoints re
 - [ ] AC-9: "Портал" branding visible in sidebar, page title, login, bot /start
 - [ ] AC-10: Sidebar reorganized with named sections (Аналитика, Контент, Управление)
 
+## Implementation Phases
+
+### Phase R1: DB + Models + GetCourse Service
+> Foundation — schema, migrations, integration service
+
+- FR-2: `daily_metrics` table + SQLAlchemy model
+- FR-3: `getcourse_credentials` table + model (Fernet encryption)
+- FR-6: `telegram_notification_targets.type` column migration + backfill
+- FR-11: Extend `ContentSubSection` (`reports`) + `ContentRole` (`viewer`) enums
+- FR-1: `GetCourseService` — async export flow (request → poll → fetch → aggregate)
+
+### Phase R2: Scheduling + Notifications + API
+> Automation — data collection, notifications, REST API
+
+- FR-4: `ReportSchedulerService` (APScheduler) — configurable time, daily trigger
+- FR-5: Telegram notification — formatted message with deltas + dashboard link button
+- FR-7: REST API — GET /today, /range, /summary, POST /collect
+- FR-15 (P1): Initial backfill from 2026-01-01
+- FR-16 (P1): Auto-cleanup (cron, >6 months)
+
+### Phase R3: Frontend — Dashboard + Settings
+> UI — reports dashboard, connection settings
+
+- FR-8: `/reports` page — KPI cards (5 metrics + delta %), recharts (7/14/30d), daily table
+- FR-9: GetCourse connection settings in `/settings`
+- FR-10: Report schedule time picker in `/settings`
+- FR-12: First-run banner when GetCourse not configured
+- FR-17 (P1): Telegram targets tabs (Meetings | Reports)
+- FR-20 (P2): Manual recollect button on dashboard
+
+### Phase R4: Rebranding + Polish
+> Rebranding and final touches
+
+- FR-13: "Task Manager" → "Портал" across ~10 locations
+- FR-14: Sidebar reorganization (Dashboard, Tasks+Meetings, Analytics, Content, Management)
+- FR-18 (P1): "Content Access" → "Section Access" rename
+- FR-19 (P1): Role labels per sub_section
+- FR-21 (P2): Loading/progress indicators during collection
+
 ## Risks & Open Questions
 - **GetCourse API rate limits:** Export flow may take longer under load; collection time should account for delays (currently 15 min buffer before notification)
 - **Export format stability:** Payment sum at column index 7, order sum at index 10 — fragile if GetCourse changes export format. Mitigation: validate column headers.
