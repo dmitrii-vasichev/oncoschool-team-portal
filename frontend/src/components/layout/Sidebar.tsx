@@ -80,7 +80,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, section: "dashboard" },
   { href: "/tasks", label: "Задачи", icon: CheckSquare, section: "work" },
   { href: "/meetings", label: "Встречи", icon: CalendarDays, section: "work" },
-  { href: "/analytics", label: "Аналитика", icon: BarChart3, section: "analytics" },
+  { href: "/analytics", label: "Статистика задач", icon: BarChart3, section: "analytics" },
   {
     href: "/reports",
     label: "Отчёты",
