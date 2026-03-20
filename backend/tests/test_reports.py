@@ -1,7 +1,7 @@
-"""Tests for Phase R1: reports module — enums, models, GetCourseService aggregation."""
+"""Tests for reports module — Phase R1 + Phase R2."""
 
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,7 +12,22 @@ from app.db.models import (
     GetCourseCredentials,
     TelegramNotificationTarget,
 )
+from app.db.schemas import (
+    CollectRequest,
+    DailyMetricResponse,
+    DailyMetricWithDelta,
+    ReportSummaryResponse,
+    ReportScheduleResponse,
+    GetCourseCredentialsResponse,
+    BackfillRequest,
+    BackfillResponse,
+)
 from app.services.getcourse_service import GetCourseService
+from app.services.report_scheduler_service import (
+    ReportSchedulerService,
+    REPORT_SCHEDULE_KEY,
+    CLEANUP_RETENTION_DAYS,
+)
 
 
 class TestContentEnums(unittest.TestCase):
@@ -168,6 +183,220 @@ class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
         session = AsyncMock()
         with self.assertRaises(RuntimeError, msg="GetCourse credentials not configured"):
             await service.collect_metrics(session, date(2026, 3, 19))
+
+
+# ===========================================================================
+# Phase R2 tests
+# ===========================================================================
+
+
+class TestPydanticSchemas(unittest.TestCase):
+    """R2.1 — Pydantic schemas for reports API."""
+
+    def test_daily_metric_response_from_attributes(self) -> None:
+        self.assertTrue(DailyMetricResponse.model_config.get("from_attributes"))
+
+    def test_daily_metric_with_delta_inherits(self) -> None:
+        self.assertTrue(issubclass(DailyMetricWithDelta, DailyMetricResponse))
+
+    def test_report_summary_response_fields(self) -> None:
+        fields = set(ReportSummaryResponse.model_fields.keys())
+        expected = {
+            "days", "date_from", "date_to",
+            "total_users", "total_payments_count", "total_payments_sum",
+            "total_orders_count", "total_orders_sum",
+            "avg_users_per_day", "avg_payments_sum_per_day", "avg_orders_sum_per_day",
+            "metrics",
+        }
+        self.assertTrue(expected.issubset(fields))
+
+    def test_collect_request_has_date(self) -> None:
+        req = CollectRequest(date=date(2026, 3, 19))
+        self.assertEqual(req.date, date(2026, 3, 19))
+
+    def test_report_schedule_response_fields(self) -> None:
+        r = ReportScheduleResponse(time="05:45", timezone="Europe/Moscow", enabled=True)
+        self.assertEqual(r.time, "05:45")
+        self.assertTrue(r.enabled)
+
+    def test_getcourse_credentials_response_no_key(self) -> None:
+        r = GetCourseCredentialsResponse(configured=True, base_url="https://example.com")
+        # Ensure no api_key field in response
+        self.assertNotIn("api_key", GetCourseCredentialsResponse.model_fields)
+
+    def test_backfill_request_fields(self) -> None:
+        req = BackfillRequest(date_from=date(2026, 1, 1), date_to=date(2026, 3, 19))
+        self.assertEqual(req.date_from, date(2026, 1, 1))
+
+
+class TestReportSchedulerService(unittest.IsolatedAsyncioTestCase):
+    """R2.2 — ReportSchedulerService tests."""
+
+    def _make_service(self) -> ReportSchedulerService:
+        bot = MagicMock()
+        session_maker = MagicMock()
+        return ReportSchedulerService(bot=bot, session_maker=session_maker)
+
+    async def test_check_and_collect_skips_when_disabled(self) -> None:
+        service = self._make_service()
+        service._get_schedule = AsyncMock(return_value={
+            "time": "05:45", "timezone": "Europe/Moscow", "enabled": False,
+        })
+        service._getcourse_service.collect_metrics = AsyncMock()
+
+        await service._check_and_collect()
+
+        service._getcourse_service.collect_metrics.assert_not_awaited()
+
+    async def test_check_and_collect_no_double_run(self) -> None:
+        service = self._make_service()
+        service._collected_today = date.today()
+        service._get_schedule = AsyncMock(return_value={
+            "time": "05:45", "timezone": "Europe/Moscow", "enabled": True,
+        })
+        service._getcourse_service.collect_metrics = AsyncMock()
+
+        await service._check_and_collect()
+
+        service._getcourse_service.collect_metrics.assert_not_awaited()
+
+    async def test_cleanup_old_metrics_calls_delete(self) -> None:
+        service = self._make_service()
+        mock_session = AsyncMock()
+        mock_begin = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_begin.__aenter__ = AsyncMock(return_value=None)
+        mock_begin.__aexit__ = AsyncMock(return_value=False)
+        mock_session.begin = MagicMock(return_value=mock_begin)
+
+        service.session_maker = MagicMock(return_value=mock_session)
+        service._metrics_repo.delete_older_than = AsyncMock(return_value=5)
+
+        await service._cleanup_old_metrics()
+
+        service._metrics_repo.delete_older_than.assert_awaited_once()
+        call_args = service._metrics_repo.delete_older_than.await_args
+        self.assertEqual(call_args.args[1], "getcourse")
+        # Cutoff should be ~180 days ago
+        cutoff = call_args.args[2]
+        expected = date.today() - timedelta(days=CLEANUP_RETENTION_DAYS)
+        self.assertEqual(cutoff, expected)
+
+
+class TestReportMessageFormatting(unittest.TestCase):
+    """R2.4 — Telegram notification message formatting."""
+
+    def _make_metric(self, **kwargs) -> MagicMock:
+        metric = MagicMock()
+        metric.users_count = kwargs.get("users_count", 100)
+        metric.payments_count = kwargs.get("payments_count", 10)
+        metric.payments_sum = kwargs.get("payments_sum", Decimal("50000"))
+        metric.orders_count = kwargs.get("orders_count", 5)
+        metric.orders_sum = kwargs.get("orders_sum", Decimal("30000"))
+        metric.metric_date = kwargs.get("metric_date", date(2026, 3, 19))
+        return metric
+
+    def test_format_with_deltas(self) -> None:
+        metric = self._make_metric(users_count=120, payments_sum=Decimal("60000"))
+        prev = self._make_metric(users_count=100, payments_sum=Decimal("50000"))
+
+        text = ReportSchedulerService._format_report_message(
+            metric, prev, date(2026, 3, 19)
+        )
+
+        self.assertIn("19.03.2026", text)
+        self.assertIn("120", text)
+        self.assertIn("\u2191", text)  # up arrow for users
+
+    def test_format_no_previous_no_deltas(self) -> None:
+        metric = self._make_metric()
+
+        text = ReportSchedulerService._format_report_message(
+            metric, None, date(2026, 3, 19)
+        )
+
+        self.assertIn("19.03.2026", text)
+        self.assertIn("100", text)
+        self.assertNotIn("\u2191", text)
+        self.assertNotIn("\u2193", text)
+
+    def test_format_negative_delta_shows_down_arrow(self) -> None:
+        metric = self._make_metric(users_count=80)
+        prev = self._make_metric(users_count=100)
+
+        text = ReportSchedulerService._format_report_message(
+            metric, prev, date(2026, 3, 19)
+        )
+
+        self.assertIn("\u2193", text)  # down arrow
+
+    def test_format_zero_delta_shows_right_arrow(self) -> None:
+        metric = self._make_metric(users_count=100)
+        prev = self._make_metric(users_count=100)
+
+        text = ReportSchedulerService._format_report_message(
+            metric, prev, date(2026, 3, 19)
+        )
+
+        self.assertIn("\u2192", text)  # right arrow
+
+
+class TestBackfillLogic(unittest.IsolatedAsyncioTestCase):
+    """R2.5 — Backfill tests."""
+
+    async def test_backfill_skips_existing(self) -> None:
+        bot = MagicMock()
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_begin = AsyncMock()
+        mock_begin.__aenter__ = AsyncMock(return_value=None)
+        mock_begin.__aexit__ = AsyncMock(return_value=False)
+        mock_session.begin = MagicMock(return_value=mock_begin)
+
+        session_maker = MagicMock(return_value=mock_session)
+
+        service = ReportSchedulerService(bot=bot, session_maker=session_maker)
+
+        # Existing metric for all dates
+        existing = MagicMock(spec=DailyMetric)
+        service._metrics_repo.get_by_date = AsyncMock(return_value=existing)
+        service._getcourse_service.collect_metrics = AsyncMock()
+        service._app_settings_repo.set = AsyncMock()
+
+        await service.run_backfill(
+            date(2026, 3, 17), date(2026, 3, 19)
+        )
+
+        # Should skip all 3 dates since they exist
+        service._getcourse_service.collect_metrics.assert_not_awaited()
+
+    async def test_backfill_handles_errors(self) -> None:
+        bot = MagicMock()
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        mock_begin = AsyncMock()
+        mock_begin.__aenter__ = AsyncMock(return_value=None)
+        mock_begin.__aexit__ = AsyncMock(return_value=False)
+        mock_session.begin = MagicMock(return_value=mock_begin)
+
+        session_maker = MagicMock(return_value=mock_session)
+
+        service = ReportSchedulerService(bot=bot, session_maker=session_maker)
+
+        # No existing metrics
+        service._metrics_repo.get_by_date = AsyncMock(return_value=None)
+        # collect_metrics fails
+        service._getcourse_service.collect_metrics = AsyncMock(
+            side_effect=RuntimeError("API error")
+        )
+        service._app_settings_repo.set = AsyncMock()
+
+        # Should not raise — handles errors gracefully
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            await service.run_backfill(date(2026, 3, 19), date(2026, 3, 19))
 
 
 if __name__ == "__main__":

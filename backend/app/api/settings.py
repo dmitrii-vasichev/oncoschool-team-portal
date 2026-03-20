@@ -9,6 +9,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user, require_admin, require_moderator
+from app.db.repositories import GetCourseCredentialsRepository
+from app.db.schemas import (
+    AIProviderUpdate,
+    GetCourseCredentialsResponse,
+    GetCourseCredentialsUpdate,
+    ReminderSettingsResponse,
+    ReminderSettingsUpdate,
+    ReportScheduleResponse,
+    ReportScheduleUpdate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +43,7 @@ from app.db.repositories import (
     ReminderSettingsRepository,
     TelegramTargetRepository,
 )
-from app.db.schemas import (
-    AIProviderUpdate,
-    ReminderSettingsResponse,
-    ReminderSettingsUpdate,
-)
+from app.utils.encryption import encrypt
 from app.services.ai_config_service import AIFeatureConfigService
 from app.services.ai_service import AIService
 from app.services.reminder_service import (
@@ -54,6 +60,7 @@ from app.services.reminder_service import (
 router = APIRouter(prefix="/settings", tags=["settings"])
 sub_repo = NotificationSubscriptionRepository()
 reminder_repo = ReminderSettingsRepository()
+creds_repo = GetCourseCredentialsRepository()
 app_settings_repo = AppSettingsRepository()
 target_repo = TelegramTargetRepository()
 ai_service = AIService()
@@ -772,3 +779,110 @@ async def update_ai_settings(
         available_providers=available,
         providers_config=providers_config,
     )
+
+
+# ── GetCourse Credentials ──
+
+
+REPORT_SCHEDULE_KEY = "report_schedule"
+DEFAULT_REPORT_SCHEDULE = {"time": "05:45", "timezone": "Europe/Moscow", "enabled": True}
+
+
+def _get_report_scheduler(request: Request):
+    return getattr(request.app.state, "report_scheduler", None)
+
+
+@router.get("/getcourse-credentials", response_model=GetCourseCredentialsResponse)
+async def get_getcourse_credentials(
+    member: TeamMember = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get GetCourse credentials status. Admin only. Never returns the API key."""
+    gc_creds = await creds_repo.get(session)
+    if not gc_creds:
+        return GetCourseCredentialsResponse(configured=False)
+    return GetCourseCredentialsResponse(
+        configured=True,
+        base_url=gc_creds.base_url,
+        updated_at=gc_creds.updated_at,
+    )
+
+
+@router.put("/getcourse-credentials", response_model=GetCourseCredentialsResponse)
+async def update_getcourse_credentials(
+    data: GetCourseCredentialsUpdate,
+    member: TeamMember = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update GetCourse credentials. Admin only. Encrypts the API key."""
+    encrypted_key = encrypt(data.api_key)
+    gc_creds = await creds_repo.upsert(
+        session,
+        base_url=data.base_url.rstrip("/"),
+        api_key_encrypted=encrypted_key,
+        updated_by_id=member.id,
+    )
+    await session.commit()
+    return GetCourseCredentialsResponse(
+        configured=True,
+        base_url=gc_creds.base_url,
+        updated_at=gc_creds.updated_at,
+    )
+
+
+# ── Report Schedule ──
+
+
+@router.get("/report-schedule", response_model=ReportScheduleResponse)
+async def get_report_schedule(
+    member: TeamMember = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get report schedule settings. Admin only."""
+    setting = await app_settings_repo.get(session, REPORT_SCHEDULE_KEY)
+    if not setting:
+        return ReportScheduleResponse(**DEFAULT_REPORT_SCHEDULE)
+    val = setting.value
+    return ReportScheduleResponse(
+        time=val.get("time", "05:45"),
+        timezone=val.get("timezone", "Europe/Moscow"),
+        enabled=val.get("enabled", True),
+    )
+
+
+@router.put("/report-schedule", response_model=ReportScheduleResponse)
+async def update_report_schedule(
+    request: Request,
+    data: ReportScheduleUpdate,
+    member: TeamMember = Depends(require_admin),
+    session: AsyncSession = Depends(get_session),
+):
+    """Update report schedule. Admin only."""
+    # Validate time format
+    try:
+        _parse_hhmm(data.time)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid time format. Use HH:MM (00:00 — 23:59)",
+        )
+
+    schedule_data = {
+        "time": data.time,
+        "timezone": data.timezone,
+        "enabled": data.enabled,
+    }
+    await app_settings_repo.set(
+        session,
+        REPORT_SCHEDULE_KEY,
+        schedule_data,
+        updated_by_id=member.id,
+    )
+    await session.commit()
+
+    # Notify scheduler to reload
+    scheduler = _get_report_scheduler(request)
+    if scheduler:
+        await scheduler.reschedule()
+
+    return ReportScheduleResponse(**schedule_data)

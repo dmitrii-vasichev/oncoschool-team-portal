@@ -10,8 +10,8 @@ from app.bot.callbacks import (
     TaskListFilter,
     TaskListScope,
 )
-from app.db.models import Meeting, Task, TaskUpdate, TeamMember
-from app.db.repositories import NotificationSubscriptionRepository, TeamMemberRepository
+from app.db.models import DailyMetric, Meeting, Task, TaskUpdate, TeamMember
+from app.db.repositories import NotificationSubscriptionRepository, TeamMemberRepository, TelegramTargetRepository
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ class NotificationService:
         self.bot = bot
         self.sub_repo = NotificationSubscriptionRepository()
         self.member_repo = TeamMemberRepository()
+        self.target_repo = TelegramTargetRepository()
 
     async def notify_task_created(
         self, session: AsyncSession, task: Task, creator: TeamMember
@@ -205,6 +206,64 @@ class NotificationService:
                     f"📊 Задач создано: {tasks_count}"
                 )
                 await self._send_safe(member.telegram_id, text)
+
+    async def notify_report_collected(
+        self,
+        session: AsyncSession,
+        metric: DailyMetric,
+        prev_metric: DailyMetric | None,
+        frontend_url: str = "http://localhost:3000",
+    ) -> None:
+        """Send report notification to Telegram targets of type 'report:getcourse'."""
+        from decimal import Decimal
+
+        def _delta(current, previous) -> str:
+            if previous is None:
+                return ""
+            diff = current - previous
+            if diff > 0:
+                return f" \u2191{diff}"
+            elif diff < 0:
+                return f" \u2193{abs(diff)}"
+            return " \u2192"
+
+        def _money(value: Decimal) -> str:
+            return f"{value:,.0f}\u20bd".replace(",", " ")
+
+        date_str = metric.metric_date.strftime("%d.%m.%Y")
+        prev = prev_metric
+
+        lines = [
+            f"\U0001f4ca \u041e\u0442\u0447\u0451\u0442 GetCourse \u0437\u0430 {date_str}",
+            "",
+            f"\U0001f464 \u041d\u043e\u0432\u044b\u0435 \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438: {metric.users_count}{_delta(metric.users_count, prev.users_count if prev else None)}",
+            f"\U0001f4b3 \u041f\u043b\u0430\u0442\u0435\u0436\u0438: {metric.payments_count} \u043d\u0430 {_money(metric.payments_sum)}{_delta(metric.payments_sum, prev.payments_sum if prev else None)}",
+            f"\U0001f4e6 \u0417\u0430\u043a\u0430\u0437\u044b: {metric.orders_count} \u043d\u0430 {_money(metric.orders_sum)}{_delta(metric.orders_sum, prev.orders_sum if prev else None)}",
+        ]
+
+        text = "\n".join(lines)
+        markup = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text="\U0001f4ca \u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0434\u0430\u0448\u0431\u043e\u0440\u0434",
+                url=f"{frontend_url}/reports",
+            )
+        ]])
+
+        targets = await self.target_repo.get_active_by_type(session, "report:getcourse")
+        for target in targets:
+            try:
+                await self.bot.send_message(
+                    chat_id=target.chat_id,
+                    text=text,
+                    reply_markup=markup,
+                    message_thread_id=target.thread_id,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to send report notification to chat %s: %s",
+                    target.chat_id,
+                    e,
+                )
 
     async def _send_safe(
         self, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None
