@@ -8,6 +8,7 @@ import {
   CheckSquare,
   CalendarDays,
   BarChart3,
+  FileBarChart,
   Users,
   Settings,
   Megaphone,
@@ -21,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useContentAccess } from "@/hooks/useContentAccess";
+import type { ContentSubSection } from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { RoleBadge } from "@/components/shared/RoleBadge";
@@ -68,6 +70,7 @@ interface NavItem {
   icon: React.ElementType;
   moderatorOnly?: boolean;
   contentAccess?: boolean;
+  contentSubSection?: ContentSubSection;
   section: "main" | "content" | "manage";
 }
 
@@ -82,6 +85,15 @@ const NAV_ITEMS: NavItem[] = [
     label: "Telegram-анализ",
     icon: Search,
     contentAccess: true,
+    contentSubSection: "telegram_analysis",
+    section: "content",
+  },
+  {
+    href: "/reports",
+    label: "Отчёты",
+    icon: FileBarChart,
+    contentAccess: true,
+    contentSubSection: "reports",
     section: "content",
   },
   {
@@ -136,7 +148,7 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
   const contentItems = NAV_ITEMS.filter(
     (i) =>
       i.section === "content" &&
-      (!i.contentAccess || hasContentAccess("telegram_analysis"))
+      (!i.contentAccess || hasContentAccess(i.contentSubSection ?? "telegram_analysis"))
   );
   const manageItems = NAV_ITEMS.filter(
     (i) => i.section === "manage" && (!i.moderatorOnly || isModerator)
