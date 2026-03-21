@@ -69,7 +69,7 @@ ANALYSIS_MAX_OUTPUT_TOKENS = 4096
 # Chunk overlap
 CHUNK_OVERLAP_CHARS = 500
 
-FEATURE_KEY = "telegram_content_analysis"
+FEATURE_KEY = "telegram_analysis"
 
 ProgressCallback = Callable[[dict[str, Any]], Coroutine[Any, Any, None]]
 
