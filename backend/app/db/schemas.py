@@ -594,13 +594,15 @@ class BackfillResponse(BaseModel):
 
 
 class ReportScheduleResponse(BaseModel):
-    time: str  # "HH:MM"
+    collection_time: str  # "HH:MM"
+    send_time: str  # "HH:MM"
     timezone: str
     enabled: bool
 
 
 class ReportScheduleUpdate(BaseModel):
-    time: str  # "HH:MM"
+    collection_time: str  # "HH:MM"
+    send_time: str  # "HH:MM"
     timezone: str = "Europe/Moscow"
     enabled: bool = True
 

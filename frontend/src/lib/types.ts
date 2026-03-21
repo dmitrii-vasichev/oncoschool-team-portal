@@ -526,7 +526,8 @@ export interface BackfillStatus {
 }
 
 export interface ReportSchedule {
-  time: string;
+  collection_time: string;
+  send_time: string;
   timezone: string;
   enabled: boolean;
 }

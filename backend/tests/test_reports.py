@@ -224,8 +224,12 @@ class TestPydanticSchemas(unittest.TestCase):
         self.assertEqual(req.date, date(2026, 3, 19))
 
     def test_report_schedule_response_fields(self) -> None:
-        r = ReportScheduleResponse(time="05:45", timezone="Europe/Moscow", enabled=True)
-        self.assertEqual(r.time, "05:45")
+        r = ReportScheduleResponse(
+            collection_time="05:45", send_time="06:30",
+            timezone="Europe/Moscow", enabled=True,
+        )
+        self.assertEqual(r.collection_time, "05:45")
+        self.assertEqual(r.send_time, "06:30")
         self.assertTrue(r.enabled)
 
     def test_getcourse_credentials_response_no_key(self) -> None:
@@ -249,7 +253,8 @@ class TestReportSchedulerService(unittest.IsolatedAsyncioTestCase):
     async def test_check_and_collect_skips_when_disabled(self) -> None:
         service = self._make_service()
         service._get_schedule = AsyncMock(return_value={
-            "time": "05:45", "timezone": "Europe/Moscow", "enabled": False,
+            "collection_time": "05:45", "send_time": "06:30",
+            "timezone": "Europe/Moscow", "enabled": False,
         })
         service._getcourse_service.collect_metrics = AsyncMock()
 
@@ -261,13 +266,71 @@ class TestReportSchedulerService(unittest.IsolatedAsyncioTestCase):
         service = self._make_service()
         service._collected_today = date.today()
         service._get_schedule = AsyncMock(return_value={
-            "time": "05:45", "timezone": "Europe/Moscow", "enabled": True,
+            "collection_time": "05:45", "send_time": "06:30",
+            "timezone": "Europe/Moscow", "enabled": True,
         })
         service._getcourse_service.collect_metrics = AsyncMock()
 
         await service._check_and_collect()
 
         service._getcourse_service.collect_metrics.assert_not_awaited()
+
+    async def test_check_and_send_skips_before_send_time(self) -> None:
+        service = self._make_service()
+        service._get_schedule = AsyncMock(return_value={
+            "collection_time": "05:45", "send_time": "23:59",
+            "timezone": "Europe/Moscow", "enabled": True,
+        })
+        service._send_report_notification = AsyncMock()
+
+        await service._check_and_send()
+
+        service._send_report_notification.assert_not_awaited()
+
+    async def test_check_and_send_waits_for_collection(self) -> None:
+        service = self._make_service()
+        service._collected_today = None  # not collected yet
+        service._get_schedule = AsyncMock(return_value={
+            "collection_time": "05:45", "send_time": "00:00",
+            "timezone": "Europe/Moscow", "enabled": True,
+        })
+        service._send_report_notification = AsyncMock()
+
+        await service._check_and_send()
+
+        # Should not send because collection hasn't finished
+        service._send_report_notification.assert_not_awaited()
+
+    async def test_check_and_send_no_double_send(self) -> None:
+        service = self._make_service()
+        service._sent_today = date.today()
+        service._get_schedule = AsyncMock(return_value={
+            "collection_time": "05:45", "send_time": "00:00",
+            "timezone": "Europe/Moscow", "enabled": True,
+        })
+        service._send_report_notification = AsyncMock()
+
+        await service._check_and_send()
+
+        service._send_report_notification.assert_not_awaited()
+
+    async def test_legacy_schedule_migration(self) -> None:
+        """Old schedule with single 'time' field should be migrated."""
+        service = self._make_service()
+        mock_setting = MagicMock()
+        mock_setting.value = {"time": "05:45", "timezone": "Europe/Moscow", "enabled": True}
+
+        mock_session = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        service.session_maker = MagicMock(return_value=mock_session)
+        service._app_settings_repo.get = AsyncMock(return_value=mock_setting)
+
+        schedule = await service._get_schedule()
+
+        self.assertEqual(schedule["collection_time"], "05:45")
+        self.assertEqual(schedule["send_time"], "06:30")
+        self.assertTrue(schedule["enabled"])
 
     async def test_cleanup_old_metrics_calls_delete(self) -> None:
         service = self._make_service()
