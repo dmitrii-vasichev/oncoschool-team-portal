@@ -120,11 +120,9 @@ class ReportSchedulerService:
             yesterday = today - timedelta(days=1)
             logger.info("ReportScheduler: collecting metrics for %s", yesterday)
 
-            async with self.session_maker() as session:
-                async with session.begin():
-                    metric = await self._getcourse_service.collect_metrics(
-                        session, yesterday
-                    )
+            metric = await self._getcourse_service.collect_metrics(
+                self.session_maker, yesterday
+            )
 
             self._collected_today = today
             logger.info("ReportScheduler: collection completed for %s", yesterday)
@@ -257,11 +255,9 @@ class ReportSchedulerService:
             logger.error("Failed to save backfill start progress: %s", e)
 
         try:
-            async with self.session_maker() as session:
-                async with session.begin():
-                    result = await self._getcourse_service.collect_metrics_range(
-                        session, date_from, date_to, collected_by_id
-                    )
+            result = await self._getcourse_service.collect_metrics_range(
+                self.session_maker, date_from, date_to, collected_by_id
+            )
             collected = result["collected"]
         except Exception as e:
             failed = total

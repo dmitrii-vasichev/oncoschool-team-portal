@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import DailyMetric, GetCourseCredentials
 from app.db.repositories import DailyMetricRepository, GetCourseCredentialsRepository
@@ -228,6 +228,11 @@ class GetCourseService:
             raise RuntimeError("GetCourse credentials not configured")
         return creds.base_url.rstrip("/"), decrypt(creds.api_key_encrypted)
 
+    async def _read_creds(self, session_maker: async_sessionmaker) -> tuple[str, str]:
+        """Read credentials using a short-lived session (no long holds)."""
+        async with session_maker() as session:
+            return await self._get_creds(session)
+
     async def _request_and_poll_export(
         self, base_url: str, api_key: str, export_type: str, date_from: str, date_to: str
     ) -> list[dict]:
@@ -254,19 +259,25 @@ class GetCourseService:
 
     async def collect_metrics(
         self,
-        session: AsyncSession,
+        session_maker: async_sessionmaker,
         target_date: date,
         collected_by_id=None,
     ) -> DailyMetric:
-        """Run 3 exports (users, payments, deals), aggregate, and upsert into daily_metrics."""
-        base_url, api_key = await self._get_creds(session)
+        """Run 3 exports (users, payments, deals), aggregate, and upsert into daily_metrics.
+
+        Uses separate DB sessions for reading credentials and writing results,
+        so the connection is NOT held during long HTTP polling.
+        """
+        # Phase 1: Read credentials (short-lived session)
+        base_url, api_key = await self._read_creds(session_maker)
         date_str = target_date.isoformat()
 
+        # Phase 2: HTTP polling — no DB connection held
         user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
             base_url, api_key, date_str, date_str
         )
 
-        # Aggregate
+        # Phase 3: Aggregate (pure computation)
         users_count = self._count_users(user_rows)
         payments_count, payments_sum = self._sum_payments(payment_rows)
         orders_count, orders_sum = self._sum_orders(deal_rows)
@@ -281,44 +292,51 @@ class GetCourseService:
             orders_sum,
         )
 
-        # Upsert
-        metric = await self._metrics_repo.upsert(
-            session,
-            source="getcourse",
-            metric_date=target_date,
-            users_count=users_count,
-            payments_count=payments_count,
-            payments_sum=payments_sum,
-            orders_count=orders_count,
-            orders_sum=orders_sum,
-            collected_at=datetime.utcnow(),
-            collected_by_id=collected_by_id,
-        )
+        # Phase 4: Save to DB (short-lived session)
+        async with session_maker() as session:
+            async with session.begin():
+                metric = await self._metrics_repo.upsert(
+                    session,
+                    source="getcourse",
+                    metric_date=target_date,
+                    users_count=users_count,
+                    payments_count=payments_count,
+                    payments_sum=payments_sum,
+                    orders_count=orders_count,
+                    orders_sum=orders_sum,
+                    collected_at=datetime.utcnow(),
+                    collected_by_id=collected_by_id,
+                )
 
         return metric
 
     async def collect_metrics_range(
         self,
-        session: AsyncSession,
+        session_maker: async_sessionmaker,
         range_from: date,
         range_to: date,
         collected_by_id=None,
     ) -> dict[str, int]:
         """Collect metrics for an entire date range with just 3 API requests.
 
+        Uses separate DB sessions for reading credentials and writing results,
+        so the connection is NOT held during long HTTP polling.
+
         Returns dict with collected/skipped/failed counts.
         """
-        base_url, api_key = await self._get_creds(session)
+        # Phase 1: Read credentials (short-lived session)
+        base_url, api_key = await self._read_creds(session_maker)
 
         logger.info(
             "Range collection: requesting exports for %s to %s", range_from, range_to
         )
 
+        # Phase 2: HTTP polling — no DB connection held
         user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
             base_url, api_key, range_from.isoformat(), range_to.isoformat()
         )
 
-        # Group by date
+        # Phase 3: Aggregate (pure computation)
         user_date_fields = ("created_at", "addDate", "registration_date", "exported_at")
         payment_date_fields = ("created_at", "payDate")
         deal_date_fields = ("created_at", "dealDate")
@@ -332,33 +350,35 @@ class GetCourseService:
             len(user_rows), len(payment_rows), len(deal_rows),
         )
 
-        # Upsert per date
+        # Phase 4: Save to DB (short-lived session)
         collected = 0
         total_days = (range_to - range_from).days + 1
 
-        for i in range(total_days):
-            current_date = range_from + timedelta(days=i)
-            day_users = users_by_date.get(current_date, [])
-            day_payments = payments_by_date.get(current_date, [])
-            day_deals = deals_by_date.get(current_date, [])
+        async with session_maker() as session:
+            async with session.begin():
+                for i in range(total_days):
+                    current_date = range_from + timedelta(days=i)
+                    day_users = users_by_date.get(current_date, [])
+                    day_payments = payments_by_date.get(current_date, [])
+                    day_deals = deals_by_date.get(current_date, [])
 
-            users_count = self._count_users(day_users)
-            payments_count, payments_sum = self._sum_payments(day_payments)
-            orders_count, orders_sum = self._sum_orders(day_deals)
+                    users_count = self._count_users(day_users)
+                    payments_count, payments_sum = self._sum_payments(day_payments)
+                    orders_count, orders_sum = self._sum_orders(day_deals)
 
-            await self._metrics_repo.upsert(
-                session,
-                source="getcourse",
-                metric_date=current_date,
-                users_count=users_count,
-                payments_count=payments_count,
-                payments_sum=payments_sum,
-                orders_count=orders_count,
-                orders_sum=orders_sum,
-                collected_at=datetime.utcnow(),
-                collected_by_id=collected_by_id,
-            )
-            collected += 1
+                    await self._metrics_repo.upsert(
+                        session,
+                        source="getcourse",
+                        metric_date=current_date,
+                        users_count=users_count,
+                        payments_count=payments_count,
+                        payments_sum=payments_sum,
+                        orders_count=orders_count,
+                        orders_sum=orders_sum,
+                        collected_at=datetime.utcnow(),
+                        collected_by_id=collected_by_id,
+                    )
+                    collected += 1
 
         logger.info("Range collection completed: %d days upserted", collected)
         return {"collected": collected, "total_days": total_days}

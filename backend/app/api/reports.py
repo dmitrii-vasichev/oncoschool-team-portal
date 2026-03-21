@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_admin
 from app.api.deps import require_content_operator
-from app.db.database import get_session
+from app.db.database import async_session, get_session
 from app.db.models import ContentSubSection, TeamMember
 from app.db.repositories import DailyMetricRepository
 from app.db.schemas import (
@@ -141,11 +141,10 @@ async def collect(
 
     # Collect (or recollect)
     try:
-        async with session.begin():
-            metric = await _getcourse_service.collect_metrics(
-                session, data.date, collected_by_id=member.id
-            )
-        status = "completed" if not existing else "completed"
+        metric = await _getcourse_service.collect_metrics(
+            async_session, data.date, collected_by_id=member.id
+        )
+        status = "completed"
         return CollectResponse(status=status, metric=DailyMetricResponse.model_validate(metric))
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))

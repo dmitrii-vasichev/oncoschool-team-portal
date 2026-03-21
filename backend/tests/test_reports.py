@@ -128,38 +128,47 @@ class TestGetCourseServiceAggregation(unittest.TestCase):
 class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
     """R1.6 — collect_metrics with mocked HTTP and DB."""
 
+    @staticmethod
+    def _make_session_maker():
+        """Create a mock async session_maker for testing."""
+        mock_session = AsyncMock()
+        mock_begin = AsyncMock()
+        mock_begin.__aenter__ = AsyncMock(return_value=None)
+        mock_begin.__aexit__ = AsyncMock(return_value=False)
+        mock_session.begin = MagicMock(return_value=mock_begin)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=False)
+        session_maker = MagicMock(return_value=mock_session)
+        return session_maker, mock_session
+
     async def test_collect_metrics_orchestrates_3_exports(self) -> None:
         service = GetCourseService()
 
-        # Mock credentials
-        mock_creds = MagicMock()
-        mock_creds.base_url = "https://school.getcourse.io"
-        mock_creds.api_key_encrypted = "encrypted_key"
-        service._creds_repo = MagicMock()
-        service._creds_repo.get = AsyncMock(return_value=mock_creds)
+        # Mock _read_creds to bypass credential DB lookup
+        service._read_creds = AsyncMock(
+            return_value=("https://school.getcourse.io", "plain_api_key")
+        )
 
         # Mock metrics repo
         mock_metric = MagicMock(spec=DailyMetric)
         service._metrics_repo = MagicMock()
         service._metrics_repo.upsert = AsyncMock(return_value=mock_metric)
 
-        # Mock decrypt
-        with patch("app.services.getcourse_service.decrypt", return_value="plain_api_key"):
-            # Mock _request_export and _poll_export
-            service._request_export = AsyncMock(side_effect=[101, 102, 103])
-            service._poll_export = AsyncMock(
-                side_effect=[
-                    # users
-                    [{"email": "a@test.com"}, {"email": "b@test.com"}],
-                    # payments
-                    [{"status": "accepted", "amount": "1000"}],
-                    # deals
-                    [{"status": "finished", "cost": "5000"}],
-                ]
-            )
+        # Mock _request_export and _poll_export
+        service._request_export = AsyncMock(side_effect=[101, 102, 103])
+        service._poll_export = AsyncMock(
+            side_effect=[
+                # users
+                [{"email": "a@test.com"}, {"email": "b@test.com"}],
+                # payments
+                [{"status": "accepted", "amount": "1000"}],
+                # deals
+                [{"status": "finished", "cost": "5000"}],
+            ]
+        )
 
-            session = AsyncMock()
-            result = await service.collect_metrics(session, date(2026, 3, 19))
+        session_maker, _ = self._make_session_maker()
+        result = await service.collect_metrics(session_maker, date(2026, 3, 19))
 
         # Verify 3 exports requested
         self.assertEqual(service._request_export.await_count, 3)
@@ -180,9 +189,9 @@ class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
         service._creds_repo = MagicMock()
         service._creds_repo.get = AsyncMock(return_value=None)
 
-        session = AsyncMock()
+        session_maker, _ = self._make_session_maker()
         with self.assertRaises(RuntimeError, msg="GetCourse credentials not configured"):
-            await service.collect_metrics(session, date(2026, 3, 19))
+            await service.collect_metrics(session_maker, date(2026, 3, 19))
 
 
 # ===========================================================================
@@ -345,7 +354,7 @@ class TestReportMessageFormatting(unittest.TestCase):
 class TestBackfillLogic(unittest.IsolatedAsyncioTestCase):
     """R2.5 — Backfill tests."""
 
-    async def test_backfill_skips_existing(self) -> None:
+    async def test_backfill_calls_collect_metrics_range(self) -> None:
         bot = MagicMock()
         mock_session = AsyncMock()
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
@@ -359,18 +368,16 @@ class TestBackfillLogic(unittest.IsolatedAsyncioTestCase):
 
         service = ReportSchedulerService(bot=bot, session_maker=session_maker)
 
-        # Existing metric for all dates
-        existing = MagicMock(spec=DailyMetric)
-        service._metrics_repo.get_by_date = AsyncMock(return_value=existing)
-        service._getcourse_service.collect_metrics = AsyncMock()
+        service._getcourse_service.collect_metrics_range = AsyncMock(
+            return_value={"collected": 3, "total_days": 3}
+        )
         service._app_settings_repo.set = AsyncMock()
 
         await service.run_backfill(
             date(2026, 3, 17), date(2026, 3, 19)
         )
 
-        # Should skip all 3 dates since they exist
-        service._getcourse_service.collect_metrics.assert_not_awaited()
+        service._getcourse_service.collect_metrics_range.assert_awaited_once()
 
     async def test_backfill_handles_errors(self) -> None:
         bot = MagicMock()
@@ -386,17 +393,14 @@ class TestBackfillLogic(unittest.IsolatedAsyncioTestCase):
 
         service = ReportSchedulerService(bot=bot, session_maker=session_maker)
 
-        # No existing metrics
-        service._metrics_repo.get_by_date = AsyncMock(return_value=None)
-        # collect_metrics fails
-        service._getcourse_service.collect_metrics = AsyncMock(
+        # collect_metrics_range fails
+        service._getcourse_service.collect_metrics_range = AsyncMock(
             side_effect=RuntimeError("API error")
         )
         service._app_settings_repo.set = AsyncMock()
 
         # Should not raise — handles errors gracefully
-        with patch("asyncio.sleep", new_callable=AsyncMock):
-            await service.run_backfill(date(2026, 3, 19), date(2026, 3, 19))
+        await service.run_backfill(date(2026, 3, 19), date(2026, 3, 19))
 
 
 class TestRequestExportHTTPMethod(unittest.IsolatedAsyncioTestCase):
