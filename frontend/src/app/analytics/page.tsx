@@ -302,12 +302,6 @@ export default function AnalyticsPage() {
     [departments, userExtraDepartmentIds, userId, userRole, userDepartmentId]
   );
 
-  const selectedDepartment = useMemo(
-    () =>
-      departments.find((department) => department.id === selectedDepartmentId) || null,
-    [departments, selectedDepartmentId]
-  );
-
   useEffect(() => {
     if (!userId || departmentsLoading) return;
 
@@ -505,12 +499,6 @@ export default function AnalyticsPage() {
     },
   ];
 
-  const scopeLabel = selectedDepartment
-    ? `Срез по отделу: ${selectedDepartment.name}`
-    : isModerator
-      ? "Срез по всем отделам"
-      : "Срез по моим задачам";
-
   const canSelectDepartment = isModerator || accessibleDepartments.length > 1;
 
   if (!user) return null;
@@ -519,11 +507,7 @@ export default function AnalyticsPage() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <section className="animate-fade-in-up stagger-1 rounded-2xl border border-border/60 bg-card p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{scopeLabel}</p>
-          </div>
-
+        <div className="flex flex-col gap-4 md:flex-row md:items-end">
           {canSelectDepartment && (
             <div className="w-full md:w-[320px]">
               <p className="mb-1 text-xs font-medium text-muted-foreground">Отдел</p>
