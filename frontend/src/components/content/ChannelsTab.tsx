@@ -164,9 +164,9 @@ export function ChannelsTab({ isEditor }: ChannelsTabProps) {
                     {ch.earliest_date && ch.latest_date ? (
                       <span className="flex items-center gap-1 justify-end">
                         <Calendar className="h-3 w-3" />
-                        {(() => { const [y, m, d] = ch.earliest_date.split("-"); return `${d}.${m}.${y.slice(2)}`; })()}
+                        {(() => { const [y, m, d] = ch.earliest_date.split("T")[0].split("-"); return `${d}.${m}.${y.slice(2)}`; })()}
                         {" — "}
-                        {(() => { const [y, m, d] = ch.latest_date.split("-"); return `${d}.${m}.${y.slice(2)}`; })()}
+                        {(() => { const [y, m, d] = ch.latest_date.split("T")[0].split("-"); return `${d}.${m}.${y.slice(2)}`; })()}
                       </span>
                     ) : (
                       "—"
