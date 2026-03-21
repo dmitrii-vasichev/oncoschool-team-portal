@@ -253,12 +253,16 @@ class ReportSchedulerService:
                 collected += 1
                 logger.info("Backfill: collected %s (%d/%d)", current_date, i + 1, total)
 
-                # Rate limit: 2 second pause between requests
-                await asyncio.sleep(2)
+                # Rate limit: 5 second pause between dates
+                await asyncio.sleep(5)
 
             except Exception as e:
                 failed += 1
                 logger.error("Backfill: failed for %s: %s", current_date, e)
+                # On rate limit, wait longer before next attempt
+                if "много запросов" in str(e).lower() or "rate" in str(e).lower():
+                    logger.info("Rate limited, waiting 30s before next date")
+                    await asyncio.sleep(30)
 
         # Save progress to app_settings
         try:

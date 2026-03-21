@@ -201,19 +201,17 @@ class GetCourseService:
         date_from = target_date.isoformat()
         date_to = target_date.isoformat()
 
-        # Request all 3 exports in parallel
-        user_export_id, payment_export_id, deals_export_id = await asyncio.gather(
-            self._request_export(base_url, api_key, "users", date_from, date_to),
-            self._request_export(base_url, api_key, "payments", date_from, date_to),
-            self._request_export(base_url, api_key, "deals", date_from, date_to),
-        )
+        # Request exports sequentially to respect GetCourse rate limits
+        user_export_id = await self._request_export(base_url, api_key, "users", date_from, date_to)
+        await asyncio.sleep(1)
+        payment_export_id = await self._request_export(base_url, api_key, "payments", date_from, date_to)
+        await asyncio.sleep(1)
+        deals_export_id = await self._request_export(base_url, api_key, "deals", date_from, date_to)
 
-        # Poll all 3 exports in parallel
-        user_rows, payment_rows, deal_rows = await asyncio.gather(
-            self._poll_export(base_url, api_key, user_export_id),
-            self._poll_export(base_url, api_key, payment_export_id),
-            self._poll_export(base_url, api_key, deals_export_id),
-        )
+        # Poll exports sequentially
+        user_rows = await self._poll_export(base_url, api_key, user_export_id)
+        payment_rows = await self._poll_export(base_url, api_key, payment_export_id)
+        deal_rows = await self._poll_export(base_url, api_key, deals_export_id)
 
         # Aggregate
         users_count = self._count_users(user_rows)
