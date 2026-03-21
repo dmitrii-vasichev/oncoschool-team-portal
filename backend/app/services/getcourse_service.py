@@ -23,6 +23,7 @@ RETRY_BASE_DELAY = 2
 
 # Rate limit handling
 RATE_LIMIT_DELAY = 30  # seconds to wait when GetCourse says "too many requests"
+MAX_RATE_LIMIT_RETRIES = 10  # max rate-limit waits (separate from error retries)
 EXPORT_PAUSE = 10  # seconds between sequential export requests
 
 
@@ -66,7 +67,10 @@ class GetCourseService:
         params["created_at[from]"] = date_from
         params["created_at[to]"] = date_to
 
-        for attempt in range(MAX_RETRIES):
+        attempt = 0
+        rate_limit_count = 0
+
+        while attempt < MAX_RETRIES:
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.get(url, params=params)
@@ -76,12 +80,17 @@ class GetCourseService:
                 if not data.get("success"):
                     error_msg = str(data.get("error_message", ""))
                     if "слишком много" in error_msg.lower():
+                        rate_limit_count += 1
+                        if rate_limit_count > MAX_RATE_LIMIT_RETRIES:
+                            raise RuntimeError(
+                                f"GetCourse export request failed: rate limited {rate_limit_count} times"
+                            )
                         logger.warning(
-                            "Rate limited on export request (%s), waiting %ds...",
-                            export_type, RATE_LIMIT_DELAY,
+                            "Rate limited on export request (%s), attempt %d, waiting %ds...",
+                            export_type, rate_limit_count, RATE_LIMIT_DELAY,
                         )
                         await asyncio.sleep(RATE_LIMIT_DELAY)
-                        continue  # retry
+                        continue  # does NOT increment attempt
                     raise RuntimeError(
                         f"GetCourse export request failed: {error_msg or data}"
                     )
@@ -93,13 +102,12 @@ class GetCourseService:
                 return export_id
 
             except (httpx.HTTPStatusError, httpx.RequestError, KeyError) as e:
-                if attempt < MAX_RETRIES - 1:
-                    delay = RETRY_BASE_DELAY ** (attempt + 1)
+                attempt += 1
+                if attempt < MAX_RETRIES:
+                    delay = RETRY_BASE_DELAY ** attempt
                     logger.warning(
                         "Export request attempt %d failed (%s), retrying in %ds",
-                        attempt + 1,
-                        e,
-                        delay,
+                        attempt, e, delay,
                     )
                     await asyncio.sleep(delay)
                 else:

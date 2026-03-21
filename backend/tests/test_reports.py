@@ -667,6 +667,44 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.get.await_count, 2)
         mock_sleep.assert_any_await(30)
 
+    async def test_request_rate_limit_does_not_consume_error_retries(self) -> None:
+        """Rate limit retries must NOT consume error retry attempts (#128)."""
+        service = GetCourseService()
+
+        rate_limited = MagicMock()
+        rate_limited.status_code = 200
+        rate_limited.raise_for_status = MagicMock()
+        rate_limited.json = MagicMock(return_value={
+            "success": False,
+            "error_message": "Слишком много запросов",
+        })
+
+        success = MagicMock()
+        success.status_code = 200
+        success.raise_for_status = MagicMock()
+        success.json = MagicMock(return_value={
+            "success": True,
+            "info": {"export_id": 77},
+        })
+
+        # 4 rate limits then success — would fail with old code (MAX_RETRIES=3)
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(
+            side_effect=[rate_limited, rate_limited, rate_limited, rate_limited, success]
+        )
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
+                export_id = await service._request_export(
+                    "https://school.getcourse.ru", "secret", "users", "2026-03-14", "2026-03-20"
+                )
+
+        self.assertEqual(export_id, 77)
+        # 5 calls total: 4 rate-limited + 1 success
+        self.assertEqual(mock_client.get.await_count, 5)
+
     async def test_exports_have_pauses_between_them(self) -> None:
         """Sequential exports should have EXPORT_PAUSE delays between them."""
         service = GetCourseService()
