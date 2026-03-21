@@ -49,14 +49,22 @@ FALLBACK_CONTEXT_WINDOW = 100_000
 
 # Maximum input tokens per single API request.
 # Prevents exceeding TPM (tokens-per-minute) rate limits on lower-tier plans.
-# OpenAI Tier 1 gpt-4o: 30K TPM — use 20K to leave headroom for
-# system prompt, output tokens, and other requests within the same minute.
+# OpenAI gpt-4o Tier 1: 30K TPM — use 20K to leave headroom.
+# OpenAI gpt-4o-mini: 200K TPM — can use 60K safely.
 MAX_INPUT_TOKENS_PER_REQUEST = {
     "openai": 20_000,
     "anthropic": 150_000,
     "gemini": 800_000,
 }
+# Higher limits for lightweight/mini models with larger TPM allowances
+MAX_INPUT_TOKENS_MINI_MODELS = {
+    "openai": 60_000,
+}
+MINI_MODEL_PATTERNS = ("mini", "gpt-4o-mini", "gpt-3.5")
 FALLBACK_MAX_INPUT_TOKENS = 20_000
+
+# Output token limit for analysis (much higher than default 1400 for short tasks)
+ANALYSIS_MAX_OUTPUT_TOKENS = 4096
 
 # Chunk overlap
 CHUNK_OVERLAP_CHARS = 500
@@ -177,9 +185,15 @@ class AnalysisService:
 
             context_window = DEFAULT_CONTEXT_WINDOWS.get(provider_name, FALLBACK_CONTEXT_WINDOW)
             context_based_tokens = int(context_window * (1 - OUTPUT_RESERVE_RATIO))
-            tpm_based_tokens = MAX_INPUT_TOKENS_PER_REQUEST.get(
-                provider_name, FALLBACK_MAX_INPUT_TOKENS
-            )
+
+            # Use higher TPM limits for mini/lightweight models
+            is_mini = ai_model and any(p in ai_model.lower() for p in MINI_MODEL_PATTERNS)
+            if is_mini and provider_name in MAX_INPUT_TOKENS_MINI_MODELS:
+                tpm_based_tokens = MAX_INPUT_TOKENS_MINI_MODELS[provider_name]
+            else:
+                tpm_based_tokens = MAX_INPUT_TOKENS_PER_REQUEST.get(
+                    provider_name, FALLBACK_MAX_INPUT_TOKENS
+                )
             max_input_tokens = min(context_based_tokens, tpm_based_tokens)
             chars_per_token = CHARS_PER_TOKEN_BY_PROVIDER.get(
                 provider_name, FALLBACK_CHARS_PER_TOKEN
@@ -212,7 +226,10 @@ class AnalysisService:
                     })
 
                 user_prompt = f"## Analysis instructions\n\n{prompt_text}\n\n## Content to analyze\n\n{chunk}"
-                result = await self._ai._complete_with_retry(provider, ANALYSIS_SYSTEM_PROMPT, user_prompt)
+                result = await self._ai._complete_with_retry(
+                    provider, ANALYSIS_SYSTEM_PROMPT, user_prompt,
+                    max_tokens=ANALYSIS_MAX_OUTPUT_TOKENS,
+                )
                 chunk_results.append(result)
 
             # Step 5: Synthesis if multiple chunks (NO DB session)
@@ -293,7 +310,8 @@ class AnalysisService:
 
         if len(user_prompt) <= max_input_chars:
             return await self._ai._complete_with_retry(
-                provider, SYNTHESIS_SYSTEM_PROMPT, user_prompt
+                provider, SYNTHESIS_SYSTEM_PROMPT, user_prompt,
+                max_tokens=ANALYSIS_MAX_OUTPUT_TOKENS,
             )
 
         # Synthesis input too large — merge in pairs hierarchically
@@ -316,7 +334,8 @@ class AnalysisService:
                     )
                     merged.append(
                         await self._ai._complete_with_retry(
-                            provider, SYNTHESIS_SYSTEM_PROMPT, pair_prompt
+                            provider, SYNTHESIS_SYSTEM_PROMPT, pair_prompt,
+                            max_tokens=ANALYSIS_MAX_OUTPUT_TOKENS,
                         )
                     )
                 else:

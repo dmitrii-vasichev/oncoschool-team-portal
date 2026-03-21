@@ -125,7 +125,8 @@ VOICE_TASK_PROMPT = """Ты — ассистент для создания за�
 
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 1.0
-OPENAI_MAX_TOKENS = 1400
+OPENAI_DEFAULT_MAX_TOKENS = 1400
+ANTHROPIC_DEFAULT_MAX_TOKENS = 4096
 MEETING_SUMMARY_OPENAI_MODEL = "gpt-4o-mini"
 MEETING_CHUNK_CHARS_DEFAULT = 8000
 MEETING_CHUNK_CHARS_MINI = 10000
@@ -138,7 +139,9 @@ MEETING_MAX_CHUNKS = 24
 
 class AIProvider(ABC):
     @abstractmethod
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(
+        self, system_prompt: str, user_prompt: str, max_tokens: int | None = None
+    ) -> str:
         """Send a request and get a text response."""
 
 
@@ -150,10 +153,12 @@ class AnthropicProvider(AIProvider):
         self.client = anthropic.AsyncAnthropic(api_key=api_key)
         self.model = model
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(
+        self, system_prompt: str, user_prompt: str, max_tokens: int | None = None
+    ) -> str:
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=4096,
+            max_tokens=max_tokens or ANTHROPIC_DEFAULT_MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -165,10 +170,12 @@ class OpenAIProvider(AIProvider):
         self.client = openai.AsyncOpenAI(api_key=api_key)
         self.model = model
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(
+        self, system_prompt: str, user_prompt: str, max_tokens: int | None = None
+    ) -> str:
         response = await self.client.chat.completions.create(
             model=self.model,
-            max_tokens=OPENAI_MAX_TOKENS,
+            max_tokens=max_tokens or OPENAI_DEFAULT_MAX_TOKENS,
             temperature=0.1,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -183,13 +190,18 @@ class GeminiProvider(AIProvider):
         self.client = genai.Client(api_key=api_key)
         self.model = model
 
-    async def complete(self, system_prompt: str, user_prompt: str) -> str:
+    async def complete(
+        self, system_prompt: str, user_prompt: str, max_tokens: int | None = None
+    ) -> str:
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system_prompt,
+        )
+        if max_tokens:
+            config.max_output_tokens = max_tokens
         response = await self.client.aio.models.generate_content(
             model=self.model,
             contents=user_prompt,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system_prompt,
-            ),
+            config=config,
         )
         return response.text
 
@@ -280,13 +292,17 @@ class AIService:
         return {name: True for name in self.provider_factories}
 
     async def _complete_with_retry(
-        self, provider: AIProvider, system_prompt: str, user_prompt: str
+        self,
+        provider: AIProvider,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int | None = None,
     ) -> str:
         """Call provider.complete with exponential backoff retry."""
         last_error = None
         for attempt in range(MAX_RETRIES):
             try:
-                return await provider.complete(system_prompt, user_prompt)
+                return await provider.complete(system_prompt, user_prompt, max_tokens=max_tokens)
             except Exception as e:
                 last_error = e
                 if attempt < MAX_RETRIES - 1:
@@ -576,7 +592,8 @@ class AIService:
         feature_key: str,
         system_prompt: str,
         user_prompt: str,
+        max_tokens: int | None = None,
     ) -> str:
         """Generic completion using a per-feature AI provider. Used by Content module."""
         provider = await self._get_current_provider(session, feature_key=feature_key)
-        return await self._complete_with_retry(provider, system_prompt, user_prompt)
+        return await self._complete_with_retry(provider, system_prompt, user_prompt, max_tokens=max_tokens)
