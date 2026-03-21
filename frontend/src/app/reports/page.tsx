@@ -420,7 +420,7 @@ export default function ReportsPage() {
                 Загрузка исторических данных...
               </p>
               <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
-                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates} дн.) — обычно занимает ~15 минут
+                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates} дн.) — обычно занимает ~{Math.max(15, backfillStatus.total_dates * 10)} минут
               </p>
             </div>
           </div>

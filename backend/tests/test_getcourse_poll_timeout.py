@@ -12,6 +12,8 @@ from app.services.getcourse_service import (
     GetCourseService,
     POLL_INTERVAL_SECONDS,
     POLL_MAX_WAIT_SECONDS,
+    POLL_SECONDS_PER_DAY,
+    POLL_MAX_TIMEOUT_CAP,
     RATE_LIMIT_BASE_DELAY,
     RATE_LIMIT_MAX_DELAY,
     MAX_RATE_LIMIT_RETRIES,
@@ -190,6 +192,41 @@ class TestPollIntervalConstant(unittest.TestCase):
 
     def test_poll_interval_is_60(self):
         self.assertEqual(POLL_INTERVAL_SECONDS, 60)
+
+
+class TestScaledTimeout(unittest.TestCase):
+    """Regression #147: multi-day backfill ranges need a scaled timeout.
+
+    A 7-day export timed out at the default 1200s because GetCourse
+    needs more time to prepare large exports server-side.
+    """
+
+    def test_single_day_keeps_default(self):
+        """Single-day range should use the default timeout."""
+        timeout = GetCourseService._scaled_timeout("2026-03-14", "2026-03-14")
+        self.assertEqual(timeout, POLL_MAX_WAIT_SECONDS)
+
+    def test_seven_day_range_scales_up(self):
+        """7-day range should get 7 * POLL_SECONDS_PER_DAY."""
+        timeout = GetCourseService._scaled_timeout("2026-03-14", "2026-03-20")
+        expected = 7 * POLL_SECONDS_PER_DAY  # 4200
+        self.assertEqual(timeout, expected)
+        self.assertGreater(timeout, POLL_MAX_WAIT_SECONDS)
+
+    def test_large_range_capped(self):
+        """Very large ranges should be capped at POLL_MAX_TIMEOUT_CAP."""
+        timeout = GetCourseService._scaled_timeout("2026-01-01", "2026-12-31")
+        self.assertEqual(timeout, POLL_MAX_TIMEOUT_CAP)
+
+    def test_invalid_dates_use_default(self):
+        """Invalid date strings should fall back to the default timeout."""
+        timeout = GetCourseService._scaled_timeout("bad", "dates")
+        self.assertEqual(timeout, POLL_MAX_WAIT_SECONDS)
+
+    def test_constants_are_sane(self):
+        """Verify the new constants have expected values."""
+        self.assertEqual(POLL_SECONDS_PER_DAY, 600)
+        self.assertEqual(POLL_MAX_TIMEOUT_CAP, 7200)
 
 
 if __name__ == "__main__":
