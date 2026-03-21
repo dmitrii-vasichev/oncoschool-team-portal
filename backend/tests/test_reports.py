@@ -593,5 +593,101 @@ class TestPollExportNotReady(unittest.IsolatedAsyncioTestCase):
                 )
 
 
+class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
+    """Regression #126: rate limit responses must be retried, not raised."""
+
+    async def test_poll_retries_on_rate_limit(self) -> None:
+        """'Слишком много запросов' during poll should wait and retry."""
+        service = GetCourseService()
+
+        rate_limited = MagicMock()
+        rate_limited.status_code = 200
+        rate_limited.raise_for_status = MagicMock()
+        rate_limited.json = MagicMock(return_value={
+            "success": False,
+            "error_message": "Слишком много запросов",
+        })
+
+        ready = MagicMock()
+        ready.status_code = 200
+        ready.raise_for_status = MagicMock()
+        ready.json = MagicMock(return_value={
+            "success": True,
+            "info": {"status": "exported", "items": [{"email": "a@test.com"}]},
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[rate_limited, ready])
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                items = await service._poll_export(
+                    "https://school.getcourse.ru", "secret", 42
+                )
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(mock_client.get.await_count, 2)
+        # Should have waited RATE_LIMIT_DELAY (30s)
+        mock_sleep.assert_any_await(30)
+
+    async def test_request_retries_on_rate_limit(self) -> None:
+        """'Слишком много запросов' during export request should wait and retry."""
+        service = GetCourseService()
+
+        rate_limited = MagicMock()
+        rate_limited.status_code = 200
+        rate_limited.raise_for_status = MagicMock()
+        rate_limited.json = MagicMock(return_value={
+            "success": False,
+            "error_message": "Слишком много запросов",
+        })
+
+        success = MagicMock()
+        success.status_code = 200
+        success.raise_for_status = MagicMock()
+        success.json = MagicMock(return_value={
+            "success": True,
+            "info": {"export_id": 99},
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(side_effect=[rate_limited, success])
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+                export_id = await service._request_export(
+                    "https://school.getcourse.ru", "secret", "users", "2026-03-13", "2026-03-19"
+                )
+
+        self.assertEqual(export_id, 99)
+        self.assertEqual(mock_client.get.await_count, 2)
+        mock_sleep.assert_any_await(30)
+
+    async def test_exports_have_pauses_between_them(self) -> None:
+        """Sequential exports should have EXPORT_PAUSE delays between them."""
+        service = GetCourseService()
+
+        service._request_and_poll_export = AsyncMock(
+            side_effect=[
+                [{"email": "a@test.com"}],
+                [{"status": "accepted", "amount": "100"}],
+                [{"status": "finished", "cost": "500"}],
+            ]
+        )
+
+        with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await service._request_and_poll_exports(
+                "https://school.getcourse.ru", "secret", "2026-03-13", "2026-03-19"
+            )
+
+        # Two pauses (after users, after payments — not after deals)
+        sleep_calls = [c.args[0] for c in mock_sleep.await_args_list]
+        self.assertEqual(sleep_calls.count(10), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

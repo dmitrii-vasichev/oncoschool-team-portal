@@ -21,6 +21,10 @@ POLL_MAX_WAIT_SECONDS = 600
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
 
+# Rate limit handling
+RATE_LIMIT_DELAY = 30  # seconds to wait when GetCourse says "too many requests"
+EXPORT_PAUSE = 10  # seconds between sequential export requests
+
 
 
 class GetCourseService:
@@ -70,8 +74,16 @@ class GetCourseService:
                     data = response.json()
 
                 if not data.get("success"):
+                    error_msg = str(data.get("error_message", ""))
+                    if "слишком много" in error_msg.lower():
+                        logger.warning(
+                            "Rate limited on export request (%s), waiting %ds...",
+                            export_type, RATE_LIMIT_DELAY,
+                        )
+                        await asyncio.sleep(RATE_LIMIT_DELAY)
+                        continue  # retry
                     raise RuntimeError(
-                        f"GetCourse export request failed: {data.get('error_message', data)}"
+                        f"GetCourse export request failed: {error_msg or data}"
                     )
 
                 export_id = data["info"]["export_id"]
@@ -114,12 +126,21 @@ class GetCourseService:
                 data = response.json()
 
             if not data.get("success"):
-                error_msg = data.get("error_message", "")
+                error_msg = str(data.get("error_message", ""))
                 # "Файл еще не создан" = file not yet created — normal intermediate state
-                if "еще не создан" in str(error_msg).lower():
+                if "еще не создан" in error_msg.lower():
                     logger.debug("Export %d not ready yet, retrying...", export_id)
                     await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     elapsed += POLL_INTERVAL_SECONDS
+                    continue
+                # "Слишком много запросов" = rate limited — wait longer and retry
+                if "слишком много" in error_msg.lower():
+                    logger.warning(
+                        "Rate limited polling export %d, waiting %ds...",
+                        export_id, RATE_LIMIT_DELAY,
+                    )
+                    await asyncio.sleep(RATE_LIMIT_DELAY)
+                    elapsed += RATE_LIMIT_DELAY
                     continue
                 raise RuntimeError(
                     f"GetCourse export poll failed: {error_msg or data}"
@@ -245,13 +266,19 @@ class GetCourseService:
     async def _request_and_poll_exports(
         self, base_url: str, api_key: str, date_from: str, date_to: str
     ) -> tuple[list[dict], list[dict], list[dict]]:
-        """Request and poll 3 exports sequentially (request → poll → next)."""
+        """Request and poll 3 exports sequentially with pauses between them."""
         user_rows = await self._request_and_poll_export(
             base_url, api_key, "users", date_from, date_to
         )
+        logger.info("Pausing %ds before next export request...", EXPORT_PAUSE)
+        await asyncio.sleep(EXPORT_PAUSE)
+
         payment_rows = await self._request_and_poll_export(
             base_url, api_key, "payments", date_from, date_to
         )
+        logger.info("Pausing %ds before next export request...", EXPORT_PAUSE)
+        await asyncio.sleep(EXPORT_PAUSE)
+
         deal_rows = await self._request_and_poll_export(
             base_url, api_key, "deals", date_from, date_to
         )
