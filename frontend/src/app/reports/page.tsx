@@ -493,26 +493,28 @@ export default function ReportsPage() {
           </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне (~15 мин).
+          Укажите период, за который нужно загрузить данные из GetCourse.
         </p>
-        <div className="grid grid-cols-2 gap-4 mt-2">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">От</label>
+        <div className="grid grid-cols-2 gap-6 mt-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">От</label>
             <DatePicker
               value={backfillFrom}
               onChange={setBackfillFrom}
               placeholder="Начало"
               clearable
+              className="w-full"
               yearRange={[2025, 2027]}
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">До</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium block">До</label>
             <DatePicker
               value={backfillTo}
               onChange={setBackfillTo}
               placeholder="Конец"
               clearable
+              className="w-full"
               yearRange={[2025, 2027]}
             />
           </div>
