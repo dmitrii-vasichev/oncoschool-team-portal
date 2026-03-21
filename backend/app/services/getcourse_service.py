@@ -67,7 +67,7 @@ class GetCourseService:
         for attempt in range(MAX_RETRIES):
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.post(url, params=params)
+                    response = await client.post(url, data=params)
                     response.raise_for_status()
                     data = response.json()
 
