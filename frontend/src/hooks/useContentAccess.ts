@@ -3,12 +3,16 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { api } from "@/lib/api";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { PermissionService } from "@/lib/permissions";
-import type { ContentAccess, ContentSubSection } from "@/lib/types";
+import type { ContentSubSection } from "@/lib/types";
+
+interface ResolvedGrant {
+  sub_section: string;
+  role: string; // "operator" | "editor"
+}
 
 interface ContentAccessState {
-  /** All content access grants for the current user (direct + department) */
-  grants: ContentAccess[];
+  /** Resolved access grants for the current user */
+  grants: ResolvedGrant[];
   /** Whether the initial fetch is still in progress */
   loading: boolean;
   /** Error from fetching access */
@@ -26,21 +30,14 @@ interface ContentAccessState {
 /**
  * Hook to fetch and expose the current user's content access state.
  *
- * - Admins have implicit editor access to everything.
- * - For other users, access is determined by ContentAccess grants
- *   (direct member_id or via department_id).
- *
- * Since the backend already resolves access per-request via dependencies,
- * this hook fetches the full access list (admin-only endpoint) for admins,
- * or tries the content endpoints to determine if the user has access.
+ * Calls GET /api/content/my-access which returns the user's resolved roles
+ * (including implicit admin→editor promotion) for each content sub-section.
  */
 export function useContentAccess(): ContentAccessState {
   const { user } = useCurrentUser();
-  const [grants, setGrants] = useState<ContentAccess[]>([]);
+  const [grants, setGrants] = useState<ResolvedGrant[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const isAdmin = user ? PermissionService.isAdmin(user) : false;
 
   const fetchAccess = useCallback(async () => {
     if (!user) {
@@ -52,56 +49,15 @@ export function useContentAccess(): ContentAccessState {
     try {
       setLoading(true);
       setError(null);
-
-      if (isAdmin) {
-        // Admins can fetch the full access list
-        const accessList = await api.getContentAccess();
-        setGrants(accessList);
-      } else {
-        // Non-admins: probe endpoints to detect access per sub-section
-        const detectedGrants: ContentAccess[] = [];
-
-        // Check telegram_analysis access
-        try {
-          await api.getChannels();
-          detectedGrants.push({
-            id: "self-telegram",
-            sub_section: "telegram_analysis",
-            member_id: user.id,
-            member_name: user.full_name,
-            department_id: null,
-            department_name: null,
-            role: "operator",
-          });
-        } catch {
-          // 403 = no access
-        }
-
-        // Check reports access
-        try {
-          await api.getReportSummary(1);
-          detectedGrants.push({
-            id: "self-reports",
-            sub_section: "reports",
-            member_id: user.id,
-            member_name: user.full_name,
-            department_id: null,
-            department_name: null,
-            role: "operator",
-          });
-        } catch {
-          // 403 = no access
-        }
-
-        setGrants(detectedGrants);
-      }
+      const myAccess = await api.getMyContentAccess();
+      setGrants(myAccess);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch content access");
       setGrants([]);
     } finally {
       setLoading(false);
     }
-  }, [user, isAdmin]);
+  }, [user]);
 
   useEffect(() => {
     fetchAccess();
@@ -110,35 +66,31 @@ export function useContentAccess(): ContentAccessState {
   const hasAccess = useCallback(
     (subSection: ContentSubSection): boolean => {
       if (!user) return false;
-      // Admins always have access
-      if (isAdmin) return true;
       return grants.some((g) => g.sub_section === subSection);
     },
-    [user, isAdmin, grants]
+    [user, grants]
   );
 
   const isEditor = useCallback(
     (subSection: ContentSubSection): boolean => {
       if (!user) return false;
-      if (isAdmin) return true;
       return grants.some(
         (g) => g.sub_section === subSection && g.role === "editor"
       );
     },
-    [user, isAdmin, grants]
+    [user, grants]
   );
 
   const isOperator = useCallback(
     (subSection: ContentSubSection): boolean => {
       if (!user) return false;
-      if (isAdmin) return true;
       return grants.some(
         (g) =>
           g.sub_section === subSection &&
           (g.role === "operator" || g.role === "editor")
       );
     },
-    [user, isAdmin, grants]
+    [user, grants]
   );
 
   return useMemo(

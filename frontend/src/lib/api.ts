@@ -1167,6 +1167,12 @@ class ApiClient {
     });
   }
 
+  // ==================== Content: My Access ====================
+
+  async getMyContentAccess(): Promise<{ sub_section: string; role: string }[]> {
+    return this.request<{ sub_section: string; role: string }[]>("/api/content/my-access");
+  }
+
   // ==================== Admin: Content Access ====================
 
   async getContentAccess(): Promise<ContentAccess[]> {
