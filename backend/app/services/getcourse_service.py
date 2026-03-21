@@ -21,8 +21,6 @@ POLL_MAX_WAIT_SECONDS = 600
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
 
-# Pause between export requests (seconds) to respect GetCourse rate limits
-EXPORT_REQUEST_PAUSE = 300  # 5 minutes
 
 
 class GetCourseService:
@@ -227,31 +225,28 @@ class GetCourseService:
             raise RuntimeError("GetCourse credentials not configured")
         return creds.base_url.rstrip("/"), decrypt(creds.api_key_encrypted)
 
+    async def _request_and_poll_export(
+        self, base_url: str, api_key: str, export_type: str, date_from: str, date_to: str
+    ) -> list[dict]:
+        """Request a single export and poll until ready before returning."""
+        export_id = await self._request_export(
+            base_url, api_key, export_type, date_from, date_to
+        )
+        return await self._poll_export(base_url, api_key, export_id)
+
     async def _request_and_poll_exports(
         self, base_url: str, api_key: str, date_from: str, date_to: str
     ) -> tuple[list[dict], list[dict], list[dict]]:
-        """Request 3 exports sequentially with pauses, then poll results."""
-        user_export_id = await self._request_export(
+        """Request and poll 3 exports sequentially (request → poll → next)."""
+        user_rows = await self._request_and_poll_export(
             base_url, api_key, "users", date_from, date_to
         )
-        logger.info("Waiting %ds before next export request...", EXPORT_REQUEST_PAUSE)
-        await asyncio.sleep(EXPORT_REQUEST_PAUSE)
-
-        payment_export_id = await self._request_export(
+        payment_rows = await self._request_and_poll_export(
             base_url, api_key, "payments", date_from, date_to
         )
-        logger.info("Waiting %ds before next export request...", EXPORT_REQUEST_PAUSE)
-        await asyncio.sleep(EXPORT_REQUEST_PAUSE)
-
-        deals_export_id = await self._request_export(
+        deal_rows = await self._request_and_poll_export(
             base_url, api_key, "deals", date_from, date_to
         )
-
-        # Poll sequentially (polling itself has 3s intervals, no extra pauses needed)
-        user_rows = await self._poll_export(base_url, api_key, user_export_id)
-        payment_rows = await self._poll_export(base_url, api_key, payment_export_id)
-        deal_rows = await self._poll_export(base_url, api_key, deals_export_id)
-
         return user_rows, payment_rows, deal_rows
 
     async def collect_metrics(
