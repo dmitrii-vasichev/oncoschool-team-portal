@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Export poll settings
 POLL_INTERVAL_SECONDS = 3
-POLL_MAX_WAIT_SECONDS = 600
+POLL_MAX_WAIT_SECONDS = 1200
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
 
@@ -127,10 +127,15 @@ class GetCourseService:
         export_id: int,
         timeout: int = POLL_MAX_WAIT_SECONDS,
     ) -> list[dict]:
-        """Poll until the export is ready and return the items list."""
+        """Poll until the export is ready and return the items list.
+
+        Rate-limit delays do NOT count toward the timeout because the export
+        continues processing on GetCourse's side while we wait.
+        """
         url = f"{base_url}/pl/api/account/exports/{export_id}"
         params = {"key": api_key}
         elapsed = 0
+        rate_limit_count = 0
 
         while elapsed < timeout:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -146,15 +151,24 @@ class GetCourseService:
                     await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     elapsed += POLL_INTERVAL_SECONDS
                     continue
-                # "Слишком много запросов" = rate limited — wait longer and retry
+                # "Слишком много запросов" = rate limited — wait with backoff
+                # NOT counted toward timeout: export keeps processing server-side
                 if "слишком много" in error_msg.lower():
-                    delay = RATE_LIMIT_BASE_DELAY
+                    rate_limit_count += 1
+                    if rate_limit_count > MAX_RATE_LIMIT_RETRIES:
+                        raise RuntimeError(
+                            f"GetCourse export {export_id} poll: rate limited {rate_limit_count} times"
+                        )
+                    delay = min(
+                        RATE_LIMIT_BASE_DELAY * (2 ** (rate_limit_count - 1)),
+                        RATE_LIMIT_MAX_DELAY,
+                    )
                     logger.warning(
-                        "Rate limited polling export %d, waiting %ds...",
-                        export_id, delay,
+                        "Rate limited polling export %d, attempt %d, waiting %ds...",
+                        export_id, rate_limit_count, delay,
                     )
                     await asyncio.sleep(delay)
-                    elapsed += delay
+                    # elapsed NOT incremented — export still processing
                     continue
                 raise RuntimeError(
                     f"GetCourse export poll failed: {error_msg or data}"
