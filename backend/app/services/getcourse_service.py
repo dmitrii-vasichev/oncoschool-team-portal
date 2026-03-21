@@ -2,7 +2,8 @@
 
 import asyncio
 import logging
-from datetime import date, datetime
+from collections import defaultdict
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import httpx
@@ -19,6 +20,9 @@ POLL_INTERVAL_SECONDS = 3
 POLL_MAX_WAIT_SECONDS = 600
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
+
+# Pause between export requests (seconds) to respect GetCourse rate limits
+EXPORT_REQUEST_PAUSE = 300  # 5 minutes
 
 
 class GetCourseService:
@@ -181,8 +185,74 @@ class GetCourseService:
         return count, total
 
     # ------------------------------------------------------------------
+    # Date extraction for grouping
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_date(row: dict, date_fields: tuple[str, ...]) -> date | None:
+        """Extract a date from a row, trying multiple field names."""
+        for field in date_fields:
+            val = row.get(field)
+            if not val:
+                continue
+            try:
+                return datetime.fromisoformat(str(val).replace(" ", "T")).date()
+            except (ValueError, TypeError):
+                try:
+                    return datetime.strptime(str(val)[:10], "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    continue
+        return None
+
+    @staticmethod
+    def _group_by_date(
+        rows: list[dict], date_fields: tuple[str, ...]
+    ) -> dict[date, list[dict]]:
+        """Group export rows by date."""
+        grouped: dict[date, list[dict]] = defaultdict(list)
+        for row in rows:
+            d = GetCourseService._extract_date(row, date_fields)
+            if d:
+                grouped[d].append(row)
+        return grouped
+
+    # ------------------------------------------------------------------
     # Main orchestration
     # ------------------------------------------------------------------
+
+    async def _get_creds(self, session: AsyncSession) -> tuple[str, str]:
+        """Return (base_url, api_key) or raise."""
+        creds = await self._get_credentials(session)
+        if not creds:
+            raise RuntimeError("GetCourse credentials not configured")
+        return creds.base_url.rstrip("/"), decrypt(creds.api_key_encrypted)
+
+    async def _request_and_poll_exports(
+        self, base_url: str, api_key: str, date_from: str, date_to: str
+    ) -> tuple[list[dict], list[dict], list[dict]]:
+        """Request 3 exports sequentially with pauses, then poll results."""
+        user_export_id = await self._request_export(
+            base_url, api_key, "users", date_from, date_to
+        )
+        logger.info("Waiting %ds before next export request...", EXPORT_REQUEST_PAUSE)
+        await asyncio.sleep(EXPORT_REQUEST_PAUSE)
+
+        payment_export_id = await self._request_export(
+            base_url, api_key, "payments", date_from, date_to
+        )
+        logger.info("Waiting %ds before next export request...", EXPORT_REQUEST_PAUSE)
+        await asyncio.sleep(EXPORT_REQUEST_PAUSE)
+
+        deals_export_id = await self._request_export(
+            base_url, api_key, "deals", date_from, date_to
+        )
+
+        # Poll sequentially (polling itself has 3s intervals, no extra pauses needed)
+        user_rows = await self._poll_export(base_url, api_key, user_export_id)
+        payment_rows = await self._poll_export(base_url, api_key, payment_export_id)
+        deal_rows = await self._poll_export(base_url, api_key, deals_export_id)
+
+        return user_rows, payment_rows, deal_rows
 
     async def collect_metrics(
         self,
@@ -191,28 +261,11 @@ class GetCourseService:
         collected_by_id=None,
     ) -> DailyMetric:
         """Run 3 exports (users, payments, deals), aggregate, and upsert into daily_metrics."""
-        creds = await self._get_credentials(session)
-        if not creds:
-            raise RuntimeError("GetCourse credentials not configured")
+        base_url, api_key = await self._get_creds(session)
+        date_str = target_date.isoformat()
 
-        base_url = creds.base_url.rstrip("/")
-        api_key = decrypt(creds.api_key_encrypted)
-
-        date_from = target_date.isoformat()
-        date_to = target_date.isoformat()
-
-        # Request all 3 exports in parallel
-        user_export_id, payment_export_id, deals_export_id = await asyncio.gather(
-            self._request_export(base_url, api_key, "users", date_from, date_to),
-            self._request_export(base_url, api_key, "payments", date_from, date_to),
-            self._request_export(base_url, api_key, "deals", date_from, date_to),
-        )
-
-        # Poll all 3 exports in parallel
-        user_rows, payment_rows, deal_rows = await asyncio.gather(
-            self._poll_export(base_url, api_key, user_export_id),
-            self._poll_export(base_url, api_key, payment_export_id),
-            self._poll_export(base_url, api_key, deals_export_id),
+        user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
+            base_url, api_key, date_str, date_str
         )
 
         # Aggregate
@@ -245,3 +298,69 @@ class GetCourseService:
         )
 
         return metric
+
+    async def collect_metrics_range(
+        self,
+        session: AsyncSession,
+        range_from: date,
+        range_to: date,
+        collected_by_id=None,
+    ) -> dict[str, int]:
+        """Collect metrics for an entire date range with just 3 API requests.
+
+        Returns dict with collected/skipped/failed counts.
+        """
+        base_url, api_key = await self._get_creds(session)
+
+        logger.info(
+            "Range collection: requesting exports for %s to %s", range_from, range_to
+        )
+
+        user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
+            base_url, api_key, range_from.isoformat(), range_to.isoformat()
+        )
+
+        # Group by date
+        user_date_fields = ("created_at", "addDate", "registration_date", "exported_at")
+        payment_date_fields = ("created_at", "payDate")
+        deal_date_fields = ("created_at", "dealDate")
+
+        users_by_date = self._group_by_date(user_rows, user_date_fields)
+        payments_by_date = self._group_by_date(payment_rows, payment_date_fields)
+        deals_by_date = self._group_by_date(deal_rows, deal_date_fields)
+
+        logger.info(
+            "Range collection: got %d user rows, %d payment rows, %d deal rows",
+            len(user_rows), len(payment_rows), len(deal_rows),
+        )
+
+        # Upsert per date
+        collected = 0
+        total_days = (range_to - range_from).days + 1
+
+        for i in range(total_days):
+            current_date = range_from + timedelta(days=i)
+            day_users = users_by_date.get(current_date, [])
+            day_payments = payments_by_date.get(current_date, [])
+            day_deals = deals_by_date.get(current_date, [])
+
+            users_count = self._count_users(day_users)
+            payments_count, payments_sum = self._sum_payments(day_payments)
+            orders_count, orders_sum = self._sum_orders(day_deals)
+
+            await self._metrics_repo.upsert(
+                session,
+                source="getcourse",
+                metric_date=current_date,
+                users_count=users_count,
+                payments_count=payments_count,
+                payments_sum=payments_sum,
+                orders_count=orders_count,
+                orders_sum=orders_sum,
+                collected_at=datetime.utcnow(),
+                collected_by_id=collected_by_id,
+            )
+            collected += 1
+
+        logger.info("Range collection completed: %d days upserted", collected)
+        return {"collected": collected, "total_days": total_days}
