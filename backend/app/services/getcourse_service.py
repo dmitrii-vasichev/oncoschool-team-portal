@@ -16,7 +16,7 @@ from app.utils.encryption import decrypt
 logger = logging.getLogger(__name__)
 
 # Export poll settings
-POLL_INTERVAL_SECONDS = 3
+POLL_INTERVAL_SECONDS = 60
 POLL_MAX_WAIT_SECONDS = 1200
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2

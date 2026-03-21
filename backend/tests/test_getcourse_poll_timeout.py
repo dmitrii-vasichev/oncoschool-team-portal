@@ -180,5 +180,17 @@ class TestPollMaxWaitConstant(unittest.TestCase):
         self.assertEqual(POLL_MAX_WAIT_SECONDS, 1200)
 
 
+class TestPollIntervalConstant(unittest.TestCase):
+    """Regression #141: poll interval must be 60s to stay within API rate limit.
+
+    GetCourse allows 100 requests per 2 hours. With 3-second polling,
+    a single export could burn ~100 requests in 5 minutes, leaving no
+    budget for the remaining export types (payments, deals).
+    """
+
+    def test_poll_interval_is_60(self):
+        self.assertEqual(POLL_INTERVAL_SECONDS, 60)
+
+
 if __name__ == "__main__":
     unittest.main()
