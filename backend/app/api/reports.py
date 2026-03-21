@@ -170,3 +170,18 @@ async def backfill(
     )
 
     return BackfillResponse(status="started", total_dates=total_dates)
+
+
+@router.get("/backfill/status")
+async def backfill_status(
+    session: AsyncSession = Depends(get_session),
+    member: TeamMember = Depends(_require_reports_viewer),
+):
+    """Get current backfill status from app_settings."""
+    from app.db.repositories import AppSettingsRepository
+
+    repo = AppSettingsRepository()
+    setting = await repo.get(session, "backfill_progress")
+    if not setting or not isinstance(setting.value, dict):
+        return {"status": "idle"}
+    return setting.value

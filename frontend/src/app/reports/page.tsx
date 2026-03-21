@@ -16,7 +16,7 @@ import { DatePicker } from "@/components/shared/DatePicker";
 import { useReports } from "@/hooks/useReports";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { api } from "@/lib/api";
-import type { DailyMetric, GetCourseCredentials } from "@/lib/types";
+import type { BackfillStatus, DailyMetric, GetCourseCredentials } from "@/lib/types";
 import {
   Users,
   CreditCard,
@@ -209,10 +209,8 @@ export default function ReportsPage() {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillFrom, setBackfillFrom] = useState("");
   const [backfillTo, setBackfillTo] = useState("");
-  type BackfillStage = "idle" | "submitting" | "done" | "error";
-  const [backfillStage, setBackfillStage] = useState<BackfillStage>("idle");
-  const [backfillResult, setBackfillResult] = useState<string | null>(null);
-  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillSubmitting, setBackfillSubmitting] = useState(false);
+  const [backfillStatus, setBackfillStatus] = useState<BackfillStatus | null>(null);
 
   const ESTIMATED_DURATION = 15 * 60; // 15 minutes in seconds
 
@@ -245,6 +243,31 @@ export default function ReportsPage() {
   useEffect(() => {
     fetchCredentials();
   }, [fetchCredentials]);
+
+  // Poll backfill status on mount and while running
+  const fetchBackfillStatus = useCallback(async () => {
+    try {
+      const status = await api.getBackfillStatus();
+      setBackfillStatus(status);
+      // When backfill completes, refetch reports data
+      if (status.status === "completed") {
+        refetch();
+      }
+    } catch {
+      // Ignore errors — user may not have access
+    }
+  }, [refetch]);
+
+  useEffect(() => {
+    fetchBackfillStatus();
+  }, [fetchBackfillStatus]);
+
+  // Poll every 10 seconds while backfill is running
+  useEffect(() => {
+    if (backfillStatus?.status !== "running") return;
+    const interval = setInterval(fetchBackfillStatus, 10_000);
+    return () => clearInterval(interval);
+  }, [backfillStatus?.status, fetchBackfillStatus]);
 
   const collecting = stage === "requesting" || stage === "collecting";
 
@@ -281,26 +304,18 @@ export default function ReportsPage() {
       toastError("Дата «от» должна быть раньше даты «до»");
       return;
     }
-    setBackfillStage("submitting");
-    setBackfillError(null);
+    setBackfillSubmitting(true);
     try {
-      const result = await api.backfillReports(backfillFrom, backfillTo);
-      setBackfillStage("done");
-      setBackfillResult(
-        `Запущена загрузка данных за ${result.total_dates} ${result.total_dates === 1 ? "день" : result.total_dates < 5 ? "дня" : "дней"}`
-      );
+      await api.backfillReports(backfillFrom, backfillTo);
       toastSuccess("Загрузка исторических данных запущена");
       setBackfillOpen(false);
-      // Auto-dismiss after 8 seconds
-      setTimeout(() => {
-        setBackfillStage("idle");
-        setBackfillResult(null);
-      }, 8000);
+      // Immediately fetch status to show "running" banner
+      await fetchBackfillStatus();
     } catch (e) {
-      setBackfillStage("error");
       const msg = e instanceof Error ? e.message : "Ошибка запуска загрузки";
-      setBackfillError(msg);
       toastError(msg);
+    } finally {
+      setBackfillSubmitting(false);
     }
   };
 
@@ -376,16 +391,97 @@ export default function ReportsPage() {
     );
   }
 
+  const backfillIsRunning = backfillStatus?.status === "running";
+
+  const formatBackfillDates = (status: BackfillStatus) => {
+    if (!status.date_from || !status.date_to) return "";
+    const from = new Date(status.date_from).toLocaleDateString("ru-RU");
+    const to = new Date(status.date_to).toLocaleDateString("ru-RU");
+    return `${from} — ${to}`;
+  };
+
+  const dismissBackfillStatus = () => {
+    setBackfillStatus(null);
+  };
+
+  // Backfill status banner (persistent, driven by backend status)
+  const backfillBanner = (() => {
+    if (!backfillStatus || backfillStatus.status === "idle") return null;
+
+    if (backfillStatus.status === "running") {
+      return (
+        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                Загрузка исторических данных...
+              </p>
+              <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
+                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates} дн.) — обычно занимает ~15 минут
+              </p>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    if (backfillStatus.status === "completed") {
+      return (
+        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                Загрузка завершена: {backfillStatus.collected} из {backfillStatus.total_dates} дн.
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
+                Период: {formatBackfillDates(backfillStatus)}
+              </p>
+            </div>
+            <button onClick={dismissBackfillStatus} className="text-emerald-600/50 hover:text-emerald-600 dark:text-emerald-400/50 dark:hover:text-emerald-400">
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    if (backfillStatus.status === "failed") {
+      return (
+        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+          <div className="flex items-center gap-3">
+            <XCircle className="h-5 w-5 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">
+                Загрузка не удалась
+              </p>
+              {backfillStatus.error && (
+                <p className="text-xs text-destructive/70 mt-0.5">
+                  {backfillStatus.error}
+                </p>
+              )}
+              <p className="text-xs text-destructive/70 mt-0.5">
+                Период: {formatBackfillDates(backfillStatus)}
+              </p>
+            </div>
+            <button onClick={dismissBackfillStatus} className="text-destructive/50 hover:text-destructive">
+              <XCircle className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    return null;
+  })();
+
   // Backfill dialog (shared between empty state and main view)
   const backfillDialog = (
     <Dialog
       open={backfillOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          setBackfillOpen(false);
-          setBackfillStage("idle");
-          setBackfillError(null);
-        }
+        if (!open) setBackfillOpen(false);
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -395,7 +491,7 @@ export default function ReportsPage() {
           </DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
-          Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне.
+          Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне (~15 мин).
         </p>
         <div className="grid grid-cols-2 gap-4 mt-2">
           <div className="space-y-1.5">
@@ -424,9 +520,6 @@ export default function ReportsPage() {
             Дата «от» должна быть раньше даты «до»
           </p>
         )}
-        {backfillStage === "error" && backfillError && (
-          <p className="text-xs text-destructive mt-1">{backfillError}</p>
-        )}
         <div className="flex justify-end gap-2 mt-4">
           <Button
             variant="outline"
@@ -444,10 +537,10 @@ export default function ReportsPage() {
               !backfillFrom ||
               !backfillTo ||
               backfillFrom > backfillTo ||
-              backfillStage === "submitting"
+              backfillSubmitting
             }
           >
-            {backfillStage === "submitting" ? (
+            {backfillSubmitting ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 Запуск...
@@ -474,7 +567,7 @@ export default function ReportsPage() {
           <p className="text-sm text-muted-foreground">
             Данные ещё не собраны. Настройте подключение GetCourse в разделе Настройки.
           </p>
-          {isAdmin && (
+          {isAdmin && !backfillIsRunning && (
             <Button
               variant="outline"
               size="sm"
@@ -485,11 +578,7 @@ export default function ReportsPage() {
               Загрузить историю
             </Button>
           )}
-          {backfillStage === "done" && backfillResult && (
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-              {backfillResult}. Обновите страницу через несколько минут.
-            </div>
-          )}
+          {backfillBanner}
         </div>
         {backfillDialog}
       </div>
@@ -541,7 +630,7 @@ export default function ReportsPage() {
                 </>
               )}
             </Button>
-            {isAdmin && (
+            {isAdmin && !backfillIsRunning && (
               <Button
                 variant="outline"
                 size="sm"
@@ -556,34 +645,8 @@ export default function ReportsPage() {
         </div>
       </section>
 
-      {/* Backfill result banner */}
-      {backfillStage === "done" && backfillResult && (
-        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                {backfillResult}
-              </p>
-              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
-                Сбор идёт в фоне. Данные появятся на странице по мере загрузки.
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Backfill error banner */}
-      {backfillStage === "error" && backfillError && (
-        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
-          <div className="flex items-center gap-3">
-            <XCircle className="h-5 w-5 text-destructive shrink-0" />
-            <p className="text-sm font-medium text-destructive">
-              {backfillError}
-            </p>
-          </div>
-        </section>
-      )}
+      {/* Backfill status banner (driven by backend polling) */}
+      {backfillBanner}
 
       {/* KPI Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">

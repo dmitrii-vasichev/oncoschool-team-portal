@@ -513,6 +513,18 @@ export interface BackfillResponse {
   total_dates: number;
 }
 
+export interface BackfillStatus {
+  status: "idle" | "running" | "completed" | "failed";
+  total_dates?: number;
+  collected?: number;
+  failed?: number;
+  date_from?: string;
+  date_to?: string;
+  started_at?: string;
+  completed_at?: string;
+  error?: string | null;
+}
+
 export interface ReportSchedule {
   time: string;
   timezone: string;

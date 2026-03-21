@@ -232,8 +232,29 @@ class ReportSchedulerService:
         total = (date_to - date_from).days + 1
         collected = 0
         failed = 0
+        error_message = None
 
         logger.info("Backfill started: %s to %s (%d dates)", date_from, date_to, total)
+
+        # Save "running" status at the start
+        try:
+            async with self.session_maker() as session:
+                async with session.begin():
+                    await self._app_settings_repo.set(
+                        session,
+                        BACKFILL_PROGRESS_KEY,
+                        {
+                            "status": "running",
+                            "total_dates": total,
+                            "collected": 0,
+                            "failed": 0,
+                            "date_from": date_from.isoformat(),
+                            "date_to": date_to.isoformat(),
+                            "started_at": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
+                        },
+                    )
+        except Exception as e:
+            logger.error("Failed to save backfill start progress: %s", e)
 
         try:
             async with self.session_maker() as session:
@@ -244,9 +265,10 @@ class ReportSchedulerService:
             collected = result["collected"]
         except Exception as e:
             failed = total
+            error_message = str(e)
             logger.error("Backfill failed: %s", e)
 
-        # Save progress to app_settings
+        # Save final status
         try:
             async with self.session_maker() as session:
                 async with session.begin():
@@ -258,7 +280,10 @@ class ReportSchedulerService:
                             "total_dates": total,
                             "collected": collected,
                             "failed": failed,
+                            "date_from": date_from.isoformat(),
+                            "date_to": date_to.isoformat(),
                             "completed_at": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
+                            "error": error_message,
                         },
                     )
         except Exception as e:

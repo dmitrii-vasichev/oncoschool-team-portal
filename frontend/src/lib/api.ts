@@ -65,6 +65,7 @@ import type {
   ReportSummary,
   CollectResponse,
   BackfillResponse,
+  BackfillStatus,
   ReportSchedule,
   GetCourseCredentials,
 } from "./types";
@@ -1123,6 +1124,10 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
     });
+  }
+
+  async getBackfillStatus(): Promise<BackfillStatus> {
+    return this.request<BackfillStatus>("/api/reports/getcourse/backfill/status");
   }
 
   // ==================== Settings: Reports ====================
