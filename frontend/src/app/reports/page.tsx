@@ -376,17 +376,122 @@ export default function ReportsPage() {
     );
   }
 
+  // Backfill dialog (shared between empty state and main view)
+  const backfillDialog = (
+    <Dialog
+      open={backfillOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          setBackfillOpen(false);
+          setBackfillStage("idle");
+          setBackfillError(null);
+        }
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="font-heading">
+            Загрузка исторических данных
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне.
+        </p>
+        <div className="grid grid-cols-2 gap-4 mt-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">От</label>
+            <DatePicker
+              value={backfillFrom}
+              onChange={setBackfillFrom}
+              placeholder="Начало"
+              clearable
+              yearRange={[2025, 2027]}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">До</label>
+            <DatePicker
+              value={backfillTo}
+              onChange={setBackfillTo}
+              placeholder="Конец"
+              clearable
+              yearRange={[2025, 2027]}
+            />
+          </div>
+        </div>
+        {backfillFrom && backfillTo && backfillFrom > backfillTo && (
+          <p className="text-xs text-destructive mt-1">
+            Дата «от» должна быть раньше даты «до»
+          </p>
+        )}
+        {backfillStage === "error" && backfillError && (
+          <p className="text-xs text-destructive mt-1">{backfillError}</p>
+        )}
+        <div className="flex justify-end gap-2 mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
+            onClick={() => setBackfillOpen(false)}
+          >
+            Отмена
+          </Button>
+          <Button
+            size="sm"
+            className="rounded-lg gap-1.5"
+            onClick={handleBackfill}
+            disabled={
+              !backfillFrom ||
+              !backfillTo ||
+              backfillFrom > backfillTo ||
+              backfillStage === "submitting"
+            }
+          >
+            {backfillStage === "submitting" ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Запуск...
+              </>
+            ) : (
+              <>
+                <CalendarRange className="h-3.5 w-3.5" />
+                Загрузить
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!summary || summary.metrics.length === 0) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <p className="text-lg font-medium text-foreground">
             Нет данных
           </p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Данные ещё не собраны. Настройте подключение GetCourse в разделе Настройки.
           </p>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg gap-1.5"
+              onClick={() => setBackfillOpen(true)}
+            >
+              <CalendarRange className="h-3.5 w-3.5" />
+              Загрузить историю
+            </Button>
+          )}
+          {backfillStage === "done" && backfillResult && (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-sm text-emerald-700 dark:text-emerald-400">
+              {backfillResult}. Обновите страницу через несколько минут.
+            </div>
+          )}
         </div>
+        {backfillDialog}
       </div>
     );
   }
@@ -836,91 +941,7 @@ export default function ReportsPage() {
         </div>
       </section>
 
-      {/* Backfill Dialog */}
-      <Dialog
-        open={backfillOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setBackfillOpen(false);
-            setBackfillStage("idle");
-            setBackfillError(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-heading">
-              Загрузка исторических данных
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне.
-          </p>
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">От</label>
-              <DatePicker
-                value={backfillFrom}
-                onChange={setBackfillFrom}
-                placeholder="Начало"
-                clearable
-                yearRange={[2025, 2027]}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">До</label>
-              <DatePicker
-                value={backfillTo}
-                onChange={setBackfillTo}
-                placeholder="Конец"
-                clearable
-                yearRange={[2025, 2027]}
-              />
-            </div>
-          </div>
-          {backfillFrom && backfillTo && backfillFrom > backfillTo && (
-            <p className="text-xs text-destructive mt-1">
-              Дата «от» должна быть раньше даты «до»
-            </p>
-          )}
-          {backfillStage === "error" && backfillError && (
-            <p className="text-xs text-destructive mt-1">{backfillError}</p>
-          )}
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-lg"
-              onClick={() => setBackfillOpen(false)}
-            >
-              Отмена
-            </Button>
-            <Button
-              size="sm"
-              className="rounded-lg gap-1.5"
-              onClick={handleBackfill}
-              disabled={
-                !backfillFrom ||
-                !backfillTo ||
-                backfillFrom > backfillTo ||
-                backfillStage === "submitting"
-              }
-            >
-              {backfillStage === "submitting" ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Запуск...
-                </>
-              ) : (
-                <>
-                  <CalendarRange className="h-3.5 w-3.5" />
-                  Загрузить
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {backfillDialog}
     </div>
   );
 }
