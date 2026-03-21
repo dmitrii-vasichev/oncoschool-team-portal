@@ -21,13 +21,18 @@ from app.services.getcourse_service import GetCourseService
 logger = logging.getLogger(__name__)
 
 REPORT_SCHEDULE_KEY = "report_schedule"
-DEFAULT_SCHEDULE = {"time": "05:45", "timezone": "Europe/Moscow", "enabled": True}
+DEFAULT_SCHEDULE = {
+    "collection_time": "05:45",
+    "send_time": "06:30",
+    "timezone": "Europe/Moscow",
+    "enabled": True,
+}
 CLEANUP_RETENTION_DAYS = 180
 BACKFILL_PROGRESS_KEY = "backfill_progress"
 
 
 class ReportSchedulerService:
-    """Runs daily GetCourse data collection at a configurable time."""
+    """Runs daily GetCourse data collection and sends report at separate times."""
 
     def __init__(self, bot: Bot, session_maker: async_sessionmaker) -> None:
         self.bot = bot
@@ -38,9 +43,12 @@ class ReportSchedulerService:
         self._target_repo = TelegramTargetRepository()
         self._getcourse_service = GetCourseService()
         self._collected_today: date | None = None
+        self._sent_today: date | None = None
+        self._last_collected_metric = None
+        self._last_collected_date: date | None = None
 
     def start(self) -> None:
-        """Start the scheduler with collection check and cleanup jobs."""
+        """Start the scheduler with collection check, send check and cleanup jobs."""
         if self.scheduler.running:
             logger.info("ReportSchedulerService already running")
             return
@@ -50,6 +58,13 @@ class ReportSchedulerService:
             "interval",
             minutes=1,
             id="report_check_and_collect",
+            replace_existing=True,
+        )
+        self.scheduler.add_job(
+            self._check_and_send,
+            "interval",
+            minutes=1,
+            id="report_check_and_send",
             replace_existing=True,
         )
         self.scheduler.add_job(
@@ -79,13 +94,32 @@ class ReportSchedulerService:
             async with self.session_maker() as session:
                 setting = await self._app_settings_repo.get(session, REPORT_SCHEDULE_KEY)
                 if setting and isinstance(setting.value, dict):
-                    return setting.value
+                    val = setting.value
+                    # Migrate legacy single 'time' field
+                    if "collection_time" not in val:
+                        old_time = val.get("time", "05:45")
+                        return {
+                            "collection_time": old_time,
+                            "send_time": "06:30",
+                            "timezone": val.get("timezone", "Europe/Moscow"),
+                            "enabled": val.get("enabled", True),
+                        }
+                    return val
         except Exception as e:
             logger.error("Failed to load report schedule: %s", e)
         return dict(DEFAULT_SCHEDULE)
 
+    @staticmethod
+    def _parse_time(time_str: str, default_h: int = 5, default_m: int = 45) -> tuple[int, int]:
+        """Parse 'HH:MM' string into (hour, minute) tuple."""
+        try:
+            parts = time_str.split(":")
+            return int(parts[0]), int(parts[1])
+        except (ValueError, IndexError, AttributeError):
+            return default_h, default_m
+
     async def _check_and_collect(self) -> None:
-        """Check if it's time to collect and trigger if so."""
+        """Check if it's collection_time and trigger data collection."""
         try:
             schedule = await self._get_schedule()
 
@@ -101,22 +135,16 @@ class ReportSchedulerService:
             now = datetime.now(tz)
             today = now.date()
 
-            # Already collected today
             if self._collected_today == today:
                 return
 
-            # Parse configured time
-            time_str = schedule.get("time", "05:45")
-            try:
-                parts = time_str.split(":")
-                target_hour, target_minute = int(parts[0]), int(parts[1])
-            except (ValueError, IndexError):
-                target_hour, target_minute = 5, 45
+            target_hour, target_minute = self._parse_time(
+                schedule.get("collection_time", "05:45"), 5, 45
+            )
 
             if now.hour != target_hour or now.minute != target_minute:
                 return
 
-            # Time to collect yesterday's data
             yesterday = today - timedelta(days=1)
             logger.info("ReportScheduler: collecting metrics for %s", yesterday)
 
@@ -125,13 +153,76 @@ class ReportSchedulerService:
             )
 
             self._collected_today = today
+            self._last_collected_metric = metric
+            self._last_collected_date = yesterday
             logger.info("ReportScheduler: collection completed for %s", yesterday)
-
-            # Send notification
-            await self._send_report_notification(metric, yesterday)
 
         except Exception as e:
             logger.error("ReportScheduler: collection failed: %s", e)
+
+    async def _check_and_send(self) -> None:
+        """Check if it's send_time and send the report notification.
+
+        If collection hasn't finished yet, wait — the notification will be
+        sent as soon as collection completes (checked every minute).
+        """
+        try:
+            schedule = await self._get_schedule()
+
+            if not schedule.get("enabled", True):
+                return
+
+            tz_name = schedule.get("timezone", "Europe/Moscow")
+            try:
+                tz = ZoneInfo(tz_name)
+            except Exception:
+                tz = ZoneInfo("Europe/Moscow")
+
+            now = datetime.now(tz)
+            today = now.date()
+
+            # Already sent today
+            if self._sent_today == today:
+                return
+
+            target_hour, target_minute = self._parse_time(
+                schedule.get("send_time", "06:30"), 6, 30
+            )
+
+            # Not yet send_time
+            if now.hour < target_hour or (now.hour == target_hour and now.minute < target_minute):
+                return
+
+            # send_time has arrived (or passed) — but collection must be done first
+            if self._collected_today != today:
+                # Collection hasn't completed yet — wait for it
+                return
+
+            # Collection done, send the report
+            metric = self._last_collected_metric
+            target_date = self._last_collected_date
+
+            if metric is None or target_date is None:
+                # Fallback: read from DB
+                yesterday = today - timedelta(days=1)
+                async with self.session_maker() as session:
+                    metric = await self._metrics_repo.get_by_date(
+                        session, "getcourse", yesterday
+                    )
+                target_date = yesterday
+                if metric is None:
+                    logger.warning("ReportScheduler: no metric found for %s, skipping send", yesterday)
+                    self._sent_today = today
+                    return
+
+            await self._send_report_notification(metric, target_date)
+            self._sent_today = today
+            self._last_collected_metric = None
+            self._last_collected_date = None
+            logger.info("ReportScheduler: report sent for %s", target_date)
+
+        except Exception as e:
+            logger.error("ReportScheduler: send failed: %s", e)
 
     async def _send_report_notification(
         self, metric, target_date: date

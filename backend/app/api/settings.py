@@ -785,7 +785,13 @@ async def update_ai_settings(
 
 
 REPORT_SCHEDULE_KEY = "report_schedule"
-DEFAULT_REPORT_SCHEDULE = {"time": "05:45", "timezone": "Europe/Moscow", "enabled": True}
+DEFAULT_REPORT_SCHEDULE = {
+    "collection_time": "05:45",
+    "send_time": "06:30",
+    "timezone": "Europe/Moscow",
+    "enabled": True,
+}
+MIN_SCHEDULE_GAP_MINUTES = 30
 
 
 def _get_report_scheduler(request: Request):
@@ -833,6 +839,27 @@ async def update_getcourse_credentials(
 # ── Report Schedule ──
 
 
+def _migrate_legacy_schedule(val: dict) -> dict:
+    """Migrate old single 'time' field to collection_time + send_time."""
+    if "collection_time" in val:
+        return val
+    old_time = val.get("time", "05:45")
+    h, m = _parse_hhmm(old_time)
+    send_h, send_m = h, m + MIN_SCHEDULE_GAP_MINUTES
+    if send_m >= 60:
+        send_h += send_m // 60
+        send_m = send_m % 60
+    if send_h >= 24:
+        send_h = 23
+        send_m = 59
+    return {
+        "collection_time": old_time,
+        "send_time": f"{send_h:02d}:{send_m:02d}",
+        "timezone": val.get("timezone", "Europe/Moscow"),
+        "enabled": val.get("enabled", True),
+    }
+
+
 @router.get("/report-schedule", response_model=ReportScheduleResponse)
 async def get_report_schedule(
     member: TeamMember = Depends(require_admin),
@@ -842,9 +869,10 @@ async def get_report_schedule(
     setting = await app_settings_repo.get(session, REPORT_SCHEDULE_KEY)
     if not setting:
         return ReportScheduleResponse(**DEFAULT_REPORT_SCHEDULE)
-    val = setting.value
+    val = _migrate_legacy_schedule(setting.value)
     return ReportScheduleResponse(
-        time=val.get("time", "05:45"),
+        collection_time=val.get("collection_time", "05:45"),
+        send_time=val.get("send_time", "06:30"),
         timezone=val.get("timezone", "Europe/Moscow"),
         enabled=val.get("enabled", True),
     )
@@ -858,17 +886,36 @@ async def update_report_schedule(
     session: AsyncSession = Depends(get_session),
 ):
     """Update report schedule. Admin only."""
-    # Validate time format
+    # Validate time formats
     try:
-        _parse_hhmm(data.time)
+        c_h, c_m = _parse_hhmm(data.collection_time)
     except (TypeError, ValueError):
         raise HTTPException(
             status_code=400,
-            detail="Invalid time format. Use HH:MM (00:00 — 23:59)",
+            detail="Invalid collection_time format. Use HH:MM (00:00 — 23:59)",
+        )
+    try:
+        s_h, s_m = _parse_hhmm(data.send_time)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid send_time format. Use HH:MM (00:00 — 23:59)",
+        )
+
+    # send_time must be after collection_time
+    collection_minutes = c_h * 60 + c_m
+    send_minutes = s_h * 60 + s_m
+    gap = send_minutes - collection_minutes
+
+    if gap < MIN_SCHEDULE_GAP_MINUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"send_time must be at least {MIN_SCHEDULE_GAP_MINUTES} minutes after collection_time",
         )
 
     schedule_data = {
-        "time": data.time,
+        "collection_time": data.collection_time,
+        "send_time": data.send_time,
         "timezone": data.timezone,
         "enabled": data.enabled,
     }
