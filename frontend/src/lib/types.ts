@@ -508,6 +508,11 @@ export interface CollectResponse {
   metric: DailyMetric | null;
 }
 
+export interface BackfillResponse {
+  status: string;
+  total_dates: number;
+}
+
 export interface ReportSchedule {
   time: string;
   timezone: string;
