@@ -395,9 +395,11 @@ export default function ReportsPage() {
 
   const formatBackfillDates = (status: BackfillStatus) => {
     if (!status.date_from || !status.date_to) return "";
-    const from = new Date(status.date_from).toLocaleDateString("ru-RU");
-    const to = new Date(status.date_to).toLocaleDateString("ru-RU");
-    return `${from} — ${to}`;
+    const formatDate = (iso: string) => {
+      const [y, m, d] = iso.split("-");
+      return `${d}.${m}.${y}`;
+    };
+    return `${formatDate(status.date_from)} — ${formatDate(status.date_to)}`;
   };
 
   const dismissBackfillStatus = () => {
@@ -960,7 +962,7 @@ export default function ReportsPage() {
               {sortedMetrics.map((m) => (
                 <tr key={m.id} className="hover:bg-muted/30">
                   <td className="px-2 py-2 text-sm font-medium">
-                    {new Date(m.metric_date).toLocaleDateString("ru-RU")}
+                    {(() => { const [y, mo, d] = m.metric_date.split("-"); return `${d}.${mo}.${y}`; })()}
                   </td>
                   <td className="px-2 py-2 text-right font-mono text-xs">
                     {m.users_count.toLocaleString("ru-RU")}
