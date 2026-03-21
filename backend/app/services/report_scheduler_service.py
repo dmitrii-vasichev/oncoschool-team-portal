@@ -224,45 +224,27 @@ class ReportSchedulerService:
     async def run_backfill(
         self, date_from: date, date_to: date, collected_by_id=None
     ) -> None:
-        """Background backfill: collect metrics for each date in range."""
-        import asyncio
+        """Background backfill: collect metrics for the entire date range.
 
+        Uses range-based collection — only 3 API requests to GetCourse
+        (users, payments, deals) for the whole period, then groups by date.
+        """
         total = (date_to - date_from).days + 1
         collected = 0
-        skipped = 0
         failed = 0
 
         logger.info("Backfill started: %s to %s (%d dates)", date_from, date_to, total)
 
-        for i in range(total):
-            current_date = date_from + timedelta(days=i)
-            try:
-                async with self.session_maker() as session:
-                    existing = await self._metrics_repo.get_by_date(
-                        session, "getcourse", current_date
+        try:
+            async with self.session_maker() as session:
+                async with session.begin():
+                    result = await self._getcourse_service.collect_metrics_range(
+                        session, date_from, date_to, collected_by_id
                     )
-                    if existing:
-                        skipped += 1
-                        continue
-
-                async with self.session_maker() as session:
-                    async with session.begin():
-                        await self._getcourse_service.collect_metrics(
-                            session, current_date, collected_by_id
-                        )
-                collected += 1
-                logger.info("Backfill: collected %s (%d/%d)", current_date, i + 1, total)
-
-                # Rate limit: 5 second pause between dates
-                await asyncio.sleep(5)
-
-            except Exception as e:
-                failed += 1
-                logger.error("Backfill: failed for %s: %s", current_date, e)
-                # On rate limit, wait longer before next attempt
-                if "много запросов" in str(e).lower() or "rate" in str(e).lower():
-                    logger.info("Rate limited, waiting 30s before next date")
-                    await asyncio.sleep(30)
+            collected = result["collected"]
+        except Exception as e:
+            failed = total
+            logger.error("Backfill failed: %s", e)
 
         # Save progress to app_settings
         try:
@@ -272,10 +254,9 @@ class ReportSchedulerService:
                         session,
                         BACKFILL_PROGRESS_KEY,
                         {
-                            "status": "completed",
+                            "status": "completed" if failed == 0 else "failed",
                             "total_dates": total,
                             "collected": collected,
-                            "skipped": skipped,
                             "failed": failed,
                             "completed_at": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
                         },
@@ -284,6 +265,6 @@ class ReportSchedulerService:
             logger.error("Failed to save backfill progress: %s", e)
 
         logger.info(
-            "Backfill completed: total=%d, collected=%d, skipped=%d, failed=%d",
-            total, collected, skipped, failed,
+            "Backfill completed: total=%d, collected=%d, failed=%d",
+            total, collected, failed,
         )
