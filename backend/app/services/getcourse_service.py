@@ -58,18 +58,14 @@ class GetCourseService:
         url = f"{base_url}/pl/api/account/{export_type}"
         params: dict = {"key": api_key}
 
-        if export_type == "users":
-            params["exported_at[from]"] = date_from
-            params["exported_at[to]"] = date_to
-        else:
-            # payments and deals use created_at
-            params["created_at[from]"] = date_from
-            params["created_at[to]"] = date_to
+        # All export types use created_at filter
+        params["created_at[from]"] = date_from
+        params["created_at[to]"] = date_to
 
         for attempt in range(MAX_RETRIES):
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.post(url, data=params)
+                    response = await client.get(url, params=params)
                     response.raise_for_status()
                     data = response.json()
 

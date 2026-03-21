@@ -399,5 +399,71 @@ class TestBackfillLogic(unittest.IsolatedAsyncioTestCase):
             await service.run_backfill(date(2026, 3, 19), date(2026, 3, 19))
 
 
+class TestRequestExportHTTPMethod(unittest.IsolatedAsyncioTestCase):
+    """Regression: _request_export must use GET with query params (not POST body)."""
+
+    async def test_request_export_uses_get_with_query_params(self) -> None:
+        """GetCourse API requires GET with filters as query parameters."""
+        service = GetCourseService()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True,
+            "info": {"export_id": 42},
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            export_id = await service._request_export(
+                "https://school.getcourse.ru", "secret", "users", "2026-03-13", "2026-03-19"
+            )
+
+        self.assertEqual(export_id, 42)
+        mock_client.get.assert_awaited_once()
+        # Must NOT call post
+        mock_client.post.assert_not_awaited()
+
+        call_kwargs = mock_client.get.await_args
+        sent_params = call_kwargs.kwargs.get("params") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs.get("params")
+        self.assertIn("created_at[from]", sent_params)
+        self.assertIn("created_at[to]", sent_params)
+        # exported_at must NOT be used
+        self.assertNotIn("exported_at[from]", sent_params)
+
+    async def test_request_export_uses_created_at_for_all_types(self) -> None:
+        """All export types (users, payments, deals) must use created_at filter."""
+        service = GetCourseService()
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True,
+            "info": {"export_id": 1},
+        })
+
+        for export_type in ("users", "payments", "deals"):
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+
+            with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+                await service._request_export(
+                    "https://school.getcourse.ru", "secret", export_type, "2026-03-01", "2026-03-19"
+                )
+
+            call_kwargs = mock_client.get.await_args
+            sent_params = call_kwargs.kwargs.get("params")
+            self.assertIn("created_at[from]", sent_params, f"{export_type} must use created_at[from]")
+            self.assertIn("created_at[to]", sent_params, f"{export_type} must use created_at[to]")
+
+
 if __name__ == "__main__":
     unittest.main()
