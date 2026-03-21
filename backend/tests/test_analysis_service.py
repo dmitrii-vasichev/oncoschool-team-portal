@@ -221,5 +221,20 @@ class TestAnalysisOutputTokens(unittest.TestCase):
         self.assertGreater(ANALYSIS_MAX_OUTPUT_TOKENS, OPENAI_DEFAULT_MAX_TOKENS)
 
 
+class TestFeatureKeyMatchesDB(unittest.TestCase):
+    """Regression test for #145: FEATURE_KEY must match the DB seed."""
+
+    def test_feature_key_matches_migration_seed(self):
+        """FEATURE_KEY must be 'telegram_analysis' (as seeded in migration 026)."""
+        from app.services.analysis_service import FEATURE_KEY
+
+        self.assertEqual(
+            FEATURE_KEY,
+            "telegram_analysis",
+            "FEATURE_KEY must match the ai_feature_config seed in migration 026. "
+            "Mismatch causes analysis to ignore per-feature AI config and fall back to default.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
