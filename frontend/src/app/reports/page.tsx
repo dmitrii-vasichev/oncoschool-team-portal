@@ -420,7 +420,7 @@ export default function ReportsPage() {
                 Загрузка исторических данных...
               </p>
               <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
-                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates} дн.) — обычно занимает ~{Math.max(15, backfillStatus.total_dates * 10)} минут
+                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates ?? 0} дн.) — обычно занимает ~{Math.max(15, (backfillStatus.total_dates ?? 0) * 10)} минут
               </p>
             </div>
           </div>
@@ -435,7 +435,7 @@ export default function ReportsPage() {
             <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                Загрузка завершена: {backfillStatus.collected} из {backfillStatus.total_dates} дн.
+                Загрузка завершена: {backfillStatus.collected ?? 0} из {backfillStatus.total_dates ?? 0} дн.
               </p>
               <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
                 Период: {formatBackfillDates(backfillStatus)}
