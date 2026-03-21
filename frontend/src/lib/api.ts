@@ -64,6 +64,7 @@ import type {
   DailyMetricWithDelta,
   ReportSummary,
   CollectResponse,
+  BackfillResponse,
   ReportSchedule,
   GetCourseCredentials,
 } from "./types";
@@ -1114,6 +1115,13 @@ class ApiClient {
     return this.request<CollectResponse>("/api/reports/getcourse/collect", {
       method: "POST",
       body: JSON.stringify({ date }),
+    });
+  }
+
+  async backfillReports(dateFrom: string, dateTo: string): Promise<BackfillResponse> {
+    return this.request<BackfillResponse>("/api/reports/getcourse/backfill", {
+      method: "POST",
+      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
     });
   }
 

@@ -5,8 +5,16 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/shared/Toast";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { useReports } from "@/hooks/useReports";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { api } from "@/lib/api";
 import type { DailyMetric, GetCourseCredentials } from "@/lib/types";
 import {
@@ -24,6 +32,7 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  CalendarRange,
 } from "lucide-react";
 import {
   Area,
@@ -187,12 +196,23 @@ export default function ReportsPage() {
   const [days, setDays] = useState(30);
   const { summary, today, loading, error, refetch } = useReports(days);
   const { toastSuccess, toastError } = useToast();
+  const { user } = useCurrentUser();
+  const isAdmin = user?.role === "admin";
   const [credentials, setCredentials] = useState<GetCourseCredentials | null>(null);
   const [credentialsLoading, setCredentialsLoading] = useState(true);
   type CollectionStage = "idle" | "requesting" | "collecting" | "done" | "error";
   const [stage, setStage] = useState<CollectionStage>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [collectError, setCollectError] = useState<string | null>(null);
+
+  // Backfill state
+  const [backfillOpen, setBackfillOpen] = useState(false);
+  const [backfillFrom, setBackfillFrom] = useState("");
+  const [backfillTo, setBackfillTo] = useState("");
+  type BackfillStage = "idle" | "submitting" | "done" | "error";
+  const [backfillStage, setBackfillStage] = useState<BackfillStage>("idle");
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   const ESTIMATED_DURATION = 15 * 60; // 15 minutes in seconds
 
@@ -252,6 +272,35 @@ export default function ReportsPage() {
       toastError(msg);
       // Auto-dismiss error after 5 seconds
       setTimeout(() => setStage("idle"), 5000);
+    }
+  };
+
+  const handleBackfill = async () => {
+    if (!backfillFrom || !backfillTo) return;
+    if (backfillFrom > backfillTo) {
+      toastError("Дата «от» должна быть раньше даты «до»");
+      return;
+    }
+    setBackfillStage("submitting");
+    setBackfillError(null);
+    try {
+      const result = await api.backfillReports(backfillFrom, backfillTo);
+      setBackfillStage("done");
+      setBackfillResult(
+        `Запущена загрузка данных за ${result.total_dates} ${result.total_dates === 1 ? "день" : result.total_dates < 5 ? "дня" : "дней"}`
+      );
+      toastSuccess("Загрузка исторических данных запущена");
+      setBackfillOpen(false);
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => {
+        setBackfillStage("idle");
+        setBackfillResult(null);
+      }, 8000);
+    } catch (e) {
+      setBackfillStage("error");
+      const msg = e instanceof Error ? e.message : "Ошибка запуска загрузки";
+      setBackfillError(msg);
+      toastError(msg);
     }
   };
 
@@ -387,9 +436,49 @@ export default function ReportsPage() {
                 </>
               )}
             </Button>
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-lg gap-1.5"
+                onClick={() => setBackfillOpen(true)}
+              >
+                <CalendarRange className="h-3.5 w-3.5" />
+                Загрузить историю
+              </Button>
+            )}
           </div>
         </div>
       </section>
+
+      {/* Backfill result banner */}
+      {backfillStage === "done" && backfillResult && (
+        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                {backfillResult}
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
+                Сбор идёт в фоне. Данные появятся на странице по мере загрузки.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Backfill error banner */}
+      {backfillStage === "error" && backfillError && (
+        <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-destructive/20 bg-destructive/5 p-4">
+          <div className="flex items-center gap-3">
+            <XCircle className="h-5 w-5 text-destructive shrink-0" />
+            <p className="text-sm font-medium text-destructive">
+              {backfillError}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* KPI Cards */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -746,6 +835,92 @@ export default function ReportsPage() {
           </table>
         </div>
       </section>
+
+      {/* Backfill Dialog */}
+      <Dialog
+        open={backfillOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBackfillOpen(false);
+            setBackfillStage("idle");
+            setBackfillError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-heading">
+              Загрузка исторических данных
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Укажите период, за который нужно загрузить данные из GetCourse. Загрузка выполняется в фоне.
+          </p>
+          <div className="grid grid-cols-2 gap-4 mt-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">От</label>
+              <DatePicker
+                value={backfillFrom}
+                onChange={setBackfillFrom}
+                placeholder="Начало"
+                clearable
+                yearRange={[2025, 2027]}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">До</label>
+              <DatePicker
+                value={backfillTo}
+                onChange={setBackfillTo}
+                placeholder="Конец"
+                clearable
+                yearRange={[2025, 2027]}
+              />
+            </div>
+          </div>
+          {backfillFrom && backfillTo && backfillFrom > backfillTo && (
+            <p className="text-xs text-destructive mt-1">
+              Дата «от» должна быть раньше даты «до»
+            </p>
+          )}
+          {backfillStage === "error" && backfillError && (
+            <p className="text-xs text-destructive mt-1">{backfillError}</p>
+          )}
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setBackfillOpen(false)}
+            >
+              Отмена
+            </Button>
+            <Button
+              size="sm"
+              className="rounded-lg gap-1.5"
+              onClick={handleBackfill}
+              disabled={
+                !backfillFrom ||
+                !backfillTo ||
+                backfillFrom > backfillTo ||
+                backfillStage === "submitting"
+              }
+            >
+              {backfillStage === "submitting" ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Запуск...
+                </>
+              ) : (
+                <>
+                  <CalendarRange className="h-3.5 w-3.5" />
+                  Загрузить
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
