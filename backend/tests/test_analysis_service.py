@@ -4,7 +4,15 @@ import unittest
 from datetime import datetime
 from types import SimpleNamespace
 
-from app.services.analysis_service import AnalysisService, CHARS_PER_TOKEN
+from app.services.analysis_service import (
+    AnalysisService,
+    CHARS_PER_TOKEN_BY_PROVIDER,
+    DEFAULT_CONTEXT_WINDOWS,
+    FALLBACK_CHARS_PER_TOKEN,
+    FALLBACK_MAX_INPUT_TOKENS,
+    MAX_INPUT_TOKENS_PER_REQUEST,
+    OUTPUT_RESERVE_RATIO,
+)
 
 
 class TestFormatContent(unittest.TestCase):
@@ -86,17 +94,72 @@ class TestSplitContent(unittest.TestCase):
 
 
 class TestTokenEstimation(unittest.TestCase):
-    """Tests for token estimation constants."""
+    """Tests for per-provider token estimation constants."""
 
-    def test_chars_per_token_reasonable(self):
-        # Russian text: ~4 chars per token
-        self.assertEqual(CHARS_PER_TOKEN, 4)
+    def test_openai_chars_per_token_lower_for_cyrillic(self):
+        # OpenAI BPE is less efficient with Cyrillic
+        self.assertLessEqual(CHARS_PER_TOKEN_BY_PROVIDER["openai"], 3.0)
 
-    def test_estimated_tokens(self):
-        text = "Тестовый текст на русском языке для проверки оценки токенов."
-        estimated = len(text) // CHARS_PER_TOKEN
-        self.assertGreater(estimated, 0)
-        self.assertLess(estimated, len(text))
+    def test_all_providers_have_chars_per_token(self):
+        for provider in DEFAULT_CONTEXT_WINDOWS:
+            self.assertIn(provider, CHARS_PER_TOKEN_BY_PROVIDER)
+
+    def test_fallback_is_conservative(self):
+        # Fallback should use the lowest (most conservative) estimate
+        min_cpt = min(CHARS_PER_TOKEN_BY_PROVIDER.values())
+        self.assertLessEqual(FALLBACK_CHARS_PER_TOKEN, min_cpt)
+
+
+class TestTPMLimitChunking(unittest.TestCase):
+    """Regression tests for #134: chunks must respect TPM rate limits."""
+
+    def test_openai_chunk_size_under_tpm_limit(self):
+        """With 44K tokens of content, OpenAI must produce multiple chunks."""
+        # Simulate ~44K tokens of Russian text at OpenAI's char-per-token rate
+        chars_per_token = CHARS_PER_TOKEN_BY_PROVIDER["openai"]
+        content_chars = int(44_000 * chars_per_token)  # ~110K chars
+        text = "А" * content_chars  # Cyrillic filler
+
+        # Calculate max_input_chars the same way run_analysis does
+        context_window = DEFAULT_CONTEXT_WINDOWS["openai"]
+        context_based = int(context_window * (1 - OUTPUT_RESERVE_RATIO))
+        tpm_based = MAX_INPUT_TOKENS_PER_REQUEST["openai"]
+        max_input_tokens = min(context_based, tpm_based)
+        max_input_chars = int(max_input_tokens * chars_per_token)
+
+        # TPM limit must be the binding constraint for OpenAI
+        self.assertEqual(max_input_tokens, tpm_based)
+        self.assertLess(tpm_based, context_based)
+
+        chunks = AnalysisService._split_content(text, max_input_chars)
+
+        # Must split into >1 chunk to stay under TPM limit
+        self.assertGreater(len(chunks), 1)
+
+        # Each chunk must be within the limit
+        for chunk in chunks:
+            self.assertLessEqual(len(chunk), max_input_chars)
+
+    def test_openai_max_tokens_per_request_below_30k_tpm(self):
+        """MAX_INPUT_TOKENS_PER_REQUEST for OpenAI must stay below 30K TPM."""
+        self.assertLessEqual(MAX_INPUT_TOKENS_PER_REQUEST["openai"], 30_000)
+
+    def test_anthropic_uses_context_window_not_tpm(self):
+        """Anthropic has high TPM limits — context window should be binding."""
+        context_based = int(DEFAULT_CONTEXT_WINDOWS["anthropic"] * (1 - OUTPUT_RESERVE_RATIO))
+        tpm_based = MAX_INPUT_TOKENS_PER_REQUEST["anthropic"]
+        effective = min(context_based, tpm_based)
+        # For Anthropic, context window is the tighter constraint
+        self.assertEqual(effective, context_based)
+
+    def test_unknown_provider_uses_conservative_defaults(self):
+        """Unknown providers should get conservative (safe) limits."""
+        cpt = CHARS_PER_TOKEN_BY_PROVIDER.get("unknown_provider", FALLBACK_CHARS_PER_TOKEN)
+        max_tokens = MAX_INPUT_TOKENS_PER_REQUEST.get("unknown_provider", FALLBACK_MAX_INPUT_TOKENS)
+
+        # Conservative: low chars-per-token → more chunks; low max tokens → smaller chunks
+        self.assertLessEqual(cpt, 3.0)
+        self.assertLessEqual(max_tokens, 30_000)
 
 
 if __name__ == "__main__":

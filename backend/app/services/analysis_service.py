@@ -26,8 +26,15 @@ from app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
 
-# Token estimation: ~4 chars per token for Russian text
-CHARS_PER_TOKEN = 4
+# Token estimation: chars per token varies by provider and script.
+# OpenAI BPE tokenizer is less efficient with Cyrillic: ~2.5 chars/token.
+# Anthropic/Gemini tokenizers handle Cyrillic better: ~3.5 chars/token.
+CHARS_PER_TOKEN_BY_PROVIDER = {
+    "openai": 2.5,
+    "anthropic": 3.5,
+    "gemini": 3.5,
+}
+FALLBACK_CHARS_PER_TOKEN = 2.5  # Conservative default
 
 # Reserve 30% of context for output
 OUTPUT_RESERVE_RATIO = 0.30
@@ -39,6 +46,17 @@ DEFAULT_CONTEXT_WINDOWS = {
     "gemini": 1_000_000,
 }
 FALLBACK_CONTEXT_WINDOW = 100_000
+
+# Maximum input tokens per single API request.
+# Prevents exceeding TPM (tokens-per-minute) rate limits on lower-tier plans.
+# OpenAI Tier 1 gpt-4o: 30K TPM — use 20K to leave headroom for
+# system prompt, output tokens, and other requests within the same minute.
+MAX_INPUT_TOKENS_PER_REQUEST = {
+    "openai": 20_000,
+    "anthropic": 150_000,
+    "gemini": 800_000,
+}
+FALLBACK_MAX_INPUT_TOKENS = 20_000
 
 # Chunk overlap
 CHUNK_OVERLAP_CHARS = 500
@@ -158,8 +176,15 @@ class AnalysisService:
                 })
 
             context_window = DEFAULT_CONTEXT_WINDOWS.get(provider_name, FALLBACK_CONTEXT_WINDOW)
-            max_input_tokens = int(context_window * (1 - OUTPUT_RESERVE_RATIO))
-            max_input_chars = max_input_tokens * CHARS_PER_TOKEN
+            context_based_tokens = int(context_window * (1 - OUTPUT_RESERVE_RATIO))
+            tpm_based_tokens = MAX_INPUT_TOKENS_PER_REQUEST.get(
+                provider_name, FALLBACK_MAX_INPUT_TOKENS
+            )
+            max_input_tokens = min(context_based_tokens, tpm_based_tokens)
+            chars_per_token = CHARS_PER_TOKEN_BY_PROVIDER.get(
+                provider_name, FALLBACK_CHARS_PER_TOKEN
+            )
+            max_input_chars = int(max_input_tokens * chars_per_token)
             chunks = self._split_content(formatted, max_input_chars)
 
             if progress_callback:
@@ -199,16 +224,8 @@ class AnalysisService:
                         "progress": 90,
                     })
 
-                synthesis_input = "\n\n---\n\n".join(
-                    f"## Partial analysis {i+1}/{len(chunk_results)}\n\n{r}"
-                    for i, r in enumerate(chunk_results)
-                )
-                user_prompt = (
-                    f"## Original analysis instructions\n\n{prompt_text}\n\n"
-                    f"## Partial results to consolidate\n\n{synthesis_input}"
-                )
-                final_result = await self._ai._complete_with_retry(
-                    provider, SYNTHESIS_SYSTEM_PROMPT, user_prompt
+                final_result = await self._synthesize_results(
+                    provider, chunk_results, prompt_text, max_input_chars
                 )
             else:
                 final_result = chunk_results[0]
@@ -256,6 +273,57 @@ class AnalysisService:
                     "progress": 0,
                 })
             raise
+
+    async def _synthesize_results(
+        self,
+        provider,
+        chunk_results: list[str],
+        prompt_text: str,
+        max_input_chars: int,
+    ) -> str:
+        """Merge partial analysis results, chunking synthesis if needed."""
+        synthesis_input = "\n\n---\n\n".join(
+            f"## Partial analysis {i+1}/{len(chunk_results)}\n\n{r}"
+            for i, r in enumerate(chunk_results)
+        )
+        user_prompt = (
+            f"## Original analysis instructions\n\n{prompt_text}\n\n"
+            f"## Partial results to consolidate\n\n{synthesis_input}"
+        )
+
+        if len(user_prompt) <= max_input_chars:
+            return await self._ai._complete_with_retry(
+                provider, SYNTHESIS_SYSTEM_PROMPT, user_prompt
+            )
+
+        # Synthesis input too large — merge in pairs hierarchically
+        logger.info(
+            "Synthesis input too large (%d chars, limit %d), merging hierarchically",
+            len(user_prompt), max_input_chars,
+        )
+        results = list(chunk_results)
+        while len(results) > 1:
+            merged: list[str] = []
+            for i in range(0, len(results), 2):
+                if i + 1 < len(results):
+                    pair_input = (
+                        f"## Partial analysis A\n\n{results[i]}\n\n---\n\n"
+                        f"## Partial analysis B\n\n{results[i+1]}"
+                    )
+                    pair_prompt = (
+                        f"## Original analysis instructions\n\n{prompt_text}\n\n"
+                        f"## Partial results to consolidate\n\n{pair_input}"
+                    )
+                    merged.append(
+                        await self._ai._complete_with_retry(
+                            provider, SYNTHESIS_SYSTEM_PROMPT, pair_prompt
+                        )
+                    )
+                else:
+                    merged.append(results[i])
+            results = merged
+
+        return results[0]
 
     @staticmethod
     def _format_content(content_items, channel_names: dict[str, str]) -> str:
