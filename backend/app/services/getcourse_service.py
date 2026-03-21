@@ -27,6 +27,10 @@ RATE_LIMIT_MAX_DELAY = 120  # max seconds to wait on rate limit (exponential bac
 MAX_RATE_LIMIT_RETRIES = 30  # max rate-limit waits (separate from error retries)
 EXPORT_PAUSE = 30  # seconds between sequential export requests
 
+# Scaled timeout for multi-day ranges
+POLL_SECONDS_PER_DAY = 600  # 10 min per day in range
+POLL_MAX_TIMEOUT_CAP = 7200  # absolute cap: 2 hours
+
 
 
 class GetCourseService:
@@ -283,32 +287,54 @@ class GetCourseService:
             return await self._get_creds(session)
 
     async def _request_and_poll_export(
-        self, base_url: str, api_key: str, export_type: str, date_from: str, date_to: str
+        self, base_url: str, api_key: str, export_type: str,
+        date_from: str, date_to: str,
+        timeout: int = POLL_MAX_WAIT_SECONDS,
     ) -> list[dict]:
         """Request a single export and poll until ready before returning."""
         export_id = await self._request_export(
             base_url, api_key, export_type, date_from, date_to
         )
-        return await self._poll_export(base_url, api_key, export_id)
+        return await self._poll_export(base_url, api_key, export_id, timeout=timeout)
+
+    @staticmethod
+    def _scaled_timeout(date_from: str, date_to: str) -> int:
+        """Calculate poll timeout scaled to the date range size.
+
+        Single-day exports keep the default 1200s (20 min).
+        Multi-day ranges get 600s (10 min) per day, capped at 7200s (2h).
+        """
+        try:
+            d_from = date.fromisoformat(date_from)
+            d_to = date.fromisoformat(date_to)
+            days = max((d_to - d_from).days + 1, 1)
+        except (ValueError, TypeError):
+            days = 1
+        return min(max(POLL_MAX_WAIT_SECONDS, days * POLL_SECONDS_PER_DAY), POLL_MAX_TIMEOUT_CAP)
 
     async def _request_and_poll_exports(
         self, base_url: str, api_key: str, date_from: str, date_to: str
     ) -> tuple[list[dict], list[dict], list[dict]]:
         """Request and poll 3 exports sequentially with pauses between them."""
+        timeout = self._scaled_timeout(date_from, date_to)
+        logger.info(
+            "Export timeout for range %s..%s: %ds", date_from, date_to, timeout
+        )
+
         user_rows = await self._request_and_poll_export(
-            base_url, api_key, "users", date_from, date_to
+            base_url, api_key, "users", date_from, date_to, timeout=timeout
         )
         logger.info("Pausing %ds before next export request...", EXPORT_PAUSE)
         await asyncio.sleep(EXPORT_PAUSE)
 
         payment_rows = await self._request_and_poll_export(
-            base_url, api_key, "payments", date_from, date_to
+            base_url, api_key, "payments", date_from, date_to, timeout=timeout
         )
         logger.info("Pausing %ds before next export request...", EXPORT_PAUSE)
         await asyncio.sleep(EXPORT_PAUSE)
 
         deal_rows = await self._request_and_poll_export(
-            base_url, api_key, "deals", date_from, date_to
+            base_url, api_key, "deals", date_from, date_to, timeout=timeout
         )
         return user_rows, payment_rows, deal_rows
 
