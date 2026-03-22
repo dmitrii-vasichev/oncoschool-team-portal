@@ -395,10 +395,10 @@ class GetCourseService:
     ) -> tuple[list, list, list]:
         """Request all 3 exports first, then fetch all results (matching n8n flow).
 
-        Phase 1: Request users → pause → request payments → pause → request deals
-        Phase 2: Fetch users (had 2×pause to process) → fetch payments → fetch deals
+        Phase 1: Request users → pause → request payments → pause → request deals → pause
+        Phase 2: Fetch users (had 3×pause) → fetch payments (had 2×pause) → fetch deals (had 1×pause)
 
-        This gives each export maximum processing time on GetCourse side.
+        Every export gets at least one full pause to be processed by GetCourse.
         No long polling in Phase 2 — just fetch (with a few quick retries if not ready).
         """
         export_types = ["users", "payments", "deals"]
@@ -430,16 +430,16 @@ class GetCourseService:
                 export_id, export_type, step,
             )
 
-            # Pause between requests (not after the last one)
-            if idx < len(export_types) - 1:
-                logger.info("Waiting %ds before next export request...", pause_seconds)
-                await self._sleep_with_heartbeat(
-                    pause_seconds, on_progress, cancel_flag,
-                    {"detail": "waiting", "export_type": export_type, "step": step},
-                )
+            # Pause after every request (including the last one) so each
+            # export has at least `pause_seconds` to be processed by GetCourse.
+            logger.info("Waiting %ds before next step...", pause_seconds)
+            await self._sleep_with_heartbeat(
+                pause_seconds, on_progress, cancel_flag,
+                {"detail": "waiting", "export_type": export_type, "step": step},
+            )
 
         # ── Phase 2: Fetch all results (single attempt each, like n8n) ──
-        # By now: users had 2×pause, payments had 1×pause, deals had 0
+        # By now: each export had at least 1×pause to process
         results: dict[str, list] = {}
         errors: dict[str, str] = {}
 

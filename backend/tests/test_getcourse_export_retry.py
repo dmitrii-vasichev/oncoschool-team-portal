@@ -186,9 +186,9 @@ class TestN8nStyleFlow(unittest.TestCase):
                     )
                 )
 
-        # 2 pauses × 600s (in 60s heartbeat chunks) = 1200s total
+        # 3 pauses × 600s (after each of 3 exports, in 60s heartbeat chunks) = 1800s total
         total_sleep = sum(sleep_durations)
-        self.assertEqual(total_sleep, 2 * custom_pause)
+        self.assertEqual(total_sleep, 3 * custom_pause)
 
 
 class TestSleepWithHeartbeat(unittest.TestCase):
