@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -209,10 +210,11 @@ export default function ReportsPage() {
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [backfillFrom, setBackfillFrom] = useState("");
   const [backfillTo, setBackfillTo] = useState("");
+  const [backfillPauseMinutes, setBackfillPauseMinutes] = useState(5);
   const [backfillSubmitting, setBackfillSubmitting] = useState(false);
   const [backfillStatus, setBackfillStatus] = useState<BackfillStatus | null>(null);
 
-  const ESTIMATED_DURATION = 15 * 60; // 15 minutes in seconds
+  const ESTIMATED_DURATION = 20 * 60; // ~20 minutes (3 exports × 5 min pause + polling)
 
   // Timer for elapsed seconds
   useEffect(() => {
@@ -320,6 +322,22 @@ export default function ReportsPage() {
     }
   };
 
+  const handleRetryBackfill = async () => {
+    if (!backfillStatus) return;
+    const dateFrom = backfillStatus.date_from;
+    const dateTo = backfillStatus.date_to;
+    if (!dateFrom || !dateTo) return;
+    try {
+      await api.resetBackfillStatus();
+      await api.backfillReports(dateFrom, dateTo, Math.max(backfillPauseMinutes, 5));
+      toastSuccess("Повторная загрузка запущена");
+      await fetchBackfillStatus();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Ошибка повторной загрузки";
+      toastError(msg);
+    }
+  };
+
   const handleBackfill = async () => {
     if (!backfillFrom || !backfillTo) return;
     if (backfillFrom > backfillTo) {
@@ -328,7 +346,7 @@ export default function ReportsPage() {
     }
     setBackfillSubmitting(true);
     try {
-      await api.backfillReports(backfillFrom, backfillTo);
+      await api.backfillReports(backfillFrom, backfillTo, Math.max(backfillPauseMinutes, 5));
       toastSuccess("Загрузка исторических данных запущена");
       setBackfillOpen(false);
       // Immediately fetch status to show "running" banner
@@ -527,14 +545,24 @@ export default function ReportsPage() {
                 Период: {formatBackfillDates(backfillStatus)}
               </p>
             </div>
-            {isAdmin && (
+            {isAdmin && !isCancelled && (
               <Button
                 variant="outline"
                 size="sm"
                 className="shrink-0 rounded-lg gap-1.5 text-xs"
-                onClick={handleResetBackfill}
+                onClick={handleRetryBackfill}
               >
                 <RefreshCw className="h-3 w-3" />
+                Повторить
+              </Button>
+            )}
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="shrink-0 rounded-lg gap-1.5 text-xs"
+                onClick={handleResetBackfill}
+              >
                 Сбросить
               </Button>
             )}
@@ -599,6 +627,24 @@ export default function ReportsPage() {
             Дата «от» должна быть раньше даты «до»
           </p>
         )}
+        <div className="space-y-2 mt-4">
+          <label className="text-sm font-medium block">
+            Пауза между экспортами (мин)
+          </label>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min={5}
+              max={60}
+              value={backfillPauseMinutes}
+              onChange={(e) => setBackfillPauseMinutes(Math.max(5, Number(e.target.value) || 5))}
+              className="w-24"
+            />
+            <p className="text-xs text-muted-foreground">
+              Мин. 5. Для большого периода увеличьте до 10–15.
+            </p>
+          </div>
+        </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button
             variant="outline"

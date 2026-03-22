@@ -321,7 +321,8 @@ class ReportSchedulerService:
         return False
 
     async def run_backfill(
-        self, date_from: date, date_to: date, collected_by_id=None
+        self, date_from: date, date_to: date, collected_by_id=None,
+        pause_seconds: int = 300,
     ) -> None:
         """Background backfill: collect metrics for the entire date range.
 
@@ -385,6 +386,7 @@ class ReportSchedulerService:
                 self.session_maker, date_from, date_to, collected_by_id,
                 on_progress=_update_progress,
                 cancel_flag=self._backfill_cancel,
+                pause_seconds=pause_seconds,
             )
             collected = result["collected"]
         except asyncio.CancelledError:

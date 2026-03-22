@@ -22,18 +22,19 @@ from app.utils.encryption import decrypt
 logger = logging.getLogger(__name__)
 
 # Export poll settings
-POLL_INITIAL_WAIT_SECONDS = 180  # wait 3 min before first poll (exports need time)
+POLL_INITIAL_WAIT_SECONDS = 300  # wait 5 min before first poll (matching n8n)
 POLL_INTERVAL_SECONDS = 60  # check export status every 60s
 POLL_MAX_WAIT_SECONDS = 900  # 15 min base timeout
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
 MAX_POLL_HTTP_ERRORS = 5  # consecutive HTTP errors before aborting poll
+MAX_EXPORT_RETRIES = 2  # retry export from scratch on timeout
 
 # Rate limit handling
 RATE_LIMIT_BASE_DELAY = 30  # initial seconds to wait on rate limit
 RATE_LIMIT_MAX_DELAY = 120  # max seconds to wait on rate limit (exponential backoff cap)
 MAX_RATE_LIMIT_RETRIES = 30  # max rate-limit waits (separate from error retries)
-EXPORT_PAUSE = 60  # seconds between sequential export requests
+EXPORT_PAUSE = 300  # seconds between sequential export requests (5 min, matching n8n)
 
 # Scaled timeout for multi-day ranges
 POLL_SECONDS_PER_DAY = 300  # 5 min per day in range (was 600)
@@ -408,35 +409,88 @@ class GetCourseService:
         async with session_maker() as session:
             return await self._get_creds(session)
 
+    @staticmethod
+    async def _sleep_with_heartbeat(
+        seconds: int,
+        on_progress: ProgressCallback | None,
+        cancel_flag: asyncio.Event | None,
+        heartbeat_detail: dict[str, Any] | None = None,
+    ) -> None:
+        """Sleep for `seconds`, sending heartbeat every 60s to prevent stale detection."""
+        heartbeat_interval = 60
+        waited = 0
+        while waited < seconds:
+            if cancel_flag and cancel_flag.is_set():
+                raise asyncio.CancelledError("Cancelled by user")
+            chunk = min(heartbeat_interval, seconds - waited)
+            await asyncio.sleep(chunk)
+            waited += chunk
+            if on_progress and heartbeat_detail:
+                await on_progress("polling", {
+                    **heartbeat_detail,
+                    "elapsed_seconds": waited,
+                })
+
     async def _request_and_poll_export(
         self, base_url: str, api_key: str, export_type: str,
         date_from: str, date_to: str,
         timeout: int = POLL_MAX_WAIT_SECONDS,
+        initial_wait: int = POLL_INITIAL_WAIT_SECONDS,
         on_progress: ProgressCallback | None = None,
         cancel_flag: asyncio.Event | None = None,
     ) -> list:
-        """Request a single export, wait for it to process, then poll until ready."""
-        export_id = await self._request_export(
-            base_url, api_key, export_type, date_from, date_to
-        )
+        """Request a single export, wait for it to process, then poll until ready.
 
-        # Initial wait — exports typically take 3-5 min on GetCourse side
-        logger.info(
-            "Export %d requested, waiting %ds before polling...",
-            export_id, POLL_INITIAL_WAIT_SECONDS,
-        )
-        if on_progress:
-            await on_progress("polling", {
-                "detail": "initial_wait",
-                "poll_count": 0,
-                "elapsed_seconds": 0,
-            })
-        await asyncio.sleep(POLL_INITIAL_WAIT_SECONDS)
+        On timeout, retries with a new export_id (up to MAX_EXPORT_RETRIES times).
+        """
+        last_error: Exception | None = None
 
-        return await self._poll_export(
-            base_url, api_key, export_id, timeout=timeout,
-            on_progress=on_progress, cancel_flag=cancel_flag,
-        )
+        for attempt in range(1, MAX_EXPORT_RETRIES + 1):
+            export_id = await self._request_export(
+                base_url, api_key, export_type, date_from, date_to
+            )
+
+            logger.info(
+                "Export %d requested (attempt %d/%d), waiting %ds before polling...",
+                export_id, attempt, MAX_EXPORT_RETRIES, initial_wait,
+            )
+            if on_progress:
+                await on_progress("polling", {
+                    "detail": "initial_wait",
+                    "poll_count": 0,
+                    "elapsed_seconds": 0,
+                    "attempt": attempt,
+                })
+            await self._sleep_with_heartbeat(
+                initial_wait, on_progress, cancel_flag,
+                {"detail": "initial_wait", "poll_count": 0, "attempt": attempt},
+            )
+
+            try:
+                return await self._poll_export(
+                    base_url, api_key, export_id, timeout=timeout,
+                    on_progress=on_progress, cancel_flag=cancel_flag,
+                )
+            except TimeoutError as e:
+                last_error = e
+                if attempt < MAX_EXPORT_RETRIES:
+                    logger.warning(
+                        "Export %d timed out (attempt %d/%d), retrying with new export...",
+                        export_id, attempt, MAX_EXPORT_RETRIES,
+                    )
+                    if on_progress:
+                        await on_progress("retry", {
+                            "detail": "timeout_retry",
+                            "attempt": attempt,
+                            "max_attempts": MAX_EXPORT_RETRIES,
+                        })
+                else:
+                    logger.error(
+                        "Export %d timed out (attempt %d/%d), no more retries",
+                        export_id, attempt, MAX_EXPORT_RETRIES,
+                    )
+
+        raise last_error  # type: ignore[misc]
 
     @staticmethod
     def _scaled_timeout(date_from: str, date_to: str) -> int:
@@ -456,11 +510,13 @@ class GetCourseService:
         self, base_url: str, api_key: str, date_from: str, date_to: str,
         on_progress: ProgressCallback | None = None,
         cancel_flag: asyncio.Event | None = None,
+        pause_seconds: int = EXPORT_PAUSE,
     ) -> tuple[list, list, list]:
         """Request and poll 3 exports sequentially with pauses between them."""
         timeout = self._scaled_timeout(date_from, date_to)
         logger.info(
-            "Export timeout for range %s..%s: %ds", date_from, date_to, timeout
+            "Export timeout for range %s..%s: %ds, pause=%ds",
+            date_from, date_to, timeout, pause_seconds,
         )
 
         export_types = ["users", "payments", "deals"]
@@ -485,7 +541,8 @@ class GetCourseService:
 
             rows = await self._request_and_poll_export(
                 base_url, api_key, export_type, date_from, date_to,
-                timeout=timeout, on_progress=_stage_progress,
+                timeout=timeout, initial_wait=pause_seconds,
+                on_progress=_stage_progress,
                 cancel_flag=cancel_flag,
             )
 
@@ -499,8 +556,11 @@ class GetCourseService:
             results.append(rows)
 
             if idx < len(export_types) - 1:
-                logger.info("Pausing %ds before next export request...", EXPORT_PAUSE)
-                await asyncio.sleep(EXPORT_PAUSE)
+                logger.info("Pausing %ds before next export request...", pause_seconds)
+                await self._sleep_with_heartbeat(
+                    pause_seconds, on_progress, cancel_flag,
+                    {"detail": "export_pause", "export_type": export_type, "step": step},
+                )
 
         return results[0], results[1], results[2]
 
@@ -509,6 +569,7 @@ class GetCourseService:
         session_maker: async_sessionmaker,
         target_date: date,
         collected_by_id=None,
+        pause_seconds: int = EXPORT_PAUSE,
     ) -> DailyMetric:
         """Run 3 exports (users, payments, deals), aggregate, and upsert into daily_metrics.
 
@@ -521,7 +582,8 @@ class GetCourseService:
 
         # Phase 2: HTTP polling — no DB connection held
         user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
-            base_url, api_key, date_str, date_str
+            base_url, api_key, date_str, date_str,
+            pause_seconds=pause_seconds,
         )
 
         # Phase 3: Aggregate (pure computation)
@@ -565,6 +627,7 @@ class GetCourseService:
         collected_by_id=None,
         on_progress: ProgressCallback | None = None,
         cancel_flag: asyncio.Event | None = None,
+        pause_seconds: int = EXPORT_PAUSE,
     ) -> dict[str, int]:
         """Collect metrics for an entire date range with just 3 API requests.
 
@@ -584,6 +647,7 @@ class GetCourseService:
         user_rows, payment_rows, deal_rows = await self._request_and_poll_exports(
             base_url, api_key, range_from.isoformat(), range_to.isoformat(),
             on_progress=on_progress, cancel_flag=cancel_flag,
+            pause_seconds=pause_seconds,
         )
 
         # Phase 3: Aggregate (pure computation)

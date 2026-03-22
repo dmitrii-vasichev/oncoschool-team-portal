@@ -720,7 +720,12 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.get.await_count, 5)
 
     async def test_exports_have_pauses_between_them(self) -> None:
-        """Sequential exports should have EXPORT_PAUSE delays between them."""
+        """Sequential exports should have EXPORT_PAUSE delays between them.
+
+        Since #165, pauses use _sleep_with_heartbeat (60s chunks), so we
+        verify total sleep time equals 2 × EXPORT_PAUSE (pauses after
+        exports 1 and 2, not after export 3).
+        """
         service = GetCourseService()
 
         service._request_and_poll_export = AsyncMock(
@@ -736,10 +741,11 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
                 "https://school.getcourse.ru", "secret", "2026-03-13", "2026-03-19"
             )
 
-        # Two pauses (after users, after payments — not after deals)
+        # Two inter-export pauses, broken into 60s heartbeat chunks
         from app.services.getcourse_service import EXPORT_PAUSE
         sleep_calls = [c.args[0] for c in mock_sleep.await_args_list]
-        self.assertEqual(sleep_calls.count(EXPORT_PAUSE), 2)
+        total_sleep = sum(sleep_calls)
+        self.assertEqual(total_sleep, 2 * EXPORT_PAUSE)
 
 
 class TestRateLimitExponentialBackoff(unittest.IsolatedAsyncioTestCase):

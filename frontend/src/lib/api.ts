@@ -1112,17 +1112,17 @@ class ApiClient {
     return this.request<ReportSummary>(`/api/reports/getcourse/summary${query}`);
   }
 
-  async collectReport(date: string): Promise<CollectResponse> {
+  async collectReport(date: string, pauseMinutes = 5): Promise<CollectResponse> {
     return this.request<CollectResponse>("/api/reports/getcourse/collect", {
       method: "POST",
-      body: JSON.stringify({ date }),
+      body: JSON.stringify({ date, pause_minutes: pauseMinutes }),
     });
   }
 
-  async backfillReports(dateFrom: string, dateTo: string): Promise<BackfillResponse> {
+  async backfillReports(dateFrom: string, dateTo: string, pauseMinutes = 5): Promise<BackfillResponse> {
     return this.request<BackfillResponse>("/api/reports/getcourse/backfill", {
       method: "POST",
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo }),
+      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo, pause_minutes: pauseMinutes }),
     });
   }
 
