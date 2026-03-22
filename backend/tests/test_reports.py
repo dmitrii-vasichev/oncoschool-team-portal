@@ -724,7 +724,7 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
 
         # Two pauses (after users, after payments — not after deals)
         sleep_calls = [c.args[0] for c in mock_sleep.await_args_list]
-        self.assertEqual(sleep_calls.count(30), 2)
+        self.assertEqual(sleep_calls.count(10), 2)
 
 
 class TestRateLimitExponentialBackoff(unittest.IsolatedAsyncioTestCase):

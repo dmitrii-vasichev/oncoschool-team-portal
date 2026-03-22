@@ -22,7 +22,7 @@ from app.utils.encryption import decrypt
 logger = logging.getLogger(__name__)
 
 # Export poll settings
-POLL_INTERVAL_SECONDS = 60
+POLL_INTERVAL_SECONDS = 15  # check export status every 15s (was 60s)
 POLL_MAX_WAIT_SECONDS = 1200
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
@@ -31,7 +31,7 @@ RETRY_BASE_DELAY = 2
 RATE_LIMIT_BASE_DELAY = 30  # initial seconds to wait on rate limit
 RATE_LIMIT_MAX_DELAY = 120  # max seconds to wait on rate limit (exponential backoff cap)
 MAX_RATE_LIMIT_RETRIES = 30  # max rate-limit waits (separate from error retries)
-EXPORT_PAUSE = 30  # seconds between sequential export requests
+EXPORT_PAUSE = 10  # seconds between sequential export requests (was 30s)
 
 # Scaled timeout for multi-day ranges
 POLL_SECONDS_PER_DAY = 600  # 10 min per day in range
@@ -112,7 +112,8 @@ class GetCourseService:
 
                 export_id = data["info"]["export_id"]
                 logger.info(
-                    "Export requested: type=%s, export_id=%d", export_type, export_id
+                    "Export requested: type=%s, id=%d, range=%s..%s",
+                    export_type, export_id, date_from, date_to,
                 )
                 return export_id
 
@@ -149,7 +150,10 @@ class GetCourseService:
         rate_limit_count = 0
         wall_start = time.monotonic()
 
+        poll_count = 0
         while elapsed < timeout:
+            poll_count += 1
+            wall_elapsed = int(time.monotonic() - wall_start)
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
@@ -159,11 +163,14 @@ class GetCourseService:
                 error_msg = str(data.get("error_message", ""))
                 # "Файл еще не создан" = file not yet created — normal intermediate state
                 if "еще не создан" in error_msg.lower():
-                    logger.debug("Export %d not ready yet, retrying...", export_id)
+                    logger.info(
+                        "Export %d poll #%d: not ready yet (elapsed %ds/%ds)",
+                        export_id, poll_count, wall_elapsed, timeout,
+                    )
                     if on_progress:
                         await on_progress("polling", {
                             "detail": "waiting",
-                            "elapsed_seconds": int(time.monotonic() - wall_start),
+                            "elapsed_seconds": wall_elapsed,
                         })
                     await asyncio.sleep(POLL_INTERVAL_SECONDS)
                     elapsed += POLL_INTERVAL_SECONDS
@@ -181,19 +188,23 @@ class GetCourseService:
                         RATE_LIMIT_MAX_DELAY,
                     )
                     logger.warning(
-                        "Rate limited polling export %d, attempt %d, waiting %ds...",
-                        export_id, rate_limit_count, delay,
+                        "Export %d poll #%d: RATE LIMITED (attempt %d, waiting %ds, elapsed %ds)",
+                        export_id, poll_count, rate_limit_count, delay, wall_elapsed,
                     )
                     if on_progress:
                         await on_progress("rate_limited", {
                             "detail": "rate_limited",
                             "rate_limit_count": rate_limit_count,
                             "wait_seconds": delay,
-                            "elapsed_seconds": int(time.monotonic() - wall_start),
+                            "elapsed_seconds": wall_elapsed,
                         })
                     await asyncio.sleep(delay)
                     # elapsed NOT incremented — export still processing
                     continue
+                logger.error(
+                    "Export %d poll #%d: UNEXPECTED ERROR — %s (full response: %s)",
+                    export_id, poll_count, error_msg, data,
+                )
                 raise RuntimeError(
                     f"GetCourse export poll failed: {error_msg or data}"
                 )
@@ -204,23 +215,33 @@ class GetCourseService:
             if status == "exported":
                 items = info.get("items", [])
                 logger.info(
-                    "Export %d ready: %d items", export_id, len(items)
+                    "Export %d ready after %d polls (%ds): %d items",
+                    export_id, poll_count, wall_elapsed, len(items),
                 )
                 return items
 
             if status == "error":
+                logger.error(
+                    "Export %d poll #%d: server-side error (info: %s)",
+                    export_id, poll_count, info,
+                )
                 raise RuntimeError(f"GetCourse export {export_id} failed on server side")
 
+            logger.info(
+                "Export %d poll #%d: status=%s (elapsed %ds/%ds)",
+                export_id, poll_count, status, wall_elapsed, timeout,
+            )
             if on_progress:
                 await on_progress("polling", {
                     "detail": "processing",
-                    "elapsed_seconds": int(time.monotonic() - wall_start),
+                    "elapsed_seconds": wall_elapsed,
                 })
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
             elapsed += POLL_INTERVAL_SECONDS
 
         raise TimeoutError(
-            f"GetCourse export {export_id} did not complete within {timeout}s"
+            f"GetCourse export {export_id} did not complete within {timeout}s "
+            f"({poll_count} polls, wall time {int(time.monotonic() - wall_start)}s)"
         )
 
     # ------------------------------------------------------------------
