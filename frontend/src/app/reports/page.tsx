@@ -411,16 +411,37 @@ export default function ReportsPage() {
     if (!backfillStatus || backfillStatus.status === "idle") return null;
 
     if (backfillStatus.status === "running") {
+      const stageLabels: Record<string, string> = {
+        starting: "Подготовка…",
+        export_started: `Запрос экспорта: ${backfillStatus.export_type ?? ""}`,
+        polling: backfillStatus.detail === "rate_limited"
+          ? `Ожидание (rate limit #${backfillStatus.rate_limit_count ?? 0}, пауза ${backfillStatus.wait_seconds ?? 0}с)`
+          : `Ожидание данных: ${backfillStatus.export_type ?? ""}`,
+        rate_limited: `Ожидание (rate limit #${backfillStatus.rate_limit_count ?? 0}, пауза ${backfillStatus.wait_seconds ?? 0}с)`,
+        export_done: `Экспорт ${backfillStatus.export_type ?? ""} готов (${backfillStatus.rows_count ?? 0} записей)`,
+        saving: "Сохранение в базу данных…",
+      };
+      const stage = backfillStatus.stage ?? "starting";
+      const stageText = stageLabels[stage] ?? stage;
+      const stepText = backfillStatus.step ? ` [${backfillStatus.step}]` : "";
+      const elapsedSec = backfillStatus.elapsed_seconds;
+      const elapsedText = elapsedSec != null
+        ? ` • ${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, "0")}`
+        : "";
+
       return (
         <section className="animate-in fade-in slide-in-from-top-2 duration-300 rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
           <div className="flex items-center gap-3">
             <Loader2 className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin shrink-0" />
             <div className="flex-1">
               <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                Загрузка исторических данных...
+                Загрузка исторических данных{stepText}
               </p>
               <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">
-                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates ?? 0} дн.) — обычно занимает ~{Math.max(15, (backfillStatus.total_dates ?? 0) * 10)} минут
+                {stageText}{elapsedText}
+              </p>
+              <p className="text-xs text-blue-600/50 dark:text-blue-400/50 mt-0.5">
+                Период: {formatBackfillDates(backfillStatus)} ({backfillStatus.total_dates ?? 0} дн.)
               </p>
             </div>
           </div>
