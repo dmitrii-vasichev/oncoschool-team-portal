@@ -21,14 +21,12 @@ from app.utils.encryption import decrypt
 
 logger = logging.getLogger(__name__)
 
-# Export poll settings
-POLL_INITIAL_WAIT_SECONDS = 300  # wait 5 min before first poll (matching n8n)
+# Export poll settings (Phase 2: fetch)
 POLL_INTERVAL_SECONDS = 60  # check export status every 60s
-POLL_MAX_WAIT_SECONDS = 900  # 15 min base timeout
+POLL_MAX_WAIT_SECONDS = 900  # 15 min base timeout for polling
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2
 MAX_POLL_HTTP_ERRORS = 5  # consecutive HTTP errors before aborting poll
-MAX_EXPORT_RETRIES = 2  # retry export from scratch on timeout
 
 # Rate limit handling
 RATE_LIMIT_BASE_DELAY = 30  # initial seconds to wait on rate limit
@@ -431,67 +429,6 @@ class GetCourseService:
                     "elapsed_seconds": waited,
                 })
 
-    async def _request_and_poll_export(
-        self, base_url: str, api_key: str, export_type: str,
-        date_from: str, date_to: str,
-        timeout: int = POLL_MAX_WAIT_SECONDS,
-        initial_wait: int = POLL_INITIAL_WAIT_SECONDS,
-        on_progress: ProgressCallback | None = None,
-        cancel_flag: asyncio.Event | None = None,
-    ) -> list:
-        """Request a single export, wait for it to process, then poll until ready.
-
-        On timeout, retries with a new export_id (up to MAX_EXPORT_RETRIES times).
-        """
-        last_error: Exception | None = None
-
-        for attempt in range(1, MAX_EXPORT_RETRIES + 1):
-            export_id = await self._request_export(
-                base_url, api_key, export_type, date_from, date_to
-            )
-
-            logger.info(
-                "Export %d requested (attempt %d/%d), waiting %ds before polling...",
-                export_id, attempt, MAX_EXPORT_RETRIES, initial_wait,
-            )
-            if on_progress:
-                await on_progress("polling", {
-                    "detail": "initial_wait",
-                    "poll_count": 0,
-                    "elapsed_seconds": 0,
-                    "attempt": attempt,
-                })
-            await self._sleep_with_heartbeat(
-                initial_wait, on_progress, cancel_flag,
-                {"detail": "initial_wait", "poll_count": 0, "attempt": attempt},
-            )
-
-            try:
-                return await self._poll_export(
-                    base_url, api_key, export_id, timeout=timeout,
-                    on_progress=on_progress, cancel_flag=cancel_flag,
-                )
-            except TimeoutError as e:
-                last_error = e
-                if attempt < MAX_EXPORT_RETRIES:
-                    logger.warning(
-                        "Export %d timed out (attempt %d/%d), retrying with new export...",
-                        export_id, attempt, MAX_EXPORT_RETRIES,
-                    )
-                    if on_progress:
-                        await on_progress("retry", {
-                            "detail": "timeout_retry",
-                            "attempt": attempt,
-                            "max_attempts": MAX_EXPORT_RETRIES,
-                        })
-                else:
-                    logger.error(
-                        "Export %d timed out (attempt %d/%d), no more retries",
-                        export_id, attempt, MAX_EXPORT_RETRIES,
-                    )
-
-        raise last_error  # type: ignore[misc]
-
     @staticmethod
     def _scaled_timeout(date_from: str, date_to: str) -> int:
         """Calculate poll timeout scaled to the date range size.
@@ -512,20 +449,60 @@ class GetCourseService:
         cancel_flag: asyncio.Event | None = None,
         pause_seconds: int = EXPORT_PAUSE,
     ) -> tuple[list, list, list]:
-        """Request and poll 3 exports sequentially with pauses between them."""
+        """Request all 3 exports first, then fetch all results (matching n8n flow).
+
+        Phase 1: Request users → pause → request payments → pause → request deals
+        Phase 2: Fetch users (had 2×pause to process) → fetch payments → fetch deals
+
+        This gives each export maximum processing time on GetCourse side.
+        """
         timeout = self._scaled_timeout(date_from, date_to)
+        export_types = ["users", "payments", "deals"]
+
         logger.info(
-            "Export timeout for range %s..%s: %ds, pause=%ds",
-            date_from, date_to, timeout, pause_seconds,
+            "n8n-style export: range %s..%s, pause=%ds, poll_timeout=%ds",
+            date_from, date_to, pause_seconds, timeout,
         )
 
-        export_types = ["users", "payments", "deals"]
-        results: list[list] = []
+        # ── Phase 1: Request all 3 exports with pauses between them ──
+        export_ids: dict[str, int] = {}
 
         for idx, export_type in enumerate(export_types):
             step = f"{idx + 1}/{len(export_types)}"
 
-            async def _stage_progress(event: str, detail: dict[str, Any]) -> None:
+            if on_progress:
+                await on_progress("export_started", {
+                    "export_type": export_type,
+                    "step": step,
+                })
+
+            export_id = await self._request_export(
+                base_url, api_key, export_type, date_from, date_to
+            )
+            export_ids[export_type] = export_id
+
+            logger.info(
+                "Export %d requested (%s) [%s]",
+                export_id, export_type, step,
+            )
+
+            # Pause between requests (not after the last one)
+            if idx < len(export_types) - 1:
+                logger.info("Waiting %ds before next export request...", pause_seconds)
+                await self._sleep_with_heartbeat(
+                    pause_seconds, on_progress, cancel_flag,
+                    {"detail": "waiting", "export_type": export_type, "step": step},
+                )
+
+        # ── Phase 2: Fetch all results ──
+        # By now: users had 2×pause, payments had 1×pause, deals had 0
+        results: list[list] = []
+
+        for idx, export_type in enumerate(export_types):
+            step = f"{idx + 1}/{len(export_types)}"
+            eid = export_ids[export_type]
+
+            async def _fetch_progress(event: str, detail: dict[str, Any]) -> None:
                 if on_progress:
                     await on_progress(event, {
                         **detail,
@@ -534,15 +511,17 @@ class GetCourseService:
                     })
 
             if on_progress:
-                await on_progress("export_started", {
+                await on_progress("fetching", {
                     "export_type": export_type,
                     "step": step,
                 })
 
-            rows = await self._request_and_poll_export(
-                base_url, api_key, export_type, date_from, date_to,
-                timeout=timeout, initial_wait=pause_seconds,
-                on_progress=_stage_progress,
+            logger.info("Fetching export %d (%s)...", eid, export_type)
+
+            rows = await self._poll_export(
+                base_url, api_key, eid,
+                timeout=timeout,
+                on_progress=_fetch_progress,
                 cancel_flag=cancel_flag,
             )
 
@@ -554,13 +533,9 @@ class GetCourseService:
                 })
 
             results.append(rows)
-
-            if idx < len(export_types) - 1:
-                logger.info("Pausing %ds before next export request...", pause_seconds)
-                await self._sleep_with_heartbeat(
-                    pause_seconds, on_progress, cancel_flag,
-                    {"detail": "export_pause", "export_type": export_type, "step": step},
-                )
+            logger.info(
+                "Export %d (%s) fetched: %d rows", eid, export_type, len(rows),
+            )
 
         return results[0], results[1], results[2]
 

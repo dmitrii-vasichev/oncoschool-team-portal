@@ -1,20 +1,20 @@
-"""Regression tests for GetCourse export retry-on-timeout and configurable pause.
+"""Regression tests for GetCourse n8n-style export flow.
 
-Issue #165: Export times out after 900s because initial wait (3 min) is too short
-compared to n8n's 5 min. Also adds retry logic — if poll times out, request a new
-export_id and try again (up to MAX_EXPORT_RETRIES).
+Issue #167: Restructure export flow to match n8n — request all 3 exports first
+(with pauses between them), then fetch all results. This gives each export
+maximum processing time on GetCourse's side.
+
+Previous issue #165: Increased pauses to 5 min, added configurable pause_minutes.
 """
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.getcourse_service import (
     GetCourseService,
-    POLL_INITIAL_WAIT_SECONDS,
     POLL_INTERVAL_SECONDS,
     EXPORT_PAUSE,
-    MAX_EXPORT_RETRIES,
 )
 
 
@@ -31,72 +31,46 @@ def _make_exported_response(items=None):
     return {"success": True, "info": {"status": "exported", "items": items or []}}
 
 
-class TestInitialWaitIs5Minutes(unittest.TestCase):
-    """Issue #165: Initial wait before polling must be 5 min (matching n8n)."""
-
-    def test_initial_wait_is_300_seconds(self):
-        self.assertEqual(POLL_INITIAL_WAIT_SECONDS, 300)
+class TestExportPauseIs5Minutes(unittest.TestCase):
+    """Issue #165: Pause between exports must be 5 min (matching n8n)."""
 
     def test_export_pause_is_300_seconds(self):
         self.assertEqual(EXPORT_PAUSE, 300)
 
 
-class TestRetryOnTimeout(unittest.TestCase):
-    """Issue #165: On poll timeout, retry with a new export_id."""
+class TestN8nStyleFlow(unittest.TestCase):
+    """Issue #167: Request all exports first, then fetch all results."""
 
-    def setUp(self):
-        self.service = GetCourseService()
+    def test_requests_all_3_before_fetching(self):
+        """All 3 export requests must happen before any fetch."""
+        service = GetCourseService()
 
-    def test_max_export_retries_is_2(self):
-        self.assertEqual(MAX_EXPORT_RETRIES, 2)
-
-    def test_retry_succeeds_on_second_attempt(self):
-        """If first poll times out, second attempt with new export should succeed."""
-        # First request_export returns id=100, second returns id=200
-        request_responses = [
-            _make_export_response(100),
-            _make_export_response(200),
-        ]
-        request_call_count = 0
+        # Track order of operations
+        operation_log: list[str] = []
+        export_id_counter = [0]
 
         def request_json():
-            nonlocal request_call_count
-            result = request_responses[request_call_count]
-            request_call_count += 1
-            return result
+            export_id_counter[0] += 1
+            eid = export_id_counter[0]
+            operation_log.append(f"request_{eid}")
+            return _make_export_response(eid)
 
-        request_mock_response = MagicMock()
-        request_mock_response.raise_for_status = MagicMock()
-        request_mock_response.json = request_json
-
-        # First poll: timeout (always "not ready")
-        # Second poll: success
-        poll_responses = {}
-        poll_responses[100] = _make_not_ready_response  # always not ready
-        poll_responses[200] = None  # will be overridden below
-
-        poll_call_count = 0
-        current_export_id = [None]
+        request_mock = MagicMock()
+        request_mock.raise_for_status = MagicMock()
+        request_mock.json = request_json
 
         def poll_json():
-            nonlocal poll_call_count
-            poll_call_count += 1
-            eid = current_export_id[0]
-            if eid == 100:
-                return _make_not_ready_response()
-            return _make_exported_response([{"data": "ok"}])
+            operation_log.append("fetch")
+            return _make_exported_response([])
 
-        poll_mock_response = MagicMock()
-        poll_mock_response.raise_for_status = MagicMock()
-        poll_mock_response.json = poll_json
+        poll_mock = MagicMock()
+        poll_mock.raise_for_status = MagicMock()
+        poll_mock.json = poll_json
 
         def mock_get(url, params=None):
             if "/exports/" in url:
-                # Extract export_id from URL
-                eid = int(url.split("/exports/")[1])
-                current_export_id[0] = eid
-                return poll_mock_response
-            return request_mock_response
+                return poll_mock
+            return request_mock
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=mock_get)
@@ -105,114 +79,80 @@ class TestRetryOnTimeout(unittest.TestCase):
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-                result = asyncio.run(
-                    self.service._request_and_poll_export(
-                        "https://test.getcourse.ru", "key", "users",
+                asyncio.run(
+                    service._request_and_poll_exports(
+                        "https://test.getcourse.ru", "key",
                         "2026-03-21", "2026-03-21",
-                        timeout=10, initial_wait=0,
+                        pause_seconds=0,  # skip pauses for speed
                     )
                 )
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["data"], "ok")
-        # Two export requests were made
-        self.assertEqual(request_call_count, 2)
+        # All 3 requests should come before any fetch
+        self.assertEqual(operation_log[:3], ["request_1", "request_2", "request_3"])
+        # Then 3 fetches
+        self.assertEqual(operation_log[3:], ["fetch", "fetch", "fetch"])
 
-    def test_all_retries_exhausted_raises_timeout(self):
-        """If all retry attempts time out, TimeoutError is raised."""
-        request_mock_response = MagicMock()
-        request_mock_response.raise_for_status = MagicMock()
+    def test_pauses_between_requests_not_fetches(self):
+        """Pauses should happen between request phases, not between fetches."""
+        service = GetCourseService()
+
+        sleep_context: list[str] = []  # track when sleeps happen
+        phase = ["requesting"]
+
         export_id_counter = [0]
 
         def request_json():
             export_id_counter[0] += 1
             return _make_export_response(export_id_counter[0])
 
-        request_mock_response.json = request_json
+        request_mock = MagicMock()
+        request_mock.raise_for_status = MagicMock()
+        request_mock.json = request_json
 
-        poll_mock_response = MagicMock()
-        poll_mock_response.raise_for_status = MagicMock()
-        poll_mock_response.json = MagicMock(return_value=_make_not_ready_response())
+        poll_mock = MagicMock()
+        poll_mock.raise_for_status = MagicMock()
+        poll_mock.json = MagicMock(return_value=_make_exported_response([]))
 
         def mock_get(url, params=None):
             if "/exports/" in url:
-                return poll_mock_response
-            return request_mock_response
+                phase[0] = "fetching"
+                return poll_mock
+            return request_mock
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(side_effect=mock_get)
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
+        async def track_sleep(seconds):
+            sleep_context.append(phase[0])
+
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
-            with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-                with self.assertRaises(TimeoutError):
-                    asyncio.run(
-                        self.service._request_and_poll_export(
-                            "https://test.getcourse.ru", "key", "users",
-                            "2026-03-21", "2026-03-21",
-                            timeout=10, initial_wait=0,
-                        )
-                    )
-
-        # Should have requested MAX_EXPORT_RETRIES exports
-        self.assertEqual(export_id_counter[0], MAX_EXPORT_RETRIES)
-
-
-class TestSleepWithHeartbeat(unittest.TestCase):
-    """Issue #165: Long sleeps must send heartbeats to prevent stale detection."""
-
-    def test_heartbeat_sent_during_wait(self):
-        """_sleep_with_heartbeat should call on_progress periodically."""
-        service = GetCourseService
-        progress_calls = []
-
-        async def mock_progress(event, detail):
-            progress_calls.append((event, detail))
-
-        with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-            asyncio.run(
-                service._sleep_with_heartbeat(
-                    180, mock_progress, None,
-                    {"detail": "initial_wait", "poll_count": 0},
-                )
-            )
-
-        # 180s / 60s = 3 heartbeats
-        self.assertEqual(len(progress_calls), 3)
-        # Last heartbeat should report elapsed = 180
-        self.assertEqual(progress_calls[-1][1]["elapsed_seconds"], 180)
-
-    def test_cancel_during_wait(self):
-        """_sleep_with_heartbeat should raise CancelledError if cancel_flag is set."""
-        service = GetCourseService
-        cancel = asyncio.Event()
-        cancel.set()
-
-        with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-            with self.assertRaises(asyncio.CancelledError):
+            with patch("app.services.getcourse_service.asyncio.sleep", side_effect=track_sleep):
                 asyncio.run(
-                    service._sleep_with_heartbeat(300, None, cancel)
+                    service._request_and_poll_exports(
+                        "https://test.getcourse.ru", "key",
+                        "2026-03-21", "2026-03-21",
+                        pause_seconds=300,
+                    )
                 )
 
+        # All sleeps should happen during "requesting" phase (pauses between requests)
+        # No sleeps during "fetching" phase (exports should be ready)
+        for ctx in sleep_context:
+            self.assertEqual(ctx, "requesting",
+                             f"Sleep happened during {ctx} phase, should only be during requesting")
 
-class TestConfigurablePause(unittest.TestCase):
-    """Issue #165: pause_seconds parameter flows through the call chain."""
-
-    def test_request_and_poll_exports_uses_custom_pause(self):
-        """Custom pause_seconds should be passed to initial_wait and inter-export sleep."""
+    def test_custom_pause_seconds(self):
+        """Custom pause_seconds should be used between export requests."""
         service = GetCourseService()
 
-        sleep_durations = []
+        sleep_durations: list[int] = []
+        export_id_counter = [0]
 
-        async def track_sleep(seconds):
-            sleep_durations.append(seconds)
-
-        # Mock all 3 exports to succeed immediately
-        export_counter = [0]
         def request_json():
-            export_counter[0] += 1
-            return _make_export_response(export_counter[0])
+            export_id_counter[0] += 1
+            return _make_export_response(export_id_counter[0])
 
         request_mock = MagicMock()
         request_mock.raise_for_status = MagicMock()
@@ -232,6 +172,9 @@ class TestConfigurablePause(unittest.TestCase):
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
+        async def track_sleep(seconds):
+            sleep_durations.append(seconds)
+
         custom_pause = 600  # 10 minutes
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
@@ -244,13 +187,50 @@ class TestConfigurablePause(unittest.TestCase):
                     )
                 )
 
-        # Should have 3 initial waits of 60s chunks (custom_pause=600, chunks=60s each = 10 chunks per wait)
-        # Plus 2 inter-export pauses (also 600s in 60s chunks)
-        # Total sleep calls: 10 + 10 + 10 + 10 + 10 = 50 (3 initial waits + 2 inter-export pauses)
-        # But we just verify the total sleep time equals expected
+        # 2 pauses × 600s (in 60s heartbeat chunks) = 1200s total
         total_sleep = sum(sleep_durations)
-        # 3 exports × 600s initial_wait + 2 inter-export × 600s = 3000s
-        self.assertEqual(total_sleep, custom_pause * 5)  # 3 initial + 2 pauses
+        self.assertEqual(total_sleep, 2 * custom_pause)
+
+
+class TestSleepWithHeartbeat(unittest.TestCase):
+    """Issue #165: Long sleeps must send heartbeats to prevent stale detection."""
+
+    def test_heartbeat_sent_during_wait(self):
+        """_sleep_with_heartbeat should call on_progress periodically."""
+        progress_calls = []
+
+        async def mock_progress(event, detail):
+            progress_calls.append((event, detail))
+
+        with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
+            asyncio.run(
+                GetCourseService._sleep_with_heartbeat(
+                    180, mock_progress, None,
+                    {"detail": "waiting", "poll_count": 0},
+                )
+            )
+
+        # 180s / 60s = 3 heartbeats
+        self.assertEqual(len(progress_calls), 3)
+        self.assertEqual(progress_calls[-1][1]["elapsed_seconds"], 180)
+
+    def test_cancel_during_wait(self):
+        """_sleep_with_heartbeat should raise CancelledError if cancel_flag is set."""
+        cancel = asyncio.Event()
+        cancel.set()
+
+        with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
+            with self.assertRaises(asyncio.CancelledError):
+                asyncio.run(
+                    GetCourseService._sleep_with_heartbeat(300, None, cancel)
+                )
+
+
+class TestConfigurablePause(unittest.TestCase):
+    """Issue #165: pause_seconds parameter flows through the call chain."""
+
+    def test_pause_default_is_300(self):
+        self.assertEqual(EXPORT_PAUSE, 300)
 
 
 if __name__ == "__main__":

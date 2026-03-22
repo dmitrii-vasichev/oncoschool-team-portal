@@ -720,28 +720,27 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.get.await_count, 5)
 
     async def test_exports_have_pauses_between_them(self) -> None:
-        """Sequential exports should have EXPORT_PAUSE delays between them.
+        """n8n-style flow (#167): pauses happen between export requests.
 
-        Since #165, pauses use _sleep_with_heartbeat (60s chunks), so we
-        verify total sleep time equals 2 × EXPORT_PAUSE (pauses after
-        exports 1 and 2, not after export 3).
+        Phase 1: request users → pause → request payments → pause → request deals
+        Phase 2: fetch all 3 (no pauses needed, exports already processed)
         """
         service = GetCourseService()
 
-        service._request_and_poll_export = AsyncMock(
-            side_effect=[
-                [{"email": "a@test.com"}],
-                [{"status": "accepted", "amount": "100"}],
-                [{"status": "finished", "cost": "500"}],
-            ]
-        )
+        # Mock _request_export and _poll_export directly
+        service._request_export = AsyncMock(side_effect=[1, 2, 3])
+        service._poll_export = AsyncMock(side_effect=[
+            [{"email": "a@test.com"}],
+            [{"status": "accepted", "amount": "100"}],
+            [{"status": "finished", "cost": "500"}],
+        ])
 
         with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             await service._request_and_poll_exports(
                 "https://school.getcourse.ru", "secret", "2026-03-13", "2026-03-19"
             )
 
-        # Two inter-export pauses, broken into 60s heartbeat chunks
+        # Two inter-request pauses (in 60s heartbeat chunks)
         from app.services.getcourse_service import EXPORT_PAUSE
         sleep_calls = [c.args[0] for c in mock_sleep.await_args_list]
         total_sleep = sum(sleep_calls)

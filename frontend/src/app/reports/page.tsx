@@ -457,9 +457,12 @@ export default function ReportsPage() {
         export_started: `Запрос экспорта: ${backfillStatus.export_type ?? ""}`,
         polling: backfillStatus.detail === "rate_limited"
           ? `Ожидание (rate limit #${backfillStatus.rate_limit_count ?? 0}, пауза ${backfillStatus.wait_seconds ?? 0}с)`
-          : `Ожидание данных: ${backfillStatus.export_type ?? ""}${pollInfo}`,
+          : backfillStatus.detail === "waiting"
+            ? `Ожидание: ${backfillStatus.export_type ?? ""} обрабатывается на сервере…`
+            : `Получение данных: ${backfillStatus.export_type ?? ""}${pollInfo}`,
         rate_limited: `Ожидание (rate limit #${backfillStatus.rate_limit_count ?? 0}, пауза ${backfillStatus.wait_seconds ?? 0}с)`,
-        export_done: `Экспорт ${backfillStatus.export_type ?? ""} готов (${backfillStatus.rows_count ?? 0} записей)`,
+        fetching: `Получение данных: ${backfillStatus.export_type ?? ""}`,
+        export_done: `Готово: ${backfillStatus.export_type ?? ""} (${backfillStatus.rows_count ?? 0} записей)`,
         saving: "Сохранение в базу данных…",
       };
       const stage = backfillStatus.stage ?? "starting";
