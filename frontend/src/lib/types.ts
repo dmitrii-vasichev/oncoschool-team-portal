@@ -515,6 +515,7 @@ export interface BackfillResponse {
 
 export interface BackfillStatus {
   status: "idle" | "running" | "completed" | "failed";
+  stage?: string;
   total_dates?: number;
   collected?: number;
   failed?: number;
@@ -523,6 +524,14 @@ export interface BackfillStatus {
   started_at?: string;
   completed_at?: string;
   error?: string | null;
+  // Intermediate progress fields
+  export_type?: string;
+  step?: string;
+  detail?: string;
+  elapsed_seconds?: number;
+  rate_limit_count?: number;
+  wait_seconds?: number;
+  rows_count?: number;
 }
 
 export interface ReportSchedule {

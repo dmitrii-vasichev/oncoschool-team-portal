@@ -325,6 +325,8 @@ class ReportSchedulerService:
 
         logger.info("Backfill started: %s to %s (%d dates)", date_from, date_to, total)
 
+        started_at = datetime.now(tz=ZoneInfo("UTC")).isoformat()
+
         # Save "running" status at the start
         try:
             async with self.session_maker() as session:
@@ -334,20 +336,44 @@ class ReportSchedulerService:
                         BACKFILL_PROGRESS_KEY,
                         {
                             "status": "running",
+                            "stage": "starting",
                             "total_dates": total,
                             "collected": 0,
                             "failed": 0,
                             "date_from": date_from.isoformat(),
                             "date_to": date_to.isoformat(),
-                            "started_at": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
+                            "started_at": started_at,
                         },
                     )
         except Exception as e:
             logger.error("Failed to save backfill start progress: %s", e)
 
+        # Progress callback: updates app_settings with current stage
+        async def _update_progress(event: str, detail: dict) -> None:
+            try:
+                progress: dict = {
+                    "status": "running",
+                    "stage": event,
+                    "total_dates": total,
+                    "collected": 0,
+                    "failed": 0,
+                    "date_from": date_from.isoformat(),
+                    "date_to": date_to.isoformat(),
+                    "started_at": started_at,
+                }
+                progress.update(detail)
+                async with self.session_maker() as session:
+                    async with session.begin():
+                        await self._app_settings_repo.set(
+                            session, BACKFILL_PROGRESS_KEY, progress,
+                        )
+            except Exception as e:
+                logger.debug("Failed to update backfill progress: %s", e)
+
         try:
             result = await self._getcourse_service.collect_metrics_range(
-                self.session_maker, date_from, date_to, collected_by_id
+                self.session_maker, date_from, date_to, collected_by_id,
+                on_progress=_update_progress,
             )
             collected = result["collected"]
         except Exception as e:
@@ -369,6 +395,7 @@ class ReportSchedulerService:
                             "failed": failed,
                             "date_from": date_from.isoformat(),
                             "date_to": date_to.isoformat(),
+                            "started_at": started_at,
                             "completed_at": datetime.now(tz=ZoneInfo("UTC")).isoformat(),
                             "error": error_message,
                         },
