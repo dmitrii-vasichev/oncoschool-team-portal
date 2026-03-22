@@ -112,7 +112,7 @@ class TestProgressCallback(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        # For each of 3 exports: request → export_id, poll → exported
+        # n8n-style: 3 requests first, then 3 polls
         export_resp = MagicMock()
         export_resp.json.return_value = _make_export_response(10)
         export_resp.raise_for_status = MagicMock()
@@ -121,11 +121,10 @@ class TestProgressCallback(unittest.IsolatedAsyncioTestCase):
         poll_resp.json.return_value = _make_exported_response([{"id": 1}])
         poll_resp.raise_for_status = MagicMock()
 
-        # 3 exports × 2 calls each (request + poll) = 6 total
+        # Phase 1: 3 requests, Phase 2: 3 polls = 6 total
         mock_client.get = AsyncMock(side_effect=[
-            export_resp, poll_resp,  # users
-            export_resp, poll_resp,  # payments
-            export_resp, poll_resp,  # deals
+            export_resp, export_resp, export_resp,  # all 3 requests
+            poll_resp, poll_resp, poll_resp,         # all 3 fetches
         ])
 
         users, payments, deals = await self.service._request_and_poll_exports(
