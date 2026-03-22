@@ -190,8 +190,8 @@ class TestPollIntervalConstant(unittest.TestCase):
     budget for the remaining export types (payments, deals).
     """
 
-    def test_poll_interval_is_60(self):
-        self.assertEqual(POLL_INTERVAL_SECONDS, 60)
+    def test_poll_interval_is_15(self):
+        self.assertEqual(POLL_INTERVAL_SECONDS, 15)
 
 
 class TestScaledTimeout(unittest.TestCase):
