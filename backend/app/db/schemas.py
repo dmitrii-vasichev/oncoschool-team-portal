@@ -576,6 +576,7 @@ class ReportSummaryResponse(BaseModel):
 
 class CollectRequest(BaseModel):
     date: date
+    pause_minutes: int = 5  # minutes to wait between exports (min 5)
 
 
 class CollectResponse(BaseModel):
@@ -586,6 +587,7 @@ class CollectResponse(BaseModel):
 class BackfillRequest(BaseModel):
     date_from: date
     date_to: date
+    pause_minutes: int = 5  # minutes to wait between exports (min 5)
 
 
 class BackfillResponse(BaseModel):

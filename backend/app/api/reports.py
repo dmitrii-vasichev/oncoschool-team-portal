@@ -140,9 +140,11 @@ async def collect(
     existing = await _metrics_repo.get_by_date(session, "getcourse", data.date)
 
     # Collect (or recollect)
+    pause_seconds = max(data.pause_minutes, 5) * 60
     try:
         metric = await _getcourse_service.collect_metrics(
-            async_session, data.date, collected_by_id=member.id
+            async_session, data.date, collected_by_id=member.id,
+            pause_seconds=pause_seconds,
         )
         status = "completed"
         return CollectResponse(status=status, metric=DailyMetricResponse.model_validate(metric))
@@ -210,9 +212,11 @@ async def backfill(
 
     total_dates = (data.date_to - data.date_from).days + 1
 
+    pause_seconds = max(data.pause_minutes, 5) * 60
     scheduler = _get_report_scheduler(request)
     background_tasks.add_task(
-        scheduler.run_backfill, data.date_from, data.date_to, member.id
+        scheduler.run_backfill, data.date_from, data.date_to, member.id,
+        pause_seconds=pause_seconds,
     )
 
     return BackfillResponse(status="started", total_dates=total_dates)
