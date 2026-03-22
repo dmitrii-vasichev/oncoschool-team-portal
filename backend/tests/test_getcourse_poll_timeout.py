@@ -62,6 +62,74 @@ class TestFetchExportSuccess(unittest.TestCase):
         self.assertEqual(mock_client.get.await_count, 1)
 
 
+class TestFetchExportItemsWithoutStatus(unittest.TestCase):
+    """GetCourse may return items without a 'status' field (#174)."""
+
+    def setUp(self):
+        self.service = GetCourseService()
+
+    def test_items_without_status_field(self):
+        """success=true + info has items but no status — should return items."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True, "info": {"items": [{"id": 1}, {"id": 2}]}
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            result = asyncio.run(
+                self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+            )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(mock_client.get.await_count, 1)
+
+    def test_items_with_null_status(self):
+        """success=true + items present + status=None — should still return items."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True, "info": {"status": None, "items": [{"id": 1}]}
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            result = asyncio.run(
+                self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+            )
+
+        self.assertEqual(len(result), 1)
+
+    def test_empty_items_list_is_valid(self):
+        """success=true + items=[] — valid response for a day with no data."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True, "info": {"items": []}
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            result = asyncio.run(
+                self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+            )
+
+        self.assertEqual(result, [])
+
+
 class TestFetchExportNotReady(unittest.TestCase):
     """_fetch_export should retry a few times, then fail — no long polling."""
 

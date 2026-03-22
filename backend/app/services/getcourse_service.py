@@ -213,13 +213,28 @@ class GetCourseService:
             info = data.get("info", {})
             status = info.get("status")
 
-            if status == "exported":
-                items = info.get("items", [])
+            logger.debug(
+                "Export %d response keys: %s, status=%s",
+                export_id, list(info.keys()), status,
+            )
+
+            # Primary check: if items are present, the export is ready.
+            # GetCourse may omit the "status" field entirely when data is ready.
+            if "items" in info:
+                items = info["items"]
                 logger.info(
-                    "Export %d fetched on attempt %d: %d items",
-                    export_id, attempt, len(items),
+                    "Export %d fetched on attempt %d: %d items (status=%s)",
+                    export_id, attempt, len(items), status,
                 )
                 return items
+
+            if status == "exported":
+                # Fallback: status says exported but no items key
+                logger.warning(
+                    "Export %d: status='exported' but no 'items' key, returning empty",
+                    export_id,
+                )
+                return []
 
             if status == "error":
                 raise RuntimeError(f"GetCourse export {export_id} failed on server side")
