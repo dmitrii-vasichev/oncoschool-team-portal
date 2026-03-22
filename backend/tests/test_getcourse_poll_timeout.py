@@ -1,70 +1,91 @@
-"""Regression tests for GetCourse export polling timeout behavior.
+"""Regression tests for GetCourse export fetch behavior.
 
-Issue #139: Rate-limit delays were counted toward export timeout budget,
-causing premature TimeoutError even though the export was still processing.
+Replaces old polling tests — since #171, Phase 2 uses _fetch_export (single attempt
+with quick retries) instead of _poll_export (long polling loop).
 """
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.getcourse_service import (
     GetCourseService,
-    POLL_INTERVAL_SECONDS,
-    POLL_MAX_WAIT_SECONDS,
-    POLL_SECONDS_PER_DAY,
-    POLL_MAX_TIMEOUT_CAP,
+    FETCH_MAX_ATTEMPTS,
+    FETCH_RETRY_DELAY,
     RATE_LIMIT_BASE_DELAY,
     RATE_LIMIT_MAX_DELAY,
     MAX_RATE_LIMIT_RETRIES,
+    EXPORT_PAUSE,
 )
 
 
-def _make_rate_limit_response():
-    """Return a mock response with rate-limit error."""
-    return {"success": False, "error_message": "Слишком много запросов"}
-
-
 def _make_not_ready_response():
-    """Return a mock response for 'file not yet created'."""
     return {"success": False, "error_message": "Файл еще не создан"}
 
 
+def _make_rate_limit_response():
+    return {"success": False, "error_message": "Слишком много запросов"}
+
+
 def _make_exported_response(items=None):
-    """Return a mock response for a completed export."""
     return {"success": True, "info": {"status": "exported", "items": items or []}}
 
 
 def _make_processing_response():
-    """Return a mock response for an in-progress export."""
     return {"success": True, "info": {"status": "processing"}}
 
 
-class TestPollExportRateLimitNotCountedInTimeout(unittest.TestCase):
-    """Rate-limit delays must NOT count toward the export timeout."""
+class TestFetchExportSuccess(unittest.TestCase):
+    """_fetch_export should return items on first attempt when data is ready."""
 
     def setUp(self):
         self.service = GetCourseService()
 
-    def test_rate_limits_do_not_consume_timeout_budget(self):
-        """Even with many rate-limit pauses, the export should succeed
-        if the actual processing time is within the timeout."""
-        responses = []
-        # Simulate 5 rate-limit responses followed by success
-        for _ in range(5):
-            responses.append(_make_rate_limit_response())
-        responses.append(_make_exported_response([{"id": 1}]))
+    def test_immediate_success(self):
+        """Export ready on first fetch — no retries needed."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value=_make_exported_response([{"id": 1}]))
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            result = asyncio.run(
+                self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+            )
+
+        self.assertEqual(len(result), 1)
+        # Only 1 HTTP call — no retries
+        self.assertEqual(mock_client.get.await_count, 1)
+
+
+class TestFetchExportNotReady(unittest.TestCase):
+    """_fetch_export should retry a few times, then fail — no long polling."""
+
+    def setUp(self):
+        self.service = GetCourseService()
+
+    def test_max_attempts_is_3(self):
+        self.assertEqual(FETCH_MAX_ATTEMPTS, 3)
+
+    def test_retry_delay_is_30s(self):
+        self.assertEqual(FETCH_RETRY_DELAY, 30)
+
+    def test_not_ready_then_success(self):
+        """Not ready on first attempt, ready on second."""
+        responses = [_make_not_ready_response(), _make_exported_response([{"id": 1}])]
+        call_count = [0]
+
+        def json_side_effect():
+            result = responses[call_count[0]]
+            call_count[0] += 1
+            return result
 
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
-        call_count = 0
-
-        def json_side_effect():
-            nonlocal call_count
-            result = responses[call_count]
-            call_count += 1
-            return result
-
         mock_response.json = json_side_effect
 
         mock_client = AsyncMock()
@@ -75,17 +96,14 @@ class TestPollExportRateLimitNotCountedInTimeout(unittest.TestCase):
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
                 result = asyncio.run(
-                    self.service._poll_export("https://test.getcourse.ru", "key", 12345, timeout=10)
+                    self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
                 )
 
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["id"], 1)
-        # All 6 calls made (5 rate-limit + 1 success)
-        self.assertEqual(call_count, 6)
+        self.assertEqual(call_count[0], 2)
 
-    def test_timeout_fires_on_actual_processing_time(self):
-        """Timeout should fire based on non-rate-limit elapsed time only."""
-        # Return "not ready" responses indefinitely (simulating long processing)
+    def test_all_not_ready_raises_with_hint(self):
+        """If never ready after all attempts, error suggests increasing pause."""
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.json = MagicMock(return_value=_make_not_ready_response())
@@ -97,68 +115,36 @@ class TestPollExportRateLimitNotCountedInTimeout(unittest.TestCase):
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-                with self.assertRaises(TimeoutError) as ctx:
+                with self.assertRaises(RuntimeError) as ctx:
                     asyncio.run(
-                        self.service._poll_export("https://test.getcourse.ru", "key", 99999, timeout=10)
+                        self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
                     )
 
-        self.assertIn("did not complete within 10s", str(ctx.exception))
+        self.assertIn("не готовы", str(ctx.exception))
+        self.assertIn("увеличить паузу", str(ctx.exception))
+        # Exactly FETCH_MAX_ATTEMPTS HTTP calls
+        self.assertEqual(mock_client.get.await_count, FETCH_MAX_ATTEMPTS)
 
 
-class TestPollExportRateLimitBackoff(unittest.TestCase):
-    """Rate-limit delays should use exponential backoff."""
+class TestFetchExportRateLimit(unittest.TestCase):
+    """Rate limit during fetch should retry, not crash."""
 
     def setUp(self):
         self.service = GetCourseService()
 
-    def test_exponential_backoff_on_rate_limit(self):
-        """Rate-limit delays should increase exponentially up to the cap."""
-        responses = []
-        # 4 rate-limit responses, then success
-        for _ in range(4):
-            responses.append(_make_rate_limit_response())
-        responses.append(_make_exported_response())
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status = MagicMock()
-        call_count = 0
+    def test_rate_limit_then_success(self):
+        """Rate limited once, then succeeds."""
+        responses = [_make_rate_limit_response(), _make_exported_response([{"id": 1}])]
+        call_count = [0]
 
         def json_side_effect():
-            nonlocal call_count
-            result = responses[call_count]
-            call_count += 1
+            result = responses[call_count[0]]
+            call_count[0] += 1
             return result
 
-        mock_response.json = json_side_effect
-
-        mock_client = AsyncMock()
-        mock_client.get = AsyncMock(return_value=mock_response)
-        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client.__aexit__ = AsyncMock(return_value=False)
-
-        sleep_delays = []
-
-        async def mock_sleep(seconds):
-            sleep_delays.append(seconds)
-
-        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
-            with patch("app.services.getcourse_service.asyncio.sleep", side_effect=mock_sleep):
-                asyncio.run(
-                    self.service._poll_export("https://test.getcourse.ru", "key", 12345, timeout=10)
-                )
-
-        # Verify exponential backoff: 30, 60, 120, 120 (capped)
-        expected_delays = [
-            min(RATE_LIMIT_BASE_DELAY * (2 ** i), RATE_LIMIT_MAX_DELAY)
-            for i in range(4)
-        ]
-        self.assertEqual(sleep_delays, expected_delays)
-
-    def test_max_rate_limit_retries_raises(self):
-        """After MAX_RATE_LIMIT_RETRIES rate-limit responses, raise RuntimeError."""
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
-        mock_response.json = MagicMock(return_value=_make_rate_limit_response())
+        mock_response.json = json_side_effect
 
         mock_client = AsyncMock()
         mock_client.get = AsyncMock(return_value=mock_response)
@@ -167,61 +153,48 @@ class TestPollExportRateLimitBackoff(unittest.TestCase):
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-                with self.assertRaises(RuntimeError) as ctx:
-                    asyncio.run(
-                        self.service._poll_export("https://test.getcourse.ru", "key", 12345, timeout=9999)
-                    )
+                result = asyncio.run(
+                    self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+                )
 
-        self.assertIn("rate limited", str(ctx.exception))
-
-
-class TestPollMaxWaitConstant(unittest.TestCase):
-    """Verify the base timeout constant (15 min, increased in #163)."""
-
-    def test_poll_max_wait_is_900(self):
-        self.assertEqual(POLL_MAX_WAIT_SECONDS, 900)
+        self.assertEqual(len(result), 1)
 
 
-class TestPollIntervalConstant(unittest.TestCase):
-    """Poll interval must be 60s to stay within API rate limits."""
+class TestFetchExportServerError(unittest.TestCase):
+    """Server-side error should fail immediately."""
 
-    def test_poll_interval_is_60(self):
-        self.assertEqual(POLL_INTERVAL_SECONDS, 60)
+    def setUp(self):
+        self.service = GetCourseService()
+
+    def test_server_error_raises(self):
+        """status='error' should raise immediately, no retries."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value={
+            "success": True, "info": {"status": "error"}
+        })
+
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_response)
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
+            with self.assertRaises(RuntimeError) as ctx:
+                asyncio.run(
+                    self.service._fetch_export("https://test.getcourse.ru", "key", 12345)
+                )
+
+        self.assertIn("failed on server side", str(ctx.exception))
+        # Only 1 call — no retries on server error
+        self.assertEqual(mock_client.get.await_count, 1)
 
 
-class TestScaledTimeout(unittest.TestCase):
-    """Regression #147: multi-day backfill ranges need a scaled timeout.
+class TestExportPauseConstant(unittest.TestCase):
+    """Pause between exports must be 5 min (matching n8n)."""
 
-    A 7-day export timed out at the default 1200s because GetCourse
-    needs more time to prepare large exports server-side.
-    """
-
-    def test_single_day_keeps_default(self):
-        """Single-day range should use the default timeout."""
-        timeout = GetCourseService._scaled_timeout("2026-03-14", "2026-03-14")
-        self.assertEqual(timeout, POLL_MAX_WAIT_SECONDS)
-
-    def test_seven_day_range_scales_up(self):
-        """7-day range should get 7 * POLL_SECONDS_PER_DAY."""
-        timeout = GetCourseService._scaled_timeout("2026-03-14", "2026-03-20")
-        expected = 7 * POLL_SECONDS_PER_DAY  # 4200
-        self.assertEqual(timeout, expected)
-        self.assertGreater(timeout, POLL_MAX_WAIT_SECONDS)
-
-    def test_large_range_capped(self):
-        """Very large ranges should be capped at POLL_MAX_TIMEOUT_CAP."""
-        timeout = GetCourseService._scaled_timeout("2026-01-01", "2026-12-31")
-        self.assertEqual(timeout, POLL_MAX_TIMEOUT_CAP)
-
-    def test_invalid_dates_use_default(self):
-        """Invalid date strings should fall back to the default timeout."""
-        timeout = GetCourseService._scaled_timeout("bad", "dates")
-        self.assertEqual(timeout, POLL_MAX_WAIT_SECONDS)
-
-    def test_constants_are_sane(self):
-        """Verify the timeout constants (#159: reduced from 600 to 300)."""
-        self.assertEqual(POLL_SECONDS_PER_DAY, 300)
-        self.assertEqual(POLL_MAX_TIMEOUT_CAP, 7200)
+    def test_export_pause_is_300(self):
+        self.assertEqual(EXPORT_PAUSE, 300)
 
 
 if __name__ == "__main__":

@@ -160,7 +160,7 @@ class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
         service._metrics_repo = MagicMock()
         service._metrics_repo.upsert = AsyncMock(return_value=mock_metric)
 
-        # Mock _request_export and _poll_export (array-based items, #163)
+        # Mock _request_export and _fetch_export (array-based items, #163)
         from app.services.getcourse_service import PAYMENT_PRICE_INDEX, ORDER_SUM_INDEX
         payment_row = [""] * (PAYMENT_PRICE_INDEX + 1)
         payment_row[PAYMENT_PRICE_INDEX] = "1000"
@@ -168,7 +168,7 @@ class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
         order_row[ORDER_SUM_INDEX] = "5000"
 
         service._request_export = AsyncMock(side_effect=[101, 102, 103])
-        service._poll_export = AsyncMock(
+        service._fetch_export = AsyncMock(
             side_effect=[
                 # users (2 rows)
                 [["a@test.com", "Иванов"], ["b@test.com", "Петров"]],
@@ -186,8 +186,8 @@ class TestGetCourseServiceCollectMetrics(unittest.IsolatedAsyncioTestCase):
 
         # Verify 3 exports requested
         self.assertEqual(service._request_export.await_count, 3)
-        # Verify 3 polls
-        self.assertEqual(service._poll_export.await_count, 3)
+        # Verify 3 fetches
+        self.assertEqual(service._fetch_export.await_count, 3)
         # Verify upsert called with correct aggregated values
         service._metrics_repo.upsert.assert_awaited_once()
         call_kwargs = service._metrics_repo.upsert.await_args
@@ -546,11 +546,11 @@ class TestRequestExportHTTPMethod(unittest.IsolatedAsyncioTestCase):
             self.assertIn("created_at[to]", sent_params, f"{export_type} must use created_at[to]")
 
 
-class TestPollExportNotReady(unittest.IsolatedAsyncioTestCase):
-    """Regression: _poll_export must keep polling when file is not yet created."""
+class TestFetchExportNotReady(unittest.IsolatedAsyncioTestCase):
+    """Regression: _fetch_export must retry when file is not yet created."""
 
-    async def test_poll_continues_on_file_not_ready(self) -> None:
-        """'Файл еще не создан' is a normal intermediate state, not an error."""
+    async def test_fetch_continues_on_file_not_ready(self) -> None:
+        """'Файл еще не создан' is a normal intermediate state — retried up to FETCH_MAX_ATTEMPTS."""
         service = GetCourseService()
 
         not_ready = MagicMock()
@@ -570,21 +570,21 @@ class TestPollExportNotReady(unittest.IsolatedAsyncioTestCase):
         })
 
         mock_client = AsyncMock()
-        mock_client.get = AsyncMock(side_effect=[not_ready, not_ready, ready])
+        mock_client.get = AsyncMock(side_effect=[not_ready, ready])
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock):
-                items = await service._poll_export(
+                items = await service._fetch_export(
                     "https://school.getcourse.ru", "secret", 42
                 )
 
         self.assertEqual(len(items), 1)
-        self.assertEqual(mock_client.get.await_count, 3)
+        self.assertEqual(mock_client.get.await_count, 2)
 
-    async def test_poll_raises_on_real_error(self) -> None:
-        """Genuine API errors should still raise."""
+    async def test_fetch_raises_on_real_error(self) -> None:
+        """Genuine API errors should still raise immediately."""
         service = GetCourseService()
 
         error_resp = MagicMock()
@@ -602,7 +602,7 @@ class TestPollExportNotReady(unittest.IsolatedAsyncioTestCase):
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with self.assertRaises(RuntimeError, msg="Неверный ключ API"):
-                await service._poll_export(
+                await service._fetch_export(
                     "https://school.getcourse.ru", "secret", 42
                 )
 
@@ -610,8 +610,8 @@ class TestPollExportNotReady(unittest.IsolatedAsyncioTestCase):
 class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
     """Regression #126: rate limit responses must be retried, not raised."""
 
-    async def test_poll_retries_on_rate_limit(self) -> None:
-        """'Слишком много запросов' during poll should wait and retry."""
+    async def test_fetch_retries_on_rate_limit(self) -> None:
+        """'Слишком много запросов' during fetch should wait and retry."""
         service = GetCourseService()
 
         rate_limited = MagicMock()
@@ -637,13 +637,13 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
 
         with patch("app.services.getcourse_service.httpx.AsyncClient", return_value=mock_client):
             with patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-                items = await service._poll_export(
+                items = await service._fetch_export(
                     "https://school.getcourse.ru", "secret", 42
                 )
 
         self.assertEqual(len(items), 1)
         self.assertEqual(mock_client.get.await_count, 2)
-        # Should have waited RATE_LIMIT_DELAY (30s)
+        # Should have waited with rate limit backoff (30s base * attempt 1)
         mock_sleep.assert_any_await(30)
 
     async def test_request_retries_on_rate_limit(self) -> None:
@@ -727,9 +727,9 @@ class TestRateLimitRetry(unittest.IsolatedAsyncioTestCase):
         """
         service = GetCourseService()
 
-        # Mock _request_export and _poll_export directly
+        # Mock _request_export and _fetch_export directly
         service._request_export = AsyncMock(side_effect=[1, 2, 3])
-        service._poll_export = AsyncMock(side_effect=[
+        service._fetch_export = AsyncMock(side_effect=[
             [{"email": "a@test.com"}],
             [{"status": "accepted", "amount": "100"}],
             [{"status": "finished", "cost": "500"}],

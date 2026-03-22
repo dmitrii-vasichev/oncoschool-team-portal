@@ -3,13 +3,21 @@
 Issue #151: Backfill shows no intermediate progress — user cannot tell
 whether data is actually loading, stuck in rate-limit, or failed silently.
 The fix adds a progress_callback that reports stage transitions.
+
+Updated after _poll_export was replaced by _fetch_export:
+- _fetch_export has no on_progress/timeout params (only base_url, api_key, export_id, cancel_flag)
+- Progress callbacks are tested at _request_and_poll_exports level
+- _fetch_export uses FETCH_MAX_ATTEMPTS=3 with FETCH_RETRY_DELAY=30s
 """
 
 import asyncio
 import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.services.getcourse_service import GetCourseService
+from app.services.getcourse_service import (
+    GetCourseService,
+    FETCH_MAX_ATTEMPTS,
+)
 
 
 def _make_export_response(export_id: int = 1):
@@ -33,7 +41,7 @@ def _make_rate_limit_response():
 
 
 class TestProgressCallback(unittest.IsolatedAsyncioTestCase):
-    """Verify that on_progress callback fires during export polling."""
+    """Verify that on_progress callback fires during _request_and_poll_exports."""
 
     def setUp(self):
         self.service = GetCourseService()
@@ -46,85 +54,25 @@ class TestProgressCallback(unittest.IsolatedAsyncioTestCase):
 
     @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.services.getcourse_service.httpx.AsyncClient")
-    async def test_poll_export_calls_progress_on_not_ready(self, mock_client_cls, mock_sleep):
-        """When export is not ready yet, progress callback fires with 'polling' + 'waiting'."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        # First call: not ready, second call: exported
-        response1 = MagicMock()
-        response1.json.return_value = _make_not_ready_response()
-        response1.raise_for_status = MagicMock()
-
-        response2 = MagicMock()
-        response2.json.return_value = _make_exported_response([{"id": 1}])
-        response2.raise_for_status = MagicMock()
-
-        mock_client.get = AsyncMock(side_effect=[response1, response2])
-
-        items = await self.service._poll_export(
-            "https://example.com", "key", 123, timeout=300,
-            on_progress=self.on_progress,
-        )
-
-        self.assertEqual(len(items), 1)
-        # Should have fired at least one 'polling' event with detail='waiting'
-        polling_events = [e for e in self.progress_events if e[0] == "polling"]
-        self.assertGreaterEqual(len(polling_events), 1)
-        self.assertEqual(polling_events[0][1]["detail"], "waiting")
-
-    @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
-    @patch("app.services.getcourse_service.httpx.AsyncClient")
-    async def test_poll_export_calls_progress_on_rate_limit(self, mock_client_cls, mock_sleep):
-        """When rate-limited, progress callback fires with 'rate_limited' event."""
-        mock_client = AsyncMock()
-        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
-
-        # First call: rate limited, second call: exported
-        response1 = MagicMock()
-        response1.json.return_value = _make_rate_limit_response()
-        response1.raise_for_status = MagicMock()
-
-        response2 = MagicMock()
-        response2.json.return_value = _make_exported_response()
-        response2.raise_for_status = MagicMock()
-
-        mock_client.get = AsyncMock(side_effect=[response1, response2])
-
-        await self.service._poll_export(
-            "https://example.com", "key", 456, timeout=300,
-            on_progress=self.on_progress,
-        )
-
-        # Should have fired 'rate_limited' event with rate_limit_count
-        rl_events = [e for e in self.progress_events if e[0] == "rate_limited"]
-        self.assertGreaterEqual(len(rl_events), 1)
-        self.assertEqual(rl_events[0][1]["rate_limit_count"], 1)
-        self.assertIn("wait_seconds", rl_events[0][1])
-
-    @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
-    @patch("app.services.getcourse_service.httpx.AsyncClient")
     async def test_request_and_poll_exports_reports_stages(self, mock_client_cls, mock_sleep):
         """_request_and_poll_exports fires export_started / export_done for each type."""
         mock_client = AsyncMock()
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        # n8n-style: 3 requests first, then 3 polls
+        # n8n-style: 3 requests first, then 3 fetches
         export_resp = MagicMock()
         export_resp.json.return_value = _make_export_response(10)
         export_resp.raise_for_status = MagicMock()
 
-        poll_resp = MagicMock()
-        poll_resp.json.return_value = _make_exported_response([{"id": 1}])
-        poll_resp.raise_for_status = MagicMock()
+        fetch_resp = MagicMock()
+        fetch_resp.json.return_value = _make_exported_response([{"id": 1}])
+        fetch_resp.raise_for_status = MagicMock()
 
-        # Phase 1: 3 requests, Phase 2: 3 polls = 6 total
+        # Phase 1: 3 requests, Phase 2: 3 fetches = 6 total
         mock_client.get = AsyncMock(side_effect=[
             export_resp, export_resp, export_resp,  # all 3 requests
-            poll_resp, poll_resp, poll_resp,         # all 3 fetches
+            fetch_resp, fetch_resp, fetch_resp,     # all 3 fetches
         ])
 
         users, payments, deals = await self.service._request_and_poll_exports(
@@ -149,29 +97,88 @@ class TestProgressCallback(unittest.IsolatedAsyncioTestCase):
         for event in done_events:
             self.assertIn("rows_count", event[1])
 
+
+class TestFetchExportNotReady(unittest.IsolatedAsyncioTestCase):
+    """_fetch_export retries when export is not ready yet (up to FETCH_MAX_ATTEMPTS)."""
+
+    def setUp(self):
+        self.service = GetCourseService()
+
     @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.services.getcourse_service.httpx.AsyncClient")
-    async def test_no_progress_callback_still_works(self, mock_client_cls, mock_sleep):
-        """Without on_progress, everything works as before (no errors)."""
+    async def test_fetch_export_retries_on_not_ready(self, mock_client_cls, mock_sleep):
+        """When export is not ready, _fetch_export retries and succeeds on next attempt."""
         mock_client = AsyncMock()
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-        response = MagicMock()
-        response.json.return_value = _make_exported_response([{"id": 1}])
-        response.raise_for_status = MagicMock()
+        # First call: not ready, second call: exported
+        response1 = MagicMock()
+        response1.json.return_value = _make_not_ready_response()
+        response1.raise_for_status = MagicMock()
 
-        mock_client.get = AsyncMock(return_value=response)
+        response2 = MagicMock()
+        response2.json.return_value = _make_exported_response([{"id": 1}])
+        response2.raise_for_status = MagicMock()
 
-        items = await self.service._poll_export(
-            "https://example.com", "key", 789, timeout=300,
-            on_progress=None,
+        mock_client.get = AsyncMock(side_effect=[response1, response2])
+
+        items = await self.service._fetch_export(
+            "https://example.com", "key", 123,
+        )
+
+        self.assertEqual(len(items), 1)
+        # Should have slept between retries
+        mock_sleep.assert_awaited()
+
+    @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.getcourse_service.httpx.AsyncClient")
+    async def test_fetch_export_not_ready_exhausts_attempts(self, mock_client_cls, mock_sleep):
+        """When export is never ready, _fetch_export raises after FETCH_MAX_ATTEMPTS."""
+        mock_client = AsyncMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        not_ready_resp = MagicMock()
+        not_ready_resp.json.return_value = _make_not_ready_response()
+        not_ready_resp.raise_for_status = MagicMock()
+
+        mock_client.get = AsyncMock(return_value=not_ready_resp)
+
+        with self.assertRaises(RuntimeError) as ctx:
+            await self.service._fetch_export(
+                "https://example.com", "key", 123,
+            )
+        self.assertIn("не готовы", str(ctx.exception))
+
+    @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
+    @patch("app.services.getcourse_service.httpx.AsyncClient")
+    async def test_fetch_export_rate_limit_retries(self, mock_client_cls, mock_sleep):
+        """When rate-limited, _fetch_export retries with backoff."""
+        mock_client = AsyncMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+        # First call: rate limited, second call: exported
+        response1 = MagicMock()
+        response1.json.return_value = _make_rate_limit_response()
+        response1.raise_for_status = MagicMock()
+
+        response2 = MagicMock()
+        response2.json.return_value = _make_exported_response([{"id": 1}])
+        response2.raise_for_status = MagicMock()
+
+        mock_client.get = AsyncMock(side_effect=[response1, response2])
+
+        items = await self.service._fetch_export(
+            "https://example.com", "key", 456,
         )
         self.assertEqual(len(items), 1)
+        mock_sleep.assert_awaited()
 
 
-class TestPollHttpRetry(unittest.IsolatedAsyncioTestCase):
-    """Regression #159: transient HTTP errors in _poll_export should be retried."""
+class TestFetchHttpRetry(unittest.IsolatedAsyncioTestCase):
+    """Transient HTTP errors in _fetch_export should be retried up to FETCH_MAX_ATTEMPTS."""
 
     def setUp(self):
         self.service = GetCourseService()
@@ -179,7 +186,7 @@ class TestPollHttpRetry(unittest.IsolatedAsyncioTestCase):
     @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.services.getcourse_service.httpx.AsyncClient")
     async def test_transient_http_error_is_retried(self, mock_client_cls, mock_sleep):
-        """A single HTTP error should be retried, not crash the poll."""
+        """A single HTTP error should be retried, not crash the fetch."""
         import httpx as _httpx
 
         mock_client = AsyncMock()
@@ -194,17 +201,16 @@ class TestPollHttpRetry(unittest.IsolatedAsyncioTestCase):
 
         mock_client.get = AsyncMock(side_effect=[error_response, ok_response])
 
-        items = await self.service._poll_export(
-            "https://example.com", "key", 100, timeout=300,
+        items = await self.service._fetch_export(
+            "https://example.com", "key", 100,
         )
         self.assertEqual(len(items), 1)
 
     @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.services.getcourse_service.httpx.AsyncClient")
     async def test_too_many_http_errors_raises(self, mock_client_cls, mock_sleep):
-        """MAX_POLL_HTTP_ERRORS consecutive HTTP errors should raise RuntimeError."""
+        """FETCH_MAX_ATTEMPTS consecutive HTTP errors should raise RuntimeError."""
         import httpx as _httpx
-        from app.services.getcourse_service import MAX_POLL_HTTP_ERRORS
 
         mock_client = AsyncMock()
         mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
@@ -215,21 +221,21 @@ class TestPollHttpRetry(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaises(RuntimeError) as ctx:
-            await self.service._poll_export(
-                "https://example.com", "key", 200, timeout=9999,
+            await self.service._fetch_export(
+                "https://example.com", "key", 200,
             )
-        self.assertIn("HTTP errors", str(ctx.exception))
+        self.assertIn("HTTP error after", str(ctx.exception))
 
 
-class TestPollCancellation(unittest.IsolatedAsyncioTestCase):
-    """Regression #159: cancel_flag should stop polling."""
+class TestFetchCancellation(unittest.IsolatedAsyncioTestCase):
+    """cancel_flag should stop _fetch_export."""
 
     def setUp(self):
         self.service = GetCourseService()
 
     @patch("app.services.getcourse_service.asyncio.sleep", new_callable=AsyncMock)
     @patch("app.services.getcourse_service.httpx.AsyncClient")
-    async def test_cancel_flag_stops_poll(self, mock_client_cls, mock_sleep):
+    async def test_cancel_flag_stops_fetch(self, mock_client_cls, mock_sleep):
         """Setting cancel_flag should raise CancelledError."""
         cancel = asyncio.Event()
         cancel.set()  # already cancelled
@@ -239,8 +245,8 @@ class TestPollCancellation(unittest.IsolatedAsyncioTestCase):
         mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
         with self.assertRaises(asyncio.CancelledError):
-            await self.service._poll_export(
-                "https://example.com", "key", 300, timeout=300,
+            await self.service._fetch_export(
+                "https://example.com", "key", 300,
                 cancel_flag=cancel,
             )
 

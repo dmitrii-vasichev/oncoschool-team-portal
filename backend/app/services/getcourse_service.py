@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
@@ -21,22 +20,18 @@ from app.utils.encryption import decrypt
 
 logger = logging.getLogger(__name__)
 
-# Export poll settings (Phase 2: fetch)
-POLL_INTERVAL_SECONDS = 60  # check export status every 60s
-POLL_MAX_WAIT_SECONDS = 900  # 15 min base timeout for polling
-MAX_RETRIES = 3
+# Phase 2: fetch settings
+FETCH_MAX_ATTEMPTS = 3  # quick retries if export not ready yet
+FETCH_RETRY_DELAY = 30  # seconds between fetch retries
+MAX_RETRIES = 3  # retries for export request (Phase 1)
 RETRY_BASE_DELAY = 2
-MAX_POLL_HTTP_ERRORS = 5  # consecutive HTTP errors before aborting poll
+MAX_FETCH_HTTP_ERRORS = 3  # HTTP errors before giving up on fetch
 
-# Rate limit handling
+# Rate limit handling (used in both Phase 1 and Phase 2)
 RATE_LIMIT_BASE_DELAY = 30  # initial seconds to wait on rate limit
 RATE_LIMIT_MAX_DELAY = 120  # max seconds to wait on rate limit (exponential backoff cap)
-MAX_RATE_LIMIT_RETRIES = 30  # max rate-limit waits (separate from error retries)
+MAX_RATE_LIMIT_RETRIES = 30  # max rate-limit waits in Phase 1 (export request)
 EXPORT_PAUSE = 300  # seconds between sequential export requests (5 min, matching n8n)
-
-# Scaled timeout for multi-day ranges
-POLL_SECONDS_PER_DAY = 300  # 5 min per day in range (was 600)
-POLL_MAX_TIMEOUT_CAP = 7200  # absolute cap: 2 hours
 
 # Column indices in GetCourse export items (stable per account, matches n8n)
 PAYMENT_PRICE_INDEX = 7   # payment amount column
@@ -140,145 +135,108 @@ class GetCourseService:
 
         raise RuntimeError("Unreachable")  # pragma: no cover
 
-    async def _poll_export(
+    async def _fetch_export(
         self,
         base_url: str,
         api_key: str,
         export_id: int,
-        timeout: int = POLL_MAX_WAIT_SECONDS,
-        on_progress: ProgressCallback | None = None,
         cancel_flag: asyncio.Event | None = None,
     ) -> list:
-        """Poll until the export is ready and return the items list.
+        """Fetch export results. Like n8n: single attempt, quick retry if not ready.
 
-        Rate-limit delays do NOT count toward the timeout because the export
-        continues processing on GetCourse's side while we wait.
-        Transient HTTP errors are retried up to MAX_POLL_HTTP_ERRORS times.
-        If cancel_flag is set, raises CancelledError.
+        After Phase 1 pauses, the export should be ready. If not — a few quick
+        retries (30s apart), then fail. No long polling.
         """
         url = f"{base_url}/pl/api/account/exports/{export_id}"
         params = {"key": api_key}
-        elapsed = 0
-        rate_limit_count = 0
-        http_error_count = 0
-        wall_start = time.monotonic()
 
-        poll_count = 0
-        while elapsed < timeout:
-            # Check cancellation
+        for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
             if cancel_flag and cancel_flag.is_set():
-                raise asyncio.CancelledError("Backfill cancelled by user")
+                raise asyncio.CancelledError("Cancelled by user")
 
-            poll_count += 1
-            wall_elapsed = int(time.monotonic() - wall_start)
-
-            # HTTP request with retry on transient errors
+            # HTTP request
             try:
                 async with httpx.AsyncClient(timeout=30) as client:
                     response = await client.get(url, params=params)
                     response.raise_for_status()
                     data = response.json()
-                http_error_count = 0  # reset on success
             except (httpx.TransportError, httpx.HTTPStatusError) as e:
-                http_error_count += 1
-                logger.warning(
-                    "Export %d poll #%d: HTTP error (%s), attempt %d/%d",
-                    export_id, poll_count, e, http_error_count, MAX_POLL_HTTP_ERRORS,
-                )
-                if http_error_count >= MAX_POLL_HTTP_ERRORS:
-                    raise RuntimeError(
-                        f"GetCourse export {export_id} poll: {http_error_count} consecutive HTTP errors: {e}"
-                    ) from e
-                await asyncio.sleep(POLL_INTERVAL_SECONDS)
-                elapsed += POLL_INTERVAL_SECONDS
-                continue
+                if attempt < FETCH_MAX_ATTEMPTS:
+                    logger.warning(
+                        "Export %d fetch attempt %d/%d: HTTP error (%s), retrying in %ds",
+                        export_id, attempt, FETCH_MAX_ATTEMPTS, e, FETCH_RETRY_DELAY,
+                    )
+                    await asyncio.sleep(FETCH_RETRY_DELAY)
+                    continue
+                raise RuntimeError(
+                    f"GetCourse export {export_id}: HTTP error after {attempt} attempts: {e}"
+                ) from e
 
+            # Check response
             if not data.get("success"):
                 error_msg = str(data.get("error_message", ""))
-                # "Файл еще не создан" = file not yet created — normal intermediate state
+
+                # "Файл еще не создан" — not ready yet
                 if "еще не создан" in error_msg.lower():
-                    logger.info(
-                        "Export %d poll #%d: not ready yet (elapsed %ds/%ds)",
-                        export_id, poll_count, wall_elapsed, timeout,
-                    )
-                    if on_progress:
-                        await on_progress("polling", {
-                            "detail": "waiting",
-                            "poll_count": poll_count,
-                            "elapsed_seconds": wall_elapsed,
-                        })
-                    await asyncio.sleep(POLL_INTERVAL_SECONDS)
-                    elapsed += POLL_INTERVAL_SECONDS
-                    continue
-                # "Слишком много запросов" = rate limited — wait with backoff
-                # NOT counted toward timeout: export keeps processing server-side
-                if "слишком много" in error_msg.lower():
-                    rate_limit_count += 1
-                    if rate_limit_count > MAX_RATE_LIMIT_RETRIES:
-                        raise RuntimeError(
-                            f"GetCourse export {export_id} poll: rate limited {rate_limit_count} times"
+                    if attempt < FETCH_MAX_ATTEMPTS:
+                        logger.info(
+                            "Export %d fetch attempt %d/%d: not ready, retrying in %ds",
+                            export_id, attempt, FETCH_MAX_ATTEMPTS, FETCH_RETRY_DELAY,
                         )
-                    delay = min(
-                        RATE_LIMIT_BASE_DELAY * (2 ** (rate_limit_count - 1)),
-                        RATE_LIMIT_MAX_DELAY,
+                        await asyncio.sleep(FETCH_RETRY_DELAY)
+                        continue
+                    raise RuntimeError(
+                        f"GetCourse export {export_id}: данные не готовы после {attempt} попыток. "
+                        "Попробуйте увеличить паузу между экспортами."
                     )
-                    logger.warning(
-                        "Export %d poll #%d: RATE LIMITED (attempt %d, waiting %ds, elapsed %ds)",
-                        export_id, poll_count, rate_limit_count, delay, wall_elapsed,
+
+                # Rate limited — retry with backoff
+                if "слишком много" in error_msg.lower():
+                    if attempt < FETCH_MAX_ATTEMPTS:
+                        delay = min(RATE_LIMIT_BASE_DELAY * attempt, RATE_LIMIT_MAX_DELAY)
+                        logger.warning(
+                            "Export %d fetch attempt %d/%d: rate limited, waiting %ds",
+                            export_id, attempt, FETCH_MAX_ATTEMPTS, delay,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    raise RuntimeError(
+                        f"GetCourse export {export_id}: rate limited after {attempt} attempts"
                     )
-                    if on_progress:
-                        await on_progress("rate_limited", {
-                            "detail": "rate_limited",
-                            "rate_limit_count": rate_limit_count,
-                            "wait_seconds": delay,
-                            "elapsed_seconds": wall_elapsed,
-                        })
-                    await asyncio.sleep(delay)
-                    # elapsed NOT incremented — export still processing
-                    continue
-                logger.error(
-                    "Export %d poll #%d: UNEXPECTED ERROR — %s (full response: %s)",
-                    export_id, poll_count, error_msg, data,
-                )
+
+                # Unknown error
                 raise RuntimeError(
-                    f"GetCourse export poll failed: {error_msg or data}"
+                    f"GetCourse export {export_id} fetch failed: {error_msg or data}"
                 )
 
+            # Success response
             info = data.get("info", {})
             status = info.get("status")
 
             if status == "exported":
                 items = info.get("items", [])
                 logger.info(
-                    "Export %d ready after %d polls (%ds): %d items",
-                    export_id, poll_count, wall_elapsed, len(items),
+                    "Export %d fetched on attempt %d: %d items",
+                    export_id, attempt, len(items),
                 )
                 return items
 
             if status == "error":
-                logger.error(
-                    "Export %d poll #%d: server-side error (info: %s)",
-                    export_id, poll_count, info,
-                )
                 raise RuntimeError(f"GetCourse export {export_id} failed on server side")
 
-            logger.info(
-                "Export %d poll #%d: status=%s (elapsed %ds/%ds)",
-                export_id, poll_count, status, wall_elapsed, timeout,
-            )
-            if on_progress:
-                await on_progress("polling", {
-                    "detail": "processing",
-                    "poll_count": poll_count,
-                    "elapsed_seconds": wall_elapsed,
-                })
-            await asyncio.sleep(POLL_INTERVAL_SECONDS)
-            elapsed += POLL_INTERVAL_SECONDS
+            # Unknown status (processing, etc.) — retry
+            if attempt < FETCH_MAX_ATTEMPTS:
+                logger.info(
+                    "Export %d fetch attempt %d/%d: status=%s, retrying in %ds",
+                    export_id, attempt, FETCH_MAX_ATTEMPTS, status, FETCH_RETRY_DELAY,
+                )
+                await asyncio.sleep(FETCH_RETRY_DELAY)
+                continue
 
-        raise TimeoutError(
-            f"GetCourse export {export_id} did not complete within {timeout}s "
-            f"({poll_count} polls, wall time {int(time.monotonic() - wall_start)}s)"
-        )
+            raise RuntimeError(
+                f"GetCourse export {export_id}: status '{status}' after {attempt} attempts. "
+                "Попробуйте увеличить паузу между экспортами."
+            )
 
     # ------------------------------------------------------------------
     # Aggregation helpers (pure logic, no HTTP)
@@ -429,20 +387,6 @@ class GetCourseService:
                     "elapsed_seconds": waited,
                 })
 
-    @staticmethod
-    def _scaled_timeout(date_from: str, date_to: str) -> int:
-        """Calculate poll timeout scaled to the date range size.
-
-        Single-day: 300s (5 min). Multi-day: 300s per day, capped at 7200s (2h).
-        """
-        try:
-            d_from = date.fromisoformat(date_from)
-            d_to = date.fromisoformat(date_to)
-            days = max((d_to - d_from).days + 1, 1)
-        except (ValueError, TypeError):
-            days = 1
-        return min(max(POLL_MAX_WAIT_SECONDS, days * POLL_SECONDS_PER_DAY), POLL_MAX_TIMEOUT_CAP)
-
     async def _request_and_poll_exports(
         self, base_url: str, api_key: str, date_from: str, date_to: str,
         on_progress: ProgressCallback | None = None,
@@ -455,13 +399,13 @@ class GetCourseService:
         Phase 2: Fetch users (had 2×pause to process) → fetch payments → fetch deals
 
         This gives each export maximum processing time on GetCourse side.
+        No long polling in Phase 2 — just fetch (with a few quick retries if not ready).
         """
-        timeout = self._scaled_timeout(date_from, date_to)
         export_types = ["users", "payments", "deals"]
 
         logger.info(
-            "n8n-style export: range %s..%s, pause=%ds, poll_timeout=%ds",
-            date_from, date_to, pause_seconds, timeout,
+            "n8n-style export: range %s..%s, pause=%ds",
+            date_from, date_to, pause_seconds,
         )
 
         # ── Phase 1: Request all 3 exports with pauses between them ──
@@ -494,7 +438,7 @@ class GetCourseService:
                     {"detail": "waiting", "export_type": export_type, "step": step},
                 )
 
-        # ── Phase 2: Fetch all results ──
+        # ── Phase 2: Fetch all results (single attempt each, like n8n) ──
         # By now: users had 2×pause, payments had 1×pause, deals had 0
         results: dict[str, list] = {}
         errors: dict[str, str] = {}
@@ -502,14 +446,6 @@ class GetCourseService:
         for idx, export_type in enumerate(export_types):
             step = f"{idx + 1}/{len(export_types)}"
             eid = export_ids[export_type]
-
-            async def _fetch_progress(event: str, detail: dict[str, Any]) -> None:
-                if on_progress:
-                    await on_progress(event, {
-                        **detail,
-                        "export_type": export_type,
-                        "step": step,
-                    })
 
             if on_progress:
                 await on_progress("fetching", {
@@ -520,10 +456,8 @@ class GetCourseService:
             logger.info("Fetching export %d (%s)...", eid, export_type)
 
             try:
-                rows = await self._poll_export(
+                rows = await self._fetch_export(
                     base_url, api_key, eid,
-                    timeout=timeout,
-                    on_progress=_fetch_progress,
                     cancel_flag=cancel_flag,
                 )
                 results[export_type] = rows

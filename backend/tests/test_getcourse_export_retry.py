@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.getcourse_service import (
     GetCourseService,
-    POLL_INTERVAL_SECONDS,
     EXPORT_PAUSE,
 )
 
