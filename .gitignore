@@ -17,6 +17,7 @@ node_modules/
 
 # Claude Code / AI tooling
 .claude/
+.superpowers/
 .agents/
 skills/
 skills-lock.json
