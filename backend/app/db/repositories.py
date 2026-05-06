@@ -196,6 +196,9 @@ class DepartmentRepository:
 
 
 class TaskLabelRepository:
+    async def get_by_id(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        return await session.get(TaskLabel, label_id)
+
     async def get_by_slug(self, session: AsyncSession, slug: str) -> TaskLabel | None:
         stmt = select(TaskLabel).where(TaskLabel.slug == slug)
         result = await session.execute(stmt)
@@ -266,20 +269,19 @@ class TaskLabelRepository:
         *,
         name: str,
         created_by_id: uuid.UUID | None,
+        color: str | None = None,
     ) -> TaskLabel:
         normalized = normalize_task_label_name(name)
         slug = slugify_task_label(normalized)
         existing = await self.get_by_slug(session, slug)
         if existing:
             if existing.is_archived:
-                existing.is_archived = False
-                existing.name = normalized
-                await session.flush()
+                raise ValueError("Archived task label already exists")
             return existing
         label = TaskLabel(
             name=normalized,
             slug=slug,
-            color=pick_task_label_color(slug),
+            color=validate_task_label_color(color) if color else pick_task_label_color(slug),
             created_by_id=created_by_id,
         )
         session.add(label)
@@ -289,8 +291,50 @@ class TaskLabelRepository:
             await session.rollback()
             existing = await self.get_by_slug(session, slug)
             if existing:
+                if existing.is_archived:
+                    raise ValueError("Archived task label already exists")
                 return existing
             raise
+        return label
+
+    async def update(
+        self,
+        session: AsyncSession,
+        label_id: uuid.UUID,
+        *,
+        name: str | None = None,
+        color: str | None = None,
+    ) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        if name is not None:
+            normalized = normalize_task_label_name(name)
+            slug = slugify_task_label(normalized)
+            existing = await self.get_by_slug(session, slug)
+            if existing and existing.id != label.id:
+                raise ValueError("Task label name already exists")
+            label.name = normalized
+            label.slug = slug
+        if color is not None:
+            label.color = validate_task_label_color(color)
+        await session.flush()
+        return label
+
+    async def archive(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        label.is_archived = True
+        await session.flush()
+        return label
+
+    async def restore(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        label.is_archived = False
+        await session.flush()
         return label
 
     async def replace_task_labels(
@@ -304,8 +348,18 @@ class TaskLabelRepository:
         missing_ids = [label_id for label_id in label_ids if label_id not in found_ids]
         if missing_ids:
             raise ValueError("Одна или несколько меток не найдены")
+        existing_label_ids = {label.id for label in getattr(task, "labels", [])}
+        newly_added_archived = [
+            label
+            for label in labels
+            if label.is_archived and label.id not in existing_label_ids
+        ]
+        if newly_added_archived:
+            raise ValueError("Архивные метки нельзя добавить к задаче")
         task.labels = labels
-        await session.flush()
+        flush = getattr(session, "flush", None)
+        if flush:
+            await flush()
         return task
 
     async def is_shared_for_member(
@@ -314,7 +368,21 @@ class TaskLabelRepository:
         label_id: uuid.UUID,
         member_id: uuid.UUID,
     ) -> bool:
-        return False
+        stmt = (
+            select(func.count(Task.id))
+            .join(TaskLabelLink, TaskLabelLink.task_id == Task.id)
+            .where(
+                TaskLabelLink.label_id == label_id,
+                or_(
+                    Task.created_by_id.is_(None),
+                    Task.created_by_id != member_id,
+                    Task.assignee_id.is_(None),
+                    Task.assignee_id != member_id,
+                ),
+            )
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0) > 0
 
 
 class TaskRepository:

@@ -88,12 +88,13 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
             session,
             name=" conference ",
             created_by_id=uuid.uuid4(),
+            color="teal",
         )
 
         self.assertIs(result, existing)
         session.add.assert_not_called()
 
-    async def test_create_or_reactivate_unarchives_existing_label(self) -> None:
+    async def test_create_or_reactivate_rejects_archived_existing_label(self) -> None:
         archived = SimpleNamespace(
             id=uuid.uuid4(),
             name="Conference",
@@ -106,15 +107,16 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
         repo = TaskLabelRepository()
         repo.get_by_slug = AsyncMock(return_value=archived)
 
-        result = await repo.create_or_reactivate(
-            session,
-            name="Conference",
-            created_by_id=uuid.uuid4(),
-        )
+        with self.assertRaises(ValueError) as ctx:
+            await repo.create_or_reactivate(
+                session,
+                name="Conference",
+                created_by_id=uuid.uuid4(),
+                color="teal",
+            )
 
-        self.assertIs(result, archived)
-        self.assertFalse(archived.is_archived)
-        session.flush.assert_awaited_once()
+        self.assertEqual(str(ctx.exception), "Archived task label already exists")
+        session.flush.assert_not_called()
 
     async def test_create_or_reactivate_returns_existing_label_after_insert_race(self) -> None:
         existing = SimpleNamespace(
@@ -136,6 +138,7 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
             session,
             name="Conference",
             created_by_id=uuid.uuid4(),
+            color="teal",
         )
 
         self.assertIs(result, existing)
@@ -176,3 +179,92 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tasks", compiled)
         self.assertIn("assignee_id", compiled)
         self.assertNotIn("team_members", compiled)
+
+    async def test_update_label_changes_name_slug_and_color(self) -> None:
+        label_id = uuid.uuid4()
+        label = SimpleNamespace(
+            id=label_id,
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=False,
+        )
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+        repo.get_by_slug = AsyncMock(return_value=None)
+
+        result = await repo.update(session, label_id, name=" Partner  Event ", color="rose")
+
+        self.assertIs(result, label)
+        self.assertEqual(label.name, "Partner Event")
+        self.assertEqual(label.slug, "partner event")
+        self.assertEqual(label.color, "rose")
+        session.flush.assert_awaited_once()
+
+    async def test_update_label_rejects_duplicate_slug(self) -> None:
+        label_id = uuid.uuid4()
+        other_id = uuid.uuid4()
+        label = SimpleNamespace(
+            id=label_id,
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=False,
+        )
+        duplicate = SimpleNamespace(id=other_id, slug="partners", is_archived=False)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+        repo.get_by_slug = AsyncMock(return_value=duplicate)
+
+        with self.assertRaises(ValueError) as ctx:
+            await repo.update(session, label_id, name="Partners")
+
+        self.assertEqual(str(ctx.exception), "Task label name already exists")
+
+    async def test_archive_sets_is_archived(self) -> None:
+        label = SimpleNamespace(id=uuid.uuid4(), is_archived=False)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+
+        result = await repo.archive(session, label.id)
+
+        self.assertIs(result, label)
+        self.assertTrue(label.is_archived)
+        session.flush.assert_awaited_once()
+
+    async def test_restore_clears_is_archived(self) -> None:
+        label = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+
+        result = await repo.restore(session, label.id)
+
+        self.assertIs(result, label)
+        self.assertFalse(label.is_archived)
+        session.flush.assert_awaited_once()
+
+    async def test_is_shared_for_member_checks_author_and_assignee(self) -> None:
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one=lambda: 1))
+        repo = TaskLabelRepository()
+
+        result = await repo.is_shared_for_member(
+            session,
+            label_id=uuid.uuid4(),
+            member_id=uuid.uuid4(),
+        )
+
+        self.assertTrue(result)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        self.assertIn("created_by_id", compiled)
+        self.assertIn("assignee_id", compiled)
+        self.assertIn("IS NULL", compiled)
