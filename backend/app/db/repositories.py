@@ -208,12 +208,39 @@ class TaskLabelRepository:
         search: str | None = None,
         include_archived: bool = False,
         limit: int = 20,
+        visible_department_ids: list[uuid.UUID] | None = None,
+        fallback_member_id: uuid.UUID | None = None,
     ) -> list[tuple[TaskLabel, int]]:
-        usage_count = func.count(TaskLabelLink.task_id).label("usage_count")
+        usage_count_subquery_stmt = select(
+            TaskLabelLink.label_id,
+            func.count(TaskLabelLink.task_id).label("usage_count"),
+        )
+        if visible_department_ids is not None:
+            usage_count_subquery_stmt = usage_count_subquery_stmt.join(
+                Task,
+                Task.id == TaskLabelLink.task_id,
+            )
+            if visible_department_ids:
+                usage_count_subquery_stmt = usage_count_subquery_stmt.join(
+                    TeamMember,
+                    TeamMember.id == Task.assignee_id,
+                ).where(TeamMember.department_id.in_(visible_department_ids))
+            elif fallback_member_id:
+                usage_count_subquery_stmt = usage_count_subquery_stmt.where(
+                    Task.assignee_id == fallback_member_id
+                )
+            else:
+                usage_count_subquery_stmt = usage_count_subquery_stmt.where(sa.false())
+
+        usage_counts = (
+            usage_count_subquery_stmt
+            .group_by(TaskLabelLink.label_id)
+            .subquery()
+        )
+        usage_count = func.coalesce(usage_counts.c.usage_count, 0).label("usage_count")
         stmt = (
             select(TaskLabel, usage_count)
-            .outerjoin(TaskLabelLink, TaskLabelLink.label_id == TaskLabel.id)
-            .group_by(TaskLabel.id)
+            .outerjoin(usage_counts, usage_counts.c.label_id == TaskLabel.id)
             .order_by(usage_count.desc(), TaskLabel.name.asc())
             .limit(limit)
         )

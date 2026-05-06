@@ -6,6 +6,7 @@ from app.db.database import get_session
 from app.db.models import TeamMember
 from app.db.repositories import TaskLabelRepository
 from app.db.schemas import TaskLabelCreate, TaskLabelResponse
+from app.services.task_visibility_service import resolve_visible_department_ids
 
 router = APIRouter(prefix="/task-labels", tags=["task-labels"])
 label_repo = TaskLabelRepository()
@@ -28,11 +29,14 @@ async def list_task_labels(
     normalized_search = search.strip() if search is not None else None
     if normalized_search == "":
         normalized_search = None
+    visible_department_ids = await resolve_visible_department_ids(session, member)
     labels = await label_repo.search(
         session,
         search=normalized_search,
         include_archived=include_archived,
         limit=limit,
+        visible_department_ids=visible_department_ids,
+        fallback_member_id=member.id,
     )
     return [_label_response(label, usage_count) for label, usage_count in labels]
 

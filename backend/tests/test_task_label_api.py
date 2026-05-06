@@ -31,7 +31,11 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
             labels_api.label_repo,
             "search",
             AsyncMock(return_value=[(label, 3)]),
-        ) as search_mock:
+        ) as search_mock, patch.object(
+            labels_api,
+            "resolve_visible_department_ids",
+            AsyncMock(return_value=None),
+        ):
             response = await labels_api.list_task_labels(
                 search="conf",
                 limit=20,
@@ -47,6 +51,8 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
             search="conf",
             include_archived=False,
             limit=20,
+            visible_department_ids=None,
+            fallback_member_id=member.id,
         )
 
     async def test_list_task_labels_treats_whitespace_search_as_no_search(self) -> None:
@@ -57,7 +63,11 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
             labels_api.label_repo,
             "search",
             AsyncMock(return_value=[]),
-        ) as search_mock:
+        ) as search_mock, patch.object(
+            labels_api,
+            "resolve_visible_department_ids",
+            AsyncMock(return_value=[]),
+        ):
             response = await labels_api.list_task_labels(
                 search="   ",
                 limit=20,
@@ -72,6 +82,40 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
             search=None,
             include_archived=False,
             limit=20,
+            visible_department_ids=[],
+            fallback_member_id=member.id,
+        )
+
+    async def test_list_task_labels_scopes_usage_counts_to_visible_departments(self) -> None:
+        department_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="member", is_active=True)
+        session = SimpleNamespace()
+
+        with patch.object(
+            labels_api.label_repo,
+            "search",
+            AsyncMock(return_value=[]),
+        ) as search_mock, patch.object(
+            labels_api,
+            "resolve_visible_department_ids",
+            AsyncMock(return_value=[department_id]),
+        ) as visibility_mock:
+            await labels_api.list_task_labels(
+                search=None,
+                limit=20,
+                include_archived=False,
+                member=member,
+                session=session,
+            )
+
+        visibility_mock.assert_awaited_once_with(session, member)
+        search_mock.assert_awaited_once_with(
+            session,
+            search=None,
+            include_archived=False,
+            limit=20,
+            visible_department_ids=[department_id],
+            fallback_member_id=member.id,
         )
 
     async def test_create_task_label_commits_and_returns_label(self) -> None:

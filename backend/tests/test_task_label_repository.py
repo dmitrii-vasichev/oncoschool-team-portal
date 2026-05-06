@@ -122,3 +122,38 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(result, existing)
         session.rollback.assert_awaited_once()
         self.assertEqual(repo.get_by_slug.await_count, 2)
+
+    async def test_search_scopes_usage_counts_to_visible_departments(self) -> None:
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=SimpleNamespace(all=lambda: []))
+        repo = TaskLabelRepository()
+
+        await repo.search(
+            session,
+            visible_department_ids=[uuid.uuid4()],
+            fallback_member_id=uuid.uuid4(),
+        )
+
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        self.assertIn("tasks", compiled)
+        self.assertIn("team_members", compiled)
+        self.assertIn("department_id", compiled)
+
+    async def test_search_falls_back_to_own_tasks_without_department_scope(self) -> None:
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=SimpleNamespace(all=lambda: []))
+        repo = TaskLabelRepository()
+        member_id = uuid.uuid4()
+
+        await repo.search(
+            session,
+            visible_department_ids=[],
+            fallback_member_id=member_id,
+        )
+
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        self.assertIn("tasks", compiled)
+        self.assertIn("assignee_id", compiled)
+        self.assertNotIn("team_members", compiled)
