@@ -767,15 +767,17 @@ export default function TaskDetailPage() {
               <Badge variant="secondary" className="text-xs">
                 {TASK_SOURCE_LABELS[task.source]}
               </Badge>
-            )}
+          )}
 
           {canEditLabels ? (
-            <div className="min-w-[180px] max-w-full">
+            <div className="max-w-full">
               <TaskLabelPicker
                 value={labelDraft}
                 onChange={(nextLabels) => void handleLabelsChange(nextLabels)}
                 disabled={savingLabels}
-                placeholder="Добавить метки"
+                maxVisible={3}
+                placeholder="Метки"
+                variant="compact"
               />
             </div>
           ) : (

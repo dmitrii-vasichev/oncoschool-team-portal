@@ -12,8 +12,11 @@ import {
 } from "@/components/ui/popover";
 import { api } from "@/lib/api";
 import type { TaskLabel } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 import { TaskLabelChips } from "./TaskLabelChips";
+
+type TaskLabelPickerVariant = "default" | "compact";
 
 export function TaskLabelPicker({
   value,
@@ -21,12 +24,14 @@ export function TaskLabelPicker({
   disabled = false,
   maxVisible = 3,
   placeholder = "Метки",
+  variant = "default",
 }: {
   value: TaskLabel[];
   onChange: (labels: TaskLabel[]) => void;
   disabled?: boolean;
   maxVisible?: number;
   placeholder?: string;
+  variant?: TaskLabelPickerVariant;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -119,13 +124,21 @@ export function TaskLabelPicker({
           type="button"
           variant="outline"
           disabled={disabled}
-          className="h-auto min-h-10 w-full justify-start gap-2 px-3 py-2"
+          className={cn(
+            "h-auto justify-start gap-2",
+            variant === "compact"
+              ? "min-h-6 w-auto max-w-full rounded-full px-2.5 py-0.5 text-xs font-medium leading-none"
+              : "min-h-10 w-full px-3 py-2"
+          )}
         >
           {value.length ? (
             <TaskLabelChips
               labels={value}
               maxVisible={maxVisible}
-              className="w-full flex-nowrap overflow-hidden"
+              className={cn(
+                "flex-nowrap overflow-hidden",
+                variant === "compact" ? "max-w-[220px]" : "w-full"
+              )}
             />
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
