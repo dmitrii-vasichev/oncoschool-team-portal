@@ -51,3 +51,18 @@ export function canEditTaskLabel(label: TaskLabel) {
 export function canArchiveTaskLabel(label: TaskLabel) {
   return label.can_archive;
 }
+
+export function getTaskLabelPickerStateAfterArchive({
+  options,
+  selectedLabels,
+  archivedLabelId,
+}: {
+  options: TaskLabel[];
+  selectedLabels: TaskLabel[];
+  archivedLabelId: string;
+}) {
+  return {
+    options: options.filter((label) => label.id !== archivedLabelId),
+    selectedLabels,
+  };
+}

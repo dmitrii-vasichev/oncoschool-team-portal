@@ -13,7 +13,7 @@
 - Latest verification:
   - `cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_label_repository.py tests/test_task_label_api.py tests/test_task_label_task_api.py tests/test_task_permission_service.py tests/test_task_update_permissions.py -q` passed: 66 tests.
   - `cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 309 tests.
-  - `cd frontend && npm test` passed: 13 tests.
+  - `cd frontend && npm test` passed: 14 tests.
   - `cd frontend && npx tsc --noEmit` passed.
   - `cd frontend && npm run lint` passed.
   - `git diff --check` passed.

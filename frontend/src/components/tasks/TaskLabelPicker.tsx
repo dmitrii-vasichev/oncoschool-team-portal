@@ -35,6 +35,7 @@ import {
   TASK_LABEL_COLOR_OPTIONS,
   canArchiveTaskLabel,
   canEditTaskLabel,
+  getTaskLabelPickerStateAfterArchive,
   labelSwatchClass,
 } from "./taskLabelUtils";
 
@@ -222,10 +223,14 @@ export function TaskLabelPicker({
     setArchiving(true);
     try {
       const archived = await api.archiveTaskLabel(archiveLabel.id);
+      // Archived labels stay attached to existing tasks; only remove them from picker results.
       setOptions((labels) =>
-        labels.filter((label) => label.id !== archived.id)
+        getTaskLabelPickerStateAfterArchive({
+          options: labels,
+          selectedLabels: valueRef.current,
+          archivedLabelId: archived.id,
+        }).options
       );
-      onChange(valueRef.current.filter((label) => label.id !== archived.id));
       toastSuccess("Метка архивирована");
       setArchiveLabel(null);
     } catch (error) {

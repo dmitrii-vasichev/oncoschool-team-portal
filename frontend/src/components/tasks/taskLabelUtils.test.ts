@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   TASK_LABEL_COLOR_OPTIONS,
+  getTaskLabelPickerStateAfterArchive,
   canArchiveTaskLabel,
   canEditTaskLabel,
   labelClass,
@@ -49,4 +50,22 @@ test("capability helpers read backend capability flags", () => {
   assert.equal(canArchiveTaskLabel(label({ can_archive: true })), true);
   assert.equal(canEditTaskLabel(label({ can_edit: false })), false);
   assert.equal(canArchiveTaskLabel(label({ can_archive: false })), false);
+});
+
+test("archiving a label removes it from picker options without changing selected labels", () => {
+  const archived = label({ id: "label-1", name: "Owned" });
+  const other = label({ id: "label-2", name: "Other" });
+  const selectedLabels = [archived, other];
+
+  const result = getTaskLabelPickerStateAfterArchive({
+    options: [archived, other],
+    selectedLabels,
+    archivedLabelId: archived.id,
+  });
+
+  assert.deepEqual(
+    result.options.map((item) => item.id),
+    [other.id]
+  );
+  assert.deepEqual(result.selectedLabels, selectedLabels);
 });
