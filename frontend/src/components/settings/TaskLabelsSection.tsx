@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
@@ -42,6 +42,7 @@ export function TaskLabelsSection() {
   const [archiveLabel, setArchiveLabel] = useState<TaskLabel | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [busyLabelId, setBusyLabelId] = useState<string | null>(null);
+  const labelRequestSeqRef = useRef(0);
 
   const memberNames = useMemo(
     () => new Map(members.map((member) => [member.id, member.full_name])),
@@ -50,6 +51,8 @@ export function TaskLabelsSection() {
 
   const loadLabels = useCallback(
     async (options?: { quiet?: boolean }) => {
+      const requestSeq = labelRequestSeqRef.current + 1;
+      labelRequestSeqRef.current = requestSeq;
       if (!options?.quiet) setLoading(true);
       try {
         const result = await api.getTaskLabels({
@@ -57,13 +60,17 @@ export function TaskLabelsSection() {
           limit: 100,
           include_archived: true,
         });
+        if (labelRequestSeqRef.current !== requestSeq) return;
         setLabels(result);
       } catch (error) {
+        if (labelRequestSeqRef.current !== requestSeq) return;
         toastError(
           error instanceof Error ? error.message : "Не удалось загрузить метки"
         );
       } finally {
-        if (!options?.quiet) setLoading(false);
+        if (labelRequestSeqRef.current === requestSeq) {
+          setLoading(false);
+        }
       }
     },
     [debouncedSearch, toastError]
@@ -107,12 +114,10 @@ export function TaskLabelsSection() {
     if (!editingLabel) return;
     setSavingEdit(true);
     try {
-      const updated = await api.updateTaskLabel(editingLabel.id, data);
-      setLabels((current) =>
-        current.map((label) => (label.id === updated.id ? updated : label))
-      );
+      await api.updateTaskLabel(editingLabel.id, data);
       toastSuccess("Метка обновлена");
       setEditingLabel(null);
+      await loadLabels({ quiet: true });
     } catch (error) {
       await reloadAfterFailure("Не удалось обновить метку", error);
     } finally {
@@ -124,12 +129,10 @@ export function TaskLabelsSection() {
     if (!archiveLabel) return;
     setBusyLabelId(archiveLabel.id);
     try {
-      const archived = await api.archiveTaskLabel(archiveLabel.id);
-      setLabels((current) =>
-        current.map((label) => (label.id === archived.id ? archived : label))
-      );
+      await api.archiveTaskLabel(archiveLabel.id);
       toastSuccess("Метка архивирована");
       setArchiveLabel(null);
+      await loadLabels({ quiet: true });
     } catch (error) {
       await reloadAfterFailure("Не удалось архивировать метку", error);
     } finally {
@@ -140,11 +143,9 @@ export function TaskLabelsSection() {
   async function handleRestoreLabel(label: TaskLabel) {
     setBusyLabelId(label.id);
     try {
-      const restored = await api.restoreTaskLabel(label.id);
-      setLabels((current) =>
-        current.map((item) => (item.id === restored.id ? restored : item))
-      );
+      await api.restoreTaskLabel(label.id);
       toastSuccess("Метка восстановлена");
+      await loadLabels({ quiet: true });
     } catch (error) {
       await reloadAfterFailure("Не удалось восстановить метку", error);
     } finally {
