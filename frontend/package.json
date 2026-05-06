@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test --experimental-strip-types src/lib/dateUtils.test.ts"
+    "test": "node --test --experimental-strip-types src/lib/dateUtils.test.ts src/components/tasks/taskFilterUtils.test.ts"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
