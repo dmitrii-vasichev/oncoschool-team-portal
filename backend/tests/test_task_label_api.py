@@ -142,3 +142,25 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
             created_by_id=member.id,
         )
         session.commit.assert_awaited_once()
+
+    async def test_label_response_includes_capabilities(self) -> None:
+        label = make_label()
+        member = SimpleNamespace(id=label.created_by_id, role="member", is_active=True)
+        session = SimpleNamespace()
+
+        with patch.object(
+            labels_api.label_repo,
+            "is_shared_for_member",
+            AsyncMock(return_value=False),
+        ):
+            response = await labels_api._label_response(
+                session,
+                label,
+                usage_count=2,
+                member=member,
+            )
+
+        self.assertTrue(response.can_edit)
+        self.assertTrue(response.can_archive)
+        self.assertFalse(response.can_restore)
+        self.assertFalse(response.is_shared_for_current_user)

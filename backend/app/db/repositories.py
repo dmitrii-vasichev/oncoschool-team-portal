@@ -45,11 +45,12 @@ logger = logging.getLogger(__name__)
 
 LABEL_COLOR_PALETTE = (
     "teal",
-    "coral",
     "blue",
     "purple",
     "gold",
     "green",
+    "coral",
+    "rose",
     "slate",
 )
 
@@ -70,6 +71,13 @@ def slugify_task_label(raw_name: str) -> str:
 def pick_task_label_color(slug: str) -> str:
     index = sum(ord(char) for char in slug) % len(LABEL_COLOR_PALETTE)
     return LABEL_COLOR_PALETTE[index]
+
+
+def validate_task_label_color(color: str | None) -> str:
+    normalized = (color or "").strip().lower()
+    if normalized not in LABEL_COLOR_PALETTE:
+        raise ValueError("Unknown task label color")
+    return normalized
 
 
 class TeamMemberRepository:
@@ -299,6 +307,14 @@ class TaskLabelRepository:
         task.labels = labels
         await session.flush()
         return task
+
+    async def is_shared_for_member(
+        self,
+        session: AsyncSession,
+        label_id: uuid.UUID,
+        member_id: uuid.UUID,
+    ) -> bool:
+        return False
 
 
 class TaskRepository:

@@ -51,6 +51,25 @@ class TaskLabelNormalizationTests(unittest.TestCase):
     def test_palette_is_non_empty(self) -> None:
         self.assertGreater(len(LABEL_COLOR_PALETTE), 0)
 
+    def test_palette_contains_management_colors(self) -> None:
+        self.assertEqual(
+            LABEL_COLOR_PALETTE,
+            ("teal", "blue", "purple", "gold", "green", "coral", "rose", "slate"),
+        )
+
+    def test_validate_label_color_accepts_palette_value(self) -> None:
+        from app.db.repositories import validate_task_label_color
+
+        self.assertEqual(validate_task_label_color("rose"), "rose")
+
+    def test_validate_label_color_rejects_unknown_value(self) -> None:
+        from app.db.repositories import validate_task_label_color
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_task_label_color("neon")
+
+        self.assertEqual(str(ctx.exception), "Unknown task label color")
+
 
 class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
     async def test_create_or_reactivate_returns_existing_active_label(self) -> None:

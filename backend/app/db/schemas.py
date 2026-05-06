@@ -117,6 +117,12 @@ class TaskChecklistItem(BaseModel):
 
 class TaskLabelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=80)
+    color: str | None = None
+
+
+class TaskLabelUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    color: str | None = None
 
 
 class TaskLabelResponse(BaseModel):
@@ -131,6 +137,10 @@ class TaskLabelResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     usage_count: int = 0
+    can_edit: bool = False
+    can_archive: bool = False
+    can_restore: bool = False
+    is_shared_for_current_user: bool = False
 
 
 class TaskCreate(BaseModel):
