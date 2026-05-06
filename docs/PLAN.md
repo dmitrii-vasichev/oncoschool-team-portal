@@ -1,227 +1,1003 @@
-# Task Filter Sheet Implementation Plan
+# Task Label Management Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the tall inline task filter toolbar with a compact search row and responsive filter sheet.
+**Goal:** Add task label color selection, member-owned label editing/archiving, and moderator label cleanup in Settings.
 
-**Architecture:** Keep the existing task API and filtering state shape, but move structured filter presentation into a sheet opened from the task board header. Extract active-filter counting, chip generation, reset, and removal into a small pure helper module so the visible state can be tested without a browser. Reuse the existing Radix/shadcn `Sheet`, `Select`, `Popover`, and `Button` primitives.
+**Architecture:** Extend the existing `TaskLabel` catalog instead of adding a new entity. Backend endpoints compute per-user label capabilities and enforce the shared-label ownership rule; frontend uses those capability flags in the picker and a moderator Settings section. Archived labels remain attached to old tasks but are excluded from normal picker/search and cannot be newly attached.
 
-**Tech Stack:** Next.js 14, React 18, TypeScript, Tailwind CSS, Radix/shadcn UI primitives, lucide-react, Node built-in test runner.
+**Tech Stack:** FastAPI, SQLAlchemy async ORM, Pydantic, Alembic-managed PostgreSQL schema already present, Next.js 14, React 18, TypeScript, Tailwind CSS, Radix/shadcn UI primitives, lucide-react, Python `pytest`, frontend Node test runner.
 
 ---
 
 ## Source Documents
 
-- Approved design spec: `docs/superpowers/specs/2026-05-06-task-filter-sheet-design.md`
-- Current task board: `frontend/src/app/tasks/page.tsx`
-- Current filter component: `frontend/src/components/tasks/TaskFilters.tsx`
-- Current labels picker: `frontend/src/components/tasks/TaskLabelPicker.tsx`
-- Current sheet primitive: `frontend/src/components/ui/sheet.tsx`
-- Current select primitive: `frontend/src/components/ui/select.tsx`
+- Approved design spec: `docs/superpowers/specs/2026-05-06-task-label-management-design.md`
+- Existing task label design: `docs/superpowers/specs/2026-05-05-task-labels-design.md`
+- Current backend label API: `backend/app/api/task_labels.py`
+- Current backend label repository: `backend/app/db/repositories.py`
+- Current backend schemas: `backend/app/db/schemas.py`
+- Current task attach endpoint: `backend/app/api/tasks.py`
+- Current frontend picker: `frontend/src/components/tasks/TaskLabelPicker.tsx`
+- Current frontend chips: `frontend/src/components/tasks/TaskLabelChips.tsx`
+- Current settings tabs: `frontend/src/app/settings/page.tsx`
 
 ## Scope Check
 
-This is one frontend UI subsystem. It does not require backend changes, label API changes, saved views, role changes, or changes to task visibility rules.
+This plan covers one cohesive feature: task label catalog management for the web portal. It includes backend permissions/API, frontend picker color/action UI, moderator Settings UI, tests, and documentation. It does not include label merge, analytics, Telegram bot label management, or separate personal label pages.
 
 ## File Structure
 
-- Create `frontend/src/components/tasks/taskFilterUtils.ts`: pure filter-state helpers and exported `TaskFilterValues`.
-- Create `frontend/src/components/tasks/taskFilterUtils.test.ts`: Node tests for active counts, chip generation, label overflow, reset behavior, and individual chip removal.
-- Create `frontend/src/hooks/useMediaQuery.ts`: small client hook to choose right-side sheet on desktop and bottom sheet on smaller screens.
-- Modify `frontend/package.json`: include the new helper test in `npm test`.
-- Modify `frontend/src/components/tasks/TaskLabelPicker.tsx`: add a select-like chevron option and compact label summary for filter usage.
-- Modify `frontend/src/components/tasks/TaskFilters.tsx`: replace the inline grid with compact search/filter row, responsive sheet, ordered fields, active chips, reset behavior, and helper usage.
-- Modify `docs/STATUS.md`: record implementation progress and validation commands after execution starts.
+- Modify `backend/app/db/repositories.py`: label palette validation, active-only create behavior, update/archive/restore helpers, shared-label query, archived attach guard.
+- Modify `backend/app/db/schemas.py`: label create/update/response schemas and capability fields.
+- Modify `backend/app/api/task_labels.py`: list/create/update/archive/restore endpoints and per-user capability responses.
+- Modify `backend/tests/test_task_label_repository.py`: repository behavior tests.
+- Modify `backend/tests/test_task_label_api.py`: API permission, conflict, and response capability tests.
+- Modify `backend/tests/test_task_label_task_api.py`: archived attach preservation/rejection tests.
+- Modify `frontend/src/lib/types.ts`: label capability fields, palette type, create/update request types.
+- Modify `frontend/src/lib/api.ts`: include archived list params and label update/archive/restore methods.
+- Create `frontend/src/components/tasks/taskLabelUtils.ts`: shared palette metadata and pure helper functions for label classes and capability display.
+- Create `frontend/src/components/tasks/taskLabelUtils.test.ts`: Node tests for palette keys, classes, and action capability helpers.
+- Modify `frontend/src/components/tasks/TaskLabelChips.tsx`: use shared label color helpers and add `rose`.
+- Modify `frontend/src/components/tasks/TaskLabelPicker.tsx`: creation color swatches, row swatches, edit/archive actions, moderator manage link.
+- Create `frontend/src/components/tasks/TaskLabelEditDialog.tsx`: reusable name/color editor for picker and Settings.
+- Create `frontend/src/components/settings/TaskLabelsSection.tsx`: moderator label catalog management.
+- Modify `frontend/src/app/settings/page.tsx`: add `task-labels` moderator tab.
+- Modify `frontend/package.json`: include `taskLabelUtils.test.ts` in `npm test`.
+- Modify `docs/STATUS.md`: record the new feature phase and latest planning state.
+- Modify `docs/TEST_PLAN.md`: add automated and manual checks for label management.
 
----
-
-## Task 1: Pure Filter Helpers and Tests
+## Task 1: Backend Schemas and Label Palette
 
 **Files:**
 
-- Create: `frontend/src/components/tasks/taskFilterUtils.ts`
-- Create: `frontend/src/components/tasks/taskFilterUtils.test.ts`
+- Modify: `backend/app/db/schemas.py`
+- Modify: `backend/app/db/repositories.py`
+- Modify: `backend/tests/test_task_label_repository.py`
+- Modify: `backend/tests/test_task_label_api.py`
+
+- [ ] **Step 1: Write failing repository palette tests**
+
+Append these tests to `backend/tests/test_task_label_repository.py`:
+
+```python
+    def test_palette_contains_management_colors(self) -> None:
+        self.assertEqual(
+            LABEL_COLOR_PALETTE,
+            ("teal", "blue", "purple", "gold", "green", "coral", "rose", "slate"),
+        )
+
+    def test_validate_label_color_accepts_palette_value(self) -> None:
+        from app.db.repositories import validate_task_label_color
+
+        self.assertEqual(validate_task_label_color("rose"), "rose")
+
+    def test_validate_label_color_rejects_unknown_value(self) -> None:
+        from app.db.repositories import validate_task_label_color
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_task_label_color("neon")
+
+        self.assertEqual(str(ctx.exception), "Unknown task label color")
+```
+
+- [ ] **Step 2: Write failing API schema response tests**
+
+Add this test to `TaskLabelApiTests` in `backend/tests/test_task_label_api.py`:
+
+```python
+    async def test_label_response_includes_capabilities(self) -> None:
+        label = make_label()
+        member = SimpleNamespace(id=label.created_by_id, role="member", is_active=True)
+        session = SimpleNamespace()
+
+        with patch.object(
+            labels_api.label_repo,
+            "is_shared_for_member",
+            AsyncMock(return_value=False),
+        ):
+            response = await labels_api._label_response(
+                session,
+                label,
+                usage_count=2,
+                member=member,
+            )
+
+        self.assertTrue(response.can_edit)
+        self.assertTrue(response.can_archive)
+        self.assertFalse(response.can_restore)
+        self.assertFalse(response.is_shared_for_current_user)
+```
+
+- [ ] **Step 3: Run failing tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_repository.py::TaskLabelNormalizationTests::test_palette_contains_management_colors tests/test_task_label_repository.py::TaskLabelNormalizationTests::test_validate_label_color_accepts_palette_value tests/test_task_label_repository.py::TaskLabelNormalizationTests::test_validate_label_color_rejects_unknown_value tests/test_task_label_api.py::TaskLabelApiTests::test_label_response_includes_capabilities -q
+```
+
+Expected: failures because the palette order, `validate_task_label_color`, async `_label_response`, and capability schema fields are not implemented yet.
+
+- [ ] **Step 4: Implement palette validation**
+
+In `backend/app/db/repositories.py`, replace the current `LABEL_COLOR_PALETTE` tuple and add validation:
+
+```python
+LABEL_COLOR_PALETTE = (
+    "teal",
+    "blue",
+    "purple",
+    "gold",
+    "green",
+    "coral",
+    "rose",
+    "slate",
+)
+
+
+def validate_task_label_color(color: str | None) -> str:
+    normalized = (color or "").strip().lower()
+    if normalized not in LABEL_COLOR_PALETTE:
+        raise ValueError("Unknown task label color")
+    return normalized
+```
+
+Keep `pick_task_label_color(slug)` unchanged except that it now uses the new tuple.
+
+- [ ] **Step 5: Implement schema fields**
+
+In `backend/app/db/schemas.py`, update the label schemas:
+
+```python
+class TaskLabelCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    color: str | None = None
+
+
+class TaskLabelUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    color: str | None = None
+
+
+class TaskLabelResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    slug: str
+    color: str
+    created_by_id: uuid.UUID | None
+    is_archived: bool
+    created_at: datetime
+    updated_at: datetime
+    usage_count: int = 0
+    can_edit: bool = False
+    can_archive: bool = False
+    can_restore: bool = False
+    is_shared_for_current_user: bool = False
+```
+
+- [ ] **Step 6: Implement async response capability helper**
+
+In `backend/app/api/task_labels.py`, import `PermissionService` and change `_label_response` to this async helper:
+
+```python
+from app.services.permission_service import PermissionService
+
+
+async def _label_response(
+    session: AsyncSession,
+    label,
+    usage_count: int = 0,
+    member: TeamMember | None = None,
+) -> TaskLabelResponse:
+    is_moderator = bool(member and PermissionService.is_moderator(member))
+    is_owner = bool(member and label.created_by_id == member.id)
+    is_shared = False
+    if member and not is_moderator and is_owner:
+        is_shared = await label_repo.is_shared_for_member(session, label.id, member.id)
+
+    is_active = not label.is_archived
+    can_member_manage = is_active and is_owner and not is_shared
+
+    return TaskLabelResponse.model_validate(label).model_copy(
+        update={
+            "usage_count": usage_count,
+            "can_edit": is_moderator or can_member_manage,
+            "can_archive": is_moderator or can_member_manage,
+            "can_restore": is_moderator and label.is_archived,
+            "is_shared_for_current_user": is_shared,
+        }
+    )
+```
+
+Task 3 updates every API call site to `await _label_response(...)`.
+
+- [ ] **Step 7: Add temporary repository helper stub for test shape**
+
+In `TaskLabelRepository`, add this method so Task 1 tests can pass before the real SQL behavior is added in Task 2:
+
+```python
+    async def is_shared_for_member(
+        self,
+        session: AsyncSession,
+        label_id: uuid.UUID,
+        member_id: uuid.UUID,
+    ) -> bool:
+        return False
+```
+
+Task 2 replaces this stub with the real query.
+
+- [ ] **Step 8: Run tests for Task 1**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_api.py -q
+```
+
+Expected: existing API tests may fail because `_label_response` call sites are still synchronous. Fix only direct call-site errors by awaiting `_label_response(session, label, usage_count, member)` where needed, then rerun until these two files pass.
+
+- [ ] **Step 9: Commit Task 1**
+
+Run:
+
+```bash
+git add backend/app/db/repositories.py backend/app/db/schemas.py backend/app/api/task_labels.py backend/tests/test_task_label_repository.py backend/tests/test_task_label_api.py
+git commit -m "feat: add task label palette capabilities"
+```
+
+## Task 2: Backend Repository Management Behavior
+
+**Files:**
+
+- Modify: `backend/app/db/repositories.py`
+- Modify: `backend/tests/test_task_label_repository.py`
+- Modify: `backend/tests/test_task_label_task_api.py`
+
+- [ ] **Step 1: Replace old reactivation test with archived conflict test**
+
+In `backend/tests/test_task_label_repository.py`, replace `test_create_or_reactivate_unarchives_existing_label` with:
+
+```python
+    async def test_create_or_reactivate_rejects_archived_existing_label(self) -> None:
+        archived = SimpleNamespace(
+            id=uuid.uuid4(),
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=True,
+        )
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_slug = AsyncMock(return_value=archived)
+
+        with self.assertRaises(ValueError) as ctx:
+            await repo.create_or_reactivate(
+                session,
+                name="Conference",
+                created_by_id=uuid.uuid4(),
+                color="teal",
+            )
+
+        self.assertEqual(str(ctx.exception), "Archived task label already exists")
+        session.flush.assert_not_called()
+```
+
+- [ ] **Step 2: Update active creation tests for color argument**
+
+In the remaining `create_or_reactivate` tests, add `color="teal"` to calls where a color should be explicit. Keep one test without color to verify fallback:
+
+```python
+        result = await repo.create_or_reactivate(
+            session,
+            name=" conference ",
+            created_by_id=uuid.uuid4(),
+            color="teal",
+        )
+```
+
+- [ ] **Step 3: Add update/archive/restore tests**
+
+Append these tests to `TaskLabelRepositoryTests`:
+
+```python
+    async def test_update_label_changes_name_slug_and_color(self) -> None:
+        label_id = uuid.uuid4()
+        label = SimpleNamespace(
+            id=label_id,
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=False,
+        )
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+        repo.get_by_slug = AsyncMock(return_value=None)
+
+        result = await repo.update(session, label_id, name=" Partner  Event ", color="rose")
+
+        self.assertIs(result, label)
+        self.assertEqual(label.name, "Partner Event")
+        self.assertEqual(label.slug, "partner event")
+        self.assertEqual(label.color, "rose")
+        session.flush.assert_awaited_once()
+
+    async def test_update_label_rejects_duplicate_slug(self) -> None:
+        label_id = uuid.uuid4()
+        other_id = uuid.uuid4()
+        label = SimpleNamespace(
+            id=label_id,
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=False,
+        )
+        duplicate = SimpleNamespace(id=other_id, slug="partners", is_archived=False)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+        repo.get_by_slug = AsyncMock(return_value=duplicate)
+
+        with self.assertRaises(ValueError) as ctx:
+            await repo.update(session, label_id, name="Partners")
+
+        self.assertEqual(str(ctx.exception), "Task label name already exists")
+
+    async def test_archive_sets_is_archived(self) -> None:
+        label = SimpleNamespace(id=uuid.uuid4(), is_archived=False)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+
+        result = await repo.archive(session, label.id)
+
+        self.assertIs(result, label)
+        self.assertTrue(label.is_archived)
+        session.flush.assert_awaited_once()
+
+    async def test_restore_clears_is_archived(self) -> None:
+        label = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_id = AsyncMock(return_value=label)
+
+        result = await repo.restore(session, label.id)
+
+        self.assertIs(result, label)
+        self.assertFalse(label.is_archived)
+        session.flush.assert_awaited_once()
+```
+
+- [ ] **Step 4: Add shared-label SQL tests**
+
+Append these tests to `TaskLabelRepositoryTests`:
+
+```python
+    async def test_is_shared_for_member_checks_author_and_assignee(self) -> None:
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one=lambda: 1))
+        repo = TaskLabelRepository()
+
+        result = await repo.is_shared_for_member(
+            session,
+            label_id=uuid.uuid4(),
+            member_id=uuid.uuid4(),
+        )
+
+        self.assertTrue(result)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        self.assertIn("created_by_id", compiled)
+        self.assertIn("assignee_id", compiled)
+        self.assertIn("IS NULL", compiled)
+```
+
+- [ ] **Step 5: Add archived attach guard tests**
+
+Append these tests to `backend/tests/test_task_label_task_api.py`:
+
+```python
+    async def test_replace_task_labels_rejects_new_archived_label(self) -> None:
+        active = SimpleNamespace(id=uuid.uuid4(), is_archived=False)
+        archived = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        task = SimpleNamespace(labels=[active])
+        session = SimpleNamespace()
+        repo = tasks_api.TaskLabelRepository()
+        repo.get_by_ids = AsyncMock(return_value=[archived])
+
+        with self.assertRaises(ValueError) as ctx:
+            await repo.replace_task_labels(session, task, [archived.id])
+
+        self.assertEqual(str(ctx.exception), "Архивные метки нельзя добавить к задаче")
+
+    async def test_replace_task_labels_preserves_existing_archived_label(self) -> None:
+        archived = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        task = SimpleNamespace(labels=[archived])
+        session = SimpleNamespace()
+        repo = tasks_api.TaskLabelRepository()
+        repo.get_by_ids = AsyncMock(return_value=[archived])
+
+        result = await repo.replace_task_labels(session, task, [archived.id])
+
+        self.assertIs(result, task)
+        self.assertEqual(task.labels, [archived])
+```
+
+- [ ] **Step 6: Run failing tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_task_api.py -q
+```
+
+Expected: failures for missing repository methods, old `create_or_reactivate` signature, and archived attach behavior.
+
+- [ ] **Step 7: Implement repository methods**
+
+In `TaskLabelRepository`, implement these methods and update `create_or_reactivate`:
+
+```python
+    async def get_by_id(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        return await session.get(TaskLabel, label_id)
+
+    async def create_or_reactivate(
+        self,
+        session: AsyncSession,
+        *,
+        name: str,
+        created_by_id: uuid.UUID | None,
+        color: str | None = None,
+    ) -> TaskLabel:
+        normalized = normalize_task_label_name(name)
+        slug = slugify_task_label(normalized)
+        existing = await self.get_by_slug(session, slug)
+        if existing:
+            if existing.is_archived:
+                raise ValueError("Archived task label already exists")
+            return existing
+        label = TaskLabel(
+            name=normalized,
+            slug=slug,
+            color=validate_task_label_color(color) if color else pick_task_label_color(slug),
+            created_by_id=created_by_id,
+        )
+        session.add(label)
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            existing = await self.get_by_slug(session, slug)
+            if existing:
+                if existing.is_archived:
+                    raise ValueError("Archived task label already exists")
+                return existing
+            raise
+        return label
+
+    async def update(
+        self,
+        session: AsyncSession,
+        label_id: uuid.UUID,
+        *,
+        name: str | None = None,
+        color: str | None = None,
+    ) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        if name is not None:
+            normalized = normalize_task_label_name(name)
+            slug = slugify_task_label(normalized)
+            existing = await self.get_by_slug(session, slug)
+            if existing and existing.id != label.id:
+                raise ValueError("Task label name already exists")
+            label.name = normalized
+            label.slug = slug
+        if color is not None:
+            label.color = validate_task_label_color(color)
+        await session.flush()
+        return label
+
+    async def archive(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        label.is_archived = True
+        await session.flush()
+        return label
+
+    async def restore(self, session: AsyncSession, label_id: uuid.UUID) -> TaskLabel | None:
+        label = await self.get_by_id(session, label_id)
+        if not label:
+            return None
+        label.is_archived = False
+        await session.flush()
+        return label
+
+    async def is_shared_for_member(
+        self,
+        session: AsyncSession,
+        label_id: uuid.UUID,
+        member_id: uuid.UUID,
+    ) -> bool:
+        stmt = (
+            select(func.count(Task.id))
+            .join(TaskLabelLink, TaskLabelLink.task_id == Task.id)
+            .where(
+                TaskLabelLink.label_id == label_id,
+                or_(
+                    Task.created_by_id.is_(None),
+                    Task.created_by_id != member_id,
+                    Task.assignee_id.is_(None),
+                    Task.assignee_id != member_id,
+                ),
+            )
+        )
+        result = await session.execute(stmt)
+        return int(result.scalar_one() or 0) > 0
+```
+
+- [ ] **Step 8: Implement archived attach guard**
+
+In `replace_task_labels`, after missing-id validation and before assigning `task.labels`, add:
+
+```python
+        existing_label_ids = {label.id for label in getattr(task, "labels", [])}
+        newly_added_archived = [
+            label for label in labels
+            if label.is_archived and label.id not in existing_label_ids
+        ]
+        if newly_added_archived:
+            raise ValueError("Архивные метки нельзя добавить к задаче")
+```
+
+- [ ] **Step 9: Run Task 2 tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_task_api.py -q
+```
+
+Expected: pass.
+
+- [ ] **Step 10: Commit Task 2**
+
+Run:
+
+```bash
+git add backend/app/db/repositories.py backend/tests/test_task_label_repository.py backend/tests/test_task_label_task_api.py
+git commit -m "feat: add task label management repository"
+```
+
+## Task 3: Backend Label API Permissions and Endpoints
+
+**Files:**
+
+- Modify: `backend/app/api/task_labels.py`
+- Modify: `backend/tests/test_task_label_api.py`
+
+- [ ] **Step 1: Add API tests for archived listing permission**
+
+Append to `TaskLabelApiTests`:
+
+```python
+    async def test_member_cannot_include_archived_labels(self) -> None:
+        member = SimpleNamespace(id=uuid.uuid4(), role="member", is_active=True)
+        session = SimpleNamespace()
+
+        with self.assertRaises(labels_api.HTTPException) as ctx:
+            await labels_api.list_task_labels(
+                search=None,
+                limit=20,
+                include_archived=True,
+                member=member,
+                session=session,
+            )
+
+        self.assertEqual(ctx.exception.status_code, 403)
+```
+
+- [ ] **Step 2: Add create color and archived conflict tests**
+
+Append:
+
+```python
+    async def test_create_task_label_passes_color(self) -> None:
+        label = make_label("Partners", usage_count=0)
+        member = SimpleNamespace(id=uuid.uuid4(), role="member", is_active=True)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        with patch.object(
+            labels_api.label_repo,
+            "create_or_reactivate",
+            AsyncMock(return_value=label),
+        ) as create_mock, patch.object(
+            labels_api.label_repo,
+            "is_shared_for_member",
+            AsyncMock(return_value=False),
+        ):
+            response = await labels_api.create_task_label(
+                data=labels_api.TaskLabelCreate(name=" Partners ", color="rose"),
+                member=member,
+                session=session,
+            )
+
+        self.assertEqual(response.name, "Partners")
+        create_mock.assert_awaited_once_with(
+            session,
+            name=" Partners ",
+            created_by_id=member.id,
+            color="rose",
+        )
+        session.commit.assert_awaited_once()
+
+    async def test_create_task_label_archived_conflict_returns_409(self) -> None:
+        member = SimpleNamespace(id=uuid.uuid4(), role="member", is_active=True)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        with patch.object(
+            labels_api.label_repo,
+            "create_or_reactivate",
+            AsyncMock(side_effect=ValueError("Archived task label already exists")),
+        ):
+            with self.assertRaises(labels_api.HTTPException) as ctx:
+                await labels_api.create_task_label(
+                    data=labels_api.TaskLabelCreate(name="Conference", color="teal"),
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 409)
+        session.commit.assert_not_awaited()
+```
+
+- [ ] **Step 3: Add update/archive/restore permission tests**
+
+Append:
+
+```python
+    async def test_member_updates_owned_non_shared_label(self) -> None:
+        member_id = uuid.uuid4()
+        label = make_label("Conference")
+        label.created_by_id = member_id
+        member = SimpleNamespace(id=member_id, role="member", is_active=True)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        with patch.object(labels_api.label_repo, "get_by_id", AsyncMock(return_value=label)), \
+            patch.object(labels_api.label_repo, "is_shared_for_member", AsyncMock(return_value=False)), \
+            patch.object(labels_api.label_repo, "update", AsyncMock(return_value=label)) as update_mock:
+            response = await labels_api.update_task_label(
+                label_id=label.id,
+                data=labels_api.TaskLabelUpdate(name="Conference 2026", color="purple"),
+                member=member,
+                session=session,
+            )
+
+        self.assertTrue(response.can_edit)
+        update_mock.assert_awaited_once_with(
+            session,
+            label.id,
+            name="Conference 2026",
+            color="purple",
+        )
+        session.commit.assert_awaited_once()
+
+    async def test_member_cannot_update_shared_label(self) -> None:
+        member_id = uuid.uuid4()
+        label = make_label("Conference")
+        label.created_by_id = member_id
+        member = SimpleNamespace(id=member_id, role="member", is_active=True)
+        session = SimpleNamespace()
+
+        with patch.object(labels_api.label_repo, "get_by_id", AsyncMock(return_value=label)), \
+            patch.object(labels_api.label_repo, "is_shared_for_member", AsyncMock(return_value=True)):
+            with self.assertRaises(labels_api.HTTPException) as ctx:
+                await labels_api.update_task_label(
+                    label_id=label.id,
+                    data=labels_api.TaskLabelUpdate(name="Conference 2026"),
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    async def test_moderator_restores_archived_label(self) -> None:
+        label = make_label("Conference")
+        label.is_archived = True
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator", is_active=True)
+        session = SimpleNamespace(commit=AsyncMock())
+
+        with patch.object(labels_api.label_repo, "restore", AsyncMock(return_value=label)) as restore_mock:
+            response = await labels_api.restore_task_label(
+                label_id=label.id,
+                member=member,
+                session=session,
+            )
+
+        self.assertTrue(response.can_edit)
+        restore_mock.assert_awaited_once_with(session, label.id)
+        session.commit.assert_awaited_once()
+```
+
+- [ ] **Step 4: Run failing API tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_api.py -q
+```
+
+Expected: failures for missing endpoint functions and old create behavior.
+
+- [ ] **Step 5: Implement permission helper**
+
+In `backend/app/api/task_labels.py`, add:
+
+```python
+async def _ensure_can_manage_label(
+    session: AsyncSession,
+    label,
+    member: TeamMember,
+    *,
+    restore: bool = False,
+) -> None:
+    if PermissionService.is_moderator(member):
+        return
+    if restore:
+        raise HTTPException(status_code=403, detail="Доступ только для модераторов")
+    if label.is_archived:
+        raise HTTPException(status_code=403, detail="Архивную метку может восстановить модератор")
+    if label.created_by_id != member.id:
+        raise HTTPException(status_code=403, detail="Можно менять только свои метки")
+    if await label_repo.is_shared_for_member(session, label.id, member.id):
+        raise HTTPException(
+            status_code=403,
+            detail="Эта метка уже используется в чужих задачах. Изменить её может только модератор",
+        )
+```
+
+- [ ] **Step 6: Update list/create and add endpoints**
+
+In `backend/app/api/task_labels.py`, update imports to include `uuid` and `TaskLabelUpdate`. Then implement these endpoint bodies:
+
+```python
+@router.get("", response_model=list[TaskLabelResponse])
+async def list_task_labels(
+    search: str | None = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    include_archived: bool = Query(False),
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    normalized_search = search.strip() if search is not None else None
+    if normalized_search == "":
+        normalized_search = None
+    if include_archived and not PermissionService.is_moderator(member):
+        raise HTTPException(status_code=403, detail="Архивные метки доступны только модераторам")
+    visible_department_ids = await resolve_visible_department_ids(session, member)
+    labels = await label_repo.search(
+        session,
+        search=normalized_search,
+        include_archived=include_archived,
+        limit=limit,
+        visible_department_ids=visible_department_ids,
+        fallback_member_id=member.id,
+    )
+    return [
+        await _label_response(session, label, usage_count, member)
+        for label, usage_count in labels
+    ]
+```
+
+```python
+@router.post("", response_model=TaskLabelResponse, status_code=201)
+async def create_task_label(
+    data: TaskLabelCreate,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        label = await label_repo.create_or_reactivate(
+            session,
+            name=data.name,
+            created_by_id=member.id,
+            color=data.color,
+        )
+        await session.commit()
+        return await _label_response(session, label, 0, member)
+    except ValueError as exc:
+        message = str(exc)
+        if message == "Archived task label already exists":
+            raise HTTPException(
+                status_code=409,
+                detail="Метка с таким названием находится в архиве. Модератор может восстановить её.",
+            )
+        if message == "Unknown task label color":
+            raise HTTPException(status_code=400, detail="Выберите один из доступных цветов метки")
+        raise HTTPException(status_code=400, detail=message)
+```
+
+```python
+@router.patch("/{label_id}", response_model=TaskLabelResponse)
+async def update_task_label(
+    label_id: uuid.UUID,
+    data: TaskLabelUpdate,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    label = await label_repo.get_by_id(session, label_id)
+    if not label:
+        raise HTTPException(status_code=404, detail="Метка не найдена")
+    await _ensure_can_manage_label(session, label, member)
+    try:
+        updated = await label_repo.update(
+            session,
+            label_id,
+            name=data.name,
+            color=data.color,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        if message == "Task label name already exists":
+            raise HTTPException(status_code=409, detail="Метка с таким названием уже существует")
+        if message == "Unknown task label color":
+            raise HTTPException(status_code=400, detail="Выберите один из доступных цветов метки")
+        raise HTTPException(status_code=400, detail=message)
+    await session.commit()
+    return await _label_response(session, updated, member=member)
+```
+
+```python
+@router.delete("/{label_id}", response_model=TaskLabelResponse)
+async def archive_task_label(
+    label_id: uuid.UUID,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    label = await label_repo.get_by_id(session, label_id)
+    if not label:
+        raise HTTPException(status_code=404, detail="Метка не найдена")
+    await _ensure_can_manage_label(session, label, member)
+    archived = await label_repo.archive(session, label_id)
+    await session.commit()
+    return await _label_response(session, archived, member=member)
+```
+
+```python
+@router.post("/{label_id}/restore", response_model=TaskLabelResponse)
+async def restore_task_label(
+    label_id: uuid.UUID,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    if not PermissionService.is_moderator(member):
+        raise HTTPException(status_code=403, detail="Доступ только для модераторов")
+    restored = await label_repo.restore(session, label_id)
+    if not restored:
+        raise HTTPException(status_code=404, detail="Метка не найдена")
+    await session.commit()
+    return await _label_response(session, restored, member=member)
+```
+
+- [ ] **Step 7: Run backend label API tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_label_api.py tests/test_task_label_repository.py tests/test_task_label_task_api.py -q
+```
+
+Expected: pass.
+
+- [ ] **Step 8: Run broader backend permission tests**
+
+Run:
+
+```bash
+cd backend && pytest tests/test_task_permission_service.py tests/test_task_update_permissions.py -q
+```
+
+Expected: pass, confirming task edit permissions were not widened.
+
+- [ ] **Step 9: Commit Task 3**
+
+Run:
+
+```bash
+git add backend/app/api/task_labels.py backend/tests/test_task_label_api.py
+git commit -m "feat: expose task label management api"
+```
+
+## Task 4: Frontend Types, API Client, and Shared Label Utilities
+
+**Files:**
+
+- Modify: `frontend/src/lib/types.ts`
+- Modify: `frontend/src/lib/api.ts`
+- Create: `frontend/src/components/tasks/taskLabelUtils.ts`
+- Create: `frontend/src/components/tasks/taskLabelUtils.test.ts`
+- Modify: `frontend/src/components/tasks/TaskLabelChips.tsx`
 - Modify: `frontend/package.json`
 
-- [ ] **Step 1: Write the failing helper tests**
+- [ ] **Step 1: Write frontend utility tests**
 
-Create `frontend/src/components/tasks/taskFilterUtils.test.ts`:
+Create `frontend/src/components/tasks/taskLabelUtils.test.ts`:
 
 ```ts
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  buildActiveTaskFilterChips,
-  clearStructuredTaskFilters,
-  countActiveStructuredTaskFilters,
-  EMPTY_FILTERS,
-  removeTaskFilterChip,
-  type ActiveTaskFilterChip,
-  type TaskFilterValues,
-} from "./taskFilterUtils.ts";
-import type { Department, TaskLabel, TeamMember } from "../../lib/types.ts";
+  TASK_LABEL_COLOR_OPTIONS,
+  canArchiveTaskLabel,
+  canEditTaskLabel,
+  labelClass,
+  labelSwatchClass,
+} from "./taskLabelUtils.ts";
+import type { TaskLabel } from "../../lib/types.ts";
 
-function label(id: string, name: string): TaskLabel {
-  return {
-    id,
-    name,
-    slug: name.toLowerCase().replace(/\s+/g, "-"),
+function label(overrides: Partial<TaskLabel> = {}): TaskLabel {
+  const base: TaskLabel = {
+    id: "label-1",
+    name: "Conference",
+    slug: "conference",
     color: "teal",
-    created_by_id: null,
-    is_archived: false,
-    usage_count: 1,
-    created_at: "2026-05-06T00:00:00Z",
-    updated_at: "2026-05-06T00:00:00Z",
-  };
-}
-
-const departments: Department[] = [
-  {
-    id: "dept-dev",
-    name: "Разработка",
-    description: null,
-    head_id: null,
-    color: null,
-    sort_order: 1,
-    is_active: true,
-    created_at: "2026-05-06T00:00:00Z",
-  },
-];
-
-const members: TeamMember[] = [
-  {
-    id: "member-1",
-    telegram_id: null,
-    telegram_username: null,
-    full_name: "Иван Петров",
-    name_variants: [],
-    department_id: "dept-dev",
-    extra_department_ids: [],
-    position: null,
-    email: null,
-    birthday: null,
-    avatar_url: null,
-    role: "member",
-    is_test: false,
-    is_active: true,
-    created_at: "2026-05-06T00:00:00Z",
-    updated_at: "2026-05-06T00:00:00Z",
-  },
-];
-
-function filters(overrides: Partial<TaskFilterValues>): TaskFilterValues {
-  return { ...EMPTY_FILTERS, ...overrides };
-}
-
-test("countActiveStructuredTaskFilters excludes search and counts label selection as one group", () => {
-  const value = filters({
-    search: "landing",
-    labels: [label("label-vk", "VK"), label("label-site", "Site")],
-    department_id: "dept-dev",
-    assignee_id: "member-1",
-    priority: "high",
-    source: "voice",
-  });
-
-  assert.equal(
-    countActiveStructuredTaskFilters(value, { showDepartmentFilter: true }),
-    5
-  );
-});
-
-test("countActiveStructuredTaskFilters ignores hidden department filter", () => {
-  const value = filters({
-    department_id: "dept-dev",
-    source: "web",
-  });
-
-  assert.equal(
-    countActiveStructuredTaskFilters(value, { showDepartmentFilter: false }),
-    1
-  );
-});
-
-test("buildActiveTaskFilterChips shows two labels plus overflow before other filters", () => {
-  const value = filters({
-    labels: [
-      label("label-vk", "VK"),
-      label("label-site", "Site"),
-      label("label-crm", "CRM"),
-    ],
-    department_id: "dept-dev",
-    assignee_id: "member-1",
-    priority: "urgent",
-    source: "summary",
-  });
-
-  const chips = buildActiveTaskFilterChips({
-    filters: value,
-    departments,
-    members,
-    showDepartmentFilter: true,
-  });
-
-  assert.deepEqual(
-    chips.map((chip) => chip.label),
-    [
-      "VK",
-      "Site",
-      "+1 меток",
-      "Отдел: Разработка",
-      "Исполнитель: Иван Петров",
-      "Срочный",
-      "Summary",
-    ]
-  );
-});
-
-test("clearStructuredTaskFilters preserves search and clears structured fields", () => {
-  const value = filters({
-    search: "landing",
-    labels: [label("label-vk", "VK")],
-    department_id: "dept-dev",
     created_by_id: "member-1",
-    priority: "low",
-    source: "text",
-  });
+    is_archived: false,
+    created_at: "2026-05-06T00:00:00Z",
+    updated_at: "2026-05-06T00:00:00Z",
+    usage_count: 0,
+    can_edit: false,
+    can_archive: false,
+    can_restore: false,
+    is_shared_for_current_user: false,
+  };
+  return Object.assign(base, overrides);
+}
 
-  assert.deepEqual(clearStructuredTaskFilters(value), {
-    ...EMPTY_FILTERS,
-    search: "landing",
-  });
+test("TASK_LABEL_COLOR_OPTIONS exposes the fixed backend palette", () => {
+  assert.deepEqual(
+    TASK_LABEL_COLOR_OPTIONS.map((option) => option.value),
+    ["teal", "blue", "purple", "gold", "green", "coral", "rose", "slate"]
+  );
 });
 
-test("removeTaskFilterChip removes a selected label without clearing other labels", () => {
-  const value = filters({
-    labels: [
-      label("label-vk", "VK"),
-      label("label-site", "Site"),
-    ],
-  });
-  const chip: ActiveTaskFilterChip = {
-    type: "label",
-    key: "label:label-vk",
-    label: "VK",
-    labelId: "label-vk",
-  };
+test("labelClass falls back to slate for unknown legacy colors", () => {
+  assert.equal(labelClass("unknown"), labelClass("slate"));
+});
 
-  assert.deepEqual(
-    removeTaskFilterChip(value, chip).labels.map((item) => item.id),
-    ["label-site"]
-  );
+test("labelSwatchClass supports rose", () => {
+  assert.match(labelSwatchClass("rose"), /rose/);
+});
+
+test("capability helpers read backend capability flags", () => {
+  assert.equal(canEditTaskLabel(label({ can_edit: true })), true);
+  assert.equal(canArchiveTaskLabel(label({ can_archive: true })), true);
+  assert.equal(canEditTaskLabel(label({ can_edit: false })), false);
+  assert.equal(canArchiveTaskLabel(label({ can_archive: false })), false);
 });
 ```
 
-- [ ] **Step 2: Update the frontend test command**
+- [ ] **Step 2: Add the utility test to npm test**
 
-Modify `frontend/package.json`:
+In `frontend/package.json`, update the `test` script:
 
 ```json
-"test": "node --test --experimental-strip-types src/lib/dateUtils.test.ts src/components/tasks/taskFilterUtils.test.ts"
+"test": "node --test --experimental-strip-types src/lib/dateUtils.test.ts src/lib/compactHeaderControls.test.ts src/components/tasks/taskFilterUtils.test.ts src/components/tasks/taskLabelUtils.test.ts"
 ```
 
-- [ ] **Step 3: Run the tests and confirm the new tests fail**
+- [ ] **Step 3: Run failing frontend test**
 
 Run:
 
@@ -229,797 +1005,562 @@ Run:
 cd frontend && npm test
 ```
 
-Expected: FAIL because `frontend/src/components/tasks/taskFilterUtils.ts` does not exist.
+Expected: failure because `taskLabelUtils.ts` does not exist yet.
 
-- [ ] **Step 4: Implement the helper module**
+- [ ] **Step 4: Extend frontend types**
 
-Create `frontend/src/components/tasks/taskFilterUtils.ts`:
+In `frontend/src/lib/types.ts`, add the palette type near task types:
 
 ```ts
-import type {
-  Department,
-  TaskLabel,
-  TaskPriority,
-  TaskSource,
-  TeamMember,
-} from "../../lib/types.ts";
-import { TASK_PRIORITY_LABELS, TASK_SOURCE_LABELS } from "../../lib/types.ts";
+export type TaskLabelColor =
+  | "teal"
+  | "blue"
+  | "purple"
+  | "gold"
+  | "green"
+  | "coral"
+  | "rose"
+  | "slate";
+```
 
-export interface TaskFilterValues {
-  search: string;
-  priority: string;
-  source: string;
-  department_id: string;
-  assignee_id: string;
-  created_by_id: string;
-  labels: TaskLabel[];
+Update `TaskLabel`:
+
+```ts
+  color: TaskLabelColor | string;
+  can_edit: boolean;
+  can_archive: boolean;
+  can_restore: boolean;
+  is_shared_for_current_user: boolean;
+```
+
+Update request types:
+
+```ts
+export interface TaskLabelCreateRequest {
+  name: string;
+  color?: TaskLabelColor;
 }
 
-export const EMPTY_FILTERS: TaskFilterValues = {
-  search: "",
-  priority: "",
-  source: "",
-  department_id: "",
-  assignee_id: "",
-  created_by_id: "",
-  labels: [],
-};
-
-export type ActiveTaskFilterChip =
-  | {
-      type: "label";
-      key: string;
-      label: string;
-      labelId: string;
-    }
-  | {
-      type: "label-overflow";
-      key: "labels-overflow";
-      label: string;
-    }
-  | {
-      type: "field";
-      key: keyof Pick<
-        TaskFilterValues,
-        "priority" | "source" | "department_id" | "assignee_id" | "created_by_id"
-      >;
-      label: string;
-    };
-
-export function countActiveStructuredTaskFilters(
-  filters: TaskFilterValues,
-  { showDepartmentFilter }: { showDepartmentFilter: boolean }
-) {
-  let count = 0;
-  if (filters.labels.length > 0) count += 1;
-  if (showDepartmentFilter && filters.department_id) count += 1;
-  if (filters.assignee_id || filters.created_by_id) count += 1;
-  if (filters.priority) count += 1;
-  if (filters.source) count += 1;
-  return count;
-}
-
-export function clearStructuredTaskFilters(
-  filters: TaskFilterValues
-): TaskFilterValues {
-  return {
-    ...EMPTY_FILTERS,
-    search: filters.search,
-  };
-}
-
-export function removeTaskFilterChip(
-  filters: TaskFilterValues,
-  chip: ActiveTaskFilterChip
-): TaskFilterValues {
-  if (chip.type === "label") {
-    return {
-      ...filters,
-      labels: filters.labels.filter((label) => label.id !== chip.labelId),
-    };
-  }
-
-  if (chip.type === "label-overflow") {
-    return filters;
-  }
-
-  return {
-    ...filters,
-    [chip.key]: "",
-  };
-}
-
-export function buildActiveTaskFilterChips({
-  filters,
-  members,
-  departments,
-  showDepartmentFilter,
-  maxVisibleLabels = 2,
-}: {
-  filters: TaskFilterValues;
-  members: TeamMember[];
-  departments: Department[];
-  showDepartmentFilter: boolean;
-  maxVisibleLabels?: number;
-}): ActiveTaskFilterChip[] {
-  const chips: ActiveTaskFilterChip[] = [];
-  const visibleLabels = filters.labels.slice(0, maxVisibleLabels);
-  const hiddenLabelCount = filters.labels.length - visibleLabels.length;
-
-  visibleLabels.forEach((label) => {
-    chips.push({
-      type: "label",
-      key: `label:${label.id}`,
-      label: label.name,
-      labelId: label.id,
-    });
-  });
-
-  if (hiddenLabelCount > 0) {
-    chips.push({
-      type: "label-overflow",
-      key: "labels-overflow",
-      label: `+${hiddenLabelCount} меток`,
-    });
-  }
-
-  if (showDepartmentFilter && filters.department_id) {
-    const department = departments.find(
-      (item) => item.id === filters.department_id
-    );
-    chips.push({
-      type: "field",
-      key: "department_id",
-      label: `Отдел: ${department?.name || "—"}`,
-    });
-  }
-
-  if (filters.assignee_id) {
-    const member = members.find((item) => item.id === filters.assignee_id);
-    chips.push({
-      type: "field",
-      key: "assignee_id",
-      label:
-        filters.assignee_id === "unassigned"
-          ? "Исполнитель: Не назначен"
-          : `Исполнитель: ${member?.full_name || "—"}`,
-    });
-  }
-
-  if (filters.created_by_id) {
-    const member = members.find((item) => item.id === filters.created_by_id);
-    chips.push({
-      type: "field",
-      key: "created_by_id",
-      label: `Автор: ${member?.full_name || "—"}`,
-    });
-  }
-
-  if (filters.priority) {
-    chips.push({
-      type: "field",
-      key: "priority",
-      label: TASK_PRIORITY_LABELS[filters.priority as TaskPriority],
-    });
-  }
-
-  if (filters.source) {
-    chips.push({
-      type: "field",
-      key: "source",
-      label: TASK_SOURCE_LABELS[filters.source as TaskSource],
-    });
-  }
-
-  return chips;
+export interface TaskLabelUpdateRequest {
+  name?: string;
+  color?: TaskLabelColor;
 }
 ```
 
-- [ ] **Step 5: Run helper tests**
+- [ ] **Step 5: Extend frontend API client**
+
+In `frontend/src/lib/api.ts`, update and add methods:
+
+```ts
+  async getTaskLabels(params?: {
+    search?: string;
+    limit?: number;
+    include_archived?: boolean;
+  }): Promise<TaskLabel[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.limit) searchParams.set("limit", String(params.limit));
+    if (params?.include_archived) searchParams.set("include_archived", "true");
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+    return this.request<TaskLabel[]>(`/api/task-labels${query}`);
+  }
+
+  async updateTaskLabel(
+    labelId: string,
+    data: TaskLabelUpdateRequest
+  ): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async archiveTaskLabel(labelId: string): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async restoreTaskLabel(labelId: string): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}/restore`, {
+      method: "POST",
+    });
+  }
+```
+
+Ensure `TaskLabelUpdateRequest` is imported from `types.ts`.
+
+- [ ] **Step 6: Implement shared task label utilities**
+
+Create `frontend/src/components/tasks/taskLabelUtils.ts`:
+
+```ts
+import type { TaskLabel, TaskLabelColor } from "@/lib/types";
+
+export const TASK_LABEL_COLOR_OPTIONS: Array<{
+  value: TaskLabelColor;
+  label: string;
+}> = [
+  { value: "teal", label: "Teal" },
+  { value: "blue", label: "Blue" },
+  { value: "purple", label: "Purple" },
+  { value: "gold", label: "Gold" },
+  { value: "green", label: "Green" },
+  { value: "coral", label: "Coral" },
+  { value: "rose", label: "Rose" },
+  { value: "slate", label: "Slate" },
+];
+
+const LABEL_CLASSES: Record<string, string> = {
+  teal: "bg-primary/10 text-primary border-primary/20",
+  blue: "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-300",
+  purple: "bg-purple-500/10 text-purple-700 border-purple-500/20 dark:text-purple-300",
+  gold: "bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-300",
+  green: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-300",
+  coral: "bg-orange-500/10 text-orange-700 border-orange-500/20 dark:text-orange-300",
+  rose: "bg-rose-500/10 text-rose-700 border-rose-500/20 dark:text-rose-300",
+  slate: "bg-slate-500/10 text-slate-700 border-slate-500/20 dark:text-slate-300",
+};
+
+const SWATCH_CLASSES: Record<string, string> = {
+  teal: "bg-teal-500",
+  blue: "bg-blue-500",
+  purple: "bg-purple-500",
+  gold: "bg-amber-500",
+  green: "bg-emerald-500",
+  coral: "bg-orange-500",
+  rose: "bg-rose-500",
+  slate: "bg-slate-500",
+};
+
+export function labelClass(color: string) {
+  return LABEL_CLASSES[color] || LABEL_CLASSES.slate;
+}
+
+export function labelSwatchClass(color: string) {
+  return SWATCH_CLASSES[color] || SWATCH_CLASSES.slate;
+}
+
+export function canEditTaskLabel(label: TaskLabel) {
+  return label.can_edit;
+}
+
+export function canArchiveTaskLabel(label: TaskLabel) {
+  return label.can_archive;
+}
+```
+
+- [ ] **Step 7: Update TaskLabelChips**
+
+In `frontend/src/components/tasks/TaskLabelChips.tsx`, remove the local `LABEL_CLASSES` and `labelClass` definitions and import:
+
+```ts
+import { labelClass } from "./taskLabelUtils";
+```
+
+Keep the component markup unchanged except for using the imported helper.
+
+- [ ] **Step 8: Run Task 4 tests**
 
 Run:
 
 ```bash
 cd frontend && npm test
+cd frontend && npx tsc --noEmit
 ```
 
-Expected: PASS.
+Expected: both pass.
 
-- [ ] **Step 6: Commit Task 1**
+- [ ] **Step 9: Commit Task 4**
 
 Run:
 
 ```bash
-git add frontend/package.json frontend/src/components/tasks/taskFilterUtils.ts frontend/src/components/tasks/taskFilterUtils.test.ts
-git commit -m "test: cover task filter helper state"
+git add frontend/src/lib/types.ts frontend/src/lib/api.ts frontend/src/components/tasks/taskLabelUtils.ts frontend/src/components/tasks/taskLabelUtils.test.ts frontend/src/components/tasks/TaskLabelChips.tsx frontend/package.json
+git commit -m "feat: add task label frontend helpers"
 ```
 
----
-
-## Task 2: Responsive Sheet Side Hook
+## Task 5: Label Picker Color Creation and Member Actions
 
 **Files:**
 
-- Create: `frontend/src/hooks/useMediaQuery.ts`
+- Create: `frontend/src/components/tasks/TaskLabelEditDialog.tsx`
+- Modify: `frontend/src/components/tasks/TaskLabelPicker.tsx`
 
-- [ ] **Step 1: Add the media-query hook**
+- [ ] **Step 1: Create the edit dialog component**
 
-Create `frontend/src/hooks/useMediaQuery.ts`:
+Create `frontend/src/components/tasks/TaskLabelEditDialog.tsx`:
 
-```ts
+```tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 
-export function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import type { TaskLabel, TaskLabelColor } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+import {
+  TASK_LABEL_COLOR_OPTIONS,
+  labelSwatchClass,
+} from "./taskLabelUtils";
+
+export function TaskLabelEditDialog({
+  label,
+  open,
+  saving,
+  onOpenChange,
+  onSave,
+}: {
+  label: TaskLabel | null;
+  open: boolean;
+  saving?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: { name: string; color: TaskLabelColor }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [color, setColor] = useState<TaskLabelColor>("teal");
 
   useEffect(() => {
-    const mediaQueryList = window.matchMedia(query);
+    if (!label || !open) return;
+    setName(label.name);
+    setColor(
+      TASK_LABEL_COLOR_OPTIONS.some((option) => option.value === label.color)
+        ? (label.color as TaskLabelColor)
+        : "slate"
+    );
+  }, [label, open]);
 
-    function updateMatches() {
-      setMatches(mediaQueryList.matches);
-    }
+  const normalizedName = name.trim();
 
-    updateMatches();
-    mediaQueryList.addEventListener("change", updateMatches);
-
-    return () => {
-      mediaQueryList.removeEventListener("change", updateMatches);
-    };
-  }, [query]);
-
-  return matches;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogHeader>
+          <DialogTitle>Редактировать метку</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="task-label-name">Название</Label>
+            <Input
+              id="task-label-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              maxLength={80}
+              disabled={saving}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Цвет</Label>
+            <div className="grid grid-cols-4 gap-2">
+              {TASK_LABEL_COLOR_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setColor(option.value)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border px-2 py-2 text-xs font-medium",
+                    color === option.value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border/60 hover:bg-muted"
+                  )}
+                >
+                  <span
+                    className={cn("h-3 w-3 rounded-full", labelSwatchClass(option.value))}
+                  />
+                  <span className="truncate">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            Отмена
+          </Button>
+          <Button
+            type="button"
+            disabled={saving || !normalizedName}
+            onClick={() => onSave({ name: normalizedName, color })}
+          >
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Сохранить
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 ```
 
-- [ ] **Step 2: Run TypeScript check**
+- [ ] **Step 2: Add picker state and imports**
 
-Run:
-
-```bash
-cd frontend && npx tsc --noEmit
-```
-
-Expected: PASS.
-
-- [ ] **Step 3: Commit Task 2**
-
-Run:
-
-```bash
-git add frontend/src/hooks/useMediaQuery.ts
-git commit -m "feat: add media query hook"
-```
-
----
-
-## Task 3: Unified Labels Picker Trigger
-
-**Files:**
-
-- Modify: `frontend/src/components/tasks/TaskLabelPicker.tsx`
-
-- [ ] **Step 1: Add chevron and compact summary support**
-
-Modify the import:
-
-```ts
-import { Check, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
-```
-
-Modify the function signature props:
-
-```ts
-export function TaskLabelPicker({
-  value,
-  onChange,
-  disabled = false,
-  maxVisible = 3,
-  placeholder = "Метки",
-  variant = "default",
-  displayMode = "chips",
-  triggerClassName,
-  showChevron = false,
-}: {
-  value: TaskLabel[];
-  onChange: (labels: TaskLabel[]) => void;
-  disabled?: boolean;
-  maxVisible?: number;
-  placeholder?: string;
-  variant?: TaskLabelPickerVariant;
-  displayMode?: TaskLabelPickerDisplayMode;
-  triggerClassName?: string;
-  showChevron?: boolean;
-}) {
-```
-
-Add this summary value after `canCreate`:
-
-```ts
-  const summaryText =
-    value.length === 0
-      ? placeholder
-      : value.length === 1
-        ? value[0].name
-        : `${value[0].name} +${value.length - 1}`;
-```
-
-Replace the `Button` children inside `PopoverTrigger` with:
+In `TaskLabelPicker.tsx`, add imports:
 
 ```tsx
-          <span className="flex min-w-0 flex-1 items-center">
-            {value.length && displayMode === "summary" ? (
-              <span className="min-w-0 truncate text-foreground">
-                {summaryText}
-              </span>
-            ) : value.length ? (
-              <TaskLabelChips
-                labels={value}
-                maxVisible={maxVisible}
-                className={cn(
-                  "flex-nowrap overflow-hidden",
-                  variant === "compact" ? "max-w-[220px]" : "w-full"
-                )}
-              />
-            ) : (
-              <span className="truncate text-muted-foreground">
-                {placeholder}
-              </span>
-            )}
-          </span>
-          {showChevron && (
-            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
-          )}
-```
-
-Update the `Button` className base so the optional chevron can align with the text:
-
-```ts
-            "h-auto min-w-0 justify-between gap-2",
-```
-
-- [ ] **Step 2: Run TypeScript check**
-
-Run:
-
-```bash
-cd frontend && npx tsc --noEmit
-```
-
-Expected: PASS.
-
-- [ ] **Step 3: Commit Task 3**
-
-Run:
-
-```bash
-git add frontend/src/components/tasks/TaskLabelPicker.tsx
-git commit -m "feat: align task label picker trigger"
-```
-
----
-
-## Task 4: Filter Sheet UI
-
-**Files:**
-
-- Modify: `frontend/src/components/tasks/TaskFilters.tsx`
-
-- [ ] **Step 1: Replace local filter value exports with helper exports**
-
-Remove the local `TaskFilterValues`, `EMPTY_FILTERS`, and `ActiveFilter` definitions from `TaskFilters.tsx`.
-
-Update the React import:
-
-```ts
-import { useMemo, useState, type ReactNode } from "react";
-```
-
-Add these imports:
-
-```ts
+import Link from "next/link";
+import { Archive, Pencil, Settings } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useToast } from "@/components/shared/Toast";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { PermissionService } from "@/lib/permissions";
+import type { TaskLabelColor } from "@/lib/types";
+import { TaskLabelEditDialog } from "./TaskLabelEditDialog";
 import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { useMediaQuery } from "@/hooks/useMediaQuery";
-import {
-  buildActiveTaskFilterChips,
-  clearStructuredTaskFilters,
-  countActiveStructuredTaskFilters,
-  removeTaskFilterChip,
-  EMPTY_FILTERS,
-  type ActiveTaskFilterChip,
-  type TaskFilterValues,
-} from "@/components/tasks/taskFilterUtils";
+  TASK_LABEL_COLOR_OPTIONS,
+  canArchiveTaskLabel,
+  canEditTaskLabel,
+  labelSwatchClass,
+} from "./taskLabelUtils";
 ```
 
-Add this export near the imports so existing consumers keep working:
+Keep the existing lucide import list deduplicated: include `Archive`, `Check`, `ChevronDown`, `Loader2`, `Pencil`, `Plus`, `Search`, `Settings`, and `X`.
 
-```ts
-export { EMPTY_FILTERS, type TaskFilterValues } from "@/components/tasks/taskFilterUtils";
+Inside the component state, add:
+
+```tsx
+  const { user } = useCurrentUser();
+  const { toastError, toastSuccess } = useToast();
+  const isModerator = user ? PermissionService.isModerator(user) : false;
+  const [createColor, setCreateColor] = useState<TaskLabelColor>("teal");
+  const [editingLabel, setEditingLabel] = useState<TaskLabel | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [archiveLabel, setArchiveLabel] = useState<TaskLabel | null>(null);
+  const [archiving, setArchiving] = useState(false);
 ```
 
-- [ ] **Step 2: Replace expanded inline state with sheet state**
+- [ ] **Step 3: Add reload helper and create color payload**
 
-Replace:
+Inside `TaskLabelPicker`, extract loading into:
 
-```ts
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const desktopGridClass = showDepartmentFilter
-    ? FILTER_GRID_WITH_DEPARTMENT
-    : FILTER_GRID_WITHOUT_DEPARTMENT;
-```
-
-with:
-
-```ts
-  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  const isDesktopSheet = useMediaQuery("(min-width: 768px)");
-```
-
-Remove `FILTER_GRID_WITH_DEPARTMENT` and `FILTER_GRID_WITHOUT_DEPARTMENT`.
-
-- [ ] **Step 3: Add active chip and reset helpers**
-
-After `selectedMemberFilterValue`, add:
-
-```ts
-  const activeFilterCount = countActiveStructuredTaskFilters(filters, {
-    showDepartmentFilter,
-  });
-  const activeFilterChips = buildActiveTaskFilterChips({
-    filters,
-    members,
-    departments,
-    showDepartmentFilter,
-  });
-
-  function resetStructuredFilters() {
-    onFiltersChange(clearStructuredTaskFilters(filters));
-  }
-
-  function handleActiveChipClick(chip: ActiveTaskFilterChip) {
-    if (chip.type === "label-overflow") {
-      setFilterSheetOpen(true);
-      return;
+```tsx
+  async function loadLabels() {
+    setLoadError(false);
+    setLoading(true);
+    try {
+      const labels = await api.getTaskLabels({
+        search: normalizedSearch || undefined,
+        limit: 20,
+      });
+      setOptions(labels);
+    } catch {
+      setOptions([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    onFiltersChange(removeTaskFilterChip(filters, chip));
   }
 ```
 
-Remove the old `activeFilters` array construction and `removeFilter` function.
-
-- [ ] **Step 4: Add the reusable field wrapper**
-
-Add this local component before `return`:
+Update the `useEffect` to call `loadLabels()` with a cancellation guard by keeping the existing pattern. The simplest safe implementation is to keep the current inline effect and add a separate `refreshLabels` function:
 
 ```tsx
-  function FilterField({
-    label,
-    children,
-  }: {
-    label: string;
-    children: ReactNode;
-  }) {
-    return (
-      <div className="space-y-1.5">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-        {children}
-      </div>
-    );
+  async function refreshLabels() {
+    try {
+      const labels = await api.getTaskLabels({
+        search: normalizedSearch || undefined,
+        limit: 20,
+      });
+      setOptions(labels);
+    } catch {
+      setLoadError(true);
+    }
   }
 ```
 
-- [ ] **Step 5: Replace the render output with compact row, chips, and sheet**
-
-Replace the `return (...)` block in `TaskFilters.tsx` with:
+In `createLabel`, change the API call:
 
 ```tsx
-  return (
-    <div className="flex-1 space-y-2">
-      <div className="grid gap-2 sm:grid-cols-[minmax(280px,1fr)_auto]">
-        <div className="relative group min-w-0">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary" />
-          <Input
-            placeholder="Найти задачу..."
-            value={filters.search}
-            onChange={(event) =>
-              onFiltersChange({ ...filters, search: event.target.value })
-            }
-            className="h-10 w-full rounded-xl border-border/70 bg-card pl-9 pr-9 shadow-sm focus:border-primary/40"
-          />
-          {filters.search && (
-            <button
-              type="button"
-              aria-label="Очистить поиск"
-              onClick={() => onFiltersChange({ ...filters, search: "" })}
-              className="absolute right-2.5 top-1/2 rounded-full p-0.5 text-muted-foreground hover:text-foreground -translate-y-1/2"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
+      const label = await api.createTaskLabel({
+        name: labelName,
+        color: createColor,
+      });
+```
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setFilterSheetOpen(true)}
-          className="h-10 justify-center rounded-xl border-border/70 bg-card px-4 shadow-sm"
-          aria-label={
-            activeFilterCount > 0
-              ? `Открыть фильтры, активных фильтров: ${activeFilterCount}`
-              : "Открыть фильтры"
-          }
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0
-            ? `Фильтры · ${activeFilterCount}`
-            : "Фильтры"}
-        </Button>
-      </div>
+After success, reset `createColor` to `"teal"`. In the catch block, show:
 
-      {activeFilterChips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-          {activeFilterChips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => handleActiveChipClick(chip)}
-              className={cn(
-                "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                chip.type === "label-overflow"
-                  ? "border-border/70 bg-muted text-muted-foreground hover:bg-muted/80"
-                  : "border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
-              )}
-            >
-              <span className="truncate">{chip.label}</span>
-              {chip.type !== "label-overflow" && (
-                <X className="h-3 w-3 opacity-60" />
-              )}
-            </button>
-          ))}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={resetStructuredFilters}
-            className="h-7 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-3.5 w-3.5" />
-            Сбросить
-          </Button>
-        </div>
-      )}
+```tsx
+      toastError(error instanceof Error ? error.message : "Не удалось создать метку");
+```
 
-      <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
-        <SheetContent
-          side={isDesktopSheet ? "right" : "bottom"}
-          className={cn(
-            "flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0",
-            isDesktopSheet
-              ? "h-full w-full sm:max-w-md"
-              : "rounded-t-2xl"
-          )}
-        >
-          <SheetHeader className="border-b border-border/60 px-5 py-4 text-left">
-            <SheetTitle>Фильтры</SheetTitle>
-            <SheetDescription>
-              Настройте вид доски задач
-            </SheetDescription>
-          </SheetHeader>
+- [ ] **Step 4: Add color swatches to create flow**
 
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-            <FilterField label="Метки">
-              <TaskLabelPicker
-                value={filters.labels}
-                onChange={(labels) => onFiltersChange({ ...filters, labels })}
-                maxVisible={1}
-                placeholder="Все метки"
-                displayMode="summary"
-                triggerClassName={FILTER_CONTROL_CLASS}
-                showChevron
-              />
-            </FilterField>
+Before the create button, render the fixed palette when `canCreate`:
 
-            {showDepartmentFilter && (
-              <FilterField label="Отдел">
-                <Select
-                  value={filters.department_id || "all"}
-                  onValueChange={(value) => {
-                    const nextDepartmentId = value === "all" ? "" : value;
-                    const shouldResetAssignee =
-                      Boolean(nextDepartmentId) &&
-                      Boolean(filters.assignee_id) &&
-                      filters.assignee_id !== "unassigned" &&
-                      !members.some(
-                        (member) =>
-                          member.id === filters.assignee_id &&
-                          member.department_id === nextDepartmentId
-                      );
-                    const shouldResetAuthor =
-                      Boolean(nextDepartmentId) &&
-                      Boolean(filters.created_by_id) &&
-                      !members.some(
-                        (member) =>
-                          member.id === filters.created_by_id &&
-                          member.department_id === nextDepartmentId
-                      );
-
-                    onFiltersChange({
-                      ...filters,
-                      department_id: nextDepartmentId,
-                      assignee_id: shouldResetAssignee ? "" : filters.assignee_id,
-                      created_by_id: shouldResetAuthor ? "" : filters.created_by_id,
-                    });
-                  }}
+```tsx
+          {!loading && canCreate && (
+            <div className="mt-2 grid grid-cols-8 gap-1 border-t border-border/60 pt-2">
+              {TASK_LABEL_COLOR_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-label={`Выбрать цвет ${option.label}`}
+                  disabled={controlsDisabled}
+                  onClick={() => setCreateColor(option.value)}
+                  className={cn(
+                    "flex h-7 items-center justify-center rounded-md border",
+                    createColor === option.value
+                      ? "border-primary bg-primary/10"
+                      : "border-border/60 hover:bg-muted"
+                  )}
                 >
-                  <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                    <SelectValue placeholder="Отдел" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все отделы</SelectItem>
-                    {departments.map((department) => (
-                      <SelectItem key={department.id} value={department.id}>
-                        {department.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FilterField>
-            )}
-
-            <FilterField label="Участник">
-              <Select
-                value={selectedMemberFilterValue}
-                onValueChange={handleMemberValueChange}
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="Участник" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все участники</SelectItem>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>Исполнитель</SelectLabel>
-                    <SelectItem value="assignee:unassigned">
-                      <span className="text-muted-foreground">Не назначен</span>
-                    </SelectItem>
-                    {memberOptions.map((member) => (
-                      <SelectItem
-                        key={`assignee:${member.id}`}
-                        value={`assignee:${member.id}`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <UserAvatar
-                            name={member.full_name}
-                            avatarUrl={member.avatar_url}
-                            size="sm"
-                          />
-                          <span className="truncate">{member.full_name}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>Автор</SelectLabel>
-                    {memberOptions.map((member) => (
-                      <SelectItem
-                        key={`author:${member.id}`}
-                        value={`author:${member.id}`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <UserAvatar
-                            name={member.full_name}
-                            avatarUrl={member.avatar_url}
-                            size="sm"
-                          />
-                          <span className="truncate">{member.full_name}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </FilterField>
-
-            <FilterField label="Приоритет">
-              <Select
-                value={filters.priority || "all"}
-                onValueChange={(value) =>
-                  onFiltersChange({
-                    ...filters,
-                    priority: value === "all" ? "" : value,
-                  })
-                }
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="Приоритет" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все приоритеты</SelectItem>
-                  {(Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(
-                    (priority) => (
-                      <SelectItem key={priority} value={priority}>
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={`h-2 w-2 rounded-full ${PRIORITY_DOT_COLORS[priority]}`}
-                          />
-                          {TASK_PRIORITY_LABELS[priority]}
-                        </span>
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </FilterField>
-
-            <FilterField label="Источник">
-              <Select
-                value={filters.source || "all"}
-                onValueChange={(value) =>
-                  onFiltersChange({
-                    ...filters,
-                    source: value === "all" ? "" : value,
-                  })
-                }
-              >
-                <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                  <SelectValue placeholder="Источник" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Все источники</SelectItem>
-                  {(Object.keys(TASK_SOURCE_LABELS) as TaskSource[]).map(
-                    (source) => (
-                      <SelectItem key={source} value={source}>
-                        <span className="flex items-center gap-2">
-                          <span className="text-xs">{SOURCE_ICONS[source]}</span>
-                          {TASK_SOURCE_LABELS[source]}
-                        </span>
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-
-          <SheetFooter className="gap-2 border-t border-border/60 px-5 py-4 sm:space-x-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={resetStructuredFilters}
-              className="rounded-xl"
-            >
-              Сбросить
-            </Button>
-            <SheetClose asChild>
-              <Button type="button" className="rounded-xl">
-                Готово
-              </Button>
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    </div>
-  );
+                  <span className={cn("h-3.5 w-3.5 rounded-full", labelSwatchClass(option.value))} />
+                </button>
+              ))}
+            </div>
+          )}
 ```
 
-- [ ] **Step 6: Remove unused imports and constants**
+- [ ] **Step 5: Add row swatches and actions**
 
-After the render replacement, remove unused `ChevronDown`, the old grid constants, and any old active-filter types that TypeScript reports.
+Replace each option row with a button plus row actions. Keep selection toggling on the main button:
 
-- [ ] **Step 7: Run frontend checks**
+```tsx
+              <div
+                key={label.id}
+                className="flex items-center gap-1 rounded-md hover:bg-muted"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleLabel(label)}
+                  disabled={controlsDisabled}
+                  className="flex min-w-0 flex-1 items-center justify-between px-2 py-2 text-left text-sm disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", labelSwatchClass(label.color))} />
+                    <span className="truncate">{label.name}</span>
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {label.usage_count}
+                    {selectedIds.has(label.id) && <Check className="h-4 w-4 text-primary" />}
+                  </span>
+                </button>
+                {(canEditTaskLabel(label) || canArchiveTaskLabel(label)) && (
+                  <span className="flex shrink-0 items-center pr-1">
+                    {canEditTaskLabel(label) && (
+                      <button
+                        type="button"
+                        aria-label={`Редактировать метку ${label.name}`}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                        onClick={() => setEditingLabel(label)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {canArchiveTaskLabel(label) && (
+                      <button
+                        type="button"
+                        aria-label={`Архивировать метку ${label.name}`}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
+                        onClick={() => setArchiveLabel(label)}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </span>
+                )}
+              </div>
+```
+
+- [ ] **Step 6: Implement edit and archive handlers**
+
+Add handlers:
+
+```tsx
+  async function handleEditLabel(data: { name: string; color: TaskLabelColor }) {
+    if (!editingLabel) return;
+    setSavingEdit(true);
+    try {
+      const updated = await api.updateTaskLabel(editingLabel.id, data);
+      setOptions((labels) => labels.map((label) => label.id === updated.id ? updated : label));
+      onChange(valueRef.current.map((label) => label.id === updated.id ? updated : label));
+      toastSuccess("Метка обновлена");
+      setEditingLabel(null);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось обновить метку");
+      await refreshLabels();
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleArchiveLabel() {
+    if (!archiveLabel) return;
+    setArchiving(true);
+    try {
+      const archived = await api.archiveTaskLabel(archiveLabel.id);
+      setOptions((labels) => labels.filter((label) => label.id !== archived.id));
+      onChange(valueRef.current.filter((label) => label.id !== archived.id));
+      toastSuccess("Метка архивирована");
+      setArchiveLabel(null);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось архивировать метку");
+      await refreshLabels();
+    } finally {
+      setArchiving(false);
+    }
+  }
+```
+
+- [ ] **Step 7: Render dialogs and moderator link**
+
+At the bottom of `PopoverContent`, before closing it, add:
+
+```tsx
+        {isModerator && (
+          <div className="mt-2 border-t border-border/60 pt-2">
+            <Link
+              href="/settings?tab=task-labels"
+              className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Settings className="h-4 w-4" />
+              Управлять метками
+            </Link>
+          </div>
+        )}
+```
+
+Render siblings after `</Popover>`:
+
+```tsx
+      <TaskLabelEditDialog
+        label={editingLabel}
+        open={!!editingLabel}
+        saving={savingEdit}
+        onOpenChange={(open) => !open && setEditingLabel(null)}
+        onSave={(data) => void handleEditLabel(data)}
+      />
+      <ConfirmDialog
+        open={!!archiveLabel}
+        onOpenChange={(open) => !open && setArchiveLabel(null)}
+        title="Архивировать метку?"
+        description="Метка останется на старых задачах, но больше не будет доступна для новых."
+        confirmLabel="Архивировать"
+        confirmDisabled={archiving}
+        cancelDisabled={archiving}
+        onConfirm={() => void handleArchiveLabel()}
+      />
+```
+
+Wrap the component return in a fragment if needed.
+
+- [ ] **Step 8: Run frontend checks**
 
 Run:
 
@@ -1028,116 +1569,468 @@ cd frontend && npm test
 cd frontend && npx tsc --noEmit
 ```
 
-Expected: both commands PASS.
+Expected: pass.
 
-- [ ] **Step 8: Commit Task 4**
+- [ ] **Step 9: Commit Task 5**
 
 Run:
 
 ```bash
-git add frontend/src/components/tasks/TaskFilters.tsx
-git commit -m "feat: move task filters into sheet"
+git add frontend/src/components/tasks/TaskLabelPicker.tsx frontend/src/components/tasks/TaskLabelEditDialog.tsx
+git commit -m "feat: manage owned task labels from picker"
 ```
 
----
+## Task 6: Moderator Settings Label Management
 
-## Task 5: Manual UI Verification
+**Files:**
+
+- Create: `frontend/src/components/settings/TaskLabelsSection.tsx`
+- Modify: `frontend/src/app/settings/page.tsx`
+
+- [ ] **Step 1: Create TaskLabelsSection**
+
+Create `frontend/src/components/settings/TaskLabelsSection.tsx`:
+
+```tsx
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Archive, Loader2, Pencil, RotateCcw, Search, Tags } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useToast } from "@/components/shared/Toast";
+import { useTeam } from "@/hooks/useTeam";
+import { api } from "@/lib/api";
+import type { TaskLabel, TaskLabelColor } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { TaskLabelEditDialog } from "@/components/tasks/TaskLabelEditDialog";
+import { TaskLabelChips } from "@/components/tasks/TaskLabelChips";
+import { labelSwatchClass } from "@/components/tasks/taskLabelUtils";
+
+type LabelStatusFilter = "active" | "archived";
+
+export function TaskLabelsSection() {
+  const { toastSuccess, toastError } = useToast();
+  const { members } = useTeam();
+  const [labels, setLabels] = useState<TaskLabel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<LabelStatusFilter>("active");
+  const [editingLabel, setEditingLabel] = useState<TaskLabel | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [archiveLabel, setArchiveLabel] = useState<TaskLabel | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  const membersById = useMemo(
+    () => new Map(members.map((member) => [member.id, member])),
+    [members]
+  );
+
+  const loadLabels = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.getTaskLabels({
+        search: search.trim() || undefined,
+        limit: 100,
+        include_archived: true,
+      });
+      setLabels(data);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось загрузить метки");
+    } finally {
+      setLoading(false);
+    }
+  }, [search, toastError]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void loadLabels();
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [loadLabels]);
+
+  const visibleLabels = labels.filter((label) =>
+    status === "archived" ? label.is_archived : !label.is_archived
+  );
+
+  async function handleEditLabel(data: { name: string; color: TaskLabelColor }) {
+    if (!editingLabel) return;
+    setSavingEdit(true);
+    try {
+      const updated = await api.updateTaskLabel(editingLabel.id, data);
+      setLabels((items) => items.map((item) => item.id === updated.id ? updated : item));
+      toastSuccess("Метка обновлена");
+      setEditingLabel(null);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось обновить метку");
+      await loadLabels();
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function handleArchiveLabel() {
+    if (!archiveLabel) return;
+    setArchiving(true);
+    try {
+      const archived = await api.archiveTaskLabel(archiveLabel.id);
+      setLabels((items) => items.map((item) => item.id === archived.id ? archived : item));
+      toastSuccess("Метка архивирована");
+      setArchiveLabel(null);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось архивировать метку");
+      await loadLabels();
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  async function handleRestore(label: TaskLabel) {
+    setRestoringId(label.id);
+    try {
+      const restored = await api.restoreTaskLabel(label.id);
+      setLabels((items) => items.map((item) => item.id === restored.id ? restored : item));
+      toastSuccess("Метка восстановлена");
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Не удалось восстановить метку");
+      await loadLabels();
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  if (loading && labels.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
+        <Skeleton className="h-6 w-48" />
+        <Skeleton className="h-10 w-full" />
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-14 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+        <div className="flex items-center gap-3 p-6 pb-0">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Tags className="h-5 w-5" />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-heading text-base font-semibold">Метки задач</h2>
+            <p className="text-xs text-muted-foreground">
+              Цвета, названия и архив общих меток задач
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4 p-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Найти метку"
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex gap-1.5">
+            {(["active", "archived"] as LabelStatusFilter[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setStatus(item)}
+                className={cn(
+                  "rounded-full px-3 py-1 text-xs font-medium transition-colors",
+                  status === item
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {item === "active" ? "Активные" : "Архив"}
+              </button>
+            ))}
+          </div>
+
+          {visibleLabels.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-6 text-center">
+              <Tags className="mx-auto mb-2 h-7 w-7 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">
+                {status === "active" ? "Активных меток нет" : "Архивных меток нет"}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {visibleLabels.map((label) => {
+                const owner = label.created_by_id
+                  ? membersById.get(label.created_by_id)
+                  : null;
+                return (
+                  <div
+                    key={label.id}
+                    className="flex items-center gap-3 rounded-xl border border-border/60 p-3.5"
+                  >
+                    <span className={cn("h-3 w-3 shrink-0 rounded-full", labelSwatchClass(label.color))} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TaskLabelChips labels={[label]} maxVisible={1} />
+                        {label.is_archived && (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-2xs font-medium text-muted-foreground">
+                            Архив
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-2xs text-muted-foreground">
+                        {label.usage_count} задач · {owner?.full_name || "Без владельца"}
+                      </p>
+                    </div>
+                    {!label.is_archived ? (
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setEditingLabel(label)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="sr-only">Редактировать</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setArchiveLabel(label)}
+                        >
+                          <Archive className="h-4 w-4" />
+                          <span className="sr-only">Архивировать</span>
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={restoringId === label.id}
+                        onClick={() => void handleRestore(label)}
+                      >
+                        {restoringId === label.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        )}
+                        Восстановить
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <TaskLabelEditDialog
+        label={editingLabel}
+        open={!!editingLabel}
+        saving={savingEdit}
+        onOpenChange={(open) => !open && setEditingLabel(null)}
+        onSave={(data) => void handleEditLabel(data)}
+      />
+      <ConfirmDialog
+        open={!!archiveLabel}
+        onOpenChange={(open) => !open && setArchiveLabel(null)}
+        title="Архивировать метку?"
+        description="Метка останется на старых задачах, но больше не будет доступна для новых."
+        confirmLabel="Архивировать"
+        confirmDisabled={archiving}
+        cancelDisabled={archiving}
+        onConfirm={() => void handleArchiveLabel()}
+      />
+    </>
+  );
+}
+```
+
+- [ ] **Step 2: Add Settings tab**
+
+In `frontend/src/app/settings/page.tsx`, import `Tags` and the section:
+
+```tsx
+import { Tags } from "lucide-react";
+import { TaskLabelsSection } from "@/components/settings/TaskLabelsSection";
+```
+
+Update the tab type:
+
+```ts
+type TabId =
+  | "integrations"
+  | "reports"
+  | "ai"
+  | "notifications"
+  | "reminders"
+  | "task-labels";
+```
+
+Add the tab:
+
+```ts
+  { id: "task-labels", label: "Метки задач", icon: Tags, adminOnly: false },
+```
+
+Add the content case:
+
+```tsx
+    case "task-labels":
+      return <TaskLabelsSection />;
+```
+
+The whole settings page is already wrapped in `ModeratorGuard`, so this tab is moderator/admin-only even though `adminOnly` is false.
+
+- [ ] **Step 3: Run frontend checks**
+
+Run:
+
+```bash
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+```
+
+Expected: pass.
+
+- [ ] **Step 4: Commit Task 6**
+
+Run:
+
+```bash
+git add frontend/src/components/settings/TaskLabelsSection.tsx frontend/src/app/settings/page.tsx
+git commit -m "feat: add moderator task label settings"
+```
+
+## Task 7: Documentation and Final Verification
 
 **Files:**
 
 - Modify: `docs/STATUS.md`
+- Modify: `docs/TEST_PLAN.md`
 
-- [ ] **Step 1: Start the frontend dev server**
+- [ ] **Step 1: Update status**
+
+Add this section near the top of `docs/STATUS.md`:
+
+```markdown
+## Task Label Management
+
+- Current phase: implemented and under verification
+- Spec: `docs/superpowers/specs/2026-05-06-task-label-management-design.md`
+- Plan: `docs/PLAN.md`
+- Scope: web portal label colors, member-owned label actions, moderator cleanup UI
+- Latest verification:
+  - Pending final backend and frontend validation commands.
+```
+
+After all verification commands pass, replace the pending bullet with the exact commands that passed.
+
+- [ ] **Step 2: Update test plan**
+
+Add this section to `docs/TEST_PLAN.md`:
+
+```markdown
+## Task Label Management
+
+### Automated
+
+- `cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_api.py tests/test_task_label_task_api.py tests/test_task_permission_service.py tests/test_task_update_permissions.py -q`
+- `cd backend && pytest -q`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+
+### Manual
+
+1. Create a label from the task label picker and choose a non-default color.
+2. Confirm the label chip uses the selected color on task cards and task detail.
+3. As the label creator, edit the label name and color before it is used on another person's task.
+4. Attach the label to a task where the author or assignee is another user, then confirm ordinary member edit/archive actions disappear after refresh.
+5. Archive an owned, non-shared label and confirm it disappears from normal picker results.
+6. Confirm the archived label remains visible on a task that already had it.
+7. As a moderator, open `/settings?tab=task-labels`.
+8. Edit an active label from Settings.
+9. Archive an active label from Settings.
+10. Switch to the archive filter and restore the archived label.
+11. Try creating a new label with the same name as an archived label and confirm the UI shows the archived-conflict message.
+```
+
+- [ ] **Step 3: Run backend validation**
 
 Run:
 
 ```bash
-cd frontend && npm run dev -- --hostname 127.0.0.1 --port 3001
+cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_api.py tests/test_task_label_task_api.py tests/test_task_permission_service.py tests/test_task_update_permissions.py -q
+cd backend && pytest -q
 ```
 
-Expected: Next.js starts on `http://127.0.0.1:3001`.
+Expected: both pass.
 
-- [ ] **Step 2: Verify desktop behavior**
-
-Open `http://127.0.0.1:3001/tasks` in the in-app browser or Playwright.
-
-Verify:
-
-- default header shows search, `Фильтры`, and `Новая задача`;
-- no active chip row appears when structured filters are empty;
-- `Фильтры` opens a right-side sheet at desktop width;
-- sheet order is labels, department, participant, priority, source;
-- labels trigger has the same height, border, radius, background, and chevron as the other filter triggers;
-- selecting one label creates one removable label chip;
-- selecting three labels shows two label chips plus `+1 меток`;
-- clicking a visible label chip removes only that label;
-- clicking overflow opens the sheet;
-- `Сбросить` clears structured filters and keeps the search text;
-- `Готово` closes the sheet without changing active filters.
-
-- [ ] **Step 3: Verify mobile behavior**
-
-Set the browser viewport to a mobile width such as `390x844`.
-
-Verify:
-
-- search and filter button remain usable without text overlap;
-- `Фильтры` opens a bottom sheet;
-- bottom sheet content scrolls if needed;
-- all controls fit within the sheet width;
-- create button does not overlap the filter row.
-
-- [ ] **Step 4: Run production-oriented checks**
+- [ ] **Step 4: Run frontend validation**
 
 Run:
 
 ```bash
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
-cd frontend && npm run build
+cd frontend && npm run lint
 ```
 
-Expected: all commands PASS.
+Expected: all pass.
 
-- [ ] **Step 5: Update status**
+- [ ] **Step 5: Optional browser smoke**
 
-Append this entry to `docs/STATUS.md` after verification:
+Start the frontend dev server if it is not running:
 
-```md
-## Task Filter Sheet
-
-- Current phase: implemented and verified
-- Spec: `docs/superpowers/specs/2026-05-06-task-filter-sheet-design.md`
-- Plan: `docs/PLAN.md`
-- Latest verification:
-  - Frontend helper tests pass.
-  - Frontend TypeScript check passes.
-  - Frontend production build passes.
-  - Desktop task filter sheet manually verified.
-  - Mobile bottom sheet manually verified.
+```bash
+cd frontend && npm run dev
 ```
 
-- [ ] **Step 6: Commit Task 5**
+Open the app and smoke these routes:
+
+- `/tasks`: task label picker opens and renders color swatches.
+- `/settings?tab=task-labels`: moderator label management tab renders.
+
+If using the in-app browser, capture any visual regressions and fix them before final status.
+
+- [ ] **Step 6: Update status with actual verification**
+
+In `docs/STATUS.md`, replace the pending verification bullets with the commands that passed. If a command could not be run, record the reason.
+
+- [ ] **Step 7: Commit docs**
 
 Run:
 
 ```bash
-git add docs/STATUS.md
-git commit -m "docs: update task filter sheet status"
+git add docs/STATUS.md docs/TEST_PLAN.md
+git commit -m "docs: update task label management status"
 ```
 
----
+## Final Done Criteria
 
-## Definition of Done
-
-- The task board header no longer shows the full structured filter grid by default.
-- Search remains visible and functional.
-- `Фильтры · N` opens a responsive sheet.
-- Desktop uses a right-side sheet.
-- Mobile and tablet use a bottom sheet.
-- The sheet field order is labels, department, participant, priority, source.
-- Labels remain multi-select.
-- Labels trigger visually matches the other filter triggers, including the chevron.
-- Active label chips show individual labels with overflow after two labels.
-- Reset clears structured filters and preserves search.
-- `npm test`, `npx tsc --noEmit`, and `npm run build` pass from `frontend/`.
+- Backend enforces fixed color palette, archived conflicts, member-owned label management, shared-label lockout, moderator restore, and archived attach guard.
+- Frontend creation flow lets users choose a palette color.
+- Picker row actions appear only from backend capability flags.
+- Moderator Settings tab can edit/archive/restore labels.
+- Archived labels remain visible on old tasks but disappear from normal picker results.
+- All automated validation commands in `docs/TEST_PLAN.md` pass or have a documented blocker.
+- `docs/STATUS.md` records the final verification state.

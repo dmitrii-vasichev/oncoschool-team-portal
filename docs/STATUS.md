@@ -1,5 +1,18 @@
 # Status
 
+## Task Label Management
+
+- Current phase: implementation plan ready
+- Spec: `docs/superpowers/specs/2026-05-06-task-label-management-design.md`
+- Plan: `docs/PLAN.md`
+- Scope: web portal label colors, member-owned label actions, moderator cleanup UI
+- Latest progress:
+  - Design approved.
+  - Implementation plan written from the approved design.
+- Next actions:
+  - Execute `docs/PLAN.md` task-by-task.
+  - Update this section with verification results after implementation starts.
+
 ## Task Labels
 
 - Current phase: implementation verification

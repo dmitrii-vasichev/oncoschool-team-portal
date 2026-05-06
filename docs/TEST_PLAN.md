@@ -1,5 +1,29 @@
 # Test Plan
 
+## Task Label Management
+
+### Automated
+
+- `cd backend && pytest tests/test_task_label_repository.py tests/test_task_label_api.py tests/test_task_label_task_api.py tests/test_task_permission_service.py tests/test_task_update_permissions.py -q`
+- `cd backend && pytest -q`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+
+### Manual
+
+1. Create a label from the task label picker and choose a non-default color.
+2. Confirm the label chip uses the selected color on task cards and task detail.
+3. As the label creator, edit the label name and color before it is used on another person's task.
+4. Attach the label to a task where the author or assignee is another user, then confirm ordinary member edit/archive actions disappear after refresh.
+5. Archive an owned, non-shared label and confirm it disappears from normal picker results.
+6. Confirm the archived label remains visible on a task that already had it.
+7. As a moderator, open `/settings?tab=task-labels`.
+8. Edit an active label from Settings.
+9. Archive an active label from Settings.
+10. Switch to the archive filter and restore the archived label.
+11. Try creating a new label with the same name as an archived label and confirm the UI shows the archived-conflict message.
+
 ## Task Labels
 
 ### Automated
