@@ -3,6 +3,8 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+from sqlalchemy.exc import IntegrityError
+
 from app.db.models import Task, TaskLabel, TaskLabelLink
 from app.db.repositories import (
     LABEL_COLOR_PALETTE,
@@ -94,3 +96,29 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(result, archived)
         self.assertFalse(archived.is_archived)
         session.flush.assert_awaited_once()
+
+    async def test_create_or_reactivate_returns_existing_label_after_insert_race(self) -> None:
+        existing = SimpleNamespace(
+            id=uuid.uuid4(),
+            name="Conference",
+            slug="conference",
+            color="teal",
+            is_archived=False,
+        )
+        session = MagicMock()
+        session.flush = AsyncMock(
+            side_effect=IntegrityError("insert task label", {}, Exception("duplicate"))
+        )
+        session.rollback = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_slug = AsyncMock(side_effect=[None, existing])
+
+        result = await repo.create_or_reactivate(
+            session,
+            name="Conference",
+            created_by_id=uuid.uuid4(),
+        )
+
+        self.assertIs(result, existing)
+        session.rollback.assert_awaited_once()
+        self.assertEqual(repo.get_by_slug.await_count, 2)

@@ -248,7 +248,14 @@ class TaskLabelRepository:
             created_by_id=created_by_id,
         )
         session.add(label)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            existing = await self.get_by_slug(session, slug)
+            if existing:
+                return existing
+            raise
         return label
 
     async def replace_task_labels(
