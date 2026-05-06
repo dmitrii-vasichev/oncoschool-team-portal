@@ -25,6 +25,6 @@
   - Frontend TypeScript check passes.
   - Frontend production build passes.
   - Narrow/mobile browser QA passed against a local mock API: filters open in a bottom sheet, labels are first, all filter controls share the same trigger visual, labels support multi-select without closing the sheet, and active label chips collapse to `+N меток`.
-  - Final review fixes were applied: quick reset returned to the active chip row, filter controls gained small accessibility polish, and background refresh loading is scoped to the current user.
+  - Final review fixes were applied: quick reset returned to the active chip row, filter controls gained small accessibility polish, and background refresh loading/rendering is scoped to the current user.
   - Narrow/mobile browser QA rechecked the quick reset path after final review fixes.
   - Desktop/right-sheet behavior was reviewed in code and by implementation reviewers; visual desktop QA remains limited by the fixed in-app browser viewport.

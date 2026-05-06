@@ -79,6 +79,8 @@ export default function TasksPage() {
     [accessibleDepartments]
   );
   const canSwitchDepartment = accessibleDepartments.length > 1;
+  const showInitialLoading =
+    loading || Boolean(userId && loadedDataUserIdRef.current !== userId);
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
@@ -281,7 +283,7 @@ export default function TasksPage() {
     [tasks, draggedTaskId, toastError, user]
   );
 
-  if (loading) {
+  if (showInitialLoading) {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         <div className="flex items-center justify-between gap-4">
