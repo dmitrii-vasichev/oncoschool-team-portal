@@ -10,6 +10,7 @@ from app.db.repositories import (
     LABEL_COLOR_PALETTE,
     TaskLabelRepository,
     normalize_task_label_name,
+    pick_task_label_color,
     slugify_task_label,
 )
 
@@ -93,6 +94,27 @@ class TaskLabelRepositoryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, existing)
         session.add.assert_not_called()
+
+    async def test_create_or_reactivate_uses_fallback_color_when_color_omitted(self) -> None:
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TaskLabelRepository()
+        repo.get_by_slug = AsyncMock(return_value=None)
+        creator_id = uuid.uuid4()
+
+        result = await repo.create_or_reactivate(
+            session,
+            name=" Partner  Event ",
+            created_by_id=creator_id,
+        )
+
+        expected_slug = "partner event"
+        self.assertIs(result, session.add.call_args.args[0])
+        self.assertEqual(result.name, "Partner Event")
+        self.assertEqual(result.slug, expected_slug)
+        self.assertEqual(result.color, pick_task_label_color(expected_slug))
+        self.assertEqual(result.created_by_id, creator_id)
+        session.flush.assert_awaited_once()
 
     async def test_create_or_reactivate_rejects_archived_existing_label(self) -> None:
         archived = SimpleNamespace(
