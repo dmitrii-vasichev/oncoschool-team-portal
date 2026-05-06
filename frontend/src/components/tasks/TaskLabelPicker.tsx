@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Plus, Search, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Plus, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export function TaskLabelPicker({
   variant = "default",
   displayMode = "chips",
   triggerClassName,
+  showChevron = false,
 }: {
   value: TaskLabel[];
   onChange: (labels: TaskLabel[]) => void;
@@ -37,6 +38,7 @@ export function TaskLabelPicker({
   variant?: TaskLabelPickerVariant;
   displayMode?: TaskLabelPickerDisplayMode;
   triggerClassName?: string;
+  showChevron?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -57,6 +59,12 @@ export function TaskLabelPicker({
     !options.some(
       (label) => label.name.toLowerCase() === normalizedSearch.toLowerCase()
     );
+  const summaryText =
+    value.length === 0
+      ? placeholder
+      : value.length === 1
+        ? value[0].name
+        : `${value[0].name} +${value.length - 1}`;
 
   useEffect(() => {
     if (!open) return;
@@ -130,30 +138,35 @@ export function TaskLabelPicker({
           variant="outline"
           disabled={disabled}
           className={cn(
-            "h-auto justify-start gap-2",
+            "h-auto min-w-0 justify-between gap-2",
             variant === "compact"
               ? "min-h-6 w-auto max-w-full rounded-full px-2.5 py-0.5 text-xs font-medium leading-none"
               : "min-h-10 w-full px-3 py-2",
             triggerClassName
           )}
         >
-          {value.length && displayMode === "summary" ? (
-            <span className="min-w-0 truncate text-foreground">
-              {value.length === 1
-                ? `Метка: ${value[0].name}`
-                : `Метки: ${value.length}`}
-            </span>
-          ) : value.length ? (
-            <TaskLabelChips
-              labels={value}
-              maxVisible={maxVisible}
-              className={cn(
-                "flex-nowrap overflow-hidden",
-                variant === "compact" ? "max-w-[220px]" : "w-full"
-              )}
-            />
-          ) : (
-            <span className="text-muted-foreground">{placeholder}</span>
+          <span className="flex min-w-0 flex-1 items-center">
+            {value.length && displayMode === "summary" ? (
+              <span className="min-w-0 truncate text-foreground">
+                {summaryText}
+              </span>
+            ) : value.length ? (
+              <TaskLabelChips
+                labels={value}
+                maxVisible={maxVisible}
+                className={cn(
+                  "flex-nowrap overflow-hidden",
+                  variant === "compact" ? "max-w-[220px]" : "w-full"
+                )}
+              />
+            ) : (
+              <span className="truncate text-muted-foreground">
+                {placeholder}
+              </span>
+            )}
+          </span>
+          {showChevron && (
+            <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
           )}
         </Button>
       </PopoverTrigger>
