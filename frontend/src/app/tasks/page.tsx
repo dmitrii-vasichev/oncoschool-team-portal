@@ -94,6 +94,9 @@ export default function TasksPage() {
       if (filters.created_by_id) {
         params.created_by_id = filters.created_by_id;
       }
+      if (filters.labels.length > 0) {
+        params.label_ids = filters.labels.map((label) => label.id).join(",");
+      }
       const [tasksRes, membersRes] = await Promise.all([
         api.getTasks(params),
         api.getTeam().catch(() => [] as TeamMember[]),
@@ -114,6 +117,7 @@ export default function TasksPage() {
     filters.assignee_id,
     filters.created_by_id,
     filters.department_id,
+    filters.labels,
     toastError,
     user?.id,
   ]);

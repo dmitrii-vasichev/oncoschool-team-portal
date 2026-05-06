@@ -14,10 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TaskLabelPicker } from "@/components/tasks/TaskLabelPicker";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import type { TaskPriority, TaskSource } from "@/lib/types";
 import { TASK_PRIORITY_LABELS, TASK_SOURCE_LABELS } from "@/lib/types";
-import type { Department, TeamMember } from "@/lib/types";
+import type { Department, TaskLabel, TeamMember } from "@/lib/types";
 
 export interface TaskFilterValues {
   search: string;
@@ -26,15 +27,17 @@ export interface TaskFilterValues {
   department_id: string;
   assignee_id: string;
   created_by_id: string;
+  labels: TaskLabel[];
 }
 
-const EMPTY_FILTERS: TaskFilterValues = {
+export const EMPTY_FILTERS: TaskFilterValues = {
   search: "",
   priority: "",
   source: "",
   department_id: "",
   assignee_id: "",
   created_by_id: "",
+  labels: [],
 };
 
 const PRIORITY_DOT_COLORS: Record<string, string> = {
@@ -99,6 +102,15 @@ export function TaskFilters({
       label: TASK_SOURCE_LABELS[filters.source as TaskSource],
     });
   }
+  if (filters.labels.length > 0) {
+    activeFilters.push({
+      key: "labels",
+      label:
+        filters.labels.length === 1
+          ? `Метка: ${filters.labels[0].name}`
+          : `Метки: ${filters.labels.length}`,
+    });
+  }
   if (showDepartmentFilter && filters.department_id) {
     const department = departments.find((d) => d.id === filters.department_id);
     activeFilters.push({
@@ -125,7 +137,10 @@ export function TaskFilters({
   }
 
   function removeFilter(key: keyof TaskFilterValues) {
-    onFiltersChange({ ...filters, [key]: "" });
+    onFiltersChange({
+      ...filters,
+      [key]: key === "labels" ? [] : "",
+    });
   }
 
   function handleMemberValueChange(value: string) {
@@ -263,6 +278,14 @@ export function TaskFilters({
             </SelectContent>
           </Select>
 
+          <div className="w-full shrink-0 sm:w-[190px] lg:w-[190px]">
+            <TaskLabelPicker
+              value={filters.labels}
+              onChange={(labels) => onFiltersChange({ ...filters, labels })}
+              placeholder="Все метки"
+            />
+          </div>
+
           {/* Department */}
           {showDepartmentFilter && (
             <Select
@@ -381,5 +404,3 @@ export function TaskFilters({
     </div>
   );
 }
-
-export { EMPTY_FILTERS };

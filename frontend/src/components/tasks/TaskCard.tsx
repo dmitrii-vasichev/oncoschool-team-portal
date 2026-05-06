@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { PriorityIcon } from "@/components/shared/PriorityBadge";
 import { StatusIcon } from "@/components/shared/StatusBadge";
+import { TaskLabelChips } from "@/components/tasks/TaskLabelChips";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import {
   Tooltip,
@@ -120,6 +121,8 @@ export function TaskCard({ task }: { task: Task }) {
                 <PriorityIcon priority={task.priority} className="h-6 w-6 rounded-[10px]" />
               </div>
             </div>
+
+            <TaskLabelChips labels={task.labels || []} maxVisible={2} />
 
             {/* Checklist preview */}
             {checklist.length > 0 && (
