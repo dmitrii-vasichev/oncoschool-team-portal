@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Plus, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,14 @@ export function TaskLabelPicker({
   const [options, setOptions] = useState<TaskLabel[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const valueRef = useRef(value);
+  valueRef.current = value;
   const selectedIds = useMemo(
     () => new Set(value.map((label) => label.id)),
     [value]
   );
+  const controlsDisabled = disabled || creating;
   const normalizedSearch = search.trim();
   const canCreate =
     normalizedSearch.length > 0 &&
@@ -45,6 +49,7 @@ export function TaskLabelPicker({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    setLoadError(false);
     setLoading(true);
     api
       .getTaskLabels({ search: normalizedSearch || undefined, limit: 20 })
@@ -52,7 +57,10 @@ export function TaskLabelPicker({
         if (!cancelled) setOptions(labels);
       })
       .catch(() => {
-        if (!cancelled) setOptions([]);
+        if (!cancelled) {
+          setOptions([]);
+          setLoadError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -62,7 +70,20 @@ export function TaskLabelPicker({
     };
   }, [open, normalizedSearch]);
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    if (disabled || creating) {
+      if (disabled) setOpen(false);
+      return;
+    }
+    setOpen(nextOpen);
+  }
+
   function toggleLabel(label: TaskLabel) {
+    if (controlsDisabled) return;
     if (selectedIds.has(label.id)) {
       onChange(value.filter((item) => item.id !== label.id));
       return;
@@ -71,12 +92,16 @@ export function TaskLabelPicker({
   }
 
   async function createLabel() {
-    if (!normalizedSearch || creating) return;
+    if (!normalizedSearch || controlsDisabled) return;
+    const labelName = normalizedSearch;
+    const selectedIdsAtCall = new Set(valueRef.current.map((label) => label.id));
     setCreating(true);
     try {
-      const label = await api.createTaskLabel({ name: normalizedSearch });
-      if (!selectedIds.has(label.id)) {
-        onChange([...value, label]);
+      const label = await api.createTaskLabel({ name: labelName });
+      const latestLabels = valueRef.current;
+      const latestIds = new Set(latestLabels.map((item) => item.id));
+      if (!selectedIdsAtCall.has(label.id) && !latestIds.has(label.id)) {
+        onChange([...latestLabels, label]);
       }
       setSearch("");
       setOpen(false);
@@ -86,7 +111,7 @@ export function TaskLabelPicker({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -101,12 +126,16 @@ export function TaskLabelPicker({
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[320px] p-2">
+      <PopoverContent
+        align="start"
+        className="w-[calc(100vw-1rem)] max-w-[320px] p-2"
+      >
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            disabled={controlsDisabled}
             placeholder="Найти или создать метку"
             className="h-9 pl-9"
           />
@@ -124,7 +153,8 @@ export function TaskLabelPicker({
                 key={label.id}
                 type="button"
                 onClick={() => toggleLabel(label)}
-                className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+                disabled={controlsDisabled}
+                className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
               >
                 <span className="truncate">{label.name}</span>
                 <span className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -135,11 +165,21 @@ export function TaskLabelPicker({
                 </span>
               </button>
             ))}
+          {!loading && loadError && (
+            <div className="px-2 py-3 text-sm text-muted-foreground">
+              Не удалось загрузить метки
+            </div>
+          )}
+          {!loading && !loadError && options.length === 0 && !canCreate && (
+            <div className="px-2 py-3 text-sm text-muted-foreground">
+              Метки не найдены
+            </div>
+          )}
           {!loading && canCreate && (
             <button
               type="button"
               onClick={() => void createLabel()}
-              disabled={creating}
+              disabled={controlsDisabled}
               className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
             >
               {creating ? (
@@ -157,10 +197,13 @@ export function TaskLabelPicker({
               <button
                 key={label.id}
                 type="button"
+                aria-label={`Удалить метку ${label.name}`}
+                disabled={controlsDisabled}
                 onClick={() =>
+                  !controlsDisabled &&
                   onChange(value.filter((item) => item.id !== label.id))
                 }
-                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs"
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs disabled:pointer-events-none disabled:opacity-50"
               >
                 {label.name}
                 <X className="h-3 w-3" />
