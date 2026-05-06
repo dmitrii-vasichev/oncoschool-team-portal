@@ -48,6 +48,7 @@ export default function TasksPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<TaskStatus>("new");
   const defaultScopeUserIdRef = useRef<string | null>(null);
+  const hasLoadedDataRef = useRef(false);
   const userId = user?.id || "";
   const userDepartmentId = user?.department_id || "";
   const userExtraDepartmentIds = useMemo(
@@ -80,7 +81,9 @@ export default function TasksPage() {
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      setLoading(true);
+      if (!hasLoadedDataRef.current) {
+        setLoading(true);
+      }
       const params: Record<string, string> = { per_page: "200" };
       if (
         filters.department_id &&
@@ -110,6 +113,7 @@ export default function TasksPage() {
     } catch {
       toastError("Не удалось загрузить задачи");
     } finally {
+      hasLoadedDataRef.current = true;
       setLoading(false);
     }
   }, [
