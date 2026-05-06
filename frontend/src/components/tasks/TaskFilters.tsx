@@ -1,9 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, X, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Search, X, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
@@ -16,30 +25,24 @@ import {
 } from "@/components/ui/select";
 import { TaskLabelPicker } from "@/components/tasks/TaskLabelPicker";
 import { UserAvatar } from "@/components/shared/UserAvatar";
+import {
+  buildActiveTaskFilterChips,
+  clearStructuredTaskFilters,
+  countActiveStructuredTaskFilters,
+  removeTaskFilterChip,
+  type ActiveTaskFilterChip,
+  type TaskFilterValues,
+} from "@/components/tasks/taskFilterUtils";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import type { TaskPriority, TaskSource } from "@/lib/types";
 import { TASK_PRIORITY_LABELS, TASK_SOURCE_LABELS } from "@/lib/types";
-import type { Department, TaskLabel, TeamMember } from "@/lib/types";
+import type { Department, TeamMember } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export interface TaskFilterValues {
-  search: string;
-  priority: string;
-  source: string;
-  department_id: string;
-  assignee_id: string;
-  created_by_id: string;
-  labels: TaskLabel[];
-}
-
-export const EMPTY_FILTERS: TaskFilterValues = {
-  search: "",
-  priority: "",
-  source: "",
-  department_id: "",
-  assignee_id: "",
-  created_by_id: "",
-  labels: [],
-};
+export {
+  EMPTY_FILTERS,
+  type TaskFilterValues,
+} from "@/components/tasks/taskFilterUtils";
 
 const PRIORITY_DOT_COLORS: Record<string, string> = {
   urgent: "bg-priority-urgent-dot",
@@ -56,18 +59,7 @@ const SOURCE_ICONS: Record<string, string> = {
 };
 
 const FILTER_CONTROL_CLASS =
-  "h-9 w-full rounded-lg border-border/70 bg-background/80 shadow-none hover:border-primary/30 data-[state=open]:border-primary/40 data-[state=open]:shadow-none";
-
-const FILTER_GRID_WITH_DEPARTMENT =
-  "min-[1680px]:grid-cols-[minmax(240px,1fr)_minmax(142px,0.58fr)_minmax(142px,0.58fr)_minmax(164px,0.68fr)_minmax(150px,0.6fr)_minmax(170px,0.74fr)]";
-
-const FILTER_GRID_WITHOUT_DEPARTMENT =
-  "min-[1500px]:grid-cols-[minmax(260px,1fr)_minmax(150px,0.65fr)_minmax(150px,0.65fr)_minmax(170px,0.72fr)_minmax(180px,0.78fr)]";
-
-interface ActiveFilter {
-  key: keyof TaskFilterValues;
-  label: string;
-}
+  "h-10 w-full rounded-xl border-border/70 bg-background/80 shadow-none hover:border-primary/30 data-[state=open]:border-primary/40 data-[state=open]:shadow-none";
 
 interface TaskFiltersProps {
   filters: TaskFilterValues;
@@ -84,16 +76,14 @@ export function TaskFilters({
   departments,
   showDepartmentFilter = true,
 }: TaskFiltersProps) {
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const desktopGridClass = showDepartmentFilter
-    ? FILTER_GRID_WITH_DEPARTMENT
-    : FILTER_GRID_WITHOUT_DEPARTMENT;
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const isDesktopSheet = useMediaQuery("(min-width: 768px)");
   const memberOptions = useMemo(
     () =>
       filters.department_id
         ? members.filter((m) => m.department_id === filters.department_id)
         : members,
-    [filters.department_id, members]
+    [filters.department_id, members],
   );
   const selectedMemberFilterValue = useMemo(() => {
     if (filters.created_by_id) return `author:${filters.created_by_id}`;
@@ -101,60 +91,16 @@ export function TaskFilters({
     if (filters.assignee_id) return `assignee:${filters.assignee_id}`;
     return "all";
   }, [filters.assignee_id, filters.created_by_id]);
-
-  const activeFilters: ActiveFilter[] = [];
-  if (filters.priority) {
-    activeFilters.push({
-      key: "priority",
-      label: TASK_PRIORITY_LABELS[filters.priority as TaskPriority],
-    });
-  }
-  if (filters.source) {
-    activeFilters.push({
-      key: "source",
-      label: TASK_SOURCE_LABELS[filters.source as TaskSource],
-    });
-  }
-  if (filters.labels.length > 0) {
-    activeFilters.push({
-      key: "labels",
-      label:
-        filters.labels.length === 1
-          ? `Метка: ${filters.labels[0].name}`
-          : `Метки: ${filters.labels.length}`,
-    });
-  }
-  if (showDepartmentFilter && filters.department_id) {
-    const department = departments.find((d) => d.id === filters.department_id);
-    activeFilters.push({
-      key: "department_id",
-      label: department?.name || "Отдел",
-    });
-  }
-  if (filters.assignee_id) {
-    const member = members.find((m) => m.id === filters.assignee_id);
-    activeFilters.push({
-      key: "assignee_id",
-      label:
-        filters.assignee_id === "unassigned"
-          ? "Исполнитель: Не назначен"
-          : `Исполнитель: ${member?.full_name || "—"}`,
-    });
-  }
-  if (filters.created_by_id) {
-    const member = members.find((m) => m.id === filters.created_by_id);
-    activeFilters.push({
-      key: "created_by_id",
-      label: `Автор: ${member?.full_name || "—"}`,
-    });
-  }
-
-  function removeFilter(key: keyof TaskFilterValues) {
-    onFiltersChange({
-      ...filters,
-      [key]: key === "labels" ? [] : "",
-    });
-  }
+  const activeFilterCount = countActiveStructuredTaskFilters(filters, {
+    showDepartmentFilter,
+  });
+  const activeFilterChips = buildActiveTaskFilterChips({
+    filters,
+    members,
+    departments,
+    showDepartmentFilter,
+  });
+  const sheetSide = isDesktopSheet ? "right" : "bottom";
 
   function handleMemberValueChange(value: string) {
     if (value === "all") {
@@ -193,15 +139,50 @@ export function TaskFilters({
     });
   }
 
+  function handleDepartmentValueChange(value: string) {
+    const nextDepartmentId = value === "all" ? "" : value;
+    const shouldResetAssignee =
+      Boolean(nextDepartmentId) &&
+      Boolean(filters.assignee_id) &&
+      filters.assignee_id !== "unassigned" &&
+      !members.some(
+        (m) =>
+          m.id === filters.assignee_id && m.department_id === nextDepartmentId,
+      );
+    const shouldResetAuthor =
+      Boolean(nextDepartmentId) &&
+      Boolean(filters.created_by_id) &&
+      !members.some(
+        (m) =>
+          m.id === filters.created_by_id &&
+          m.department_id === nextDepartmentId,
+      );
+
+    onFiltersChange({
+      ...filters,
+      department_id: nextDepartmentId,
+      assignee_id: shouldResetAssignee ? "" : filters.assignee_id,
+      created_by_id: shouldResetAuthor ? "" : filters.created_by_id,
+    });
+  }
+
+  function resetStructuredFilters() {
+    onFiltersChange(clearStructuredTaskFilters(filters));
+  }
+
+  function handleActiveChipClick(chip: ActiveTaskFilterChip) {
+    if (chip.type === "label-overflow") {
+      setFilterSheetOpen(true);
+      return;
+    }
+
+    onFiltersChange(removeTaskFilterChip(filters, chip));
+  }
+
   return (
-    <div className="flex-1 rounded-xl border border-border/70 bg-card/90 p-2.5 shadow-sm shadow-slate-200/50 dark:shadow-none">
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3",
-          desktopGridClass
-        )}
-      >
-        <div className="relative group sm:col-span-2 lg:col-span-1">
+    <div className="flex-1 space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[minmax(280px,1fr)_auto]">
+        <div className="relative group">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary" />
           <Input
             placeholder="Найти задачу..."
@@ -209,7 +190,7 @@ export function TaskFilters({
             onChange={(e) =>
               onFiltersChange({ ...filters, search: e.target.value })
             }
-            className="h-9 w-full rounded-lg border-border/70 bg-background/80 pl-9 shadow-none focus:border-primary/40"
+            className="h-10 w-full rounded-xl border-border/70 bg-background/80 pl-9 pr-9 shadow-none focus:border-primary/40"
           />
           {filters.search && (
             <button
@@ -218,207 +199,247 @@ export function TaskFilters({
               onClick={() => onFiltersChange({ ...filters, search: "" })}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rounded-full p-0.5"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
         <Button
           variant="outline"
-          size="sm"
-          onClick={() => setFiltersExpanded(!filtersExpanded)}
-          className="h-9 rounded-lg gap-1.5 border-border/70 bg-background/80 shadow-none sm:col-span-2 lg:hidden"
+          onClick={() => setFilterSheetOpen(true)}
+          className="h-10 rounded-xl gap-2 border-border/70 bg-background/80 px-4 shadow-none"
         >
           <SlidersHorizontal className="h-4 w-4" />
-          Фильтры
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${filtersExpanded ? "rotate-180" : ""}`}
-          />
+          {activeFilterCount > 0 ? `Фильтры · ${activeFilterCount}` : "Фильтры"}
         </Button>
-
-        <div
-          className={cn(
-            "gap-2 sm:col-span-2 sm:grid-cols-2 lg:contents",
-            filtersExpanded ? "grid lg:contents" : "hidden lg:contents"
-          )}
-        >
-          <Select
-            value={filters.priority || "all"}
-            onValueChange={(v) =>
-              onFiltersChange({ ...filters, priority: v === "all" ? "" : v })
-            }
-          >
-            <SelectTrigger className={FILTER_CONTROL_CLASS}>
-              <SelectValue placeholder="Приоритет" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все приоритеты</SelectItem>
-              {(Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(
-                (p) => (
-                  <SelectItem key={p} value={p}>
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${PRIORITY_DOT_COLORS[p]}`}
-                      />
-                      {TASK_PRIORITY_LABELS[p]}
-                    </span>
-                  </SelectItem>
-                )
-              )}
-            </SelectContent>
-          </Select>
-
-          {/* Source */}
-          <Select
-            value={filters.source || "all"}
-            onValueChange={(v) =>
-              onFiltersChange({ ...filters, source: v === "all" ? "" : v })
-            }
-          >
-            <SelectTrigger className={FILTER_CONTROL_CLASS}>
-              <SelectValue placeholder="Источник" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все источники</SelectItem>
-              {(Object.keys(TASK_SOURCE_LABELS) as TaskSource[]).map((s) => (
-                <SelectItem key={s} value={s}>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs">{SOURCE_ICONS[s]}</span>
-                    {TASK_SOURCE_LABELS[s]}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="min-w-0">
-            <TaskLabelPicker
-              value={filters.labels}
-              onChange={(labels) => onFiltersChange({ ...filters, labels })}
-              maxVisible={1}
-              placeholder="Все метки"
-              displayMode="summary"
-              triggerClassName={FILTER_CONTROL_CLASS}
-            />
-          </div>
-
-          {showDepartmentFilter && (
-            <Select
-              value={filters.department_id || "all"}
-              onValueChange={(v) => {
-                const nextDepartmentId = v === "all" ? "" : v;
-                const shouldResetAssignee =
-                  Boolean(nextDepartmentId) &&
-                  Boolean(filters.assignee_id) &&
-                  filters.assignee_id !== "unassigned" &&
-                  !members.some(
-                    (m) =>
-                      m.id === filters.assignee_id &&
-                      m.department_id === nextDepartmentId
-                  );
-                const shouldResetAuthor =
-                  Boolean(nextDepartmentId) &&
-                  Boolean(filters.created_by_id) &&
-                  !members.some(
-                    (m) =>
-                      m.id === filters.created_by_id &&
-                      m.department_id === nextDepartmentId
-                  );
-
-                onFiltersChange({
-                  ...filters,
-                  department_id: nextDepartmentId,
-                  assignee_id: shouldResetAssignee ? "" : filters.assignee_id,
-                  created_by_id: shouldResetAuthor ? "" : filters.created_by_id,
-                });
-              }}
-            >
-              <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                <SelectValue placeholder="Отдел" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все отделы</SelectItem>
-                {departments.map((department) => (
-                  <SelectItem key={department.id} value={department.id}>
-                    {department.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select
-            value={selectedMemberFilterValue}
-            onValueChange={handleMemberValueChange}
-          >
-            <SelectTrigger className={FILTER_CONTROL_CLASS}>
-              <SelectValue placeholder="Участник" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все участники</SelectItem>
-              <SelectSeparator />
-
-              <SelectGroup>
-                <SelectLabel>Исполнитель</SelectLabel>
-                <SelectItem value="assignee:unassigned">
-                  <span className="text-muted-foreground">Не назначен</span>
-                </SelectItem>
-                {memberOptions.map((m) => (
-                  <SelectItem key={`assignee:${m.id}`} value={`assignee:${m.id}`}>
-                    <span className="flex items-center gap-2">
-                      <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
-                      <span className="truncate">{m.full_name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-
-              <SelectSeparator />
-
-              <SelectGroup>
-                <SelectLabel>Автор</SelectLabel>
-                {memberOptions.map((m) => (
-                  <SelectItem key={`author:${m.id}`} value={`author:${m.id}`}>
-                    <span className="flex items-center gap-2">
-                      <UserAvatar name={m.full_name} avatarUrl={m.avatar_url} size="sm" />
-                      <span className="truncate">{m.full_name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
-      {activeFilters.length > 0 && (
-        <div className="mt-2 flex items-center gap-1.5 flex-wrap border-t border-border/60 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
-          <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-          {activeFilters.map((f) => (
+      {activeFilterChips.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+          {activeFilterChips.map((chip) => (
             <button
-              key={f.key}
+              key={chip.key}
               type="button"
-              onClick={() => removeFilter(f.key)}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 text-primary px-2.5 py-1 text-xs font-medium hover:bg-primary/20 group"
+              onClick={() => handleActiveChipClick(chip)}
+              className={cn(
+                "inline-flex max-w-full items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20",
+                chip.type !== "label-overflow" && "group",
+              )}
             >
-              <span className="truncate">{f.label}</span>
-              <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+              <span className="truncate">{chip.label}</span>
+              {chip.type !== "label-overflow" && (
+                <X className="h-3 w-3 opacity-60 group-hover:opacity-100" />
+              )}
             </button>
           ))}
-          {activeFilters.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onFiltersChange(EMPTY_FILTERS)}
-              className="h-7 rounded-full px-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-              Сбросить
-            </Button>
-          )}
         </div>
       )}
+
+      <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <SheetContent
+          side={sheetSide}
+          className={cn(
+            "flex max-h-[85dvh] flex-col gap-0 overflow-hidden p-0",
+            isDesktopSheet ? "h-full w-full sm:max-w-md" : "rounded-t-2xl",
+          )}
+        >
+          <SheetHeader className="border-b border-border/70 px-5 py-4 pr-12 text-left">
+            <SheetTitle>Фильтры</SheetTitle>
+            <SheetDescription>Настройте вид доски задач</SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="space-y-4">
+              <FilterField label="Метки">
+                <TaskLabelPicker
+                  value={filters.labels}
+                  onChange={(labels) => onFiltersChange({ ...filters, labels })}
+                  maxVisible={2}
+                  placeholder="Все метки"
+                  displayMode="summary"
+                  triggerClassName={FILTER_CONTROL_CLASS}
+                  showChevron
+                />
+              </FilterField>
+
+              {showDepartmentFilter && (
+                <FilterField label="Отдел">
+                  <Select
+                    value={filters.department_id || "all"}
+                    onValueChange={handleDepartmentValueChange}
+                  >
+                    <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                      <SelectValue placeholder="Отдел" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все отделы</SelectItem>
+                      {departments.map((department) => (
+                        <SelectItem key={department.id} value={department.id}>
+                          {department.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+              )}
+
+              <FilterField label="Участник">
+                <Select
+                  value={selectedMemberFilterValue}
+                  onValueChange={handleMemberValueChange}
+                >
+                  <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                    <SelectValue placeholder="Участник" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все участники</SelectItem>
+                    <SelectSeparator />
+
+                    <SelectGroup>
+                      <SelectLabel>Исполнитель</SelectLabel>
+                      <SelectItem value="assignee:unassigned">
+                        <span className="text-muted-foreground">
+                          Не назначен
+                        </span>
+                      </SelectItem>
+                      {memberOptions.map((m) => (
+                        <SelectItem
+                          key={`assignee:${m.id}`}
+                          value={`assignee:${m.id}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <UserAvatar
+                              name={m.full_name}
+                              avatarUrl={m.avatar_url}
+                              size="sm"
+                            />
+                            <span className="truncate">{m.full_name}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+
+                    <SelectSeparator />
+
+                    <SelectGroup>
+                      <SelectLabel>Автор</SelectLabel>
+                      {memberOptions.map((m) => (
+                        <SelectItem
+                          key={`author:${m.id}`}
+                          value={`author:${m.id}`}
+                        >
+                          <span className="flex items-center gap-2">
+                            <UserAvatar
+                              name={m.full_name}
+                              avatarUrl={m.avatar_url}
+                              size="sm"
+                            />
+                            <span className="truncate">{m.full_name}</span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Приоритет">
+                <Select
+                  value={filters.priority || "all"}
+                  onValueChange={(v) =>
+                    onFiltersChange({
+                      ...filters,
+                      priority: v === "all" ? "" : v,
+                    })
+                  }
+                >
+                  <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                    <SelectValue placeholder="Приоритет" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все приоритеты</SelectItem>
+                    {(Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(
+                      (p) => (
+                        <SelectItem key={p} value={p}>
+                          <span className="flex items-center gap-2">
+                            <span
+                              className={`h-2 w-2 rounded-full ${PRIORITY_DOT_COLORS[p]}`}
+                            />
+                            {TASK_PRIORITY_LABELS[p]}
+                          </span>
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label="Источник">
+                <Select
+                  value={filters.source || "all"}
+                  onValueChange={(v) =>
+                    onFiltersChange({
+                      ...filters,
+                      source: v === "all" ? "" : v,
+                    })
+                  }
+                >
+                  <SelectTrigger className={FILTER_CONTROL_CLASS}>
+                    <SelectValue placeholder="Источник" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Все источники</SelectItem>
+                    {(Object.keys(TASK_SOURCE_LABELS) as TaskSource[]).map(
+                      (s) => (
+                        <SelectItem key={s} value={s}>
+                          <span className="flex items-center gap-2">
+                            <span className="text-xs">{SOURCE_ICONS[s]}</span>
+                            {TASK_SOURCE_LABELS[s]}
+                          </span>
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </div>
+
+          <SheetFooter className="gap-2 border-t border-border/70 px-5 py-4 sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={resetStructuredFilters}
+              disabled={activeFilterCount === 0}
+              className="h-10 rounded-xl"
+            >
+              Сбросить
+            </Button>
+            <SheetClose asChild>
+              <Button type="button" className="h-10 rounded-xl">
+                Готово
+              </Button>
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      {children}
     </div>
   );
 }
