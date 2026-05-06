@@ -64,6 +64,8 @@ import { DatePicker } from "@/components/shared/DatePicker";
 import { TimePicker } from "@/components/shared/TimePicker";
 import { TaskUpdates } from "@/components/tasks/TaskUpdates";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
+import { TaskLabelPicker } from "@/components/tasks/TaskLabelPicker";
+import { TaskLabelChips } from "@/components/tasks/TaskLabelChips";
 import { useTask } from "@/hooks/useTasks";
 import { useTeam } from "@/hooks/useTeam";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -71,7 +73,7 @@ import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
-import type { TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/types";
+import type { TaskLabel, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/types";
 import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
 
 /* ============================================
@@ -253,6 +255,8 @@ export default function TaskDetailPage() {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [savingDescription, setSavingDescription] = useState(false);
+  const [labelDraft, setLabelDraft] = useState<TaskLabel[]>([]);
+  const [savingLabels, setSavingLabels] = useState(false);
   const [reminderDate, setReminderDate] = useState("");
   const [reminderTime, setReminderTime] = useState("09:00");
   const [reminderComment, setReminderComment] = useState("");
@@ -272,6 +276,11 @@ export default function TaskDetailPage() {
     if (!task || isEditingDescription) return;
     setDescriptionDraft(task.description || "");
   }, [task, isEditingDescription]);
+
+  useEffect(() => {
+    if (!task) return;
+    setLabelDraft(task.labels || []);
+  }, [task]);
 
   useEffect(() => {
     if (!task) return;
@@ -344,6 +353,7 @@ export default function TaskDetailPage() {
   const isAuthor = !!user && task.created_by_id === user.id;
   const canEditTitle = !!canChangeStatus;
   const canEditTaskMeta = isModerator || isAuthor;
+  const canEditLabels = !!user && PermissionService.canEditTask(user, task);
   const canManageReminder =
     !!user && PermissionService.canManageTaskReminder(user, task);
   const canSetReminderForCurrentTask = canManageReminder && !!task.assignee_id;
@@ -431,6 +441,25 @@ export default function TaskDetailPage() {
       throw error;
     } finally {
       setChecklistSaving(false);
+    }
+  }
+
+  async function handleLabelsChange(nextLabels: TaskLabel[]) {
+    if (!shortId || !canEditLabels || savingLabels) return;
+    const previousLabels = labelDraft;
+    setLabelDraft(nextLabels);
+    setSavingLabels(true);
+    try {
+      await api.updateTask(shortId, {
+        label_ids: nextLabels.map((label) => label.id),
+      });
+      await refetch();
+      toastSuccess("Метки обновлены");
+    } catch {
+      setLabelDraft(previousLabels);
+      toastError("Не удалось обновить метки");
+    } finally {
+      setSavingLabels(false);
     }
   }
 
@@ -739,6 +768,19 @@ export default function TaskDetailPage() {
                 {TASK_SOURCE_LABELS[task.source]}
               </Badge>
             )}
+
+          {canEditLabels ? (
+            <div className="min-w-[180px] max-w-full">
+              <TaskLabelPicker
+                value={labelDraft}
+                onChange={(nextLabels) => void handleLabelsChange(nextLabels)}
+                disabled={savingLabels}
+                placeholder="Добавить метки"
+              />
+            </div>
+          ) : (
+            <TaskLabelChips labels={task.labels || []} maxVisible={4} />
+          )}
 
           {overdue && (
             <Badge

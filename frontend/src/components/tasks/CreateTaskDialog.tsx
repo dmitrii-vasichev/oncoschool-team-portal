@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
+import { TaskLabelPicker } from "@/components/tasks/TaskLabelPicker";
 import {
   AlertTriangle,
   ArrowUp,
@@ -32,7 +33,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
-import type { TeamMember, TaskPriority } from "@/lib/types";
+import type { TaskLabel, TeamMember, TaskPriority } from "@/lib/types";
 import { TASK_PRIORITY_LABELS } from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
 
@@ -90,6 +91,7 @@ export function CreateTaskDialog({
   const canAssignToOthers = PermissionService.canCreateTaskForOthers(currentUser);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [labels, setLabels] = useState<TaskLabel[]>([]);
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [assigneeId, setAssigneeId] = useState<string>(
     canAssignToOthers ? "" : currentUser.id
@@ -101,6 +103,7 @@ export function CreateTaskDialog({
   function resetForm() {
     setTitle("");
     setDescription("");
+    setLabels([]);
     setPriority("medium");
     setAssigneeId(canAssignToOthers ? "" : currentUser.id);
     setDeadline("");
@@ -120,6 +123,7 @@ export function CreateTaskDialog({
       await api.createTask({
         title: title.trim(),
         description: description.trim() || null,
+        label_ids: labels.map((label) => label.id),
         priority,
         assignee_id: assigneeId || null,
         source: "web",
@@ -182,6 +186,16 @@ export function CreateTaskDialog({
               placeholder="Подробности задачи..."
               rows={3}
               className="bg-muted/30 border-border/60 focus:bg-card resize-none min-h-[80px]"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Метки</Label>
+            <TaskLabelPicker
+              value={labels}
+              onChange={setLabels}
+              disabled={saving}
+              placeholder="Добавить метки"
             />
           </div>
 
