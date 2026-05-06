@@ -24,6 +24,7 @@ import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
+import { normalizeTaskUrgency } from "@/lib/taskUrgency";
 import type {
   Meeting,
   ParseSummaryResponse,
@@ -32,20 +33,15 @@ import type {
   TaskPriority,
 } from "@/lib/types";
 
-const PRIORITY_COLORS: Record<TaskPriority, string> = {
+const URGENCY_COLORS: Record<TaskPriority, string> = {
   urgent:
     "bg-priority-urgent-bg text-priority-urgent-fg border-priority-urgent-fg/20",
-  high: "bg-priority-high-bg text-priority-high-fg border-priority-high-fg/20",
-  medium:
-    "bg-priority-medium-bg text-priority-medium-fg border-priority-medium-fg/20",
-  low: "bg-priority-low-bg text-priority-low-fg border-priority-low-fg/20",
+  normal: "bg-muted text-muted-foreground border-border/50",
 };
 
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  urgent: "Сроч",
-  high: "Выс",
-  medium: "Сред",
-  low: "Низ",
+const URGENCY_LABELS: Record<TaskPriority, string> = {
+  urgent: "Срочная",
+  normal: "Обычная",
 };
 
 type ViewState = "display" | "parsing" | "preview";
@@ -97,7 +93,12 @@ export function SummaryTab({
       setEditTitle(result.title);
       setEditSummary(result.summary);
       setEditDecisions([...result.decisions]);
-      setEditTasks(result.tasks.map((t) => ({ ...t })));
+      setEditTasks(
+        result.tasks.map((t) => ({
+          ...t,
+          priority: normalizeTaskUrgency(t.priority),
+        }))
+      );
       setEditParticipants([...result.participants]);
       setViewState("preview");
     } catch (e) {
@@ -156,7 +157,7 @@ export function SummaryTab({
         title: "",
         description: null,
         assignee_name: null,
-        priority: "medium" as TaskPriority,
+        priority: "normal" as TaskPriority,
         deadline: null,
       },
     ]);
@@ -424,25 +425,23 @@ export function SummaryTab({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <div>
                       <Label className="text-2xs text-muted-foreground/70 uppercase tracking-wider">
-                        Приоритет
+                        Срочность
                       </Label>
                       <div className="flex gap-1 mt-1.5">
-                        {(
-                          ["low", "medium", "high", "urgent"] as TaskPriority[]
-                        ).map((p) => (
+                        {(["normal", "urgent"] as TaskPriority[]).map((p) => (
                           <button
                             key={p}
                             onClick={() => updateTask(i, "priority", p)}
                             className={`
                               flex-1 h-8 rounded-lg text-2xs font-semibold border transition-colors
                               ${
-                                task.priority === p
-                                  ? PRIORITY_COLORS[p]
+                                normalizeTaskUrgency(task.priority) === p
+                                  ? URGENCY_COLORS[p]
                                   : "border-border/40 text-muted-foreground/50 hover:border-border"
                               }
                             `}
                           >
-                            {PRIORITY_LABELS[p]}
+                            {URGENCY_LABELS[p]}
                           </button>
                         ))}
                       </div>

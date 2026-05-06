@@ -93,7 +93,7 @@ export function MeetingTasksTab({
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <PriorityBadge priority={task.priority} />
+                  <PriorityBadge priority={task.priority} showNormal={false} />
                   <StatusBadge status={task.status} />
                   <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
                 </div>

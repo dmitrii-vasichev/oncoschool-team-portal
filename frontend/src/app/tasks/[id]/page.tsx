@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -72,8 +73,9 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
+import { normalizeTaskUrgency } from "@/lib/taskUrgency";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
-import type { TaskLabel, TaskStatus, TaskPriority, TaskChecklistItem } from "@/lib/types";
+import type { TaskLabel, TaskStatus, TaskChecklistItem } from "@/lib/types";
 import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
 
 /* ============================================
@@ -99,13 +101,6 @@ const STATUS_TRANSITIONS: Record<
   done: [],
   cancelled: [{ status: "new", label: "Вернуть", icon: Play }],
 };
-
-const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
-  { value: "urgent", label: "Срочный" },
-  { value: "high", label: "Высокий" },
-  { value: "medium", label: "Средний" },
-  { value: "low", label: "Низкий" },
-];
 
 const MOSCOW_TIMEZONE = "Europe/Moscow";
 const MOSCOW_UTC_OFFSET_HOURS = 3;
@@ -390,15 +385,18 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handlePriorityChange(priority: string) {
+  async function handleUrgencyChange(checked: boolean) {
     if (!shortId || !canEditTaskMeta) return;
     try {
       await api.updateTask(shortId, {
-        priority: priority as TaskPriority,
+        priority: checked ? "urgent" : "normal",
       });
       await refetch();
+      toastSuccess(
+        checked ? "Задача отмечена срочной" : "Задача стала обычной"
+      );
     } catch {
-      toastError("Не удалось изменить приоритет");
+      toastError("Не удалось обновить срочность");
     }
   }
 
@@ -716,25 +714,17 @@ export default function TaskDetailPage() {
         <div className="flex items-center gap-2.5 flex-wrap mb-4">
           <StatusBadge status={task.status} />
 
-          {/* Priority: inline-editable for moderator/author */}
           {canEditTaskMeta ? (
-            <Select
-              value={task.priority}
-              onValueChange={handlePriorityChange}
-            >
-              <SelectTrigger className="h-auto w-auto border-none bg-transparent p-0 shadow-none focus:ring-0 [&>svg]:hidden">
-                <span className="cursor-pointer hover:opacity-80">
-                  <PriorityBadge priority={task.priority} />
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {PRIORITY_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-card px-3 py-1.5">
+              <label htmlFor="task-urgent" className="text-xs font-medium">
+                Срочная задача
+              </label>
+              <Switch
+                id="task-urgent"
+                checked={normalizeTaskUrgency(task.priority) === "urgent"}
+                onCheckedChange={handleUrgencyChange}
+              />
+            </div>
           ) : (
             <PriorityBadge priority={task.priority} />
           )}

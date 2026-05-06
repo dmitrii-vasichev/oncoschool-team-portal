@@ -124,9 +124,31 @@ test("buildActiveTaskFilterChips shows two labels plus overflow before other fil
       "+1 меток",
       "Отдел: Разработка",
       "Исполнитель: Иван Петров",
-      "Срочный",
+      "Срочность: Срочная",
       "Summary",
     ]
+  );
+});
+
+test("buildActiveTaskFilterChips normalizes legacy priority filters to urgency labels", () => {
+  assert.deepEqual(
+    buildActiveTaskFilterChips({
+      filters: filters({ priority: "high" }),
+      departments,
+      members,
+      showDepartmentFilter: true,
+    }).map((chip) => chip.label),
+    ["Срочность: Срочная"]
+  );
+
+  assert.deepEqual(
+    buildActiveTaskFilterChips({
+      filters: filters({ priority: "low" }),
+      departments,
+      members,
+      showDepartmentFilter: true,
+    }).map((chip) => chip.label),
+    ["Срочность: Обычная"]
   );
 });
 

@@ -16,6 +16,7 @@ import { useDepartments } from "@/hooks/useDepartments";
 import { PermissionService } from "@/lib/permissions";
 import { getAccessibleDepartments } from "@/lib/departmentAccess";
 import { api } from "@/lib/api";
+import { normalizeTaskUrgency } from "@/lib/taskUrgency";
 import type {
   MemberStats,
   MeetingAnalytics,
@@ -43,7 +44,6 @@ import {
 } from "recharts";
 
 const CHART_TEAL = "hsl(174, 62%, 26%)";
-const CHART_CORAL = "hsl(16, 76%, 58%)";
 const CHART_VIOLET = "hsl(262, 52%, 55%)";
 const CHART_AMBER = "hsl(43, 82%, 58%)";
 const CHART_BLUE = "hsl(200, 65%, 48%)";
@@ -55,11 +55,9 @@ const SOURCE_CHART: Record<string, { label: string; color: string }> = {
   web: { label: "Веб", color: CHART_TEAL },
 };
 
-const PRIORITY_CHART: Record<string, { label: string; color: string }> = {
-  urgent: { label: "Срочный", color: "hsl(0, 72%, 51%)" },
-  high: { label: "Высокий", color: CHART_CORAL },
-  medium: { label: "Средний", color: CHART_AMBER },
-  low: { label: "Низкий", color: "hsl(210, 10%, 60%)" },
+const URGENCY_CHART: Record<string, { label: string; color: string }> = {
+  urgent: { label: "Срочные", color: "hsl(0, 72%, 51%)" },
+  normal: { label: "Обычные", color: "hsl(210, 10%, 60%)" },
 };
 
 function daysSince(dateStr: string | null): number | null {
@@ -399,20 +397,26 @@ export default function AnalyticsPage() {
     [overview]
   );
 
-  const priorityRows = useMemo(
-    () =>
-      overview?.tasks_by_priority
-        ? Object.entries(overview.tasks_by_priority)
-            .map(([key, value]) => ({
-              label: PRIORITY_CHART[key]?.label || key,
-              value,
-              color: PRIORITY_CHART[key]?.color || "hsl(210, 10%, 60%)",
-            }))
-            .filter((row) => row.value > 0)
-            .sort((a, b) => b.value - a.value)
-        : [],
-    [overview]
-  );
+  const urgencyRows = useMemo(() => {
+    if (!overview?.tasks_by_priority) return [];
+
+    const totals = Object.entries(overview.tasks_by_priority).reduce<
+      Record<string, number>
+    >((acc, [key, value]) => {
+      const urgency = normalizeTaskUrgency(key);
+      acc[urgency] = (acc[urgency] || 0) + value;
+      return acc;
+    }, {});
+
+    return Object.entries(totals)
+      .map(([key, value]) => ({
+        label: URGENCY_CHART[key]?.label || key,
+        value,
+        color: URGENCY_CHART[key]?.color || "hsl(210, 10%, 60%)",
+      }))
+      .filter((row) => row.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [overview]);
 
   const sortedMembers = useMemo(
     () =>
@@ -452,7 +456,7 @@ export default function AnalyticsPage() {
         title: "Лидер нагрузки по отделам",
         description: `${topDepartment.department_name}: ${topDepartment.active_tasks} активных задач.`,
         action:
-          "Проверьте баланс между отделами и перераспределите высокоприоритетные задачи.",
+          "Проверьте баланс между отделами и перераспределите срочные задачи.",
       });
     }
 
@@ -477,7 +481,7 @@ export default function AnalyticsPage() {
       usage:
         "Используйте его ежедневно на standup для оперативного управления потоком задач.",
       extension:
-        "Новое объединение: добавить связку «статус + приоритет», чтобы видеть, где зависают критичные задачи.",
+        "Новое объединение: добавить связку «статус + срочность», чтобы видеть, где зависают критичные задачи.",
     },
     {
       title: "Контур отделов",
@@ -756,12 +760,12 @@ export default function AnalyticsPage() {
           <div className="mb-4 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
             <h3 className="font-heading font-semibold text-sm">
-              Источники и приоритеты
+              Источники и срочность
             </h3>
           </div>
           <div className="space-y-4">
             <DistributionBars title="По источникам" rows={sourceRows} />
-            <DistributionBars title="По приоритетам" rows={priorityRows} />
+            <DistributionBars title="По срочности" rows={urgencyRows} />
           </div>
         </div>
       </section>

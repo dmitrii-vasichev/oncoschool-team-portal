@@ -16,6 +16,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useDepartments } from "@/hooks/useDepartments";
 import { api } from "@/lib/api";
 import { getAccessibleDepartments } from "@/lib/departmentAccess";
+import { normalizeTaskUrgency } from "@/lib/taskUrgency";
 import type { Task, TaskStatus, TeamMember } from "@/lib/types";
 import { TASK_STATUS_LABELS } from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
@@ -174,7 +175,13 @@ export default function TasksPage() {
       ) {
         return false;
       }
-      if (filters.priority && t.priority !== filters.priority) return false;
+      if (
+        filters.priority &&
+        normalizeTaskUrgency(t.priority) !==
+          normalizeTaskUrgency(filters.priority)
+      ) {
+        return false;
+      }
       if (filters.source && t.source !== filters.source) return false;
       if (filters.assignee_id) {
         if (filters.assignee_id === "unassigned") {

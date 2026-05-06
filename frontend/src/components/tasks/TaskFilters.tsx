@@ -34,8 +34,8 @@ import {
   type TaskFilterValues,
 } from "@/components/tasks/taskFilterUtils";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import type { TaskPriority, TaskSource } from "@/lib/types";
-import { TASK_PRIORITY_LABELS, TASK_SOURCE_LABELS } from "@/lib/types";
+import type { TaskSource } from "@/lib/types";
+import { TASK_SOURCE_LABELS } from "@/lib/types";
 import type { Department, TeamMember } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -43,13 +43,6 @@ export {
   EMPTY_FILTERS,
   type TaskFilterValues,
 } from "@/components/tasks/taskFilterUtils";
-
-const PRIORITY_DOT_COLORS: Record<string, string> = {
-  urgent: "bg-priority-urgent-dot",
-  high: "bg-priority-high-dot",
-  medium: "bg-priority-medium-dot",
-  low: "bg-priority-low-dot",
-};
 
 const SOURCE_ICONS: Record<string, string> = {
   text: "📝",
@@ -364,7 +357,7 @@ export function TaskFilters({
                 </Select>
               </FilterField>
 
-              <FilterField label="Приоритет">
+              <FilterField label="Срочность">
                 <Select
                   value={filters.priority || "all"}
                   onValueChange={(v) =>
@@ -375,22 +368,12 @@ export function TaskFilters({
                   }
                 >
                   <SelectTrigger className={FILTER_CONTROL_CLASS}>
-                    <SelectValue placeholder="Приоритет" />
+                    <SelectValue placeholder="Срочность" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Все приоритеты</SelectItem>
-                    {(Object.keys(TASK_PRIORITY_LABELS) as TaskPriority[]).map(
-                      (p) => (
-                        <SelectItem key={p} value={p}>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className={`h-2 w-2 rounded-full ${PRIORITY_DOT_COLORS[p]}`}
-                            />
-                            {TASK_PRIORITY_LABELS[p]}
-                          </span>
-                        </SelectItem>
-                      ),
-                    )}
+                    <SelectItem value="all">Все задачи</SelectItem>
+                    <SelectItem value="urgent">Срочные</SelectItem>
+                    <SelectItem value="normal">Обычные</SelectItem>
                   </SelectContent>
                 </Select>
               </FilterField>

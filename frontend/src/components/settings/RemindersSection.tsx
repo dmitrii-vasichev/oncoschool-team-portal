@@ -179,7 +179,7 @@ const TASK_LINE_FIELD_META: Record<
     iconClassName: "text-muted-foreground",
   },
   priority: {
-    label: "Приоритет",
+    label: "Срочность",
     icon: Flag,
     iconClassName: "text-primary",
   },
@@ -712,7 +712,7 @@ function ReminderEditDialog({
       number: "#245",
       title: "Подготовить отчет",
       deadline: "📅 28.02",
-      priority: "⚡ high",
+      priority: "Срочно",
     };
     const parts = taskLineFieldsOrder
       .filter((field) => {

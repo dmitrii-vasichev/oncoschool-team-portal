@@ -25,8 +25,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatusIcon } from "@/components/shared/StatusBadge";
-import { PriorityIcon } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import {
@@ -42,6 +40,7 @@ import { useIsTruncated } from "@/hooks/useIsTruncated";
 import { PermissionService } from "@/lib/permissions";
 import { getAccessibleDepartments } from "@/lib/departmentAccess";
 import { api } from "@/lib/api";
+import { isTaskUrgent } from "@/lib/taskUrgency";
 import { sanitizeZoomJoinUrl } from "@/lib/zoomLink";
 import { UpcomingBirthdays } from "./team/components/UpcomingBirthdays";
 import type {
@@ -176,6 +175,7 @@ function TaskListItem({
   showAssignee?: boolean;
 }) {
   const overdue = variant === "overdue" || isOverdue(task);
+  const urgent = isTaskUrgent(task.priority);
   const borderClass = overdue
     ? "border border-destructive/35 bg-destructive/[0.06] hover:bg-destructive/[0.1] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset]"
     : variant === "unassigned"
@@ -208,16 +208,12 @@ function TaskListItem({
     <TooltipProvider delayDuration={120}>
       <Link
         href={`/tasks/${task.short_id}`}
-        className={`block rounded-xl p-3 transition-all duration-150 ${borderClass}`}
+        className={`relative block overflow-hidden rounded-xl p-3 transition-all duration-150 ${urgent ? "pl-4" : ""} ${borderClass}`}
       >
+        {urgent && (
+          <span className="absolute inset-y-0 left-0 w-1 bg-priority-urgent-dot" />
+        )}
         <div className="flex items-start gap-2.5">
-          <div className="mt-0.5 flex items-center gap-1.5 shrink-0">
-            <StatusIcon
-              status={task.status}
-              className={`h-6 w-6 rounded-[10px] ${overdue ? "ring-destructive/35" : ""}`}
-            />
-            <PriorityIcon priority={task.priority} className="h-6 w-6 rounded-[10px]" />
-          </div>
           <div className="flex-1 min-w-0">
             <div className="min-w-0 flex items-start gap-1.5">
               {sourceIcon}
@@ -243,6 +239,11 @@ function TaskListItem({
               )}
             </div>
             <div className="mt-2 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
+            {urgent && (
+              <span className="inline-flex items-center rounded-full bg-priority-urgent-bg px-2 py-0.5 text-[11px] font-medium text-priority-urgent-fg ring-1 ring-inset ring-priority-urgent-dot/35">
+                Срочно
+              </span>
+            )}
             {overdue && (
               <span className="inline-flex items-center rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
                 Просрочено

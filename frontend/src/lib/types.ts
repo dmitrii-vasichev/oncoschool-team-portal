@@ -3,7 +3,7 @@
 // ============================================
 
 export type TaskStatus = "new" | "in_progress" | "review" | "done" | "cancelled";
-export type TaskPriority = "urgent" | "high" | "medium" | "low";
+export type TaskPriority = "normal" | "urgent";
 export type TaskSource = "text" | "voice" | "summary" | "web";
 export type TaskLabelColor =
   | "teal"
@@ -36,10 +36,8 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
-  urgent: "Срочный",
-  high: "Высокий",
-  medium: "Средний",
-  low: "Низкий",
+  normal: "Обычная",
+  urgent: "Срочная",
 };
 
 export const TASK_SOURCE_LABELS: Record<TaskSource, string> = {

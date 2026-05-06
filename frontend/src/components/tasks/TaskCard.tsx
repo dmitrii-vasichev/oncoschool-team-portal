@@ -9,8 +9,6 @@ import {
   Circle,
   ListChecks,
 } from "lucide-react";
-import { PriorityIcon } from "@/components/shared/PriorityBadge";
-import { StatusIcon } from "@/components/shared/StatusBadge";
 import { TaskLabelChips } from "@/components/tasks/TaskLabelChips";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import {
@@ -21,6 +19,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useIsTruncated } from "@/hooks/useIsTruncated";
 import { cn } from "@/lib/utils";
+import { isTaskUrgent } from "@/lib/taskUrgency";
 import type { Task } from "@/lib/types";
 import { parseLocalDate } from "@/lib/dateUtils";
 
@@ -41,6 +40,7 @@ function isOverdue(task: Task): boolean {
 
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task);
+  const urgent = isTaskUrgent(task.priority);
   const checklist = task.checklist || [];
   const completedChecklistCount = checklist.filter((item) => item.is_completed).length;
   const checklistPreview = checklist.slice(0, 2);
@@ -61,18 +61,20 @@ export function TaskCard({ task }: { task: Task }) {
     <TooltipProvider delayDuration={120}>
       <div
         className={`
-          group h-full rounded-xl border overflow-hidden shadow-sm
+          group relative h-full rounded-xl border overflow-hidden shadow-sm
           transition-all duration-150 hover:shadow-md hover:-translate-y-0.5
           ${cardClass}
         `}
       >
+        {urgent && (
+          <div className="absolute inset-y-0 left-0 w-1 bg-priority-urgent-dot" />
+        )}
         <Link
           href={`/tasks/${task.short_id}`}
           className="block h-full"
           draggable={false}
         >
-          <div className="flex h-full flex-col gap-2.5 p-3">
-            {/* Header: title + status/priority icons */}
+          <div className={cn("flex h-full flex-col gap-2.5 p-3", urgent && "pl-4")}>
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1 space-y-0.5">
                 {isTitleTruncated ? (
@@ -116,10 +118,6 @@ export function TaskCard({ task }: { task: Task }) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1">
-                <StatusIcon status={task.status} className="h-6 w-6 rounded-[10px]" />
-                <PriorityIcon priority={task.priority} className="h-6 w-6 rounded-[10px]" />
-              </div>
             </div>
 
             <TaskLabelChips labels={task.labels || []} maxVisible={2} />
@@ -169,6 +167,11 @@ export function TaskCard({ task }: { task: Task }) {
             {/* Footer */}
             <div className="mt-auto flex min-h-6 items-center justify-between gap-2 pt-0.5">
               <div className="flex min-h-6 items-center gap-1.5">
+                {urgent && (
+                  <span className="rounded-full bg-priority-urgent-bg px-2 py-0.5 text-2xs font-medium text-priority-urgent-fg ring-1 ring-inset ring-priority-urgent-dot/35">
+                    Срочно
+                  </span>
+                )}
                 {overdue && (
                   <span className="rounded-full bg-destructive/12 px-2 py-0.5 text-2xs font-medium text-destructive">
                     Просрочено

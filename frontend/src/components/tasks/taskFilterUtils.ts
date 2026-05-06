@@ -1,11 +1,14 @@
 import type {
   Department,
   TaskLabel,
-  TaskPriority,
   TaskSource,
   TeamMember,
 } from "../../lib/types.ts";
-import { TASK_PRIORITY_LABELS, TASK_SOURCE_LABELS } from "../../lib/types.ts";
+import { TASK_SOURCE_LABELS } from "../../lib/types.ts";
+import {
+  normalizeTaskUrgency,
+  TASK_URGENCY_LABELS,
+} from "../../lib/taskUrgency.ts";
 
 export interface TaskFilterValues {
   search: string;
@@ -158,10 +161,11 @@ export function buildActiveTaskFilterChips({
   }
 
   if (filters.priority) {
+    const urgency = normalizeTaskUrgency(filters.priority);
     chips.push({
       type: "field",
       key: "priority",
-      label: TASK_PRIORITY_LABELS[filters.priority as TaskPriority],
+      label: `Срочность: ${TASK_URGENCY_LABELS[urgency]}`,
     });
   }
 

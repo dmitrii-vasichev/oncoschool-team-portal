@@ -20,59 +20,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { DatePicker } from "@/components/shared/DatePicker";
 import { TaskLabelPicker } from "@/components/tasks/TaskLabelPicker";
 import {
   AlertTriangle,
-  ArrowUp,
-  Minus,
-  ArrowDown,
   CalendarDays,
+  ListChecks,
   Loader2,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
-import type { TaskLabel, TeamMember, TaskPriority } from "@/lib/types";
-import { TASK_PRIORITY_LABELS } from "@/lib/types";
+import type {
+  TaskChecklistItem,
+  TaskLabel,
+  TeamMember,
+  TaskPriority,
+} from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
 
-const PRIORITY_OPTIONS: {
-  value: TaskPriority;
-  icon: typeof AlertTriangle;
-  color: string;
-  activeColor: string;
-  ringColor: string;
-}[] = [
-  {
-    value: "urgent",
-    icon: AlertTriangle,
-    color: "text-priority-urgent-fg",
-    activeColor: "bg-priority-urgent-bg border-priority-urgent-dot",
-    ringColor: "ring-priority-urgent-dot/30",
-  },
-  {
-    value: "high",
-    icon: ArrowUp,
-    color: "text-priority-high-fg",
-    activeColor: "bg-priority-high-bg border-priority-high-dot",
-    ringColor: "ring-priority-high-dot/30",
-  },
-  {
-    value: "medium",
-    icon: Minus,
-    color: "text-priority-medium-fg",
-    activeColor: "bg-priority-medium-bg border-priority-medium-dot",
-    ringColor: "ring-priority-medium-dot/30",
-  },
-  {
-    value: "low",
-    icon: ArrowDown,
-    color: "text-priority-low-fg",
-    activeColor: "bg-priority-low-bg border-priority-low-dot",
-    ringColor: "ring-priority-low-dot/30",
-  },
-];
+function createChecklistId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 export function CreateTaskDialog({
   open,
@@ -92,7 +67,9 @@ export function CreateTaskDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<TaskLabel[]>([]);
-  const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [priority, setPriority] = useState<TaskPriority>("normal");
+  const [checklist, setChecklist] = useState<TaskChecklistItem[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>(
     canAssignToOthers ? "" : currentUser.id
   );
@@ -104,10 +81,30 @@ export function CreateTaskDialog({
     setTitle("");
     setDescription("");
     setLabels([]);
-    setPriority("medium");
+    setPriority("normal");
+    setChecklist([]);
+    setNewChecklistItem("");
     setAssigneeId(canAssignToOthers ? "" : currentUser.id);
     setDeadline("");
     setError(null);
+  }
+
+  function addChecklistItem() {
+    const itemTitle = newChecklistItem.trim();
+    if (!itemTitle) return;
+    setChecklist((items) => [
+      ...items,
+      {
+        id: createChecklistId(),
+        title: itemTitle,
+        is_completed: false,
+      },
+    ]);
+    setNewChecklistItem("");
+  }
+
+  function removeChecklistItem(itemId: string) {
+    setChecklist((items) => items.filter((item) => item.id !== itemId));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -123,6 +120,7 @@ export function CreateTaskDialog({
       await api.createTask({
         title: title.trim(),
         description: description.trim() || null,
+        checklist,
         label_ids: labels.map((label) => label.id),
         priority,
         assignee_id: assigneeId || null,
@@ -150,7 +148,7 @@ export function CreateTaskDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="sm:max-w-[480px] backdrop-blur-sm">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px] backdrop-blur-sm">
         <DialogHeader>
           <DialogTitle className="text-lg">Новая задача</DialogTitle>
           <DialogDescription>
@@ -199,29 +197,85 @@ export function CreateTaskDialog({
             />
           </div>
 
-          {/* Priority — visual buttons */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Приоритет</Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {PRIORITY_OPTIONS.map(({ value, icon: Icon, color, activeColor, ringColor }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setPriority(value)}
-                  className={`
-                    flex flex-col items-center gap-1.5 rounded-lg border-2 px-2 py-2.5
-                    text-xs font-medium
-                    ${
-                      priority === value
-                        ? `${activeColor} ${color} ring-2 ${ringColor} shadow-sm`
-                        : "border-border/40 text-muted-foreground hover:border-border hover:bg-muted/50"
-                    }
-                  `}
+            <Label htmlFor="create-urgent" className="text-sm font-medium">
+              Срочность
+            </Label>
+            <div
+              className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${
+                priority === "urgent"
+                  ? "border-priority-urgent-dot/60 bg-priority-urgent-bg text-priority-urgent-fg"
+                  : "border-border/60 bg-muted/30"
+              }`}
+            >
+              <span className="text-sm font-medium">
+                {priority === "urgent" ? "Срочная" : "Обычная"}
+              </span>
+              <Switch
+                id="create-urgent"
+                checked={priority === "urgent"}
+                onCheckedChange={(checked) =>
+                  setPriority(checked ? "urgent" : "normal")
+                }
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label
+              htmlFor="create-checklist-item"
+              className="text-sm font-medium"
+            >
+              Чек-лист
+            </Label>
+            <div className="space-y-2">
+              {checklist.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2"
                 >
-                  <Icon className="h-4 w-4" />
-                  {TASK_PRIORITY_LABELS[value]}
-                </button>
+                  <ListChecks className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {item.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeChecklistItem(item.id)}
+                    className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    aria-label="Удалить пункт чек-листа"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
+
+              <div className="flex gap-2">
+                <Input
+                  id="create-checklist-item"
+                  value={newChecklistItem}
+                  onChange={(e) => setNewChecklistItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addChecklistItem();
+                    }
+                  }}
+                  placeholder="Добавить пункт"
+                  disabled={saving}
+                  className="h-10 bg-muted/30 border-border/60"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addChecklistItem}
+                  disabled={saving || !newChecklistItem.trim()}
+                  className="h-10 gap-1.5 border-border/60"
+                >
+                  <Plus className="h-4 w-4" />
+                  Добавить
+                </Button>
+              </div>
             </div>
           </div>
 
