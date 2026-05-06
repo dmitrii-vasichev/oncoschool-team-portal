@@ -76,6 +76,7 @@ export function TaskLabelPicker({
   const [savingEdit, setSavingEdit] = useState(false);
   const [archiveLabel, setArchiveLabel] = useState<TaskLabel | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const mountedRef = useRef(false);
   const valueRef = useRef(value);
   valueRef.current = value;
   const selectedIds = useMemo(
@@ -102,11 +103,21 @@ export function TaskLabelPicker({
         search: normalizedSearch || undefined,
         limit: 20,
       });
+      if (!mountedRef.current) return;
       setOptions(labels);
+      setLoadError(false);
     } catch {
+      if (!mountedRef.current) return;
       setLoadError(true);
     }
   }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -175,6 +186,7 @@ export function TaskLabelPicker({
       toastError(
         error instanceof Error ? error.message : "Не удалось создать метку"
       );
+      await refreshLabels();
     } finally {
       setCreating(false);
     }
@@ -322,7 +334,8 @@ export function TaskLabelPicker({
                         <button
                           type="button"
                           aria-label={`Редактировать метку ${label.name}`}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                          disabled={controlsDisabled}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                           onClick={() => setEditingLabel(label)}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -332,7 +345,8 @@ export function TaskLabelPicker({
                         <button
                           type="button"
                           aria-label={`Архивировать метку ${label.name}`}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive"
+                          disabled={controlsDisabled}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
                           onClick={() => setArchiveLabel(label)}
                         >
                           <Archive className="h-3.5 w-3.5" />
@@ -359,6 +373,7 @@ export function TaskLabelPicker({
                     key={option.value}
                     type="button"
                     aria-label={`Выбрать цвет ${option.label}`}
+                    aria-pressed={createColor === option.value}
                     disabled={controlsDisabled}
                     onClick={() => setCreateColor(option.value)}
                     className={cn(

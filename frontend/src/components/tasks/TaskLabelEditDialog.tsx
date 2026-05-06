@@ -73,6 +73,7 @@ export function TaskLabelEditDialog({
                 <button
                   key={option.value}
                   type="button"
+                  aria-pressed={color === option.value}
                   disabled={saving}
                   onClick={() => setColor(option.value)}
                   className={cn(
