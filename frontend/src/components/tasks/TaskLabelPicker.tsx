@@ -206,7 +206,7 @@ export function TaskLabelPicker({
               ) : (
                 <Plus className="h-4 w-4" />
               )}
-              Создать "{normalizedSearch}"
+              Создать &quot;{normalizedSearch}&quot;
             </button>
           )}
         </div>
