@@ -8,6 +8,7 @@ import {
   Bot,
   Bell,
   Clock,
+  Tags,
 } from "lucide-react";
 import { ModeratorGuard } from "@/components/shared/ModeratorGuard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -21,10 +22,17 @@ import { ContentAccessSection } from "@/components/settings/ContentAccessSection
 import { TelegramTargetsSection } from "@/components/settings/TelegramTargetsSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
 import { RemindersSection } from "@/components/settings/RemindersSection";
+import { TaskLabelsSection } from "@/components/settings/TaskLabelsSection";
 
 // ── Tab definitions ──
 
-type TabId = "integrations" | "reports" | "ai" | "notifications" | "reminders";
+type TabId =
+  | "integrations"
+  | "reports"
+  | "ai"
+  | "notifications"
+  | "reminders"
+  | "task-labels";
 
 interface TabDef {
   id: TabId;
@@ -41,6 +49,7 @@ const TABS: TabDef[] = [
   { id: "ai", label: "AI", icon: Bot, adminOnly: true },
   { id: "notifications", label: "Уведомления", icon: Bell, adminOnly: false },
   { id: "reminders", label: "Напоминания", icon: Clock, adminOnly: false, requireReminders: true },
+  { id: "task-labels", label: "Метки задач", icon: Tags, adminOnly: false },
 ];
 
 // ── Page ──
@@ -191,6 +200,9 @@ function SettingsTabContent({
 
     case "reminders":
       return canConfigureReminders ? <RemindersSection /> : null;
+
+    case "task-labels":
+      return <TaskLabelsSection />;
 
     default:
       return null;
