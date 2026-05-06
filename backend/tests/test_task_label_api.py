@@ -164,3 +164,20 @@ class TaskLabelApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.can_archive)
         self.assertFalse(response.can_restore)
         self.assertFalse(response.is_shared_for_current_user)
+
+    async def test_label_response_archived_moderator_can_restore_not_archive(self) -> None:
+        label = make_label()
+        label.is_archived = True
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator", is_active=True)
+        session = SimpleNamespace()
+
+        response = await labels_api._label_response(
+            session,
+            label,
+            usage_count=2,
+            member=member,
+        )
+
+        self.assertTrue(response.can_edit)
+        self.assertFalse(response.can_archive)
+        self.assertTrue(response.can_restore)

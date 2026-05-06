@@ -32,7 +32,7 @@ async def _label_response(
         update={
             "usage_count": usage_count,
             "can_edit": is_moderator or can_member_manage,
-            "can_archive": is_moderator or can_member_manage,
+            "can_archive": is_active and (is_moderator or can_member_manage),
             "can_restore": is_moderator and label.is_archived,
             "is_shared_for_current_user": is_shared,
         }
