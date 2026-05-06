@@ -183,7 +183,7 @@ export function TaskFilters({
   return (
     <div className="flex-1 space-y-3">
       {/* Main filter row */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:flex-nowrap">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center xl:flex-nowrap">
         {/* Search */}
         <div className="relative group w-full lg:w-[220px] lg:shrink-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary" />
@@ -224,7 +224,8 @@ export function TaskFilters({
           className={`
             w-full flex-col gap-2
             sm:w-auto sm:flex-row sm:flex-wrap sm:items-center
-            lg:flex-1 lg:min-w-0 lg:w-auto lg:flex-nowrap
+            lg:flex-1 lg:min-w-0 lg:w-auto lg:flex-wrap
+            xl:flex-nowrap
             ${filtersExpanded ? "flex" : "hidden lg:flex"}
           `}
         >
@@ -282,6 +283,7 @@ export function TaskFilters({
             <TaskLabelPicker
               value={filters.labels}
               onChange={(labels) => onFiltersChange({ ...filters, labels })}
+              maxVisible={1}
               placeholder="Все метки"
             />
           </div>

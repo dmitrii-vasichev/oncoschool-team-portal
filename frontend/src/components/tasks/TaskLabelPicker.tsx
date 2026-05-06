@@ -19,11 +19,13 @@ export function TaskLabelPicker({
   value,
   onChange,
   disabled = false,
+  maxVisible = 3,
   placeholder = "Метки",
 }: {
   value: TaskLabel[];
   onChange: (labels: TaskLabel[]) => void;
   disabled?: boolean;
+  maxVisible?: number;
   placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -120,7 +122,11 @@ export function TaskLabelPicker({
           className="h-auto min-h-10 w-full justify-start gap-2 px-3 py-2"
         >
           {value.length ? (
-            <TaskLabelChips labels={value} maxVisible={3} />
+            <TaskLabelChips
+              labels={value}
+              maxVisible={maxVisible}
+              className="w-full flex-nowrap overflow-hidden"
+            />
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
