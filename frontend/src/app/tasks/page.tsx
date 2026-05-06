@@ -48,8 +48,10 @@ export default function TasksPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<TaskStatus>("new");
   const defaultScopeUserIdRef = useRef<string | null>(null);
-  const hasLoadedDataRef = useRef(false);
+  const loadedDataUserIdRef = useRef<string | null>(null);
+  const currentUserIdRef = useRef("");
   const userId = user?.id || "";
+  currentUserIdRef.current = userId;
   const userDepartmentId = user?.department_id || "";
   const userExtraDepartmentIds = useMemo(
     () => user?.extra_department_ids || [],
@@ -80,8 +82,12 @@ export default function TasksPage() {
 
   const fetchData = useCallback(async () => {
     if (!user?.id) return;
+    const requestUserId = user.id;
+    const isCurrentUserRequest = () =>
+      currentUserIdRef.current === requestUserId;
+
     try {
-      if (!hasLoadedDataRef.current) {
+      if (loadedDataUserIdRef.current !== requestUserId) {
         setLoading(true);
       }
       const params: Record<string, string> = { per_page: "200" };
@@ -108,13 +114,18 @@ export default function TasksPage() {
         filters.assignee_id === "unassigned"
           ? tasksRes.items.filter((task) => !task.assignee_id)
           : tasksRes.items;
+      if (!isCurrentUserRequest()) return;
       setTasks(scopedTasks);
       setMembers(membersRes);
     } catch {
-      toastError("Не удалось загрузить задачи");
+      if (isCurrentUserRequest()) {
+        toastError("Не удалось загрузить задачи");
+      }
     } finally {
-      hasLoadedDataRef.current = true;
-      setLoading(false);
+      if (isCurrentUserRequest()) {
+        loadedDataUserIdRef.current = requestUserId;
+        setLoading(false);
+      }
     }
   }, [
     accessibleDepartmentIds,

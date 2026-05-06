@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -205,7 +205,13 @@ export function TaskFilters({
         </div>
 
         <Button
+          type="button"
           variant="outline"
+          aria-label={
+            activeFilterCount > 0
+              ? `Открыть фильтры, активно ${activeFilterCount}`
+              : "Открыть фильтры"
+          }
           onClick={() => setFilterSheetOpen(true)}
           className="h-10 rounded-xl gap-2 border-border/70 bg-background/80 px-4 shadow-none"
         >
@@ -237,6 +243,14 @@ export function TaskFilters({
               )}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={resetStructuredFilters}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3 w-3" />
+            Сбросить
+          </button>
         </div>
       )}
 
@@ -441,9 +455,14 @@ function FilterField({
   label: string;
   children: ReactNode;
 }) {
+  const labelId = useId();
+
   return (
-    <div className="space-y-1.5">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="space-y-1.5" aria-labelledby={labelId}>
+      <div
+        id={labelId}
+        className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+      >
         {label}
       </div>
       {children}
