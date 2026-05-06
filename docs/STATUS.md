@@ -2,7 +2,7 @@
 
 ## Task Urgency and Create Checklist
 
-- Current phase: implementation in progress; final verification next
+- Current phase: implemented and verified
 - Spec: `docs/superpowers/specs/2026-05-06-task-urgency-and-create-checklist-design.md`
 - Plan: `docs/superpowers/plans/2026-05-06-task-urgency-and-create-checklist.md`
 - Scope: binary urgency across backend, frontend, bot, AI, notifications, reminders, analytics, and create-dialog checklist
@@ -15,9 +15,13 @@
   - Frontend urgency helpers, filter chips, task board filters, task cards, dashboard task cards, create-dialog checklist drafting, and task detail urgency editing are implemented.
   - Meeting preview, meeting task list, analytics distribution, and reminder settings copy now use urgency language.
 - Latest verification:
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_urgency.py tests/test_task_update_permissions.py -q` passed: 21 tests.
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_urgency.py tests/test_reminder_digest_section_order.py tests/test_group_task_mentions.py -q` passed: 21 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_urgency.py tests/test_task_update_permissions.py tests/test_reminder_digest_section_order.py tests/test_task_label_task_api.py tests/test_task_permission_service.py -q` passed: 45 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 317 tests.
   - `cd frontend && npm test && npx tsc --noEmit` passed: 18 tests plus TypeScript check.
+  - `cd frontend && npm run lint && npm run build` passed.
+  - `git diff --check` passed.
+  - Frontend dev server started at `http://127.0.0.1:3001`; `curl -I -L http://127.0.0.1:3001/tasks` returned `HTTP 200 OK`.
+  - Browser automation for in-app visual QA was unavailable in the active tool set, so authenticated visual checks for urgent/overdue card coexistence and create-dialog checklist submission remain a manual check in the running app.
 
 ## Task Label Management
 
