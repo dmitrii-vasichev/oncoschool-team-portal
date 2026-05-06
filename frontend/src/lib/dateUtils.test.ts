@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatDateOnly, toLocalDateString } from "./dateUtils";
+import { formatDateOnly, toLocalDateString } from "./dateUtils.ts";
 
 function withTimezone(timeZone: string, callback: () => void) {
   const previous = process.env.TZ;
