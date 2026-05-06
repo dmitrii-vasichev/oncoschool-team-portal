@@ -1,5 +1,18 @@
 # Status
 
+## Task Urgency and Create Checklist
+
+- Current phase: implementation planning complete
+- Spec: `docs/superpowers/specs/2026-05-06-task-urgency-and-create-checklist-design.md`
+- Plan: `docs/superpowers/plans/2026-05-06-task-urgency-and-create-checklist.md`
+- Scope: binary urgency across backend, frontend, bot, AI, notifications, reminders, analytics, and create-dialog checklist
+- Latest progress:
+  - Approved design recorded and committed.
+  - Detailed implementation plan created and linked from `docs/PLAN.md`.
+  - Planned legacy mapping is `urgent/high -> urgent` and `medium/low -> normal`.
+- Latest verification:
+  - Pending implementation.
+
 ## Task Label Management
 
 - Current phase: implemented and verified

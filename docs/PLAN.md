@@ -1,3 +1,47 @@
+# Active Plan: Task Urgency and Create Checklist
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-06-task-urgency-and-create-checklist.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Replace four-level task priority with binary task urgency across the system, remove status/priority icons from task cards, and allow checklist items during task creation.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-06-task-urgency-and-create-checklist-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-06-task-urgency-and-create-checklist.md`
+
+**Milestones:**
+
+1. Backend urgency domain, schemas, service normalization, API filters, and migration.
+2. Backend AI, bot, notifications, reminders, and analytics integrations.
+3. Frontend urgency helpers, types, filters, and filter tests.
+4. Task cards, create dialog checklist, and task detail urgency editing.
+5. Meeting preview, analytics, reminder settings copy, and documentation.
+6. Final backend/frontend verification and browser QA.
+
+**Definition of done:**
+
+- Existing `urgent` and `high` tasks are urgent after migration.
+- Existing `medium` and `low` tasks are normal after migration.
+- New task writes produce only `normal` or `urgent`.
+- Task cards do not show status or priority icons.
+- Urgent cards show the approved red left edge and visible `Срочно` text.
+- Overdue cards remain visually distinct and can coexist with urgency.
+- New task dialog submits draft checklist items.
+- Web, backend, bot, AI, notifications, reminders, analytics, docs, and tests use urgency language.
+
+**Validation commands:**
+
+```bash
+cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_urgency.py tests/test_task_update_permissions.py tests/test_reminder_digest_section_order.py tests/test_task_label_task_api.py tests/test_task_permission_service.py -q
+cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
 # Task Label Management Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
