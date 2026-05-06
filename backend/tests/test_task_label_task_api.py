@@ -83,3 +83,28 @@ class TaskLabelTaskApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, labeled_task)
         replace_mock.assert_awaited_once_with(session, task, label_ids)
+
+    async def test_replace_task_labels_rejects_new_archived_label(self) -> None:
+        active = SimpleNamespace(id=uuid.uuid4(), is_archived=False)
+        archived = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        task = SimpleNamespace(labels=[active])
+        session = SimpleNamespace()
+        repo = tasks_api.TaskLabelRepository()
+        repo.get_by_ids = AsyncMock(return_value=[archived])
+
+        with self.assertRaises(ValueError) as ctx:
+            await repo.replace_task_labels(session, task, [archived.id])
+
+        self.assertEqual(str(ctx.exception), "Архивные метки нельзя добавить к задаче")
+
+    async def test_replace_task_labels_preserves_existing_archived_label(self) -> None:
+        archived = SimpleNamespace(id=uuid.uuid4(), is_archived=True)
+        task = SimpleNamespace(labels=[archived])
+        session = SimpleNamespace()
+        repo = tasks_api.TaskLabelRepository()
+        repo.get_by_ids = AsyncMock(return_value=[archived])
+
+        result = await repo.replace_task_labels(session, task, [archived.id])
+
+        self.assertIs(result, task)
+        self.assertEqual(task.labels, [archived])

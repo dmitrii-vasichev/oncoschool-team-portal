@@ -10,6 +10,11 @@
 - `cd frontend && npx tsc --noEmit`
 - `cd frontend && npm run lint`
 
+If `backend/.env` is not present, run backend unit tests with minimal test settings:
+
+- `cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_task_label_repository.py tests/test_task_label_api.py tests/test_task_label_task_api.py tests/test_task_permission_service.py tests/test_task_update_permissions.py -q`
+- `cd backend && env DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q`
+
 ### Manual
 
 1. Create a label from the task label picker and choose a non-default color.

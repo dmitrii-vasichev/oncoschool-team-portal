@@ -6,6 +6,7 @@ import type {
   Task,
   TaskLabel,
   TaskLabelCreateRequest,
+  TaskLabelUpdateRequest,
   TaskCreateRequest,
   TaskEditRequest,
   TaskUpdate,
@@ -301,10 +302,12 @@ class ApiClient {
   async getTaskLabels(params?: {
     search?: string;
     limit?: number;
+    include_archived?: boolean;
   }): Promise<TaskLabel[]> {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set("search", params.search);
     if (params?.limit) searchParams.set("limit", String(params.limit));
+    if (params?.include_archived) searchParams.set("include_archived", "true");
     const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
     return this.request<TaskLabel[]>(`/api/task-labels${query}`);
   }
@@ -313,6 +316,28 @@ class ApiClient {
     return this.request<TaskLabel>("/api/task-labels", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  async updateTaskLabel(
+    labelId: string,
+    data: TaskLabelUpdateRequest
+  ): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async archiveTaskLabel(labelId: string): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async restoreTaskLabel(labelId: string): Promise<TaskLabel> {
+    return this.request<TaskLabel>(`/api/task-labels/${labelId}/restore`, {
+      method: "POST",
     });
   }
 

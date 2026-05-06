@@ -5,6 +5,15 @@
 export type TaskStatus = "new" | "in_progress" | "review" | "done" | "cancelled";
 export type TaskPriority = "urgent" | "high" | "medium" | "low";
 export type TaskSource = "text" | "voice" | "summary" | "web";
+export type TaskLabelColor =
+  | "teal"
+  | "blue"
+  | "purple"
+  | "gold"
+  | "green"
+  | "coral"
+  | "rose"
+  | "slate";
 export type UpdateType = "progress" | "status_change" | "comment" | "blocker" | "completion";
 export type MemberRole = "admin" | "moderator" | "member";
 export type MemberDeactivationStrategy = "unassign" | "reassign";
@@ -117,12 +126,16 @@ export interface TaskLabel {
   id: string;
   name: string;
   slug: string;
-  color: string;
+  color: TaskLabelColor | string;
   created_by_id: string | null;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
   usage_count: number;
+  can_edit: boolean;
+  can_archive: boolean;
+  can_restore: boolean;
+  is_shared_for_current_user: boolean;
 }
 
 export interface TaskUpdate {
@@ -610,6 +623,12 @@ export interface TaskEditRequest {
 
 export interface TaskLabelCreateRequest {
   name: string;
+  color?: TaskLabelColor;
+}
+
+export interface TaskLabelUpdateRequest {
+  name?: string;
+  color?: TaskLabelColor;
 }
 
 export interface TaskUpdateCreateRequest {
