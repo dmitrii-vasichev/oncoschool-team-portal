@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe"
 OPENAI_TRANSCRIPTION_MAX_BYTES = 25 * 1024 * 1024
+OPENAI_TRANSCRIPTION_SAFE_CHUNK_BYTES = 24 * 1024 * 1024
 
 
 class VoiceService:

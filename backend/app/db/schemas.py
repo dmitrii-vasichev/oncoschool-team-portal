@@ -20,6 +20,7 @@ ReminderDigestSectionKeyType = Literal["overdue", "upcoming", "in_progress", "ne
 ReminderTaskLineFieldKeyType = Literal["number", "title", "deadline", "priority"]
 MeetingAIProcessingStatusType = Literal[
     "idle",
+    "queued",
     "recording_not_ready",
     "recording_ready",
     "transcribing",
@@ -355,6 +356,15 @@ class MeetingAIProcessingResponse(BaseModel):
     draft_tasks: list[MeetingBoardTaskDraft] = Field(default_factory=list)
     published_at: datetime | None = None
     published_by_id: uuid.UUID | None = None
+    transcription_requested_by_id: uuid.UUID | None = None
+    transcription_phase: str | None = None
+    transcription_progress_percent: int = 0
+    transcription_current_chunk: int = 0
+    transcription_total_chunks: int = 0
+    transcription_source_bytes: int | None = None
+    transcription_prepared_bytes: int | None = None
+    transcription_attempt_count: int = 0
+    transcription_last_heartbeat_at: datetime | None = None
 
 
 class MeetingAIProcessingDraftUpdate(BaseModel):

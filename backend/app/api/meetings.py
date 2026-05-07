@@ -778,7 +778,7 @@ async def transcribe_meeting_audio(
     if not meeting:
         raise HTTPException(status_code=404, detail="Встреча не найдена")
     try:
-        processing = await meeting_ai_outcomes_service.transcribe_meeting_audio(
+        processing = await meeting_ai_outcomes_service.queue_meeting_audio_transcription(
             session,
             meeting=meeting,
             zoom_service=_get_zoom_service(request),
@@ -791,6 +791,21 @@ async def transcribe_meeting_audio(
         await session.rollback()
         logger.exception("Audio transcription failed for meeting %s", meeting_id)
         raise HTTPException(status_code=502, detail=f"Ошибка транскрибации: {exc}")
+
+
+@router.get("/{meeting_id}/ai/processing", response_model=MeetingAIProcessingResponse)
+async def get_meeting_ai_processing(
+    meeting_id: uuid.UUID,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Встреча не найдена")
+    processing = await meeting_ai_outcomes_service.processing_repo.get_or_create(
+        session, meeting_id
+    )
+    return MeetingAIProcessingResponse.model_validate(processing)
 
 
 @router.post("/{meeting_id}/ai/generate-draft", response_model=MeetingAIProcessingResponse)

@@ -31,6 +31,9 @@ from app.db.database import async_session
 from app.services.broadcast_scheduler_service import BroadcastSchedulerService
 from app.services.content_cleanup_service import ContentCleanupService
 from app.services.meeting_scheduler_service import MeetingSchedulerService
+from app.services.meeting_transcription_scheduler_service import (
+    MeetingTranscriptionSchedulerService,
+)
 from app.services.reminder_service import ReminderService
 from app.services.report_scheduler_service import ReportSchedulerService
 from app.services.supabase_storage import SupabaseStorageService
@@ -158,6 +161,13 @@ meeting_scheduler = MeetingSchedulerService(
     bot=bot, session_maker=async_session, zoom_service=zoom_service
 )
 app.state.meeting_scheduler = meeting_scheduler
+meeting_transcription_scheduler = MeetingTranscriptionSchedulerService(
+    bot=bot,
+    session_maker=async_session,
+    zoom_service=zoom_service,
+    frontend_url=settings.NEXT_PUBLIC_FRONTEND_URL,
+)
+app.state.meeting_transcription_scheduler = meeting_transcription_scheduler
 broadcast_scheduler = BroadcastSchedulerService(
     bot=bot,
     session_maker=async_session,
@@ -183,6 +193,7 @@ async def _start_background_schedulers() -> None:
     reminder_service.start()
     await reminder_service.refresh_task_overdue_schedule_from_settings()
     meeting_scheduler.start()
+    meeting_transcription_scheduler.start()
     report_scheduler.start()
     broadcast_scheduler.start()
     content_cleanup.start()
@@ -206,6 +217,7 @@ async def _start_background_schedulers() -> None:
 async def _stop_background_schedulers() -> None:
     reminder_service.stop()
     meeting_scheduler.stop()
+    meeting_transcription_scheduler.stop()
     report_scheduler.stop()
     broadcast_scheduler.stop()
     content_cleanup.stop()

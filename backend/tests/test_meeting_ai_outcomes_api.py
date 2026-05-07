@@ -16,13 +16,13 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
         processing = SimpleNamespace(
             id=uuid.uuid4(),
             meeting_id=meeting_id,
-            status="transcript_ready",
-            transcript_source="openai_audio",
+            status="queued",
+            transcript_source=None,
             transcription_model="gpt-4o-mini-transcribe",
             started_at=None,
             completed_at=None,
             error_message=None,
-            transcript_char_count=50,
+            transcript_char_count=None,
             audio_duration_seconds=None,
             estimated_cost_usd=None,
             draft_summary=None,
@@ -44,7 +44,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(
                 meetings_api.meeting_ai_outcomes_service,
-                "transcribe_meeting_audio",
+                "queue_meeting_audio_transcription",
                 AsyncMock(return_value=processing),
             ),
         ):
@@ -55,7 +55,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
                 session=session,
             )
 
-        self.assertEqual(response.status, "transcript_ready")
+        self.assertEqual(response.status, "queued")
         session.commit.assert_not_awaited()
         session.rollback.assert_not_awaited()
 
@@ -78,7 +78,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(
                 meetings_api.meeting_ai_outcomes_service,
-                "transcribe_meeting_audio",
+                "queue_meeting_audio_transcription",
                 AsyncMock(side_effect=ValueError("Транскрибация уже выполняется")),
             ),
         ):
@@ -114,7 +114,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch.object(
                 meetings_api.meeting_ai_outcomes_service,
-                "transcribe_meeting_audio",
+                "queue_meeting_audio_transcription",
                 AsyncMock(side_effect=RuntimeError("openai down")),
             ),
         ):
@@ -130,6 +130,60 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("openai down", exc.exception.detail)
         session.commit.assert_not_awaited()
         session.rollback.assert_awaited_once()
+
+    async def test_get_meeting_ai_processing_returns_existing_state(self) -> None:
+        meeting_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id)
+        processing = SimpleNamespace(
+            id=uuid.uuid4(),
+            meeting_id=meeting_id,
+            status="queued",
+            transcript_source=None,
+            transcription_model="gpt-4o-mini-transcribe",
+            started_at=None,
+            completed_at=None,
+            error_message=None,
+            transcript_char_count=None,
+            audio_duration_seconds=None,
+            estimated_cost_usd=None,
+            draft_summary=None,
+            draft_decisions=[],
+            draft_tasks=[],
+            published_at=None,
+            published_by_id=None,
+            transcription_requested_by_id=member.id,
+            transcription_phase="queued",
+            transcription_progress_percent=0,
+            transcription_current_chunk=0,
+            transcription_total_chunks=0,
+            transcription_source_bytes=None,
+            transcription_prepared_bytes=None,
+            transcription_attempt_count=0,
+            transcription_last_heartbeat_at=None,
+        )
+        session = SimpleNamespace()
+
+        with (
+            patch.object(
+                meetings_api.meeting_service,
+                "get_meeting_by_id",
+                AsyncMock(return_value=meeting),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service.processing_repo,
+                "get_or_create",
+                AsyncMock(return_value=processing),
+            ),
+        ):
+            response = await meetings_api.get_meeting_ai_processing(
+                meeting_id=meeting_id,
+                member=member,
+                session=session,
+            )
+
+        self.assertEqual(response.status, "queued")
+        self.assertEqual(response.transcription_phase, "queued")
 
     async def test_generate_draft_value_error_returns_422_without_commit(self) -> None:
         meeting_id = uuid.uuid4()

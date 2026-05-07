@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Bot, FileAudio, Loader2, Send, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,6 +11,8 @@ import type { MeetingAIProcessing, MeetingAITaskDraft } from "@/lib/types";
 import {
   buildMeetingOutcomePublishPayload,
   canPublishMeetingOutcomes,
+  formatMeetingTranscriptionStatus,
+  isMeetingTranscriptionActive,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils";
 
@@ -38,16 +40,66 @@ export function MeetingAiOutcomesPanel({
   const [decisionsText, setDecisionsText] = useState("");
   const [taskDrafts, setTaskDrafts] = useState<MeetingAITaskDraft[]>([]);
 
-  if (!isModerator) return null;
-
-  const isBusy = busy !== null;
-
   const applyProcessing = (result: MeetingAIProcessing) => {
     setProcessing(result);
     setSummary(result.draft_summary ?? "");
     setDecisionsText((result.draft_decisions ?? []).join("\n"));
     setTaskDrafts(result.draft_tasks ?? []);
   };
+
+  useEffect(() => {
+    if (!isModerator) return;
+
+    let cancelled = false;
+    const loadProcessing = async () => {
+      try {
+        const result = await api.getMeetingAIProcessing(meetingId);
+        if (!cancelled) applyProcessing(result);
+      } catch {
+        // Processing state is auxiliary; the panel remains usable if it is unavailable.
+      }
+    };
+
+    void loadProcessing();
+    return () => {
+      cancelled = true;
+    };
+  }, [isModerator, meetingId]);
+
+  const transcriptionActive = isMeetingTranscriptionActive(processing?.status);
+
+  useEffect(() => {
+    if (!isModerator || !transcriptionActive) return;
+
+    let cancelled = false;
+    const refreshProcessing = async () => {
+      try {
+        const result = await api.getMeetingAIProcessing(meetingId);
+        if (cancelled) return;
+        applyProcessing(result);
+        if (result.status === "transcript_ready") {
+          toastSuccess("Транскрипция готова");
+          await onPublished();
+        }
+      } catch {
+        // Keep polling quietly; transient API errors should not reset the visible state.
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void refreshProcessing();
+    }, 5000);
+    void refreshProcessing();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isModerator, meetingId, onPublished, toastSuccess, transcriptionActive]);
+
+  if (!isModerator) return null;
+
+  const isBusy = busy !== null || transcriptionActive;
 
   const runAction = async (
     action: Exclude<BusyAction, null>,
@@ -126,13 +178,13 @@ export function MeetingAiOutcomesPanel({
             runAction(
               "transcribe",
               () => api.transcribeMeetingAudio(meetingId),
-              "Транскрибация запущена"
+              "Транскрибация запущена. Можно закрыть страницу — мы пришлём уведомление."
             )
           }
           disabled={isBusy}
           className="rounded-lg gap-1.5"
         >
-          {busy === "transcribe" ? (
+          {busy === "transcribe" || transcriptionActive ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <FileAudio className="h-3.5 w-3.5" />
@@ -175,6 +227,32 @@ export function MeetingAiOutcomesPanel({
           Опубликовать итоги
         </Button>
       </div>
+
+      {processing && (transcriptionActive || processing.status === "failed" || processing.status === "transcript_ready") && (
+        <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-3 text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-medium text-foreground">
+              {formatMeetingTranscriptionStatus(processing)}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {Math.max(0, Math.min(100, processing.transcription_progress_percent ?? 0))}%
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{
+                width: `${Math.max(0, Math.min(100, processing.transcription_progress_percent ?? 0))}%`,
+              }}
+            />
+          </div>
+          {transcriptionActive && (
+            <p className="mt-2 text-muted-foreground">
+              Можно уйти со страницы — после завершения придёт уведомление в портале и Telegram.
+            </p>
+          )}
+        </div>
+      )}
 
       {processing && (
         <div className="space-y-4 border-t border-border/60 pt-4">

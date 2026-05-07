@@ -3,7 +3,7 @@ import tempfile
 import unittest
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy.dialects import postgresql
 
@@ -14,7 +14,11 @@ from app.db.schemas import (
     MeetingBoardTaskDraft,
 )
 from app.services.ai_service import ParsedMeeting, ParsedTask
+from app.services.audio_preparation_service import AudioPreparationService, PreparedAudioChunks
 from app.services.meeting_ai_outcomes_service import MeetingAIOutcomesService
+from app.services.meeting_transcription_scheduler_service import (
+    MeetingTranscriptionSchedulerService,
+)
 from app.services.zoom_service import AUDIO_TRANSCRIPTION_MAX_BYTES, ZoomService
 
 
@@ -71,6 +75,42 @@ def test_ai_processing_response_supports_openai_audio_source() -> None:
     assert response.draft_tasks[0].selected is True
 
 
+def test_ai_processing_response_supports_queued_transcription_progress() -> None:
+    requester_id = uuid.uuid4()
+    response = MeetingAIProcessingResponse(
+        id=uuid.uuid4(),
+        meeting_id=uuid.uuid4(),
+        status="queued",
+        transcript_source=None,
+        transcription_model="gpt-4o-mini-transcribe",
+        started_at=None,
+        completed_at=None,
+        error_message=None,
+        transcript_char_count=None,
+        audio_duration_seconds=None,
+        estimated_cost_usd=None,
+        draft_summary=None,
+        draft_decisions=[],
+        draft_tasks=[],
+        published_at=None,
+        published_by_id=None,
+        transcription_requested_by_id=requester_id,
+        transcription_phase="queued",
+        transcription_progress_percent=0,
+        transcription_current_chunk=0,
+        transcription_total_chunks=0,
+        transcription_source_bytes=None,
+        transcription_prepared_bytes=None,
+        transcription_attempt_count=0,
+        transcription_last_heartbeat_at=None,
+    )
+
+    assert response.status == "queued"
+    assert response.transcription_requested_by_id == requester_id
+    assert response.transcription_phase == "queued"
+    assert response.transcription_progress_percent == 0
+
+
 class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_claim_transcription_returns_none_when_already_transcribing(self) -> None:
         repo = MeetingAIProcessingRepository()
@@ -89,6 +129,31 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         stmt = session.execute.await_args.args[0]
         compiled = str(stmt.compile(dialect=postgresql.dialect()))
         self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
+
+    async def test_queue_transcription_rejects_existing_active_job(self) -> None:
+        repo = MeetingAIProcessingRepository()
+        repo.get_or_create = AsyncMock()
+        result = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+        meeting_id = uuid.uuid4()
+        requester_id = uuid.uuid4()
+
+        queued = await repo.queue_transcription(
+            session,
+            meeting_id=meeting_id,
+            model="gpt-4o-mini-transcribe",
+            requested_by_id=requester_id,
+        )
+
+        self.assertIsNone(queued)
+        repo.get_or_create.assert_awaited_once_with(session, meeting_id)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        self.assertIn("meeting_ai_processing.status NOT IN", compiled)
+        params = stmt.compile().params
+        self.assertEqual(params["status"], "queued")
+        self.assertEqual(params["transcription_phase"], "queued")
+        self.assertEqual(params["transcription_requested_by_id"], requester_id)
 
     async def test_claim_publish_uses_draft_ready_guard(self) -> None:
         repo = MeetingAIProcessingRepository()
@@ -142,16 +207,16 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
         self.assertEqual(stmt.compile().params["status_1"], "published")
 
-    async def test_transcribe_audio_rejects_second_run_while_transcribing(self) -> None:
+    async def test_queue_transcribe_audio_rejects_second_active_run(self) -> None:
         service = MeetingAIOutcomesService()
         service.processing_repo = SimpleNamespace(
-            claim_transcription=AsyncMock(return_value=None)
+            queue_transcription=AsyncMock(return_value=None)
         )
         session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
         zoom_service = SimpleNamespace(download_audio_recording=AsyncMock())
 
         with self.assertRaisesRegex(ValueError, "Транскрибация уже выполняется"):
-            await service.transcribe_meeting_audio(
+            await service.queue_meeting_audio_transcription(
                 session,
                 meeting=SimpleNamespace(id=uuid.uuid4(), zoom_meeting_id="123"),
                 zoom_service=zoom_service,
@@ -161,12 +226,12 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         zoom_service.download_audio_recording.assert_not_awaited()
         session.flush.assert_not_awaited()
         session.commit.assert_not_awaited()
-        service.processing_repo.claim_transcription.assert_awaited_once()
+        service.processing_repo.queue_transcription.assert_awaited_once()
 
-    async def test_transcribe_audio_commits_transcribing_before_external_io(self) -> None:
+    async def test_queue_transcribe_audio_returns_queued_without_external_io(self) -> None:
         service = MeetingAIOutcomesService()
         processing = SimpleNamespace(
-            status="transcribing",
+            status="queued",
             transcript_source=None,
             transcript_char_count=None,
             audio_duration_seconds=None,
@@ -174,23 +239,11 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
             transcription_model="gpt-4o-mini-transcribe",
         )
         service.processing_repo = SimpleNamespace(
-            claim_transcription=AsyncMock(return_value=processing)
+            queue_transcription=AsyncMock(return_value=processing)
         )
-        fd, path = tempfile.mkstemp(suffix=".m4a")
-        os.close(fd)
-        with open(path, "wb") as fh:
-            fh.write(b"audio")
-
-        async def download_audio_recording(_meeting_id):
-            self.assertEqual(session.commit.await_count, 1)
-            return path
-
         session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
         zoom_service = SimpleNamespace(
-            download_audio_recording=AsyncMock(side_effect=download_audio_recording)
-        )
-        service.voice_service = SimpleNamespace(
-            transcribe_file=AsyncMock(return_value="готовый текст")
+            download_audio_recording=AsyncMock()
         )
         meeting = SimpleNamespace(
             id=uuid.uuid4(),
@@ -199,7 +252,7 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
             transcript_source=None,
         )
 
-        result = await service.transcribe_meeting_audio(
+        result = await service.queue_meeting_audio_transcription(
             session,
             meeting=meeting,
             zoom_service=zoom_service,
@@ -207,41 +260,140 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertIs(result, processing)
-        service.processing_repo.claim_transcription.assert_awaited_once_with(
-            session, meeting_id=meeting.id, model="gpt-4o-mini-transcribe"
-        )
-        self.assertEqual(processing.status, "transcript_ready")
-        self.assertEqual(processing.transcript_source, "openai_audio")
-        self.assertEqual(processing.transcript_char_count, len("готовый текст"))
-        self.assertIsNone(processing.audio_duration_seconds)
-        self.assertIsNone(processing.estimated_cost_usd)
-        self.assertEqual(meeting.transcript, "готовый текст")
-        self.assertEqual(meeting.transcript_source, "openai_audio")
-        self.assertEqual(session.commit.await_count, 2)
+        service.processing_repo.queue_transcription.assert_awaited_once()
+        self.assertEqual(result.status, "queued")
+        zoom_service.download_audio_recording.assert_not_awaited()
+        session.flush.assert_awaited_once()
+        session.commit.assert_not_awaited()
 
-    async def test_transcribe_audio_failure_marks_failed_and_commits(self) -> None:
+    async def test_process_transcription_job_prepares_chunks_and_saves_transcript(self) -> None:
         service = MeetingAIOutcomesService()
-        processing = SimpleNamespace(status="transcribing")
+        fd, source_path = tempfile.mkstemp(suffix=".m4a")
+        os.close(fd)
+        chunk_one = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        chunk_one.write(b"one")
+        chunk_one.close()
+        chunk_two = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+        chunk_two.write(b"two")
+        chunk_two.close()
+        prepared = PreparedAudioChunks(
+            source_path=source_path,
+            chunk_dir=tempfile.mkdtemp(),
+            chunk_paths=[chunk_one.name, chunk_two.name],
+            duration_seconds=120,
+            source_bytes=100,
+            total_bytes=6,
+        )
+        meeting = SimpleNamespace(
+            id=uuid.uuid4(),
+            zoom_meeting_id="123",
+            transcript=None,
+            transcript_source=None,
+        )
+        processing = SimpleNamespace(
+            meeting_id=meeting.id,
+            meeting=meeting,
+            transcription_model="gpt-4o-mini-transcribe",
+            transcription_requested_by_id=uuid.uuid4(),
+        )
+        requester = SimpleNamespace(
+            id=processing.transcription_requested_by_id,
+            telegram_id=123456,
+            full_name="Moderator",
+        )
+        completed_processing = SimpleNamespace(status="transcript_ready")
         service.processing_repo = SimpleNamespace(
-            claim_transcription=AsyncMock(return_value=processing)
+            update_transcription_progress=AsyncMock(),
+            mark_transcription_complete=AsyncMock(return_value=completed_processing),
+        )
+        service.member_repo = SimpleNamespace(get_by_id=AsyncMock(return_value=requester))
+        service.in_app_notifications = SimpleNamespace(
+            notify_meeting_transcription_completed=AsyncMock(),
+            notify_meeting_transcription_failed=AsyncMock(),
+        )
+        service.audio_preparation_service = SimpleNamespace(
+            prepare_chunks=AsyncMock(return_value=prepared),
+            cleanup=AsyncMock(),
+        )
+        service.voice_service = SimpleNamespace(
+            transcribe_file=AsyncMock(side_effect=["текст 1", "текст 2"])
+        )
+        zoom_service = SimpleNamespace(
+            download_audio_recording=AsyncMock(return_value=source_path)
+        )
+        bot = SimpleNamespace(send_message=AsyncMock())
+        session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
+
+        result = await service.process_transcription_job(
+            session,
+            processing=processing,
+            zoom_service=zoom_service,
+            bot=bot,
+            frontend_url="https://portal.example",
+        )
+
+        self.assertIs(result, completed_processing)
+        self.assertEqual(meeting.transcript, "текст 1\n\nтекст 2")
+        self.assertEqual(meeting.transcript_source, "openai_audio")
+        service.audio_preparation_service.cleanup.assert_awaited_once_with(prepared)
+        service.processing_repo.mark_transcription_complete.assert_awaited_once_with(
+            session,
+            meeting_id=meeting.id,
+            transcript_source="openai_audio",
+            transcript_char_count=len("текст 1\n\nтекст 2"),
+            audio_duration_seconds=120,
+            estimated_cost_usd=None,
+        )
+        self.assertEqual(service.voice_service.transcribe_file.await_count, 2)
+        service.in_app_notifications.notify_meeting_transcription_completed.assert_awaited_once_with(
+            session,
+            meeting=meeting,
+            requester=requester,
+        )
+        bot.send_message.assert_awaited_once()
+        self.assertIn(
+            "https://portal.example/meetings/",
+            bot.send_message.await_args.kwargs["text"],
+        )
+        self.assertGreaterEqual(session.commit.await_count, 2)
+
+    async def test_process_transcription_job_failure_marks_failed_and_cleans_up(self) -> None:
+        service = MeetingAIOutcomesService()
+        meeting = SimpleNamespace(id=uuid.uuid4(), zoom_meeting_id="123")
+        processing = SimpleNamespace(
+            meeting_id=meeting.id,
+            meeting=meeting,
+            transcription_model="gpt-4o-mini-transcribe",
+            transcription_requested_by_id=None,
+        )
+        service.processing_repo = SimpleNamespace(
+            update_transcription_progress=AsyncMock(),
+            mark_transcription_failed=AsyncMock(return_value=SimpleNamespace(status="failed")),
         )
         session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
         zoom_service = SimpleNamespace(
             download_audio_recording=AsyncMock(side_effect=RuntimeError("zoom down"))
         )
+        service.audio_preparation_service = SimpleNamespace(cleanup=AsyncMock())
 
         with self.assertRaisesRegex(RuntimeError, "zoom down"):
-            await service.transcribe_meeting_audio(
+            await service.process_transcription_job(
                 session,
-                meeting=SimpleNamespace(id=uuid.uuid4(), zoom_meeting_id="123"),
+                processing=processing,
                 zoom_service=zoom_service,
-                moderator=SimpleNamespace(id=uuid.uuid4()),
+                bot=None,
+                frontend_url="https://portal.example",
             )
 
-        self.assertEqual(processing.status, "failed")
-        self.assertEqual(processing.error_message, "zoom down")
-        self.assertIsNotNone(processing.completed_at)
-        self.assertEqual(session.commit.await_count, 2)
+        service.processing_repo.mark_transcription_failed.assert_awaited_once_with(
+            session,
+            meeting_id=meeting.id,
+            error_message="zoom down",
+        )
+        service.audio_preparation_service.cleanup.assert_awaited_once_with(
+            None, source_path=None
+        )
+        self.assertGreaterEqual(session.commit.await_count, 2)
 
     async def test_transcribe_audio_deletes_temporary_file_on_failure(self) -> None:
         service = MeetingAIOutcomesService()
@@ -633,6 +785,136 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         session.commit.assert_not_awaited()
 
 
+class AudioPreparationServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_prepare_chunks_returns_sorted_paths_and_metadata(self) -> None:
+        fd, source_path = tempfile.mkstemp(suffix=".m4a")
+        os.close(fd)
+        with open(source_path, "wb") as fh:
+            fh.write(b"source-audio")
+
+        async def fake_subprocess(*args, **_kwargs):
+            if args[0] == "ffprobe":
+                return SimpleNamespace(communicate=AsyncMock(return_value=(b"120.5\n", b"")))
+
+            output_pattern = args[-1]
+            chunk_dir = os.path.dirname(output_pattern)
+            with open(os.path.join(chunk_dir, "chunk_001.mp3"), "wb") as fh:
+                fh.write(b"second")
+            with open(os.path.join(chunk_dir, "chunk_000.mp3"), "wb") as fh:
+                fh.write(b"first")
+            return SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
+
+        service = AudioPreparationService()
+        with patch(
+            "app.services.audio_preparation_service.asyncio.create_subprocess_exec",
+            AsyncMock(side_effect=fake_subprocess),
+        ):
+            prepared = await service.prepare_chunks(source_path)
+
+        self.assertEqual([os.path.basename(path) for path in prepared.chunk_paths], [
+            "chunk_000.mp3",
+            "chunk_001.mp3",
+        ])
+        self.assertEqual(prepared.duration_seconds, 120)
+        self.assertEqual(prepared.source_bytes, len(b"source-audio"))
+        self.assertEqual(prepared.total_bytes, len(b"first") + len(b"second"))
+        await service.cleanup(prepared)
+        self.assertFalse(os.path.exists(source_path))
+        self.assertFalse(os.path.exists(prepared.chunk_dir))
+
+    async def test_prepare_chunks_rejects_oversized_chunks_after_retry(self) -> None:
+        fd, source_path = tempfile.mkstemp(suffix=".m4a")
+        os.close(fd)
+        with open(source_path, "wb") as fh:
+            fh.write(b"source-audio")
+
+        async def fake_subprocess(*args, **_kwargs):
+            if args[0] == "ffprobe":
+                return SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
+
+            output_pattern = args[-1]
+            chunk_dir = os.path.dirname(output_pattern)
+            with open(os.path.join(chunk_dir, "chunk_000.mp3"), "wb") as fh:
+                fh.write(b"too-large")
+            return SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
+
+        service = AudioPreparationService()
+        service.safe_chunk_bytes = 1
+        with patch(
+            "app.services.audio_preparation_service.asyncio.create_subprocess_exec",
+            AsyncMock(side_effect=fake_subprocess),
+        ):
+            with self.assertRaisesRegex(ValueError, "фрагмент больше 25 МБ"):
+                await service.prepare_chunks(source_path)
+
+        await service.cleanup(None, source_path=source_path)
+
+    async def test_cleanup_removes_source_and_chunk_directory(self) -> None:
+        fd, source_path = tempfile.mkstemp(suffix=".m4a")
+        os.close(fd)
+        chunk_dir = tempfile.mkdtemp()
+        chunk_path = os.path.join(chunk_dir, "chunk_000.mp3")
+        with open(chunk_path, "wb") as fh:
+            fh.write(b"chunk")
+
+        prepared = PreparedAudioChunks(
+            source_path=source_path,
+            chunk_dir=chunk_dir,
+            chunk_paths=[chunk_path],
+            duration_seconds=None,
+            source_bytes=0,
+            total_bytes=5,
+        )
+
+        service = AudioPreparationService()
+        await service.cleanup(prepared)
+
+        self.assertFalse(os.path.exists(source_path))
+        self.assertFalse(os.path.exists(chunk_dir))
+
+
+class MeetingTranscriptionSchedulerServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_scheduler_claims_and_processes_one_due_job(self) -> None:
+        session = SimpleNamespace(commit=AsyncMock())
+
+        class FakeSessionMaker:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *_args):
+                return False
+
+        processing = SimpleNamespace(id=uuid.uuid4())
+        zoom_service = SimpleNamespace()
+        scheduler = MeetingTranscriptionSchedulerService(
+            bot=SimpleNamespace(),
+            session_maker=FakeSessionMaker(),
+            zoom_service=zoom_service,
+            frontend_url="https://portal.example",
+        )
+        scheduler.processing_repo = SimpleNamespace(
+            get_next_transcription_job=AsyncMock(return_value=processing)
+        )
+        scheduler.outcomes_service = SimpleNamespace(
+            process_transcription_job=AsyncMock()
+        )
+
+        await scheduler._process_due_jobs()
+
+        scheduler.processing_repo.get_next_transcription_job.assert_awaited_once()
+        session.commit.assert_awaited_once()
+        scheduler.outcomes_service.process_transcription_job.assert_awaited_once_with(
+            session,
+            processing=processing,
+            zoom_service=zoom_service,
+            bot=scheduler.bot,
+            frontend_url="https://portal.example",
+        )
+
+
 class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):
     async def test_select_audio_recording_file_prefers_m4a_over_mp4(self) -> None:
         service = ZoomService("account", "client", "secret")
@@ -649,7 +931,7 @@ class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(selected["file_type"], "M4A")
         self.assertEqual(selected["download_url"], "https://example.test/audio")
 
-    async def test_download_audio_recording_rejects_oversized_metadata_before_download_token(
+    async def test_download_audio_recording_allows_oversized_metadata_for_chunking(
         self,
     ) -> None:
         service = ZoomService("account", "client", "secret")
@@ -666,7 +948,37 @@ class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):
         )
         service._get_token = AsyncMock(return_value="token")
 
-        with self.assertRaisesRegex(ValueError, "Аудиофайл больше 25 МБ"):
-            await service.download_audio_recording("123")
+        class FakeStreamResponse:
+            headers = {"Content-Length": str(AUDIO_TRANSCRIPTION_MAX_BYTES + 1)}
 
-        service._get_token.assert_not_awaited()
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            def raise_for_status(self):
+                return None
+
+            async def aiter_bytes(self):
+                yield b"audio"
+
+        class FakeClient:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            def stream(self, *_args, **_kwargs):
+                return FakeStreamResponse()
+
+        with patch("app.services.zoom_service.httpx.AsyncClient", FakeClient):
+            path = await service.download_audio_recording("123")
+
+        service._get_token.assert_awaited_once()
+        self.assertTrue(os.path.exists(path))
+        os.unlink(path)

@@ -7,6 +7,7 @@ ENV PYTHONPATH=/app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libc6-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps

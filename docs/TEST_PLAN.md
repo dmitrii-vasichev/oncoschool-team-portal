@@ -1,5 +1,27 @@
 # Test Plan
 
+## Long Meeting Audio Transcription
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Confirm the Railway backend image has `ffmpeg` available.
+2. Run audio transcription on a short recording under 25 MB and confirm it completes.
+3. Run audio transcription on a Zoom recording over 25 MB and confirm it is chunked and completed.
+4. Leave the meeting page while transcription is running and confirm in-app and Telegram completion notifications arrive.
+5. Force a transcription failure and confirm status becomes failed, temporary files are removed, and retry is possible.
+6. Confirm no Zoom audio file is persisted in portal storage after success or failure.
+7. After transcript completion, generate the AI outcome draft and publish selected tasks as before.
+
 ## Meeting Board and AI Outcomes
 
 ### Automated

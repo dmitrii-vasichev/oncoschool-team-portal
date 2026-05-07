@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildMeetingOutcomePublishPayload,
   canPublishMeetingOutcomes,
+  formatMeetingTranscriptionStatus,
+  isMeetingTranscriptionActive,
   splitDraftDecisionsText,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils.ts";
@@ -61,8 +63,50 @@ test("buildMeetingOutcomePublishPayload preserves edited summary, decisions, tas
 });
 
 test("canPublishMeetingOutcomes allows publishing only draft_ready outcomes when idle", () => {
+  assert.equal(canPublishMeetingOutcomes("queued", false), false);
   assert.equal(canPublishMeetingOutcomes("transcript_ready", false), false);
   assert.equal(canPublishMeetingOutcomes("draft_ready", false), true);
   assert.equal(canPublishMeetingOutcomes("draft_ready", true), false);
   assert.equal(canPublishMeetingOutcomes(null, false), false);
+});
+
+test("isMeetingTranscriptionActive returns true for queued and transcribing states", () => {
+  assert.equal(isMeetingTranscriptionActive("queued"), true);
+  assert.equal(isMeetingTranscriptionActive("transcribing"), true);
+  assert.equal(isMeetingTranscriptionActive("transcript_ready"), false);
+  assert.equal(isMeetingTranscriptionActive("failed"), false);
+  assert.equal(isMeetingTranscriptionActive(null), false);
+});
+
+test("formatMeetingTranscriptionStatus renders phases and chunk progress", () => {
+  assert.equal(
+    formatMeetingTranscriptionStatus({
+      status: "queued",
+      transcription_phase: "queued",
+      transcription_current_chunk: 0,
+      transcription_total_chunks: 0,
+      transcription_progress_percent: 0,
+    }),
+    "В очереди"
+  );
+  assert.equal(
+    formatMeetingTranscriptionStatus({
+      status: "transcribing",
+      transcription_phase: "transcribing",
+      transcription_current_chunk: 3,
+      transcription_total_chunks: 8,
+      transcription_progress_percent: 46,
+    }),
+    "Транскрибируем 3/8"
+  );
+  assert.equal(
+    formatMeetingTranscriptionStatus({
+      status: "failed",
+      transcription_phase: "failed",
+      transcription_current_chunk: 0,
+      transcription_total_chunks: 0,
+      transcription_progress_percent: 0,
+    }),
+    "Ошибка транскрибации"
+  );
 });

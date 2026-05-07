@@ -1,5 +1,34 @@
 # Status
 
+## Long Meeting Audio Transcription
+
+- Current phase: implemented; automated verification passed
+- Spec: `docs/superpowers/specs/2026-05-07-long-meeting-audio-transcription-design.md`
+- Plan: `docs/superpowers/plans/2026-05-07-long-meeting-audio-transcription.md`
+- Scope: durable queued transcription for one- to two-hour Zoom recordings, OpenAI-safe chunking, progress UI, and requester notifications
+- Latest progress:
+  - Added durable queue/progress fields to `meeting_ai_processing`.
+  - Added `ffmpeg` audio preparation that converts long recordings into safe MP3 chunks.
+  - Reworked manual audio transcription so the API queues work instead of blocking the browser.
+  - Added a backend scheduler that claims queued/stale transcription jobs from PostgreSQL.
+  - Added in-app and Telegram notifications for the moderator who started transcription.
+  - Added frontend processing polling, progress labels, and leave-the-page guidance.
+  - Added `ffmpeg` to backend Docker images for Railway deployment.
+- Key approved decisions:
+  - Keep the first release in the existing backend service rather than adding Redis/Celery or a separate Railway worker.
+  - Use PostgreSQL as the durable queue.
+  - Transcribe chunks sequentially for simpler reliability and rate-limit behavior.
+  - Keep Zoom audio temporary only; store the final transcript and metadata.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q` passed: 38 tests.
+  - `cd frontend && npm test -- MeetingAiOutcomesPanelUtils.test.ts` passed: 34 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 363 tests.
+  - `cd frontend && npm test` passed: 34 tests.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed, including `/meetings/[id]`.
+  - `git diff --check` passed.
+
 ## Meeting Board and AI Outcomes
 
 - Current phase: implemented and verified

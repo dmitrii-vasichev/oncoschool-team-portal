@@ -1,4 +1,52 @@
-# Active Plan: Meeting Board and AI Outcomes
+# Active Plan: Long Meeting Audio Transcription
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-07-long-meeting-audio-transcription.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Make meeting audio transcription reliable for one- to two-hour Zoom recordings by queueing work, preparing OpenAI-safe chunks, and notifying the requester when processing finishes.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-07-long-meeting-audio-transcription-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-07-long-meeting-audio-transcription.md`
+
+**Milestones:**
+
+1. Extend meeting AI processing state with durable queue/progress fields.
+2. Add `ffmpeg` audio preparation into safe chunks below OpenAI's 25 MB upload limit.
+3. Process queued transcription jobs from the existing backend scheduler.
+4. Return immediately from the transcription button and expose a polling endpoint.
+5. Notify the initiating moderator in the portal and Telegram on completion or failure.
+6. Show frontend progress and let the user leave the page while work continues.
+7. Update Railway Docker images, docs, and verification.
+
+**Implementation status:**
+
+- Implemented in this branch; automated verification passed.
+
+**Definition of done:**
+
+- `Transcribe audio` does not block the browser on a long HTTP request.
+- Recordings larger than 25 MB are downloaded temporarily and prepared into OpenAI-safe chunks.
+- The backend stores progress in PostgreSQL and can recover queued/stale work after restart.
+- The meeting AI panel shows queued/transcribing progress and polls until completion/failure.
+- The initiating moderator receives in-app and Telegram notifications.
+- No Zoom audio file is persisted in portal storage.
+- Railway backend images install `ffmpeg`.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Meeting Board and AI Outcomes
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-07-meeting-board-and-ai-outcomes.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 

@@ -207,7 +207,6 @@ class ZoomService:
         audio_file = self._select_audio_recording_file(recordings)
         if not audio_file:
             return None
-        self._assert_audio_size_within_limit(audio_file.get("file_size"))
 
         suffix = ".m4a" if audio_file.get("file_type") == "M4A" else ".mp4"
         temp_path = None
@@ -222,16 +221,11 @@ class ZoomService:
                     follow_redirects=True,
                 ) as resp:
                     resp.raise_for_status()
-                    self._assert_audio_size_within_limit(resp.headers.get("Content-Length"))
                     temp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
                     temp_path = temp.name
                     temp.close()
-                    bytes_written = 0
                     with open(temp_path, "wb") as fh:
                         async for chunk in resp.aiter_bytes():
-                            bytes_written += len(chunk)
-                            if bytes_written > AUDIO_TRANSCRIPTION_MAX_BYTES:
-                                raise ValueError(AUDIO_TRANSCRIPTION_TOO_LARGE_MESSAGE)
                             fh.write(chunk)
             return temp_path
         except Exception:

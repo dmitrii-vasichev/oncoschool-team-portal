@@ -524,6 +524,8 @@ class MeetingAIProcessing(Base):
     __table_args__ = (
         UniqueConstraint("meeting_id", name="uq_meeting_ai_processing_meeting_id"),
         Index("idx_meeting_ai_processing_status", "status"),
+        Index("idx_meeting_ai_processing_phase", "transcription_phase"),
+        Index("idx_meeting_ai_processing_heartbeat", "transcription_last_heartbeat_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -556,12 +558,40 @@ class MeetingAIProcessing(Base):
     published_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
     )
+    transcription_requested_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    transcription_phase: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    transcription_progress_percent: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    transcription_current_chunk: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    transcription_total_chunks: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    transcription_source_bytes: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
+    transcription_prepared_bytes: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
+    )
+    transcription_attempt_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    transcription_last_heartbeat_at: Mapped[datetime | None] = mapped_column(
+        nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )
 
     meeting: Mapped["Meeting"] = relationship(back_populates="ai_processing")
+    transcription_requested_by: Mapped["TeamMember | None"] = relationship(
+        foreign_keys=[transcription_requested_by_id]
+    )
 
 
 class InAppNotification(Base):

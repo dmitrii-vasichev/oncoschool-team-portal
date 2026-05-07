@@ -28,6 +28,7 @@ export type MeetingStatus = "scheduled" | "in_progress" | "completed" | "cancell
 export type MeetingTranscriptSource = "zoom_api" | "manual" | "openai_audio";
 export type MeetingAIProcessingStatus =
   | "idle"
+  | "queued"
   | "recording_not_ready"
   | "recording_ready"
   | "transcribing"
@@ -248,6 +249,15 @@ export interface MeetingAIProcessing {
   draft_tasks: MeetingAITaskDraft[];
   published_at: string | null;
   published_by_id: string | null;
+  transcription_requested_by_id: string | null;
+  transcription_phase: string | null;
+  transcription_progress_percent: number;
+  transcription_current_chunk: number;
+  transcription_total_chunks: number;
+  transcription_source_bytes: number | null;
+  transcription_prepared_bytes: number | null;
+  transcription_attempt_count: number;
+  transcription_last_heartbeat_at: string | null;
 }
 
 export interface TelegramTargetRef {

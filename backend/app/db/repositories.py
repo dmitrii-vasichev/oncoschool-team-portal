@@ -706,6 +706,8 @@ class MeetingBoardRepository:
 
 
 class MeetingAIProcessingRepository:
+    ACTIVE_TRANSCRIPTION_STATUSES = ("queued", "transcribing")
+
     async def get_by_meeting_id(
         self, session: AsyncSession, meeting_id: uuid.UUID
     ) -> MeetingAIProcessing | None:
@@ -758,6 +760,179 @@ class MeetingAIProcessingRepository:
                 audio_duration_seconds=None,
                 estimated_cost_usd=None,
                 transcription_model=model,
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def queue_transcription(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        model: str,
+        requested_by_id: uuid.UUID,
+    ) -> MeetingAIProcessing | None:
+        await self.get_or_create(session, meeting_id)
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(
+                MeetingAIProcessing.meeting_id == meeting_id,
+                MeetingAIProcessing.status.notin_(self.ACTIVE_TRANSCRIPTION_STATUSES),
+            )
+            .values(
+                status="queued",
+                transcription_phase="queued",
+                transcription_progress_percent=0,
+                transcription_current_chunk=0,
+                transcription_total_chunks=0,
+                transcription_source_bytes=None,
+                transcription_prepared_bytes=None,
+                transcription_attempt_count=0,
+                transcription_last_heartbeat_at=None,
+                transcription_requested_by_id=requested_by_id,
+                started_at=None,
+                completed_at=None,
+                error_message=None,
+                transcript_source=None,
+                transcript_char_count=None,
+                audio_duration_seconds=None,
+                estimated_cost_usd=None,
+                transcription_model=model,
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def get_next_transcription_job(
+        self,
+        session: AsyncSession,
+        *,
+        stale_before: datetime,
+        max_attempts: int,
+    ) -> MeetingAIProcessing | None:
+        stmt = (
+            select(MeetingAIProcessing)
+            .where(
+                or_(
+                    MeetingAIProcessing.status == "queued",
+                    and_(
+                        MeetingAIProcessing.status == "transcribing",
+                        MeetingAIProcessing.transcription_last_heartbeat_at
+                        < stale_before,
+                    ),
+                ),
+                MeetingAIProcessing.transcription_attempt_count < max_attempts,
+            )
+            .order_by(MeetingAIProcessing.created_at.asc())
+            .limit(1)
+            .with_for_update(skip_locked=True)
+        )
+        result = await session.execute(stmt)
+        processing = result.scalar_one_or_none()
+        if not processing:
+            return None
+
+        now = datetime.utcnow()
+        processing.status = "transcribing"
+        processing.transcription_phase = "downloading"
+        processing.transcription_progress_percent = 0
+        processing.transcription_last_heartbeat_at = now
+        processing.transcription_attempt_count = (
+            processing.transcription_attempt_count or 0
+        ) + 1
+        processing.started_at = processing.started_at or now
+        processing.completed_at = None
+        processing.error_message = None
+        await session.flush()
+        return processing
+
+    async def update_transcription_progress(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        phase: str,
+        progress_percent: int,
+        current_chunk: int | None = None,
+        total_chunks: int | None = None,
+        source_bytes: int | None = None,
+        prepared_bytes: int | None = None,
+    ) -> MeetingAIProcessing | None:
+        values = {
+            "transcription_phase": phase,
+            "transcription_progress_percent": max(0, min(100, progress_percent)),
+            "transcription_last_heartbeat_at": datetime.utcnow(),
+        }
+        if current_chunk is not None:
+            values["transcription_current_chunk"] = current_chunk
+        if total_chunks is not None:
+            values["transcription_total_chunks"] = total_chunks
+        if source_bytes is not None:
+            values["transcription_source_bytes"] = source_bytes
+        if prepared_bytes is not None:
+            values["transcription_prepared_bytes"] = prepared_bytes
+
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(MeetingAIProcessing.meeting_id == meeting_id)
+            .values(**values)
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def mark_transcription_complete(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        transcript_source: str,
+        transcript_char_count: int,
+        audio_duration_seconds: int | None = None,
+        estimated_cost_usd=None,
+    ) -> MeetingAIProcessing | None:
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(MeetingAIProcessing.meeting_id == meeting_id)
+            .values(
+                status="transcript_ready",
+                transcription_phase="completed",
+                transcription_progress_percent=100,
+                transcription_last_heartbeat_at=datetime.utcnow(),
+                transcript_source=transcript_source,
+                transcript_char_count=transcript_char_count,
+                audio_duration_seconds=audio_duration_seconds,
+                estimated_cost_usd=estimated_cost_usd,
+                completed_at=datetime.utcnow(),
+                error_message=None,
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def mark_transcription_failed(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        error_message: str,
+    ) -> MeetingAIProcessing | None:
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(
+                MeetingAIProcessing.meeting_id == meeting_id,
+                MeetingAIProcessing.status != "published",
+            )
+            .values(
+                status="failed",
+                transcription_phase="failed",
+                transcription_last_heartbeat_at=datetime.utcnow(),
+                error_message=error_message,
+                completed_at=datetime.utcnow(),
             )
             .returning(MeetingAIProcessing)
         )

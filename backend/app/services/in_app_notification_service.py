@@ -181,6 +181,48 @@ class InAppNotificationService:
                 task_short_id=None,
             )
 
+    async def notify_meeting_transcription_completed(
+        self,
+        session: AsyncSession,
+        *,
+        meeting: Meeting,
+        requester: TeamMember,
+    ) -> None:
+        title = meeting.title or "Без названия"
+        char_count = len(meeting.transcript or "")
+        await self.repo.create(
+            session,
+            recipient_id=requester.id,
+            actor_id=None,
+            event_type="meeting_transcription_completed",
+            title="Транскрибация готова",
+            body=f"{title} · {char_count:,} символов".replace(",", " "),
+            priority="normal",
+            action_url=f"/meetings/{meeting.id}",
+            task_short_id=None,
+        )
+
+    async def notify_meeting_transcription_failed(
+        self,
+        session: AsyncSession,
+        *,
+        meeting: Meeting,
+        requester: TeamMember,
+        error_message: str,
+    ) -> None:
+        title = meeting.title or "Без названия"
+        await self.repo.create(
+            session,
+            recipient_id=requester.id,
+            actor_id=None,
+            event_type="meeting_transcription_failed",
+            title="Ошибка транскрибации",
+            body=f"{title} · {self._truncate(error_message, 180)}",
+            priority="high",
+            action_url=f"/meetings/{meeting.id}",
+            task_short_id=None,
+        )
+
     async def create_deadline_notifications(self, session: AsyncSession) -> None:
         today = date.today()
         tomorrow = today + timedelta(days=1)

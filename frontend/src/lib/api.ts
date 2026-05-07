@@ -444,6 +444,10 @@ class ApiClient {
     });
   }
 
+  async getMeetingAIProcessing(meetingId: string): Promise<MeetingAIProcessing> {
+    return this.request<MeetingAIProcessing>(`/api/meetings/${meetingId}/ai/processing`);
+  }
+
   async generateMeetingOutcomeDraft(meetingId: string): Promise<MeetingAIProcessing> {
     return this.request<MeetingAIProcessing>(`/api/meetings/${meetingId}/ai/generate-draft`, {
       method: "POST",
