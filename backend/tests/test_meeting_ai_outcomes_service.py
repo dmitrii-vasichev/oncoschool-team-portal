@@ -247,6 +247,19 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         assert result == [created]
+        assert meeting.parsed_summary == "Final summary"
+        assert meeting.decisions == ["Decision"]
+        assert meeting.status == "completed"
+        assert processing.status == "published"
+        assert processing.draft_summary == "Final summary"
+        assert processing.draft_decisions == ["Decision"]
+        assert processing.draft_tasks == [
+            {"title": "Selected", "priority": "normal", "selected": True},
+            {"title": "Rejected", "priority": "normal", "selected": False},
+        ]
+        assert processing.published_at is not None
+        assert processing.published_by_id == moderator.id
+        session.flush.assert_awaited_once()
         service.meeting_service.create_tasks_from_parsed.assert_awaited_once()
         args = service.meeting_service.create_tasks_from_parsed.await_args.args
         assert args[2] == [{"title": "Selected", "priority": "normal", "selected": True}]
