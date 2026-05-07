@@ -149,11 +149,16 @@ class MeetingAIOutcomesService:
         draft_decisions: list[str],
         draft_tasks: list[dict],
     ) -> list:
+        if processing.status == "published":
+            raise ValueError("Итоги встречи уже опубликованы")
+        if processing.status != "draft_ready":
+            raise ValueError("Черновик итогов встречи ещё не готов")
+
         claimed_processing = await self.processing_repo.claim_publish(
             session, meeting_id=meeting.id
         )
         if not claimed_processing:
-            raise ValueError("Итоги встречи уже опубликованы")
+            raise ValueError("Итоги встречи уже опубликованы или черновик больше не готов")
         processing = claimed_processing
 
         members = await self.member_repo.get_all_active(session)

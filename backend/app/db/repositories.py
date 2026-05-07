@@ -775,7 +775,7 @@ class MeetingAIProcessingRepository:
             update(MeetingAIProcessing)
             .where(
                 MeetingAIProcessing.meeting_id == meeting_id,
-                MeetingAIProcessing.status != "published",
+                MeetingAIProcessing.status == "draft_ready",
             )
             .values(
                 status="published",

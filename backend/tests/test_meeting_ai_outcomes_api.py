@@ -311,3 +311,58 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 422)
         self.assertEqual(exc.exception.detail, "Итоги встречи уже опубликованы")
         session.commit.assert_not_awaited()
+
+    async def test_publish_endpoint_rejects_transcript_ready_without_commit(self) -> None:
+        meeting_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id)
+        processing = SimpleNamespace(
+            id=uuid.uuid4(),
+            meeting_id=meeting_id,
+            status="transcript_ready",
+        )
+        session = SimpleNamespace(commit=AsyncMock())
+        data = MeetingAIPublishRequest(
+            draft_summary="Arbitrary summary",
+            draft_decisions=[],
+            draft_tasks=[
+                MeetingBoardTaskDraft(
+                    title="Should not be created",
+                    priority="normal",
+                    selected=True,
+                )
+            ],
+        )
+        publish_outcomes = AsyncMock(
+            side_effect=ValueError("Черновик итогов встречи ещё не готов")
+        )
+
+        with (
+            patch.object(
+                meetings_api.meeting_service,
+                "get_meeting_by_id",
+                AsyncMock(return_value=meeting),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service.processing_repo,
+                "get_or_create",
+                AsyncMock(return_value=processing),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service,
+                "publish_outcomes",
+                publish_outcomes,
+            ),
+        ):
+            with self.assertRaises(meetings_api.HTTPException) as exc:
+                await meetings_api.publish_meeting_outcomes(
+                    meeting_id=meeting_id,
+                    data=data,
+                    member=member,
+                    session=session,
+                )
+
+        publish_outcomes.assert_awaited_once()
+        self.assertEqual(exc.exception.status_code, 422)
+        self.assertEqual(exc.exception.detail, "Черновик итогов встречи ещё не готов")
+        session.commit.assert_not_awaited()
