@@ -43,6 +43,7 @@ import { TranscriptTab } from "@/components/meetings/TranscriptTab";
 import { SummaryTab } from "@/components/meetings/SummaryTab";
 import { MeetingTasksTab } from "@/components/meetings/MeetingTasksTab";
 import { NotesTab } from "@/components/meetings/NotesTab";
+import { MeetingAiOutcomesPanel } from "@/components/meetings/MeetingAiOutcomesPanel";
 
 type TabId = "transcript" | "summary" | "tasks" | "notes";
 
@@ -335,6 +336,12 @@ export default function MeetingDetailPage() {
           onEdit={() => setParticipantPickerOpen(true)}
         />
       </div>
+
+      <MeetingAiOutcomesPanel
+        meetingId={meeting.id}
+        isModerator={isModerator}
+        onPublished={fetchData}
+      />
 
       <div className="animate-fade-in-up stagger-2">
         <Button variant="outline" size="sm" className="rounded-lg" asChild>
