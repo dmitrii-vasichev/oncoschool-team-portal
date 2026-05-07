@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildMeetingOutcomePublishPayload,
+  canPublishMeetingOutcomes,
   splitDraftDecisionsText,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils.ts";
@@ -57,4 +58,11 @@ test("buildMeetingOutcomePublishPayload preserves edited summary, decisions, tas
       draft_tasks: tasks,
     }
   );
+});
+
+test("canPublishMeetingOutcomes allows publishing only draft_ready outcomes when idle", () => {
+  assert.equal(canPublishMeetingOutcomes("transcript_ready", false), false);
+  assert.equal(canPublishMeetingOutcomes("draft_ready", false), true);
+  assert.equal(canPublishMeetingOutcomes("draft_ready", true), false);
+  assert.equal(canPublishMeetingOutcomes(null, false), false);
 });

@@ -1,4 +1,4 @@
-import type { MeetingAITaskDraft } from "../../lib/types.ts";
+import type { MeetingAIProcessingStatus, MeetingAITaskDraft } from "../../lib/types.ts";
 
 export function splitDraftDecisionsText(text: string): string[] {
   return text
@@ -35,4 +35,11 @@ export function buildMeetingOutcomePublishPayload({
     draft_decisions: splitDraftDecisionsText(decisionsText),
     draft_tasks: taskDrafts,
   };
+}
+
+export function canPublishMeetingOutcomes(
+  status: MeetingAIProcessingStatus | null | undefined,
+  busy: boolean
+): boolean {
+  return status === "draft_ready" && !busy;
 }

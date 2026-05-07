@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { MeetingAIProcessing, MeetingAITaskDraft } from "@/lib/types";
 import {
   buildMeetingOutcomePublishPayload,
+  canPublishMeetingOutcomes,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils";
 
@@ -39,6 +40,8 @@ export function MeetingAiOutcomesPanel({
 
   if (!isModerator) return null;
 
+  const isBusy = busy !== null;
+
   const applyProcessing = (result: MeetingAIProcessing) => {
     setProcessing(result);
     setSummary(result.draft_summary ?? "");
@@ -65,7 +68,7 @@ export function MeetingAiOutcomesPanel({
   };
 
   const handlePublish = async () => {
-    if (busy || !processing) return;
+    if (!canPublishMeetingOutcomes(processing?.status, isBusy)) return;
     setBusy("publish");
     try {
       await api.publishMeetingOutcomes(
@@ -86,6 +89,7 @@ export function MeetingAiOutcomesPanel({
   };
 
   const selectedTaskCount = taskDrafts.filter((task) => task.selected).length;
+  const canPublish = canPublishMeetingOutcomes(processing?.status, isBusy);
 
   return (
     <section className="rounded-2xl border border-border/60 bg-card p-4 animate-fade-in-up stagger-2 space-y-4">
@@ -125,7 +129,7 @@ export function MeetingAiOutcomesPanel({
               "Транскрибация запущена"
             )
           }
-          disabled={!!busy}
+          disabled={isBusy}
           className="rounded-lg gap-1.5"
         >
           {busy === "transcribe" ? (
@@ -146,7 +150,7 @@ export function MeetingAiOutcomesPanel({
               "Черновик итогов создан"
             )
           }
-          disabled={!!busy}
+          disabled={isBusy}
           className="rounded-lg gap-1.5"
         >
           {busy === "draft" ? (
@@ -160,7 +164,7 @@ export function MeetingAiOutcomesPanel({
           type="button"
           size="sm"
           onClick={handlePublish}
-          disabled={!!busy || !processing}
+          disabled={!canPublish}
           className="rounded-lg gap-1.5"
         >
           {busy === "publish" ? (
@@ -184,7 +188,7 @@ export function MeetingAiOutcomesPanel({
               rows={3}
               className="rounded-xl border-border/60 text-sm"
               placeholder="Черновик резюме появится после генерации"
-              disabled={busy === "publish"}
+              disabled={isBusy}
             />
           </div>
 
@@ -198,7 +202,7 @@ export function MeetingAiOutcomesPanel({
               rows={3}
               className="rounded-xl border-border/60 text-sm"
               placeholder="Одно решение на строку"
-              disabled={busy === "publish"}
+              disabled={isBusy}
             />
           </div>
 
@@ -227,7 +231,7 @@ export function MeetingAiOutcomesPanel({
                     <input
                       type="checkbox"
                       checked={task.selected}
-                      disabled={busy === "publish"}
+                      disabled={isBusy}
                       onChange={(event) =>
                         setTaskDrafts((current) =>
                           toggleTaskDraftSelected(current, index, event.target.checked)
