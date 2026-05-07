@@ -97,3 +97,18 @@ export function formatMeetingTranscriptionStatus({
   }
   return status ?? "idle";
 }
+
+export function shouldShowMeetingTranscriptionStatus({
+  status,
+  transcription_phase,
+}: {
+  status: MeetingAIProcessingStatus | null | undefined;
+  transcription_phase?: string | null;
+}): boolean {
+  return (
+    isMeetingTranscriptionActive(status) ||
+    status === "transcript_ready" ||
+    transcription_phase === "completed" ||
+    transcription_phase === "failed"
+  );
+}

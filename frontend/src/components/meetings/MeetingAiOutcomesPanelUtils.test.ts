@@ -5,6 +5,7 @@ import {
   canPublishMeetingOutcomes,
   formatMeetingTranscriptionStatus,
   isMeetingTranscriptionActive,
+  shouldShowMeetingTranscriptionStatus,
   splitDraftDecisionsText,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils.ts";
@@ -108,5 +109,29 @@ test("formatMeetingTranscriptionStatus renders phases and chunk progress", () =>
       transcription_progress_percent: 0,
     }),
     "Ошибка транскрибации"
+  );
+});
+
+test("shouldShowMeetingTranscriptionStatus ignores legacy generic failed states", () => {
+  assert.equal(
+    shouldShowMeetingTranscriptionStatus({
+      status: "failed",
+      transcription_phase: null,
+    }),
+    false
+  );
+  assert.equal(
+    shouldShowMeetingTranscriptionStatus({
+      status: "failed",
+      transcription_phase: "failed",
+    }),
+    true
+  );
+  assert.equal(
+    shouldShowMeetingTranscriptionStatus({
+      status: "queued",
+      transcription_phase: "queued",
+    }),
+    true
   );
 });

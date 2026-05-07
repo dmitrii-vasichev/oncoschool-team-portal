@@ -13,6 +13,7 @@ import {
   canPublishMeetingOutcomes,
   formatMeetingTranscriptionStatus,
   isMeetingTranscriptionActive,
+  shouldShowMeetingTranscriptionStatus,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils";
 
@@ -228,7 +229,7 @@ export function MeetingAiOutcomesPanel({
         </Button>
       </div>
 
-      {processing && (transcriptionActive || processing.status === "failed" || processing.status === "transcript_ready") && (
+      {processing && shouldShowMeetingTranscriptionStatus(processing) && (
         <div className="rounded-xl border border-border/60 bg-background/60 px-3 py-3 text-xs">
           <div className="flex items-center justify-between gap-3">
             <span className="font-medium text-foreground">
