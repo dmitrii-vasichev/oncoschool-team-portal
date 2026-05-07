@@ -1,5 +1,16 @@
 # Status
 
+## Task Board Visual Polish
+
+- Current phase: design approved
+- Spec: `docs/superpowers/specs/2026-05-06-task-board-visual-polish-design.md`
+- Scope: frontend-only visual cleanup for the new task dialog, task board cards, checklist card spacing, and empty Kanban columns
+- Latest progress:
+  - Visual options were reviewed for urgent task cards, empty columns, and the create dialog.
+  - Approved urgent card treatment: keep the red left edge and remove the footer `Срочно` badge from task board cards.
+  - Approved empty column treatment: replace the large empty-state illustration/text with a quiet dashed drop-zone surface.
+  - Approved create dialog treatment: collapse description by default, put labels and urgency on one row, and keep urgency as an off-by-default switch.
+
 ## Task Urgency and Create Checklist
 
 - Current phase: implemented and verified
