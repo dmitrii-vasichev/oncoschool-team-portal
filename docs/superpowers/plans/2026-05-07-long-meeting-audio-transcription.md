@@ -102,7 +102,7 @@ Expected: fail because the new status and fields do not exist yet.
 
 - [ ] **Step 2: Add Alembic migration**
 
-Create revision `032_long_meeting_transcription_queue` with `down_revision = "031_meeting_board_ai_outcomes"` and add nullable/defaulted columns:
+Create revision `032_long_audio_queue` with `down_revision = "031_meeting_board_ai_outcomes"` and add nullable/defaulted columns:
 
 ```python
 op.add_column("meeting_ai_processing", sa.Column("transcription_requested_by_id", postgresql.UUID(as_uuid=True), nullable=True))

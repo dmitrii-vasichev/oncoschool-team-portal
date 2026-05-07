@@ -1,6 +1,6 @@
 """long meeting transcription queue
 
-Revision ID: 032_long_meeting_transcription_queue
+Revision ID: 032_long_audio_queue
 Revises: 031_meeting_board_ai_outcomes
 Create Date: 2026-05-07
 """
@@ -11,7 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = "032_long_meeting_transcription_queue"
+revision: str = "032_long_audio_queue"
 down_revision: Union[str, None] = "031_meeting_board_ai_outcomes"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
