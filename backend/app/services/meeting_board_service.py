@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,13 +22,19 @@ class BoardTaskGroups:
     done_this_week: list[Task] = field(default_factory=list)
 
 
+def _to_utc_naive(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def group_board_tasks(
     tasks: list[Task],
     *,
     today: date | None = None,
     now: datetime | None = None,
 ) -> BoardTaskGroups:
-    now = now or datetime.utcnow()
+    now = _to_utc_naive(now or datetime.now(timezone.utc))
     done_cutoff = now - timedelta(days=7)
     groups = BoardTaskGroups()
     seen: set[uuid.UUID] = set()
@@ -39,7 +45,7 @@ def group_board_tasks(
         seen.add(task.id)
         if task.status == "done":
             completed_at = getattr(task, "completed_at", None)
-            if completed_at and completed_at >= done_cutoff:
+            if completed_at and _to_utc_naive(completed_at) >= done_cutoff:
                 groups.done_this_week.append(task)
             continue
         if task.priority == "urgent":

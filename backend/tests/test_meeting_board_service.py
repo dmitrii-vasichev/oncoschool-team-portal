@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -62,6 +62,22 @@ def test_group_board_tasks_includes_done_this_week_only() -> None:
     )
 
     assert [t.short_id for t in grouped.done_this_week] == [20]
+
+
+def test_group_board_tasks_accepts_timezone_aware_completed_at() -> None:
+    now = datetime(2026, 5, 7, 12, 0, 0)
+    grouped = group_board_tasks(
+        [
+            task(
+                short_id=22,
+                status="done",
+                completed_at=datetime(2026, 5, 6, 12, 0, 0, tzinfo=timezone.utc),
+            ),
+        ],
+        now=now,
+    )
+
+    assert [t.short_id for t in grouped.done_this_week] == [22]
 
 
 class FakeScalarResult:
