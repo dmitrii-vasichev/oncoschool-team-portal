@@ -44,6 +44,32 @@ export function canPublishMeetingOutcomes(
   return status === "draft_ready" && !busy;
 }
 
+export function formatMeetingProcessingBadge(
+  status: MeetingAIProcessingStatus | null | undefined
+): string | null {
+  switch (status) {
+    case "queued":
+      return "В очереди";
+    case "recording_not_ready":
+      return "Запись недоступна";
+    case "recording_ready":
+      return "Запись готова";
+    case "transcribing":
+      return "Транскрибируется";
+    case "transcript_ready":
+      return "Транскрипция готова";
+    case "draft_ready":
+      return "Черновик готов";
+    case "published":
+      return "Опубликовано";
+    case "failed":
+      return "Ошибка";
+    case "idle":
+    default:
+      return null;
+  }
+}
+
 export function isMeetingTranscriptionActive(
   status: MeetingAIProcessingStatus | null | undefined
 ): boolean {

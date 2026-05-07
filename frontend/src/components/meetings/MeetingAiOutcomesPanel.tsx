@@ -11,6 +11,7 @@ import type { MeetingAIProcessing, MeetingAITaskDraft } from "@/lib/types";
 import {
   buildMeetingOutcomePublishPayload,
   canPublishMeetingOutcomes,
+  formatMeetingProcessingBadge,
   formatMeetingTranscriptionStatus,
   isMeetingTranscriptionActive,
   shouldShowMeetingTranscriptionStatus,
@@ -143,6 +144,7 @@ export function MeetingAiOutcomesPanel({
 
   const selectedTaskCount = taskDrafts.filter((task) => task.selected).length;
   const canPublish = canPublishMeetingOutcomes(processing?.status, isBusy);
+  const processingBadge = formatMeetingProcessingBadge(processing?.status);
 
   return (
     <section className="rounded-2xl border border-border/60 bg-card p-4 animate-fade-in-up stagger-2 space-y-4">
@@ -157,9 +159,9 @@ export function MeetingAiOutcomesPanel({
             транскрибации и не хранится в портале.
           </p>
         </div>
-        {processing && (
+        {processingBadge && (
           <span className="inline-flex w-fit items-center rounded-lg bg-muted/60 px-2.5 py-1 text-2xs font-medium text-muted-foreground">
-            {processing.status}
+            {processingBadge}
           </span>
         )}
       </div>

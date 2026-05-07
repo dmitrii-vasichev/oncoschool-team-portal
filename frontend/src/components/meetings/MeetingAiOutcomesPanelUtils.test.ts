@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildMeetingOutcomePublishPayload,
   canPublishMeetingOutcomes,
+  formatMeetingProcessingBadge,
   formatMeetingTranscriptionStatus,
   isMeetingTranscriptionActive,
   shouldShowMeetingTranscriptionStatus,
@@ -69,6 +70,14 @@ test("canPublishMeetingOutcomes allows publishing only draft_ready outcomes when
   assert.equal(canPublishMeetingOutcomes("draft_ready", false), true);
   assert.equal(canPublishMeetingOutcomes("draft_ready", true), false);
   assert.equal(canPublishMeetingOutcomes(null, false), false);
+});
+
+test("formatMeetingProcessingBadge hides idle and localizes visible statuses", () => {
+  assert.equal(formatMeetingProcessingBadge("idle"), null);
+  assert.equal(formatMeetingProcessingBadge("queued"), "В очереди");
+  assert.equal(formatMeetingProcessingBadge("draft_ready"), "Черновик готов");
+  assert.equal(formatMeetingProcessingBadge("published"), "Опубликовано");
+  assert.equal(formatMeetingProcessingBadge("failed"), "Ошибка");
 });
 
 test("isMeetingTranscriptionActive returns true for queued and transcribing states", () => {
