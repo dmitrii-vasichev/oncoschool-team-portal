@@ -786,6 +786,33 @@ class MeetingAIProcessingRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def apply_draft_if_unpublished(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        draft_summary: str,
+        draft_decisions: list[str],
+        draft_tasks: list[dict],
+    ) -> MeetingAIProcessing | None:
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(
+                MeetingAIProcessing.meeting_id == meeting_id,
+                MeetingAIProcessing.status != "published",
+            )
+            .values(
+                status="draft_ready",
+                draft_summary=draft_summary,
+                draft_decisions=draft_decisions,
+                draft_tasks=draft_tasks,
+                error_message=None,
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 class MeetingScheduleRepository:
     async def get_all_active(self, session: AsyncSession) -> list[MeetingSchedule]:

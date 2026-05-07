@@ -13,6 +13,7 @@ from app.db.schemas import (
     MeetingBoardSettingsResponse,
     MeetingBoardTaskDraft,
 )
+from app.services.ai_service import ParsedMeeting, ParsedTask
 from app.services.meeting_ai_outcomes_service import MeetingAIOutcomesService
 from app.services.zoom_service import AUDIO_TRANSCRIPTION_MAX_BYTES, ZoomService
 
@@ -103,6 +104,25 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         compiled = str(stmt.compile(dialect=postgresql.dialect()))
         self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
         self.assertEqual(stmt.compile().params["status"], "published")
+
+    async def test_apply_draft_if_unpublished_uses_published_guard(self) -> None:
+        repo = MeetingAIProcessingRepository()
+        result = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        applied = await repo.apply_draft_if_unpublished(
+            session,
+            meeting_id=uuid.uuid4(),
+            draft_summary="Summary",
+            draft_decisions=["Decision"],
+            draft_tasks=[],
+        )
+
+        self.assertIsNone(applied)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
+        self.assertEqual(stmt.compile().params["status_1"], "published")
 
     async def test_transcribe_audio_rejects_second_run_while_transcribing(self) -> None:
         service = MeetingAIOutcomesService()
@@ -481,6 +501,59 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         assert processing.error_message == "openai down"
         session.flush.assert_awaited_once()
         session.commit.assert_awaited_once()
+
+    async def test_generate_draft_rejects_concurrent_publish_after_ai_parse(self) -> None:
+        service = MeetingAIOutcomesService()
+        processing = SimpleNamespace(status="draft_ready", error_message=None)
+        service.processing_repo = SimpleNamespace(
+            get_or_create=AsyncMock(return_value=processing),
+            apply_draft_if_unpublished=AsyncMock(return_value=None),
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        service.ai_service = SimpleNamespace(
+            parse_meeting_outcomes=AsyncMock(
+                return_value=ParsedMeeting(
+                    title="Meeting",
+                    summary="Summary",
+                    decisions=["Decision"],
+                    tasks=[
+                        ParsedTask(
+                            title="Follow up",
+                            description="Send notes",
+                            assignee_name="Иван",
+                            priority="high",
+                            deadline="2026-05-07",
+                        )
+                    ],
+                )
+            )
+        )
+        session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
+        meeting = SimpleNamespace(id=uuid.uuid4(), transcript="Transcript")
+
+        with self.assertRaisesRegex(ValueError, "Итоги встречи уже опубликованы"):
+            await service.generate_draft(session, meeting=meeting)
+
+        assert processing.status == "draft_ready"
+        service.processing_repo.apply_draft_if_unpublished.assert_awaited_once_with(
+            session,
+            meeting_id=meeting.id,
+            draft_summary="Summary",
+            draft_decisions=["Decision"],
+            draft_tasks=[
+                {
+                    "title": "Follow up",
+                    "description": "Send notes",
+                    "assignee_name": "Иван",
+                    "assignee_id": None,
+                    "deadline": "2026-05-07",
+                    "priority": "urgent",
+                    "selected": True,
+                }
+            ],
+        )
+        session.flush.assert_not_awaited()
+        session.commit.assert_not_awaited()
 
 
 class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):

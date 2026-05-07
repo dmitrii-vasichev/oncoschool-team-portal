@@ -112,10 +112,7 @@ class MeetingAIOutcomesService:
             await session.commit()
             raise
 
-        processing.status = "draft_ready"
-        processing.draft_summary = parsed.summary
-        processing.draft_decisions = parsed.decisions
-        processing.draft_tasks = [
+        draft_tasks = [
             {
                 "title": task.title,
                 "description": task.description,
@@ -127,6 +124,16 @@ class MeetingAIOutcomesService:
             }
             for task in parsed.tasks
         ]
+        applied_processing = await self.processing_repo.apply_draft_if_unpublished(
+            session,
+            meeting_id=meeting.id,
+            draft_summary=parsed.summary,
+            draft_decisions=parsed.decisions,
+            draft_tasks=draft_tasks,
+        )
+        if not applied_processing:
+            raise ValueError("Итоги встречи уже опубликованы")
+        processing = applied_processing
         await session.flush()
         return processing
 
