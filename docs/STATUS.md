@@ -2,20 +2,33 @@
 
 ## Meeting Board and AI Outcomes
 
-- Current phase: implementation plan written; awaiting execution approach selection
+- Current phase: implemented and verified
 - Spec: `docs/superpowers/specs/2026-05-07-meeting-board-and-ai-outcomes-design.md`
 - Plan: `docs/superpowers/plans/2026-05-07-meeting-board-and-ai-outcomes.md`
 - Scope: shareable meeting board, hybrid task context, manual Zoom audio transcription, moderator-reviewed AI outcomes
 - Latest progress:
-  - Product direction approved as `Preparation + Meeting Board + Outcomes`, not a full live workspace.
-  - Design spec was written, reviewed, and committed.
-  - Implementation plan now breaks work into backend data/API, manual audio transcription, AI draft publishing, frontend board, and frontend review panel.
+  - Backend meeting board settings, scope computation, visible task sections, and board API are implemented.
+  - Manual Zoom audio transcription is moderator-triggered, uses temporary audio files only, and stores transcript text plus processing metadata.
+  - AI outcome draft generation creates editable summary, decisions, and task candidates.
+  - Publishing is moderator-confirmed and now requires `draft_ready` on both the frontend and backend API path.
+  - The frontend meeting detail page opens a separate shareable board route and shows a moderator-only AI outcomes panel.
+  - The board route displays scope counts, task sections, materials, and notes; inline board-composition editing remains a follow-up UI on top of the implemented settings API.
 - Key approved decisions:
   - The meeting board is a separate shareable surface from the meeting detail page.
   - Audio transcription is manual-only in the first release.
   - Zoom audio is not persisted in portal storage.
   - Default transcription model is `gpt-4o-mini-transcribe`.
   - AI creates only editable drafts; moderator confirmation is required before tasks are created.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_board_service.py tests/test_meeting_board_api.py tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q` passed: 37 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 354 tests.
+  - `cd frontend && npm test` passed: 32 tests.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed, including `/meetings/[id]/board`.
+  - `git diff --check` passed.
+  - Frontend dev server started at `http://127.0.0.1:3003`; in-app browser smoke confirmed unauthenticated `/meetings` and `/meetings/{id}/board` reach the existing login flow.
+  - Authenticated visual QA for the actual meeting board and AI outcomes panel remains a manual check because no logged-in local session/backend fixture was available in this run.
 
 ## Task Board Visual Polish
 

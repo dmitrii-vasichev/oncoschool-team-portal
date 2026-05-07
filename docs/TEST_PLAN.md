@@ -17,12 +17,13 @@
 1. Open a meeting detail page and confirm `Открыть доску встречи` opens the separate board route.
 2. Confirm the board is usable for Zoom screen sharing at desktop width.
 3. Confirm urgent, in-progress, review, and done-this-week sections render from live task data.
-4. Add a member, department, pinned task, link, and board note as a moderator.
-5. Confirm regular participants cannot edit board composition or run AI processing.
-6. Run manual audio transcription on a meeting with a Zoom recording.
-7. Confirm no audio file is persisted in portal storage after success or failure.
-8. Generate an AI outcome draft and edit summary, decisions, and task candidates.
-9. Publish with one task candidate unchecked and confirm only selected tasks are created.
+4. Using the board settings API or a seeded fixture, configure an added member, department, pinned task, link, and board note, then confirm the board displays the resulting scope counts, materials, and note.
+5. Confirm the first-release board UI does not present a working inline composition editor yet; the moderator `Добавить` control should be visibly disabled until the follow-up editor is built.
+6. Confirm regular participants cannot update board settings or run AI processing.
+7. Run manual audio transcription on a meeting with a Zoom recording.
+8. Confirm no audio file is persisted in portal storage after success or failure.
+9. Generate an AI outcome draft and edit summary, decisions, and task candidates.
+10. Publish with one task candidate unchecked and confirm only selected tasks are created.
 
 ## Task Board Visual Polish
 

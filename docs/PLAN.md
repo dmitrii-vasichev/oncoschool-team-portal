@@ -18,10 +18,17 @@
 6. Frontend AI outcomes panel.
 7. Documentation, full verification, and browser QA.
 
+**Implementation status:**
+
+- Backend board settings, scope computation, visible task sections, and settings API are implemented.
+- The first frontend board route displays board scope counts, task sections, materials, and notes. Inline editing for board composition is intentionally left as a follow-up UI; the settings API is ready for that editor.
+- Manual Zoom audio transcription downloads audio only to temporary storage and deletes it on success or failure.
+- AI outcome publishing requires a moderator-reviewed draft in `draft_ready` state at both the frontend and backend API layers.
+
 **Definition of done:**
 
 - Meeting detail page opens a separate screen-share-friendly meeting board.
-- Board is seeded from meeting participants and supports moderator-added people, departments, pinned tasks, links, and notes.
+- Board is seeded from meeting participants and the backend settings API supports moderator-added people, departments, pinned tasks, links, and notes.
 - Board shows urgent, in-progress, review, and done-this-week sections without copying tasks.
 - Board and pinned task visibility do not bypass existing task permissions.
 - Audio transcription is manual-only.
