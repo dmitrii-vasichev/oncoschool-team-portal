@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import tempfile
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -167,6 +169,55 @@ class ZoomService:
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return None
+            raise
+
+    def _select_audio_recording_file(self, recordings: dict | None) -> dict | None:
+        if not recordings or "recording_files" not in recordings:
+            return None
+        files = recordings["recording_files"]
+        preferred = ["M4A", "MP4"]
+        for file_type in preferred:
+            match = next(
+                (
+                    f for f in files
+                    if f.get("file_type") == file_type and f.get("download_url")
+                ),
+                None,
+            )
+            if match:
+                return match
+        return None
+
+    async def download_audio_recording(self, meeting_id: str) -> str | None:
+        recordings = await self.get_recordings(meeting_id)
+        audio_file = self._select_audio_recording_file(recordings)
+        if not audio_file:
+            return None
+
+        suffix = ".m4a" if audio_file.get("file_type") == "M4A" else ".mp4"
+        temp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        temp_path = temp.name
+        temp.close()
+
+        token = await self._get_token()
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                async with client.stream(
+                    "GET",
+                    audio_file["download_url"],
+                    headers={"Authorization": f"Bearer {token}"},
+                    follow_redirects=True,
+                ) as resp:
+                    resp.raise_for_status()
+                    with open(temp_path, "wb") as fh:
+                        async for chunk in resp.aiter_bytes():
+                            fh.write(chunk)
+            return temp_path
+        except Exception:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
             raise
 
     async def get_transcript(self, meeting_id: str) -> str | None:

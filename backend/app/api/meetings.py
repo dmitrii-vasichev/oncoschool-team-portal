@@ -14,6 +14,7 @@ from app.config import settings
 from app.db.database import get_session
 from app.db.models import Meeting, MeetingSchedule, TeamMember
 from app.db.schemas import (
+    MeetingAIProcessingResponse,
     MeetingBoardResponse,
     MeetingBoardSettingsResponse,
     MeetingBoardSettingsUpdate,
@@ -23,6 +24,7 @@ from app.db.schemas import (
 from app.db.repositories import MeetingRepository, TeamMemberRepository
 from app.services.ai_service import AIService
 from app.services.in_app_notification_service import InAppNotificationService
+from app.services.meeting_ai_outcomes_service import MeetingAIOutcomesService
 from app.services.meeting_board_service import MeetingBoardService
 from app.services.meeting_service import MeetingService
 from app.services.meeting_status import compute_effective_status
@@ -39,6 +41,7 @@ meeting_repo = MeetingRepository()
 task_service = TaskService()
 in_app_notification_service = InAppNotificationService()
 meeting_board_service = MeetingBoardService()
+meeting_ai_outcomes_service = MeetingAIOutcomesService()
 
 
 # ── Request / Response models ──
@@ -761,6 +764,34 @@ async def fetch_transcript(
         await session.commit()
         return {"transcript": transcript, "source": "zoom_api"}
     return {"transcript": None, "message": "Транскрипция недоступна"}
+
+
+@router.post("/{meeting_id}/ai/transcribe-audio", response_model=MeetingAIProcessingResponse)
+async def transcribe_meeting_audio(
+    meeting_id: uuid.UUID,
+    request: Request,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Встреча не найдена")
+    try:
+        processing = await meeting_ai_outcomes_service.transcribe_meeting_audio(
+            session,
+            meeting=meeting,
+            zoom_service=_get_zoom_service(request),
+            moderator=member,
+        )
+        await session.commit()
+        return MeetingAIProcessingResponse.model_validate(processing)
+    except ValueError as exc:
+        await session.commit()
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        await session.commit()
+        logger.exception("Audio transcription failed for meeting %s", meeting_id)
+        raise HTTPException(status_code=502, detail=f"Ошибка транскрибации: {exc}")
 
 
 # ── SUMMARY / AI PARSE endpoints ──

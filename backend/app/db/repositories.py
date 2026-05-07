@@ -23,6 +23,7 @@ from app.db.models import (
     GetCourseCredentials,
     InAppNotification,
     Meeting,
+    MeetingAIProcessing,
     MeetingBoardSettings,
     MeetingParticipant,
     MeetingSchedule,
@@ -702,6 +703,36 @@ class MeetingBoardRepository:
         settings.updated_by_id = member.id
         await session.flush()
         return settings
+
+
+class MeetingAIProcessingRepository:
+    async def get_by_meeting_id(
+        self, session: AsyncSession, meeting_id: uuid.UUID
+    ) -> MeetingAIProcessing | None:
+        result = await session.execute(
+            select(MeetingAIProcessing).where(
+                MeetingAIProcessing.meeting_id == meeting_id
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_or_create(
+        self, session: AsyncSession, meeting_id: uuid.UUID
+    ) -> MeetingAIProcessing:
+        existing = await self.get_by_meeting_id(session, meeting_id)
+        if existing:
+            return existing
+        processing = MeetingAIProcessing(meeting_id=meeting_id, status="idle")
+        try:
+            async with session.begin_nested():
+                session.add(processing)
+                await session.flush()
+        except IntegrityError:
+            existing = await self.get_by_meeting_id(session, meeting_id)
+            if existing:
+                return existing
+            raise
+        return processing
 
 
 class MeetingScheduleRepository:
