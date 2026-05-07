@@ -314,6 +314,12 @@ class Meeting(Base):
     participants: Mapped[list["MeetingParticipant"]] = relationship(
         back_populates="meeting"
     )
+    board_settings: Mapped["MeetingBoardSettings | None"] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan", uselist=False
+    )
+    ai_processing: Mapped["MeetingAIProcessing | None"] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class TaskLabel(Base):
@@ -471,6 +477,91 @@ class MeetingParticipant(Base):
     # Relationships
     meeting: Mapped["Meeting"] = relationship(back_populates="participants")
     member: Mapped["TeamMember"] = relationship()
+
+
+class MeetingBoardSettings(Base):
+    __tablename__ = "meeting_board_settings"
+    __table_args__ = (
+        UniqueConstraint("meeting_id", name="uq_meeting_board_settings_meeting_id"),
+        Index("idx_meeting_board_settings_meeting_id", "meeting_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    )
+    added_member_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list, server_default="{}"
+    )
+    added_department_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list, server_default="{}"
+    )
+    pinned_task_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list, server_default="{}"
+    )
+    materials: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
+    board_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    meeting: Mapped["Meeting"] = relationship(back_populates="board_settings")
+
+
+class MeetingAIProcessing(Base):
+    __tablename__ = "meeting_ai_processing"
+    __table_args__ = (
+        UniqueConstraint("meeting_id", name="uq_meeting_ai_processing_meeting_id"),
+        Index("idx_meeting_ai_processing_status", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(40), default="idle", server_default="idle", nullable=False
+    )
+    transcript_source: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    transcription_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript_char_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    audio_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    estimated_cost_usd: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 4), nullable=True
+    )
+    draft_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_decisions: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
+    draft_tasks: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]", nullable=False
+    )
+    published_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    published_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    meeting: Mapped["Meeting"] = relationship(back_populates="ai_processing")
 
 
 class InAppNotification(Base):

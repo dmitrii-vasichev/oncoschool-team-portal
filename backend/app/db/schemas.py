@@ -18,6 +18,17 @@ TelegramBroadcastStatusType = Literal["scheduled", "sent", "failed", "cancelled"
 MeetingReminderZoomMissingBehaviorType = Literal["hide", "fallback"]
 ReminderDigestSectionKeyType = Literal["overdue", "upcoming", "in_progress", "new"]
 ReminderTaskLineFieldKeyType = Literal["number", "title", "deadline", "priority"]
+MeetingAIProcessingStatusType = Literal[
+    "idle",
+    "recording_not_ready",
+    "recording_ready",
+    "transcribing",
+    "transcript_ready",
+    "draft_ready",
+    "published",
+    "failed",
+]
+MeetingTranscriptSourceType = Literal["manual", "zoom_api", "openai_audio"]
 
 
 # ── TeamMember ──
@@ -273,6 +284,89 @@ class MeetingResponse(BaseModel):
     participant_ids: list[uuid.UUID] = []
     schedule_recurrence: str | None = None
     is_schedule_template: bool = False
+
+
+class MeetingBoardMaterial(BaseModel):
+    id: str
+    title: str
+    url: str
+    description: str | None = None
+
+
+class MeetingBoardSettingsUpdate(BaseModel):
+    added_member_ids: list[uuid.UUID] | None = None
+    added_department_ids: list[uuid.UUID] | None = None
+    pinned_task_ids: list[uuid.UUID] | None = None
+    materials: list[MeetingBoardMaterial] | None = None
+    board_notes: str | None = None
+
+
+class MeetingBoardSettingsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    meeting_id: uuid.UUID
+    added_member_ids: list[uuid.UUID] = Field(default_factory=list)
+    added_department_ids: list[uuid.UUID] = Field(default_factory=list)
+    pinned_task_ids: list[uuid.UUID] = Field(default_factory=list)
+    materials: list[MeetingBoardMaterial] = Field(default_factory=list)
+    board_notes: str | None = None
+    created_by_id: uuid.UUID | None = None
+    updated_by_id: uuid.UUID | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class MeetingBoardResponse(BaseModel):
+    meeting: MeetingResponse
+    settings: MeetingBoardSettingsResponse
+    urgent: list[TaskResponse] = Field(default_factory=list)
+    in_progress: list[TaskResponse] = Field(default_factory=list)
+    review: list[TaskResponse] = Field(default_factory=list)
+    done_this_week: list[TaskResponse] = Field(default_factory=list)
+
+
+class MeetingBoardTaskDraft(BaseModel):
+    title: str
+    description: str | None = None
+    assignee_name: str | None = None
+    assignee_id: uuid.UUID | None = None
+    deadline: date | None = None
+    priority: TaskPriorityType = "normal"
+    selected: bool = True
+
+
+class MeetingAIProcessingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    meeting_id: uuid.UUID
+    status: MeetingAIProcessingStatusType
+    transcript_source: MeetingTranscriptSourceType | None = None
+    transcription_model: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error_message: str | None = None
+    transcript_char_count: int | None = None
+    audio_duration_seconds: int | None = None
+    estimated_cost_usd: Decimal | None = None
+    draft_summary: str | None = None
+    draft_decisions: list[str] = Field(default_factory=list)
+    draft_tasks: list[MeetingBoardTaskDraft] = Field(default_factory=list)
+    published_at: datetime | None = None
+    published_by_id: uuid.UUID | None = None
+
+
+class MeetingAIProcessingDraftUpdate(BaseModel):
+    draft_summary: str
+    draft_decisions: list[str] = Field(default_factory=list)
+    draft_tasks: list[MeetingBoardTaskDraft] = Field(default_factory=list)
+
+
+class MeetingAIPublishRequest(BaseModel):
+    draft_summary: str
+    draft_decisions: list[str] = Field(default_factory=list)
+    draft_tasks: list[MeetingBoardTaskDraft] = Field(default_factory=list)
 
 
 # ── MeetingSchedule ──
