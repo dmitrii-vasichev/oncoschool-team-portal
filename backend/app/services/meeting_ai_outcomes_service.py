@@ -105,10 +105,11 @@ class MeetingAIOutcomesService:
                 session, meeting.transcript, members
             )
         except Exception as exc:
-            processing.status = "failed"
-            processing.error_message = str(exc)
-            processing.completed_at = datetime.utcnow()
-            await session.flush()
+            await self.processing_repo.mark_failed_if_unpublished(
+                session,
+                meeting_id=meeting.id,
+                error_message=str(exc),
+            )
             await session.commit()
             raise
 

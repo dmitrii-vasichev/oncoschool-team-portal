@@ -124,6 +124,23 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
         self.assertEqual(stmt.compile().params["status_1"], "published")
 
+    async def test_mark_failed_if_unpublished_uses_published_guard(self) -> None:
+        repo = MeetingAIProcessingRepository()
+        result = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        marked = await repo.mark_failed_if_unpublished(
+            session,
+            meeting_id=uuid.uuid4(),
+            error_message="openai down",
+        )
+
+        self.assertIsNone(marked)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
+        self.assertEqual(stmt.compile().params["status_1"], "published")
+
     async def test_transcribe_audio_rejects_second_run_while_transcribing(self) -> None:
         service = MeetingAIOutcomesService()
         service.processing_repo = SimpleNamespace(
@@ -482,8 +499,10 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_generate_draft_failure_marks_processing_failed_and_commits(self) -> None:
         service = MeetingAIOutcomesService()
         processing = SimpleNamespace(status="pending", error_message=None)
+        failed_processing = SimpleNamespace(status="failed", error_message="openai down")
         service.processing_repo = SimpleNamespace(
-            get_or_create=AsyncMock(return_value=processing)
+            get_or_create=AsyncMock(return_value=processing),
+            mark_failed_if_unpublished=AsyncMock(return_value=failed_processing),
         )
         service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
         service.ai_service = SimpleNamespace(
@@ -497,9 +516,38 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
                 meeting=SimpleNamespace(id=uuid.uuid4(), transcript="Transcript"),
             )
 
-        assert processing.status == "failed"
-        assert processing.error_message == "openai down"
-        session.flush.assert_awaited_once()
+        service.processing_repo.mark_failed_if_unpublished.assert_awaited_once()
+        assert processing.status == "pending"
+        assert processing.error_message is None
+        session.flush.assert_not_awaited()
+        session.commit.assert_awaited_once()
+
+    async def test_generate_draft_failure_does_not_overwrite_concurrently_published_outcome(
+        self,
+    ) -> None:
+        service = MeetingAIOutcomesService()
+        processing = SimpleNamespace(status="draft_ready", error_message=None)
+        service.processing_repo = SimpleNamespace(
+            get_or_create=AsyncMock(return_value=processing),
+            mark_failed_if_unpublished=AsyncMock(return_value=None),
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        service.ai_service = SimpleNamespace(
+            parse_meeting_outcomes=AsyncMock(side_effect=RuntimeError("openai down"))
+        )
+        session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
+        meeting = SimpleNamespace(id=uuid.uuid4(), transcript="Transcript")
+
+        with self.assertRaisesRegex(RuntimeError, "openai down"):
+            await service.generate_draft(session, meeting=meeting)
+
+        service.processing_repo.mark_failed_if_unpublished.assert_awaited_once_with(
+            session,
+            meeting_id=meeting.id,
+            error_message="openai down",
+        )
+        assert processing.status == "draft_ready"
+        assert processing.error_message is None
         session.commit.assert_awaited_once()
 
     async def test_generate_draft_rejects_concurrent_publish_after_ai_parse(self) -> None:

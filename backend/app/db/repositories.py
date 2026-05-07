@@ -813,6 +813,29 @@ class MeetingAIProcessingRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def mark_failed_if_unpublished(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+        error_message: str,
+    ) -> MeetingAIProcessing | None:
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(
+                MeetingAIProcessing.meeting_id == meeting_id,
+                MeetingAIProcessing.status != "published",
+            )
+            .values(
+                status="failed",
+                error_message=error_message,
+                completed_at=datetime.utcnow(),
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 class MeetingScheduleRepository:
     async def get_all_active(self, session: AsyncSession) -> list[MeetingSchedule]:
