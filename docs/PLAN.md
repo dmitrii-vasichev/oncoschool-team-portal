@@ -1,4 +1,45 @@
-# Active Plan: Task Urgency and Create Checklist
+# Active Plan: Task Board Visual Polish
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-06-task-board-visual-polish.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Tighten the task creation dialog, task board cards, and empty Kanban columns according to the approved visual polish design.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-06-task-board-visual-polish-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-06-task-board-visual-polish.md`
+
+**Milestones:**
+
+1. Compact the new task dialog: collapsed description, one-row labels/urgency, off-by-default urgent switch, compact checklist add control.
+2. Tighten task cards: remove the footer `Срочно` badge, expose urgency accessibly, reduce reserved title/source space before checklist previews.
+3. Replace empty Kanban column illustration/copy with a quiet dashed drop-zone.
+4. Update status/test docs, run frontend verification, and complete browser QA.
+
+**Definition of done:**
+
+- New task dialog does not show internal scroll in normal desktop viewport.
+- Description is collapsed by default and expands on demand.
+- Labels and urgency share one row on desktop dialog widths and stack cleanly on narrow widths.
+- Urgency remains off by default and still writes `normal`; enabling it writes `urgent`.
+- Urgent board cards keep the red left edge and no longer show the footer `Срочно` badge.
+- Urgency remains available to assistive technology on task card links.
+- Task cards with checklist previews do not show a large empty gap between title and checklist.
+- Empty columns show a quiet dashed drop-zone instead of `Нет задач` copy and illustration.
+- Drag-over styling remains visible for empty columns.
+
+**Validation commands:**
+
+```bash
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Task Urgency and Create Checklist
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-06-task-urgency-and-create-checklist.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
