@@ -783,13 +783,11 @@ async def transcribe_meeting_audio(
             zoom_service=_get_zoom_service(request),
             moderator=member,
         )
-        await session.commit()
         return MeetingAIProcessingResponse.model_validate(processing)
     except ValueError as exc:
-        await session.commit()
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
-        await session.commit()
+        await session.rollback()
         logger.exception("Audio transcription failed for meeting %s", meeting_id)
         raise HTTPException(status_code=502, detail=f"Ошибка транскрибации: {exc}")
 

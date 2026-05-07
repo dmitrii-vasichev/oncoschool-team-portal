@@ -29,7 +29,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
             published_at=None,
             published_by_id=None,
         )
-        session = SimpleNamespace(commit=AsyncMock())
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
         request = SimpleNamespace(
             app=SimpleNamespace(state=SimpleNamespace(zoom_service=SimpleNamespace()))
         )
@@ -54,4 +54,77 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(response.status, "transcript_ready")
-        session.commit.assert_awaited_once()
+        session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+
+    async def test_transcribe_audio_value_error_returns_422_without_endpoint_commit(
+        self,
+    ) -> None:
+        meeting_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id, zoom_meeting_id="123")
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(zoom_service=SimpleNamespace()))
+        )
+
+        with (
+            patch.object(
+                meetings_api.meeting_service,
+                "get_meeting_by_id",
+                AsyncMock(return_value=meeting),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service,
+                "transcribe_meeting_audio",
+                AsyncMock(side_effect=ValueError("Транскрибация уже выполняется")),
+            ),
+        ):
+            with self.assertRaises(meetings_api.HTTPException) as exc:
+                await meetings_api.transcribe_meeting_audio(
+                    meeting_id=meeting_id,
+                    request=request,
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(exc.exception.status_code, 422)
+        self.assertEqual(exc.exception.detail, "Транскрибация уже выполняется")
+        session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+
+    async def test_transcribe_audio_unexpected_error_rolls_back_and_returns_502(
+        self,
+    ) -> None:
+        meeting_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id, zoom_meeting_id="123")
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+        request = SimpleNamespace(
+            app=SimpleNamespace(state=SimpleNamespace(zoom_service=SimpleNamespace()))
+        )
+
+        with (
+            patch.object(
+                meetings_api.meeting_service,
+                "get_meeting_by_id",
+                AsyncMock(return_value=meeting),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service,
+                "transcribe_meeting_audio",
+                AsyncMock(side_effect=RuntimeError("openai down")),
+            ),
+        ):
+            with self.assertRaises(meetings_api.HTTPException) as exc:
+                await meetings_api.transcribe_meeting_audio(
+                    meeting_id=meeting_id,
+                    request=request,
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(exc.exception.status_code, 502)
+        self.assertIn("openai down", exc.exception.detail)
+        session.commit.assert_not_awaited()
+        session.rollback.assert_awaited_once()

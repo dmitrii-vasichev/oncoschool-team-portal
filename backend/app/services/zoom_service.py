@@ -10,6 +10,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 HOST_ONLY_QUERY_KEYS = {"zak", "zpk", "role"}
+AUDIO_TRANSCRIPTION_MAX_BYTES = 25 * 1024 * 1024
+AUDIO_TRANSCRIPTION_TOO_LARGE_MESSAGE = (
+    "Аудиофайл больше 25 МБ. Для этой записи пока нужна ручная обработка или сжатие."
+)
 
 
 def _extract_meeting_id_from_path(path: str) -> str | None:
@@ -188,16 +192,25 @@ class ZoomService:
                 return match
         return None
 
+    def _assert_audio_size_within_limit(self, size: object) -> None:
+        if size in (None, ""):
+            return
+        try:
+            parsed_size = int(size)
+        except (TypeError, ValueError):
+            return
+        if parsed_size > AUDIO_TRANSCRIPTION_MAX_BYTES:
+            raise ValueError(AUDIO_TRANSCRIPTION_TOO_LARGE_MESSAGE)
+
     async def download_audio_recording(self, meeting_id: str) -> str | None:
         recordings = await self.get_recordings(meeting_id)
         audio_file = self._select_audio_recording_file(recordings)
         if not audio_file:
             return None
+        self._assert_audio_size_within_limit(audio_file.get("file_size"))
 
         suffix = ".m4a" if audio_file.get("file_type") == "M4A" else ".mp4"
-        temp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        temp_path = temp.name
-        temp.close()
+        temp_path = None
 
         token = await self._get_token()
         try:
@@ -209,15 +222,24 @@ class ZoomService:
                     follow_redirects=True,
                 ) as resp:
                     resp.raise_for_status()
+                    self._assert_audio_size_within_limit(resp.headers.get("Content-Length"))
+                    temp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                    temp_path = temp.name
+                    temp.close()
+                    bytes_written = 0
                     with open(temp_path, "wb") as fh:
                         async for chunk in resp.aiter_bytes():
+                            bytes_written += len(chunk)
+                            if bytes_written > AUDIO_TRANSCRIPTION_MAX_BYTES:
+                                raise ValueError(AUDIO_TRANSCRIPTION_TOO_LARGE_MESSAGE)
                             fh.write(chunk)
             return temp_path
         except Exception:
-            try:
-                os.unlink(temp_path)
-            except FileNotFoundError:
-                pass
+            if temp_path:
+                try:
+                    os.unlink(temp_path)
+                except FileNotFoundError:
+                    pass
             raise
 
     async def get_transcript(self, meeting_id: str) -> str | None:
