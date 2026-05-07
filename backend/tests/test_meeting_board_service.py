@@ -4,7 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
+from app.db.repositories import MeetingBoardRepository
 from app.services.meeting_board_service import MeetingBoardService, group_board_tasks
 
 
@@ -102,3 +104,31 @@ async def test_load_visible_tasks_rechecks_pinned_task_access() -> None:
     assert can_access.await_count == 2
     can_access.assert_any_await(session, viewer, allowed_task)
     can_access.assert_any_await(session, viewer, blocked_task)
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_returns_existing_settings_after_concurrent_insert() -> None:
+    meeting_id = uuid.uuid4()
+    member = SimpleNamespace(id=uuid.uuid4())
+    existing_settings = SimpleNamespace(id=uuid.uuid4(), meeting_id=meeting_id)
+    session = SimpleNamespace(
+        add=lambda settings: None,
+        flush=AsyncMock(
+            side_effect=IntegrityError(
+                "INSERT INTO meeting_board_settings",
+                {},
+                Exception("duplicate key value violates unique constraint"),
+            )
+        ),
+        rollback=AsyncMock(),
+    )
+    repo = MeetingBoardRepository()
+    repo.get_by_meeting_id = AsyncMock(side_effect=[None, existing_settings])
+
+    settings = await repo.get_or_create(session, meeting_id, member)
+
+    assert settings is existing_settings
+    repo.get_by_meeting_id.assert_any_await(session, meeting_id)
+    assert repo.get_by_meeting_id.await_count == 2
+    session.flush.assert_awaited_once()
+    session.rollback.assert_awaited_once()

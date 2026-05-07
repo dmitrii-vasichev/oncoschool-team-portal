@@ -679,7 +679,14 @@ class MeetingBoardRepository:
             updated_by_id=getattr(member, "id", None),
         )
         session.add(settings)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            existing = await self.get_by_meeting_id(session, meeting_id)
+            if existing:
+                return existing
+            raise
         return settings
 
     async def update(
