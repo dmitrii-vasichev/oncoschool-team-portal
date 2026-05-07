@@ -14,6 +14,7 @@ from app.config import settings
 from app.db.database import get_session
 from app.db.models import Meeting, MeetingSchedule, TeamMember
 from app.db.schemas import (
+    MeetingAIPublishRequest,
     MeetingAIProcessingResponse,
     MeetingBoardResponse,
     MeetingBoardSettingsResponse,
@@ -790,6 +791,54 @@ async def transcribe_meeting_audio(
         await session.rollback()
         logger.exception("Audio transcription failed for meeting %s", meeting_id)
         raise HTTPException(status_code=502, detail=f"Ошибка транскрибации: {exc}")
+
+
+@router.post("/{meeting_id}/ai/generate-draft", response_model=MeetingAIProcessingResponse)
+async def generate_meeting_outcome_draft(
+    meeting_id: uuid.UUID,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Встреча не найдена")
+    try:
+        processing = await meeting_ai_outcomes_service.generate_draft(
+            session, meeting=meeting
+        )
+        await session.commit()
+        return MeetingAIProcessingResponse.model_validate(processing)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.post("/{meeting_id}/ai/publish", response_model=MeetingWithTasksResponse)
+async def publish_meeting_outcomes(
+    meeting_id: uuid.UUID,
+    data: MeetingAIPublishRequest,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Встреча не найдена")
+    processing = await meeting_ai_outcomes_service.processing_repo.get_or_create(
+        session, meeting_id
+    )
+    tasks = await meeting_ai_outcomes_service.publish_outcomes(
+        session,
+        meeting=meeting,
+        processing=processing,
+        moderator=member,
+        draft_summary=data.draft_summary,
+        draft_decisions=data.draft_decisions,
+        draft_tasks=[task.model_dump() for task in data.draft_tasks],
+    )
+    await session.commit()
+    meeting = await meeting_service.get_meeting_by_id(session, meeting_id)
+    return MeetingWithTasksResponse(
+        meeting=_meeting_response(meeting), tasks_created=len(tasks)
+    )
 
 
 # ── SUMMARY / AI PARSE endpoints ──

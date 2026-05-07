@@ -214,6 +214,43 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(os.path.exists(path))
 
+    async def test_publish_creates_only_selected_task_candidates(self) -> None:
+        service = MeetingAIOutcomesService()
+        meeting = SimpleNamespace(id=uuid.uuid4(), parsed_summary=None, decisions=[], status="scheduled")
+        moderator = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        created = SimpleNamespace(id=uuid.uuid4())
+        service.meeting_service = SimpleNamespace(
+            create_tasks_from_parsed=AsyncMock(return_value=[created])
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        session = SimpleNamespace(flush=AsyncMock())
+        processing = SimpleNamespace(
+            status="draft_ready",
+            draft_summary="Summary",
+            draft_decisions=["Decision"],
+            draft_tasks=[],
+            published_at=None,
+            published_by_id=None,
+        )
+
+        result = await service.publish_outcomes(
+            session,
+            meeting=meeting,
+            processing=processing,
+            moderator=moderator,
+            draft_summary="Final summary",
+            draft_decisions=["Decision"],
+            draft_tasks=[
+                {"title": "Selected", "priority": "normal", "selected": True},
+                {"title": "Rejected", "priority": "normal", "selected": False},
+            ],
+        )
+
+        assert result == [created]
+        service.meeting_service.create_tasks_from_parsed.assert_awaited_once()
+        args = service.meeting_service.create_tasks_from_parsed.await_args.args
+        assert args[2] == [{"title": "Selected", "priority": "normal", "selected": True}]
+
 
 class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):
     async def test_select_audio_recording_file_prefers_m4a_over_mp4(self) -> None:

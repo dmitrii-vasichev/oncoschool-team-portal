@@ -4,7 +4,10 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Meeting, MeetingAIProcessing, TeamMember
-from app.db.repositories import MeetingAIProcessingRepository
+from app.db.repositories import MeetingAIProcessingRepository, TeamMemberRepository
+from app.services.ai_service import AIService
+from app.services.meeting_service import MeetingService
+from app.services.task_urgency import normalize_task_urgency
 from app.services.voice_service import DEFAULT_TRANSCRIPTION_MODEL, VoiceService
 
 
@@ -12,6 +15,9 @@ class MeetingAIOutcomesService:
     def __init__(self) -> None:
         self.processing_repo = MeetingAIProcessingRepository()
         self.voice_service = VoiceService()
+        self.ai_service = AIService()
+        self.meeting_service = MeetingService()
+        self.member_repo = TeamMemberRepository()
 
     async def _transcribe_temp_audio(
         self,
@@ -79,3 +85,77 @@ class MeetingAIOutcomesService:
         await session.flush()
         await session.commit()
         return processing
+
+    async def generate_draft(
+        self,
+        session: AsyncSession,
+        *,
+        meeting: Meeting,
+    ) -> MeetingAIProcessing:
+        if not meeting.transcript:
+            raise ValueError("Нет транскрипции для генерации итогов")
+
+        processing = await self.processing_repo.get_or_create(session, meeting.id)
+        members = await self.member_repo.get_all_active(session)
+        parsed = await self.ai_service.parse_meeting_outcomes(
+            session, meeting.transcript, members
+        )
+        processing.status = "draft_ready"
+        processing.draft_summary = parsed.summary
+        processing.draft_decisions = parsed.decisions
+        processing.draft_tasks = [
+            {
+                "title": task.title,
+                "description": task.description,
+                "assignee_name": task.assignee_name,
+                "assignee_id": None,
+                "deadline": task.deadline,
+                "priority": normalize_task_urgency(task.priority),
+                "selected": True,
+            }
+            for task in parsed.tasks
+        ]
+        await session.flush()
+        return processing
+
+    async def publish_outcomes(
+        self,
+        session: AsyncSession,
+        *,
+        meeting: Meeting,
+        processing: MeetingAIProcessing,
+        moderator: TeamMember,
+        draft_summary: str,
+        draft_decisions: list[str],
+        draft_tasks: list[dict],
+    ) -> list:
+        selected_tasks = []
+        persisted_tasks = []
+        for task in draft_tasks:
+            task_data = task if isinstance(task, dict) else task.model_dump()
+            persisted_task = dict(task_data)
+            deadline = persisted_task.get("deadline")
+            if hasattr(deadline, "isoformat"):
+                persisted_task["deadline"] = deadline.isoformat()
+            persisted_tasks.append(persisted_task)
+
+            if not task_data.get("selected", True):
+                continue
+            selected_tasks.append(persisted_task)
+
+        members = await self.member_repo.get_all_active(session)
+        meeting.parsed_summary = draft_summary
+        meeting.decisions = draft_decisions
+        if meeting.status != "completed":
+            meeting.status = "completed"
+        created_tasks = await self.meeting_service.create_tasks_from_parsed(
+            session, meeting, selected_tasks, moderator, members
+        )
+        processing.status = "published"
+        processing.draft_summary = draft_summary
+        processing.draft_decisions = draft_decisions
+        processing.draft_tasks = persisted_tasks
+        processing.published_at = datetime.utcnow()
+        processing.published_by_id = moderator.id
+        await session.flush()
+        return created_tasks
