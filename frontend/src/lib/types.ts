@@ -25,6 +25,17 @@ export type MeetingRecurrence =
   | "on_demand";
 export type MeetingReminderZoomMissingBehavior = "hide" | "fallback";
 export type MeetingStatus = "scheduled" | "in_progress" | "completed" | "cancelled";
+export type MeetingTranscriptSource = "zoom_api" | "manual" | "openai_audio";
+export type MeetingAIProcessingStatus =
+  | "idle"
+  | "recording_not_ready"
+  | "recording_ready"
+  | "transcribing"
+  | "transcript_ready"
+  | "draft_ready"
+  | "published"
+  | "failed";
+export type MeetingBoardSectionKey = "urgent" | "in_progress" | "review" | "done_this_week";
 export type TelegramBroadcastStatus = "scheduled" | "sent" | "failed" | "cancelled";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -171,13 +182,72 @@ export interface Meeting {
   zoom_join_url: string | null;
   zoom_recording_url: string | null;
   transcript: string | null;
-  transcript_source: "zoom_api" | "manual" | null;
+  transcript_source: MeetingTranscriptSource | null;
   status: MeetingStatus;
   duration_minutes: number;
   effective_status: MeetingStatus;
   participant_ids: string[];
   schedule_recurrence: MeetingRecurrence | null;
   is_schedule_template: boolean;
+}
+
+export interface MeetingBoardMaterial {
+  id: string;
+  title: string;
+  url: string;
+  description: string | null;
+}
+
+export interface MeetingBoardSettings {
+  id: string;
+  meeting_id: string;
+  added_member_ids: string[];
+  added_department_ids: string[];
+  pinned_task_ids: string[];
+  materials: MeetingBoardMaterial[];
+  board_notes: string | null;
+  created_by_id: string | null;
+  updated_by_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface MeetingBoardResponse {
+  meeting: Meeting;
+  settings: MeetingBoardSettings;
+  urgent: Task[];
+  in_progress: Task[];
+  review: Task[];
+  done_this_week: Task[];
+}
+
+export interface MeetingAITaskDraft {
+  title: string;
+  description: string | null;
+  assignee_name: string | null;
+  assignee_id: string | null;
+  deadline: string | null;
+  priority: TaskPriority;
+  selected: boolean;
+}
+
+export interface MeetingAIProcessing {
+  id: string;
+  meeting_id: string;
+  status: MeetingAIProcessingStatus;
+  transcript_source: MeetingTranscriptSource | null;
+  transcription_model: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  transcript_char_count: number | null;
+  audio_duration_seconds: number | null;
+  estimated_cost_usd: string | null;
+  draft_summary: string | null;
+  draft_decisions: string[];
+  draft_tasks: MeetingAITaskDraft[];
+  published_at: string | null;
+  published_by_id: string | null;
 }
 
 export interface TelegramTargetRef {

@@ -29,6 +29,10 @@ import type {
   ParseSummaryResponse,
   CreateMeetingRequest,
   MeetingWithTasksResponse,
+  MeetingBoardResponse,
+  MeetingBoardSettings,
+  MeetingAIProcessing,
+  MeetingAITaskDraft,
   MeetingSchedule,
   MeetingScheduleCreateRequest,
   TelegramNotificationTarget,
@@ -405,6 +409,20 @@ class ApiClient {
     });
   }
 
+  async getMeetingBoard(meetingId: string): Promise<MeetingBoardResponse> {
+    return this.request<MeetingBoardResponse>(`/api/meetings/${meetingId}/board`);
+  }
+
+  async updateMeetingBoardSettings(
+    meetingId: string,
+    data: Partial<Pick<MeetingBoardSettings, "added_member_ids" | "added_department_ids" | "pinned_task_ids" | "materials" | "board_notes">>
+  ): Promise<MeetingBoardSettings> {
+    return this.request<MeetingBoardSettings>(`/api/meetings/${meetingId}/board/settings`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   // Transcript & Summary
   async addTranscript(meetingId: string, text: string): Promise<Meeting> {
     return this.request<Meeting>(`/api/meetings/${meetingId}/transcript`, {
@@ -418,6 +436,28 @@ class ApiClient {
       `/api/meetings/${meetingId}/fetch-transcript`,
       { method: "POST" }
     );
+  }
+
+  async transcribeMeetingAudio(meetingId: string): Promise<MeetingAIProcessing> {
+    return this.request<MeetingAIProcessing>(`/api/meetings/${meetingId}/ai/transcribe-audio`, {
+      method: "POST",
+    });
+  }
+
+  async generateMeetingOutcomeDraft(meetingId: string): Promise<MeetingAIProcessing> {
+    return this.request<MeetingAIProcessing>(`/api/meetings/${meetingId}/ai/generate-draft`, {
+      method: "POST",
+    });
+  }
+
+  async publishMeetingOutcomes(
+    meetingId: string,
+    data: { draft_summary: string; draft_decisions: string[]; draft_tasks: MeetingAITaskDraft[] }
+  ): Promise<MeetingWithTasksResponse> {
+    return this.request<MeetingWithTasksResponse>(`/api/meetings/${meetingId}/ai/publish`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 
   async parseMeetingSummary(meetingId: string, text?: string): Promise<ParseSummaryResponse> {
