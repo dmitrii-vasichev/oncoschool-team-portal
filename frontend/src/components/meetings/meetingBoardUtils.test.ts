@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getMeetingBoardSectionMeta, isMeetingBoardTaskOverdue } from "./meetingBoardUtils.ts";
+import {
+  getMeetingBoardSectionMeta,
+  isMeetingBoardTaskOverdue,
+  MEETING_BOARD_SECTIONS,
+} from "./meetingBoardUtils.ts";
 import type { Task } from "../../lib/types.ts";
 
 function task(overrides: Partial<Task>): Task {
@@ -30,10 +34,61 @@ function task(overrides: Partial<Task>): Task {
   };
 }
 
-test("getMeetingBoardSectionMeta labels done section as done this week", () => {
-  assert.equal(getMeetingBoardSectionMeta("done_this_week").label, "Выполнено за неделю");
+test("MEETING_BOARD_SECTIONS preserves board group order", () => {
+  assert.deepEqual(MEETING_BOARD_SECTIONS, [
+    "urgent",
+    "in_progress",
+    "review",
+    "done_this_week",
+  ]);
+});
+
+test("getMeetingBoardSectionMeta returns metadata for all board groups", () => {
+  assert.deepEqual(
+    MEETING_BOARD_SECTIONS.map((key) => [key, getMeetingBoardSectionMeta(key)]),
+    [
+      [
+        "urgent",
+        {
+          label: "Срочные",
+          tone: "border-priority-urgent-fg/30 bg-priority-urgent-bg/60",
+        },
+      ],
+      [
+        "in_progress",
+        {
+          label: "В работе",
+          tone: "border-status-progress-fg/25 bg-status-progress-bg/50",
+        },
+      ],
+      [
+        "review",
+        {
+          label: "На проверке",
+          tone: "border-status-review-fg/25 bg-status-review-bg/50",
+        },
+      ],
+      [
+        "done_this_week",
+        {
+          label: "Выполнено за неделю",
+          tone: "border-status-done-fg/25 bg-status-done-bg/50",
+        },
+      ],
+    ]
+  );
 });
 
 test("isMeetingBoardTaskOverdue ignores done tasks", () => {
   assert.equal(isMeetingBoardTaskOverdue(task({ status: "done", deadline: "2026-05-01" }), new Date("2026-05-07")), false);
+});
+
+test("isMeetingBoardTaskOverdue detects active tasks with past deadlines", () => {
+  assert.equal(
+    isMeetingBoardTaskOverdue(
+      task({ status: "in_progress", deadline: "2026-05-01" }),
+      new Date("2026-05-07")
+    ),
+    true
+  );
 });
