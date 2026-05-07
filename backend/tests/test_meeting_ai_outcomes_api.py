@@ -135,7 +135,7 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
         meeting_id = uuid.uuid4()
         member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
         meeting = SimpleNamespace(id=meeting_id, transcript=None)
-        session = SimpleNamespace(commit=AsyncMock())
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
 
         with (
             patch.object(
@@ -159,6 +159,37 @@ class MeetingAIOutcomesApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(exc.exception.status_code, 422)
         self.assertEqual(exc.exception.detail, "Нет транскрипции для генерации итогов")
         session.commit.assert_not_awaited()
+        session.rollback.assert_not_awaited()
+
+    async def test_generate_draft_unexpected_error_rolls_back_and_returns_502(self) -> None:
+        meeting_id = uuid.uuid4()
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id, transcript="Transcript")
+        session = SimpleNamespace(commit=AsyncMock(), rollback=AsyncMock())
+
+        with (
+            patch.object(
+                meetings_api.meeting_service,
+                "get_meeting_by_id",
+                AsyncMock(return_value=meeting),
+            ),
+            patch.object(
+                meetings_api.meeting_ai_outcomes_service,
+                "generate_draft",
+                AsyncMock(side_effect=RuntimeError("openai down")),
+            ),
+        ):
+            with self.assertRaises(meetings_api.HTTPException) as exc:
+                await meetings_api.generate_meeting_outcome_draft(
+                    meeting_id=meeting_id,
+                    member=member,
+                    session=session,
+                )
+
+        self.assertEqual(exc.exception.status_code, 502)
+        self.assertIn("openai down", exc.exception.detail)
+        session.commit.assert_not_awaited()
+        session.rollback.assert_awaited_once()
 
     async def test_publish_endpoint_commits_once_and_returns_tasks_created(self) -> None:
         meeting_id = uuid.uuid4()

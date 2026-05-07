@@ -96,6 +96,9 @@ class MeetingAIOutcomesService:
             raise ValueError("Нет транскрипции для генерации итогов")
 
         processing = await self.processing_repo.get_or_create(session, meeting.id)
+        if processing.status == "published":
+            raise ValueError("Итоги встречи уже опубликованы")
+
         try:
             members = await self.member_repo.get_all_active(session)
             parsed = await self.ai_service.parse_meeting_outcomes(
@@ -106,6 +109,7 @@ class MeetingAIOutcomesService:
             processing.error_message = str(exc)
             processing.completed_at = datetime.utcnow()
             await session.flush()
+            await session.commit()
             raise
 
         processing.status = "draft_ready"
@@ -137,8 +141,12 @@ class MeetingAIOutcomesService:
         draft_decisions: list[str],
         draft_tasks: list[dict],
     ) -> list:
-        if processing.status == "published":
+        claimed_processing = await self.processing_repo.claim_publish(
+            session, meeting_id=meeting.id
+        )
+        if not claimed_processing:
             raise ValueError("Итоги встречи уже опубликованы")
+        processing = claimed_processing
 
         members = await self.member_repo.get_all_active(session)
         members_by_id = {str(member.id): member for member in members}
@@ -167,9 +175,17 @@ class MeetingAIOutcomesService:
         meeting.decisions = draft_decisions
         if meeting.status != "completed":
             meeting.status = "completed"
-        created_tasks = await self.meeting_service.create_tasks_from_parsed(
-            session, meeting, selected_tasks, moderator, members
-        )
+        try:
+            created_tasks = await self.meeting_service.create_tasks_from_parsed(
+                session, meeting, selected_tasks, moderator, members
+            )
+        except Exception as exc:
+            processing.status = "failed"
+            processing.error_message = str(exc)
+            processing.completed_at = datetime.utcnow()
+            await session.flush()
+            raise
+
         processing.status = "published"
         processing.draft_summary = draft_summary
         processing.draft_decisions = draft_decisions

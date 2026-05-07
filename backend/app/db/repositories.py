@@ -764,6 +764,28 @@ class MeetingAIProcessingRepository:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def claim_publish(
+        self,
+        session: AsyncSession,
+        *,
+        meeting_id: uuid.UUID,
+    ) -> MeetingAIProcessing | None:
+        await self.get_or_create(session, meeting_id)
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(
+                MeetingAIProcessing.meeting_id == meeting_id,
+                MeetingAIProcessing.status != "published",
+            )
+            .values(
+                status="published",
+                error_message=None,
+            )
+            .returning(MeetingAIProcessing)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
 
 class MeetingScheduleRepository:
     async def get_all_active(self, session: AsyncSession) -> list[MeetingSchedule]:

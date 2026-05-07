@@ -89,6 +89,21 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         compiled = str(stmt.compile(dialect=postgresql.dialect()))
         self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
 
+    async def test_claim_publish_returns_none_when_already_published(self) -> None:
+        repo = MeetingAIProcessingRepository()
+        repo.get_or_create = AsyncMock()
+        result = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        claimed = await repo.claim_publish(session, meeting_id=uuid.uuid4())
+
+        self.assertIsNone(claimed)
+        repo.get_or_create.assert_awaited_once()
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        self.assertIn("meeting_ai_processing.status != %(status_1)s", compiled)
+        self.assertEqual(stmt.compile().params["status"], "published")
+
     async def test_transcribe_audio_rejects_second_run_while_transcribing(self) -> None:
         service = MeetingAIOutcomesService()
         service.processing_repo = SimpleNamespace(
@@ -223,15 +238,18 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
             create_tasks_from_parsed=AsyncMock(return_value=[created])
         )
         service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
-        session = SimpleNamespace(flush=AsyncMock())
         processing = SimpleNamespace(
-            status="draft_ready",
+            status="published",
             draft_summary="Summary",
             draft_decisions=["Decision"],
             draft_tasks=[],
             published_at=None,
             published_by_id=None,
         )
+        service.processing_repo = SimpleNamespace(
+            claim_publish=AsyncMock(return_value=processing)
+        )
+        session = SimpleNamespace(flush=AsyncMock())
 
         result = await service.publish_outcomes(
             session,
@@ -260,6 +278,9 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         assert processing.published_at is not None
         assert processing.published_by_id == moderator.id
         session.flush.assert_awaited_once()
+        service.processing_repo.claim_publish.assert_awaited_once_with(
+            session, meeting_id=meeting.id
+        )
         service.meeting_service.create_tasks_from_parsed.assert_awaited_once()
         args = service.meeting_service.create_tasks_from_parsed.await_args.args
         assert args[2] == [{"title": "Selected", "priority": "normal", "selected": True}]
@@ -281,15 +302,18 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         service.member_repo = SimpleNamespace(
             get_all_active=AsyncMock(return_value=[assignee])
         )
-        session = SimpleNamespace(flush=AsyncMock())
         processing = SimpleNamespace(
-            status="draft_ready",
+            status="published",
             draft_summary=None,
             draft_decisions=[],
             draft_tasks=[],
             published_at=None,
             published_by_id=None,
         )
+        service.processing_repo = SimpleNamespace(
+            claim_publish=AsyncMock(return_value=processing)
+        )
+        session = SimpleNamespace(flush=AsyncMock())
         draft_task = MeetingBoardTaskDraft(
             title="Prepare agenda",
             priority="normal",
@@ -316,6 +340,9 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_publish_rejects_already_published_without_creating_tasks(self) -> None:
         service = MeetingAIOutcomesService()
+        service.processing_repo = SimpleNamespace(
+            claim_publish=AsyncMock(return_value=None)
+        )
         service.meeting_service = SimpleNamespace(
             create_tasks_from_parsed=AsyncMock(return_value=[])
         )
@@ -334,11 +361,105 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
                 draft_tasks=[{"title": "Selected", "selected": True}],
             )
 
+        service.processing_repo.claim_publish.assert_awaited_once()
         service.member_repo.get_all_active.assert_not_awaited()
         service.meeting_service.create_tasks_from_parsed.assert_not_awaited()
         session.flush.assert_not_awaited()
 
-    async def test_generate_draft_failure_marks_processing_failed_and_flushes(self) -> None:
+    async def test_publish_uses_claimed_processing_for_publish_fields(self) -> None:
+        service = MeetingAIOutcomesService()
+        meeting = SimpleNamespace(
+            id=uuid.uuid4(),
+            parsed_summary=None,
+            decisions=[],
+            status="scheduled",
+        )
+        endpoint_processing = SimpleNamespace(status="draft_ready", draft_summary=None)
+        claimed_processing = SimpleNamespace(
+            status="published",
+            draft_summary=None,
+            draft_decisions=[],
+            draft_tasks=[],
+            published_at=None,
+            published_by_id=None,
+        )
+        service.processing_repo = SimpleNamespace(
+            claim_publish=AsyncMock(return_value=claimed_processing)
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        service.meeting_service = SimpleNamespace(
+            create_tasks_from_parsed=AsyncMock(return_value=[])
+        )
+        session = SimpleNamespace(flush=AsyncMock())
+        moderator = SimpleNamespace(id=uuid.uuid4())
+
+        await service.publish_outcomes(
+            session,
+            meeting=meeting,
+            processing=endpoint_processing,
+            moderator=moderator,
+            draft_summary="Final summary",
+            draft_decisions=["Decision"],
+            draft_tasks=[],
+        )
+
+        service.processing_repo.claim_publish.assert_awaited_once_with(
+            session, meeting_id=meeting.id
+        )
+        service.meeting_service.create_tasks_from_parsed.assert_awaited_once()
+        assert claimed_processing.draft_summary == "Final summary"
+        assert claimed_processing.draft_decisions == ["Decision"]
+        assert claimed_processing.published_by_id == moderator.id
+        assert endpoint_processing.draft_summary is None
+
+    async def test_publish_claim_none_does_not_create_tasks(self) -> None:
+        service = MeetingAIOutcomesService()
+        service.processing_repo = SimpleNamespace(
+            claim_publish=AsyncMock(return_value=None)
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        service.meeting_service = SimpleNamespace(
+            create_tasks_from_parsed=AsyncMock(return_value=[])
+        )
+        session = SimpleNamespace(flush=AsyncMock())
+
+        with self.assertRaisesRegex(ValueError, "Итоги встречи уже опубликованы"):
+            await service.publish_outcomes(
+                session,
+                meeting=SimpleNamespace(id=uuid.uuid4()),
+                processing=SimpleNamespace(status="draft_ready"),
+                moderator=SimpleNamespace(id=uuid.uuid4()),
+                draft_summary="Final summary",
+                draft_decisions=[],
+                draft_tasks=[],
+            )
+
+        service.member_repo.get_all_active.assert_not_awaited()
+        service.meeting_service.create_tasks_from_parsed.assert_not_awaited()
+        session.flush.assert_not_awaited()
+
+    async def test_generate_draft_rejects_already_published(self) -> None:
+        service = MeetingAIOutcomesService()
+        processing = SimpleNamespace(status="published")
+        service.processing_repo = SimpleNamespace(
+            get_or_create=AsyncMock(return_value=processing)
+        )
+        service.member_repo = SimpleNamespace(get_all_active=AsyncMock(return_value=[]))
+        service.ai_service = SimpleNamespace(parse_meeting_outcomes=AsyncMock())
+        session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
+
+        with self.assertRaisesRegex(ValueError, "Итоги встречи уже опубликованы"):
+            await service.generate_draft(
+                session,
+                meeting=SimpleNamespace(id=uuid.uuid4(), transcript="Transcript"),
+            )
+
+        service.member_repo.get_all_active.assert_not_awaited()
+        service.ai_service.parse_meeting_outcomes.assert_not_awaited()
+        session.flush.assert_not_awaited()
+        session.commit.assert_not_awaited()
+
+    async def test_generate_draft_failure_marks_processing_failed_and_commits(self) -> None:
         service = MeetingAIOutcomesService()
         processing = SimpleNamespace(status="pending", error_message=None)
         service.processing_repo = SimpleNamespace(
@@ -348,7 +469,7 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         service.ai_service = SimpleNamespace(
             parse_meeting_outcomes=AsyncMock(side_effect=RuntimeError("openai down"))
         )
-        session = SimpleNamespace(flush=AsyncMock())
+        session = SimpleNamespace(flush=AsyncMock(), commit=AsyncMock())
 
         with self.assertRaisesRegex(RuntimeError, "openai down"):
             await service.generate_draft(
@@ -359,6 +480,7 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         assert processing.status == "failed"
         assert processing.error_message == "openai down"
         session.flush.assert_awaited_once()
+        session.commit.assert_awaited_once()
 
 
 class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):

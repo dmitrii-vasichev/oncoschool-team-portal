@@ -810,6 +810,10 @@ async def generate_meeting_outcome_draft(
         return MeetingAIProcessingResponse.model_validate(processing)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        await session.rollback()
+        logger.exception("AI outcome draft generation failed for meeting %s", meeting_id)
+        raise HTTPException(status_code=502, detail=f"Ошибка генерации итогов: {exc}")
 
 
 @router.post("/{meeting_id}/ai/publish", response_model=MeetingWithTasksResponse)
