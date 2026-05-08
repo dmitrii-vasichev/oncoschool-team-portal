@@ -382,7 +382,16 @@ function SectionHeader({
 }
 
 type DashboardTaskBlockKey = "tasks";
+type DashboardTaskGroupKey = "overdue" | "active";
+type DashboardTaskItemVariant = "default" | "overdue" | "completed";
 type ActivityMetricKey = "completed" | "created" | "in_progress_over_7_days";
+
+type DashboardTaskGroup = {
+  key: DashboardTaskGroupKey;
+  title: string;
+  tasks: Task[];
+  itemVariant: DashboardTaskItemVariant;
+};
 
 function DashboardEmptyState({
   icon: Icon,
@@ -421,6 +430,8 @@ function DashboardTaskBlock({
   tasks,
   expanded,
   onExpandedChange,
+  groupExpansion,
+  onGroupExpansionChange,
   emptyContent,
   itemVariant,
   showAssignee,
@@ -439,31 +450,57 @@ function DashboardTaskBlock({
   tasks: Task[];
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
+  groupExpansion?: Record<DashboardTaskGroupKey, boolean>;
+  onGroupExpansionChange?: (
+    groupKey: DashboardTaskGroupKey,
+    expanded: boolean,
+  ) => void;
   emptyContent: ReactNode;
-  itemVariant: "default" | "overdue" | "completed";
+  itemVariant: DashboardTaskItemVariant;
   showAssignee: boolean;
   orderingHint: string;
   truncated?: boolean;
   truncationMessage?: string;
   linkHref?: string;
   linkLabel?: string;
-  groups?: Array<{
-    title: string;
-    tasks: Task[];
-    itemVariant: "default" | "overdue" | "completed";
-  }>;
+  groups?: DashboardTaskGroup[];
 }) {
   const visibleTasks = getDashboardTaskPreview(tasks, expanded);
   const hiddenCount = Math.max(0, tasks.length - DASHBOARD_TASK_PREVIEW_LIMIT);
   const listId = `dashboard-${blockKey}-tasks`;
   const canExpand = tasks.length > DASHBOARD_TASK_PREVIEW_LIMIT;
-  const visibleTaskIds = new Set(visibleTasks.map((task) => task.id));
   const visibleGroups = groups
-    ? groups.map((group) => ({
+    ?.filter((group) => group.tasks.length > 0)
+    .map((group) => {
+      const groupExpanded = groupExpansion?.[group.key] ?? expanded;
+      return {
         ...group,
-        tasks: group.tasks.filter((task) => visibleTaskIds.has(task.id)),
-      }))
-    : undefined;
+        expanded: groupExpanded,
+        visibleTasks: getDashboardTaskPreview(group.tasks, groupExpanded),
+        hiddenCount: Math.max(
+          0,
+          group.tasks.length - DASHBOARD_TASK_PREVIEW_LIMIT,
+        ),
+        canExpand: group.tasks.length > DASHBOARD_TASK_PREVIEW_LIMIT,
+        listId: `dashboard-${blockKey}-${group.key}-tasks`,
+      };
+    });
+  const hasVisibleGroups = Boolean(visibleGroups?.length);
+  const groupLayoutClassName =
+    visibleGroups && visibleGroups.length > 1
+      ? "grid gap-4 xl:grid-cols-2"
+      : "space-y-3";
+
+  const setGroupExpanded = (
+    groupKey: DashboardTaskGroupKey,
+    nextExpanded: boolean,
+  ) => {
+    if (onGroupExpansionChange) {
+      onGroupExpansionChange(groupKey, nextExpanded);
+      return;
+    }
+    onExpandedChange(nextExpanded);
+  };
 
   return (
     <>
@@ -487,16 +524,34 @@ function DashboardTaskBlock({
       ) : (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">{orderingHint}</p>
-          <div id={listId} className="space-y-3">
-            {visibleGroups
-              ? visibleGroups
-                  .filter((group) => group.tasks.length > 0)
-                  .map((group) => (
-                    <div key={group.title} className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">
+          {hasVisibleGroups && visibleGroups ? (
+            <div id={listId} className={groupLayoutClassName}>
+              {visibleGroups.map((group) => {
+                const headingId = `${group.listId}-heading`;
+                const taskGridClassName =
+                  visibleGroups.length === 1
+                    ? "grid gap-3 md:grid-cols-2"
+                    : "space-y-2";
+
+                return (
+                  <section
+                    key={group.key}
+                    aria-labelledby={headingId}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <h3
+                        id={headingId}
+                        className="text-xs font-medium text-muted-foreground"
+                      >
                         {group.title}
-                      </p>
-                      {group.tasks.map((task) => (
+                      </h3>
+                      <span className="text-xs text-muted-foreground/70">
+                        {group.tasks.length}
+                      </span>
+                    </div>
+                    <div id={group.listId} className={taskGridClassName}>
+                      {group.visibleTasks.map((task) => (
                         <TaskListItem
                           key={task.id}
                           task={task}
@@ -505,26 +560,47 @@ function DashboardTaskBlock({
                         />
                       ))}
                     </div>
-                  ))
-              : visibleTasks.map((task) => (
-                  <TaskListItem
-                    key={task.id}
-                    task={task}
-                    variant={
-                      itemVariant === "default" && isOverdue(task)
-                        ? "overdue"
-                        : itemVariant
-                    }
-                    showAssignee={showAssignee}
-                  />
-                ))}
-          </div>
+                    {group.canExpand && (
+                      <button
+                        type="button"
+                        aria-expanded={group.expanded}
+                        aria-controls={group.listId}
+                        onClick={() =>
+                          setGroupExpanded(group.key, !group.expanded)
+                        }
+                        className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+                      >
+                        {group.expanded
+                          ? "Свернуть"
+                          : `Показать ещё ${group.hiddenCount}`}
+                      </button>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
+          ) : (
+            <div id={listId} className="space-y-3">
+              {visibleTasks.map((task) => (
+                <TaskListItem
+                  key={task.id}
+                  task={task}
+                  variant={
+                    itemVariant === "default" && isOverdue(task)
+                      ? "overdue"
+                      : itemVariant
+                  }
+                  showAssignee={showAssignee}
+                />
+              ))}
+            </div>
+          )}
           {truncated && truncationMessage && (
             <p className="text-xs text-muted-foreground">
               {truncationMessage}
             </p>
           )}
-          {canExpand && (
+          {!hasVisibleGroups && canExpand && (
             <button
               type="button"
               aria-expanded={expanded}
@@ -779,6 +855,12 @@ export default function DashboardPage() {
   >({
     tasks: false,
   });
+  const [expandedTaskGroups, setExpandedTaskGroups] = useState<
+    Record<DashboardTaskGroupKey, boolean>
+  >({
+    overdue: false,
+    active: false,
+  });
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [taskScope, setTaskScope] = useState<DashboardActivityScope>("my");
   const [myUpcomingMeetings, setMyUpcomingMeetings] = useState<Meeting[]>([]);
@@ -856,6 +938,10 @@ export default function DashboardPage() {
   useEffect(() => {
     setExpandedTaskBlocks({
       tasks: false,
+    });
+    setExpandedTaskGroups({
+      overdue: false,
+      active: false,
     });
     setSelectedActivityMetric(null);
     setDashboardActivity(null);
@@ -1188,6 +1274,16 @@ export default function DashboardPage() {
     }));
   };
 
+  const setTaskGroupExpanded = (
+    groupKey: DashboardTaskGroupKey,
+    expanded: boolean,
+  ) => {
+    setExpandedTaskGroups((current) => ({
+      ...current,
+      [groupKey]: expanded,
+    }));
+  };
+
   return (
     <div className="space-y-6">
       {/* ═══════════ Compact Header ═══════════ */}
@@ -1290,6 +1386,8 @@ export default function DashboardPage() {
               onExpandedChange={(expanded) =>
                 setTaskBlockExpanded("tasks", expanded)
               }
+              groupExpansion={expandedTaskGroups}
+              onGroupExpansionChange={setTaskGroupExpanded}
               emptyContent={
                 <DashboardEmptyState
                   icon={ClipboardList}
@@ -1301,18 +1399,20 @@ export default function DashboardPage() {
               }
               itemVariant="default"
               showAssignee={currentScope !== "my"}
-              orderingHint="Сначала просроченные, затем срочные и ближайшие дедлайны"
+              orderingHint="Задачи сгруппированы по состоянию и отсортированы по срочности."
               truncated={scopedTasksTruncated}
               truncationMessage={`Загружены первые ${scopedTasks.length} задач; в полном списке может быть больше.`}
               linkHref="/tasks"
               linkLabel="На доску"
               groups={[
                 {
+                  key: "overdue",
                   title: "Просрочено",
                   tasks: scopedOpenTaskGroups.overdue,
                   itemVariant: "overdue",
                 },
                 {
+                  key: "active",
                   title: "Активные",
                   tasks: scopedOpenTaskGroups.active,
                   itemVariant: "default",
