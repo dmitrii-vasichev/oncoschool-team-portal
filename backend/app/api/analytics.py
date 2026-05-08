@@ -1,14 +1,17 @@
 import uuid
 from datetime import date, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.auth import get_current_user, require_moderator
 from app.db.database import get_session
 from app.db.models import Department, Meeting, Task, TaskUpdate, TeamMember
+from app.db.schemas import TaskResponse
 from app.services.task_visibility_service import (
     get_headed_department_ids,
     resolve_visible_department_ids,
@@ -131,6 +134,30 @@ class DashboardTasksResponse(BaseModel):
     meta: DashboardTasksMeta
 
 
+DashboardActivityScope = Literal["my", "department", "team"]
+
+
+class DashboardActivityMetric(BaseModel):
+    count: int
+    tasks: list[TaskResponse]
+    truncated: bool = False
+
+
+class DashboardActivityDelta(BaseModel):
+    current: int
+    previous: int
+    delta: int
+
+
+class DashboardActivityResponse(BaseModel):
+    scope: DashboardActivityScope
+    selected_department_id: uuid.UUID | None
+    completed: DashboardActivityMetric
+    created: DashboardActivityMetric
+    in_progress_over_7_days: DashboardActivityMetric
+    completed_delta: DashboardActivityDelta
+
+
 def _empty_dashboard_task_metrics() -> DashboardTaskMetrics:
     return DashboardTaskMetrics(
         active=0,
@@ -187,6 +214,76 @@ def _resolve_overview_scope(
     return selected_department_id, scope_filters, scope_needs_assignee_join
 
 
+def _latest_in_progress_transition_by_task(
+    updates: list[object],
+) -> dict[object, datetime]:
+    latest: dict[object, datetime] = {}
+    for update in updates:
+        if getattr(update, "update_type", None) != "status_change":
+            continue
+        if getattr(update, "new_status", None) != "in_progress":
+            continue
+        task_id = getattr(update, "task_id", None)
+        created_at = getattr(update, "created_at", None)
+        if task_id is None or created_at is None:
+            continue
+        if task_id not in latest or created_at > latest[task_id]:
+            latest[task_id] = created_at
+    return latest
+
+
+def _filter_in_progress_more_than_seven_days(
+    tasks: list[Task],
+    transitions: dict[object, datetime],
+    *,
+    now: datetime | None = None,
+) -> list[Task]:
+    reference = now or datetime.utcnow()
+    cutoff = reference - timedelta(days=7)
+    stale: list[Task] = []
+    for task in tasks:
+        if getattr(task, "status", None) != "in_progress":
+            continue
+        transition_at = transitions.get(getattr(task, "id", None))
+        if transition_at is not None and transition_at < cutoff:
+            stale.append(task)
+    return stale
+
+
+def _dashboard_activity_scope_filters(
+    *,
+    member: TeamMember,
+    visible_department_ids: list[uuid.UUID] | None,
+    scope: DashboardActivityScope,
+    department_id: uuid.UUID | None,
+) -> tuple[list[object], bool, uuid.UUID | None]:
+    if scope == "team":
+        if (
+            getattr(member, "role", None) not in ("admin", "moderator")
+            or visible_department_ids is not None
+        ):
+            raise HTTPException(status_code=403, detail="Нет доступа к задачам команды")
+        return [], False, None
+    if scope == "my":
+        return [Task.assignee_id == member.id], False, None
+    selected_department_id = department_id or member.department_id
+    if selected_department_id is None:
+        return [Task.assignee_id == member.id], False, None
+    if (
+        visible_department_ids is not None
+        and selected_department_id not in visible_department_ids
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Нет доступа к задачам выбранного отдела",
+        )
+    return (
+        [TeamMember.department_id == selected_department_id],
+        True,
+        selected_department_id,
+    )
+
+
 async def _collect_task_metrics(
     session: AsyncSession,
     *filters,
@@ -234,6 +331,123 @@ async def _collect_task_metrics(
         done_total=int(row.done_total or 0),
         done_week=int(row.done_week or 0),
     )
+
+
+async def _count_dashboard_activity_tasks(
+    session: AsyncSession,
+    *,
+    base_filters: list[object],
+    with_assignee_join: bool,
+    extra_filters: list[object],
+) -> int:
+    stmt = _apply_task_scope(
+        select(func.count(Task.id)).where(*extra_filters),
+        filters=base_filters,
+        with_assignee_join=with_assignee_join,
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
+
+
+async def _load_dashboard_activity_tasks(
+    session: AsyncSession,
+    *,
+    base_filters: list[object],
+    with_assignee_join: bool,
+    extra_filters: list[object],
+    order_by,
+    limit: int,
+) -> list[Task]:
+    stmt = (
+        select(Task)
+        .where(*extra_filters)
+        .options(
+            selectinload(Task.assignee),
+            selectinload(Task.created_by),
+            selectinload(Task.labels),
+        )
+        .limit(limit)
+    )
+    if isinstance(order_by, list | tuple):
+        stmt = stmt.order_by(*order_by)
+    else:
+        stmt = stmt.order_by(order_by)
+    stmt = _apply_task_scope(
+        stmt,
+        filters=base_filters,
+        with_assignee_join=with_assignee_join,
+    )
+    return list((await session.execute(stmt)).scalars().all())
+
+
+def _latest_in_progress_subquery():
+    return (
+        select(
+            TaskUpdate.task_id.label("task_id"),
+            func.max(TaskUpdate.created_at).label("in_progress_since"),
+        )
+        .where(
+            TaskUpdate.update_type == "status_change",
+            TaskUpdate.new_status == "in_progress",
+        )
+        .group_by(TaskUpdate.task_id)
+        .subquery()
+    )
+
+
+async def _count_in_progress_over_seven_days_tasks(
+    session: AsyncSession,
+    *,
+    base_filters: list[object],
+    with_assignee_join: bool,
+    cutoff: datetime,
+) -> int:
+    latest_in_progress = _latest_in_progress_subquery()
+    stmt = (
+        select(func.count(Task.id))
+        .join(latest_in_progress, latest_in_progress.c.task_id == Task.id)
+        .where(
+            Task.status == "in_progress",
+            latest_in_progress.c.in_progress_since < cutoff,
+        )
+    )
+    stmt = _apply_task_scope(
+        stmt,
+        filters=base_filters,
+        with_assignee_join=with_assignee_join,
+    )
+    return int((await session.execute(stmt)).scalar_one() or 0)
+
+
+async def _load_in_progress_over_seven_days_tasks(
+    session: AsyncSession,
+    *,
+    base_filters: list[object],
+    with_assignee_join: bool,
+    cutoff: datetime,
+    limit: int,
+) -> list[Task]:
+    latest_in_progress = _latest_in_progress_subquery()
+    stmt = (
+        select(Task)
+        .join(latest_in_progress, latest_in_progress.c.task_id == Task.id)
+        .where(
+            Task.status == "in_progress",
+            latest_in_progress.c.in_progress_since < cutoff,
+        )
+        .options(
+            selectinload(Task.assignee),
+            selectinload(Task.created_by),
+            selectinload(Task.labels),
+        )
+        .order_by(latest_in_progress.c.in_progress_since.asc(), Task.created_at.desc())
+        .limit(limit)
+    )
+    stmt = _apply_task_scope(
+        stmt,
+        filters=base_filters,
+        with_assignee_join=with_assignee_join,
+    )
+    return list((await session.execute(stmt)).scalars().all())
 
 
 @router.get("/dashboard-tasks", response_model=DashboardTasksResponse)
@@ -285,6 +499,127 @@ async def analytics_dashboard_tasks(
             selected_department_id=selected_department_id,
             can_view_department=can_view_department,
             is_department_head=is_department_head,
+        ),
+    )
+
+
+@router.get("/dashboard-activity", response_model=DashboardActivityResponse)
+async def analytics_dashboard_activity(
+    scope: DashboardActivityScope = Query("my"),
+    department_id: uuid.UUID | None = Query(None),
+    detail_limit: int = Query(20, ge=1, le=50),
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get recent dashboard activity details for the selected scope."""
+    visible_department_ids = await resolve_visible_department_ids(session, member)
+    base_filters, with_assignee_join, selected_department_id = (
+        _dashboard_activity_scope_filters(
+            member=member,
+            visible_department_ids=visible_department_ids,
+            scope=scope,
+            department_id=department_id,
+        )
+    )
+
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+    previous_week_start = now - timedelta(days=14)
+
+    completed_filters = [
+        Task.status == "done",
+        Task.completed_at.is_not(None),
+        Task.completed_at >= week_ago,
+    ]
+    created_filters = [
+        Task.created_at >= week_ago,
+        Task.status.notin_(TASK_EXCLUDED_FROM_TOTAL_STATUSES),
+    ]
+    current_completed_filters = completed_filters
+    previous_completed_filters = [
+        Task.status == "done",
+        Task.completed_at.is_not(None),
+        Task.completed_at >= previous_week_start,
+        Task.completed_at < week_ago,
+    ]
+
+    completed_count = await _count_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=completed_filters,
+    )
+    created_count = await _count_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=created_filters,
+    )
+    current_completed_count = await _count_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=current_completed_filters,
+    )
+    previous_completed_count = await _count_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=previous_completed_filters,
+    )
+    stale_in_progress_count = await _count_in_progress_over_seven_days_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        cutoff=week_ago,
+    )
+
+    completed_tasks = await _load_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=completed_filters,
+        order_by=Task.completed_at.desc(),
+        limit=detail_limit,
+    )
+    created_tasks = await _load_dashboard_activity_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        extra_filters=created_filters,
+        order_by=Task.created_at.desc(),
+        limit=detail_limit,
+    )
+    stale_in_progress_tasks = await _load_in_progress_over_seven_days_tasks(
+        session,
+        base_filters=base_filters,
+        with_assignee_join=with_assignee_join,
+        cutoff=week_ago,
+        limit=detail_limit,
+    )
+
+    return DashboardActivityResponse(
+        scope=scope,
+        selected_department_id=selected_department_id,
+        completed=DashboardActivityMetric(
+            count=completed_count,
+            tasks=completed_tasks,
+            truncated=completed_count > len(completed_tasks),
+        ),
+        created=DashboardActivityMetric(
+            count=created_count,
+            tasks=created_tasks,
+            truncated=created_count > len(created_tasks),
+        ),
+        in_progress_over_7_days=DashboardActivityMetric(
+            count=stale_in_progress_count,
+            tasks=stale_in_progress_tasks,
+            truncated=stale_in_progress_count > len(stale_in_progress_tasks),
+        ),
+        completed_delta=DashboardActivityDelta(
+            current=current_completed_count,
+            previous=previous_completed_count,
+            delta=current_completed_count - previous_completed_count,
         ),
     )
 
