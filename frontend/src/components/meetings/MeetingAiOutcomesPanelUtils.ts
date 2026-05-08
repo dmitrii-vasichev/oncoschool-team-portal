@@ -1,4 +1,8 @@
-import type { MeetingAIProcessingStatus, MeetingAITaskDraft } from "../../lib/types.ts";
+import type {
+  MeetingAIProcessingStatus,
+  MeetingAITaskDraft,
+  TeamMember,
+} from "../../lib/types.ts";
 
 export function splitDraftDecisionsText(text: string): string[] {
   return text
@@ -24,6 +28,80 @@ export function setAllTaskDraftsSelected(
   return taskDrafts.map((task) =>
     task.selected === selected ? task : { ...task, selected }
   );
+}
+
+function normalizeAssigneeName(value: string | null | undefined): string {
+  return (value ?? "").trim().toLocaleLowerCase("ru-RU");
+}
+
+function memberMatchesAssigneeName(member: TeamMember, assigneeName: string): boolean {
+  const normalizedName = normalizeAssigneeName(assigneeName);
+  if (!normalizedName) return false;
+  if (normalizeAssigneeName(member.full_name) === normalizedName) return true;
+  const firstName = normalizeAssigneeName(member.full_name.split(" ")[0]);
+  if (firstName === normalizedName) return true;
+  return member.name_variants.some(
+    (variant) => normalizeAssigneeName(variant) === normalizedName
+  );
+}
+
+export function resolveTaskDraftAssignee(
+  taskDraft: MeetingAITaskDraft,
+  members: TeamMember[]
+): TeamMember | null {
+  const activeMembers = members.filter((member) => member.is_active);
+  if (taskDraft.assignee_id) {
+    const memberById = activeMembers.find((member) => member.id === taskDraft.assignee_id);
+    if (memberById) return memberById;
+  }
+  const assigneeName = taskDraft.assignee_name;
+  if (!assigneeName) return null;
+  return (
+    activeMembers.find((member) =>
+      memberMatchesAssigneeName(member, assigneeName)
+    ) ?? null
+  );
+}
+
+export function getSelectedTaskDraftsMissingAssignee(
+  taskDrafts: MeetingAITaskDraft[],
+  members: TeamMember[]
+): MeetingAITaskDraft[] {
+  return taskDrafts.filter(
+    (taskDraft) => taskDraft.selected && !resolveTaskDraftAssignee(taskDraft, members)
+  );
+}
+
+export function setTaskDraftAssignee(
+  taskDrafts: MeetingAITaskDraft[],
+  index: number,
+  member: TeamMember | null
+): MeetingAITaskDraft[] {
+  return taskDrafts.map((task, taskIndex) =>
+    taskIndex === index
+      ? {
+          ...task,
+          assignee_id: member?.id ?? null,
+          assignee_name: member?.full_name ?? null,
+        }
+      : task
+  );
+}
+
+export function prepareMeetingOutcomeTaskDraftsForPublish(
+  taskDrafts: MeetingAITaskDraft[],
+  members: TeamMember[]
+): MeetingAITaskDraft[] {
+  return taskDrafts.map((taskDraft) => {
+    const assignee = resolveTaskDraftAssignee(taskDraft, members);
+    return assignee
+      ? {
+          ...taskDraft,
+          assignee_id: assignee.id,
+          assignee_name: assignee.full_name,
+        }
+      : taskDraft;
+  });
 }
 
 export function buildMeetingOutcomePublishPayload({

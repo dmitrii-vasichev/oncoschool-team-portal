@@ -451,17 +451,8 @@ class MeetingAIOutcomesService:
         if processing.status != "draft_ready":
             raise ValueError("Черновик итогов встречи ещё не готов")
 
-        claimed_processing = await self.processing_repo.claim_publish(
-            session, meeting_id=meeting.id
-        )
-        if not claimed_processing:
-            raise ValueError("Итоги встречи уже опубликованы или черновик больше не готов")
-        processing = claimed_processing
-
-        members = await self.member_repo.get_all_active(session)
-        members_by_id = {str(member.id): member for member in members}
-        selected_tasks = []
         persisted_tasks = []
+        selected_task_candidates = []
         for task in draft_tasks:
             task_data = task if isinstance(task, dict) else task.model_dump()
             persisted_task = dict(task_data)
@@ -473,13 +464,39 @@ class MeetingAIOutcomesService:
                 persisted_task["assignee_id"] = str(assignee_id)
             persisted_tasks.append(persisted_task)
 
-            if not task_data.get("selected", True):
-                continue
-            selected_task = dict(persisted_task)
-            assignee = members_by_id.get(str(selected_task.get("assignee_id")))
-            if assignee:
-                selected_task["assignee_name"] = assignee.full_name
-            selected_tasks.append(selected_task)
+            if task_data.get("selected", True):
+                selected_task_candidates.append(dict(persisted_task))
+
+        members = []
+        selected_tasks = []
+        if selected_task_candidates:
+            members = await self.member_repo.get_all_active(session)
+            members_by_id = {str(member.id): member for member in members}
+            missing_assignee_titles = []
+            for task in selected_task_candidates:
+                assignee = _resolve_task_assignee(task, members, members_by_id)
+                if not assignee:
+                    missing_assignee_titles.append(
+                        str(task.get("title") or "Без названия")
+                    )
+                    continue
+                task["assignee_id"] = str(assignee.id)
+                task["assignee_name"] = assignee.full_name
+                selected_tasks.append(task)
+
+            if missing_assignee_titles:
+                preview = ", ".join(missing_assignee_titles[:3])
+                suffix = "..." if len(missing_assignee_titles) > 3 else ""
+                raise ValueError(
+                    f"У выбранных задач должен быть исполнитель: {preview}{suffix}"
+                )
+
+        claimed_processing = await self.processing_repo.claim_publish(
+            session, meeting_id=meeting.id
+        )
+        if not claimed_processing:
+            raise ValueError("Итоги встречи уже опубликованы или черновик больше не готов")
+        processing = claimed_processing
 
         meeting.parsed_summary = draft_summary
         meeting.decisions = draft_decisions
@@ -504,3 +521,40 @@ class MeetingAIOutcomesService:
         processing.published_by_id = moderator.id
         await session.flush()
         return created_tasks
+
+
+def _normalize_member_name(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def _member_matches_name(member: TeamMember, raw_name: str | None) -> bool:
+    name = _normalize_member_name(raw_name)
+    if not name:
+        return False
+    full_name = _normalize_member_name(getattr(member, "full_name", None))
+    if full_name == name:
+        return True
+    first_name = full_name.split()[0] if full_name else ""
+    if first_name == name:
+        return True
+    for variant in getattr(member, "name_variants", []) or []:
+        if _normalize_member_name(variant) == name:
+            return True
+    return False
+
+
+def _resolve_task_assignee(
+    task: dict,
+    members: list[TeamMember],
+    members_by_id: dict[str, TeamMember],
+) -> TeamMember | None:
+    assignee_id = task.get("assignee_id")
+    if assignee_id:
+        member = members_by_id.get(str(assignee_id))
+        if member:
+            return member
+    assignee_name = task.get("assignee_name")
+    for member in members:
+        if _member_matches_name(member, assignee_name):
+            return member
+    return None

@@ -126,6 +126,9 @@
   - Manual Zoom audio transcription is moderator-triggered, uses temporary audio files only, and stores transcript text plus processing metadata.
   - AI outcome draft generation creates editable summary, decisions, and task candidates.
   - Publishing is moderator-confirmed and now requires `draft_ready` on both the frontend and backend API path.
+  - AI outcome publishing now opens a confirmation dialog that previews saved summary, saved decisions, and created tasks before the final publish call.
+  - Selected task candidates must resolve to an active team member before publication; moderators can assign or skip candidates in the confirmation dialog.
+  - Backend publishing now rejects selected task candidates without a resolved assignee instead of silently assigning them to the publishing moderator.
   - The frontend meeting detail page opens a separate shareable board route and shows a moderator-only AI outcomes panel.
   - The board route displays scope counts, task sections, materials, and notes; inline board-composition editing remains a follow-up UI on top of the implemented settings API.
 - Key approved decisions:
@@ -138,8 +141,11 @@
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_board_service.py tests/test_meeting_board_api.py tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q` passed: 37 tests.
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 354 tests.
   - `cd frontend && npm test` passed: 32 tests.
+  - `cd frontend && npm test` passed: 48 tests after the outcome publish confirmation update.
   - `cd frontend && npx tsc --noEmit` passed.
   - `cd frontend && npm run lint` passed.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_service.py -q` passed: 35 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_api.py -q` passed: 9 tests.
   - `cd frontend && npm run build` passed, including `/meetings/[id]/board`.
   - `git diff --check` passed.
   - Frontend dev server started at `http://127.0.0.1:3003`; in-app browser smoke confirmed unauthenticated `/meetings` and `/meetings/{id}/board` reach the existing login flow.

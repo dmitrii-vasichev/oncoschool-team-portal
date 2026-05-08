@@ -5,13 +5,16 @@ import {
   canPublishMeetingOutcomes,
   formatMeetingProcessingBadge,
   formatMeetingTranscriptionStatus,
+  getSelectedTaskDraftsMissingAssignee,
   isMeetingTranscriptionActive,
+  prepareMeetingOutcomeTaskDraftsForPublish,
   shouldShowMeetingTranscriptionStatus,
   splitDraftDecisionsText,
   setAllTaskDraftsSelected,
+  setTaskDraftAssignee,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils.ts";
-import type { MeetingAITaskDraft } from "../../lib/types.ts";
+import type { MeetingAITaskDraft, TeamMember } from "../../lib/types.ts";
 
 function taskDraft(overrides: Partial<MeetingAITaskDraft> = {}): MeetingAITaskDraft {
   return {
@@ -22,6 +25,28 @@ function taskDraft(overrides: Partial<MeetingAITaskDraft> = {}): MeetingAITaskDr
     deadline: null,
     priority: "normal",
     selected: true,
+    ...overrides,
+  };
+}
+
+function teamMember(overrides: Partial<TeamMember> = {}): TeamMember {
+  return {
+    id: "member-1",
+    telegram_id: null,
+    telegram_username: null,
+    full_name: "Мария Иванова",
+    name_variants: ["Мария", "Маша"],
+    department_id: null,
+    extra_department_ids: [],
+    position: null,
+    email: null,
+    birthday: null,
+    avatar_url: null,
+    role: "member",
+    is_test: false,
+    is_active: true,
+    created_at: "2026-05-08T00:00:00Z",
+    updated_at: "2026-05-08T00:00:00Z",
     ...overrides,
   };
 }
@@ -61,6 +86,46 @@ test("setAllTaskDraftsSelected updates every task draft", () => {
     taskDraft({ title: "First", selected: true }),
     taskDraft({ title: "Second", selected: true }),
     taskDraft({ title: "Third", selected: true }),
+  ]);
+});
+
+test("getSelectedTaskDraftsMissingAssignee ignores skipped tasks and resolves name variants", () => {
+  const members = [teamMember()];
+  const drafts = [
+    taskDraft({ title: "Resolved by id", assignee_id: "member-1", assignee_name: null }),
+    taskDraft({ title: "Resolved by variant", assignee_id: null, assignee_name: "Маша" }),
+    taskDraft({ title: "Skipped missing", selected: false, assignee_id: null, assignee_name: null }),
+    taskDraft({ title: "Selected missing", assignee_id: null, assignee_name: null }),
+  ];
+
+  assert.deepEqual(getSelectedTaskDraftsMissingAssignee(drafts, members), [
+    taskDraft({ title: "Selected missing", assignee_id: null, assignee_name: null }),
+  ]);
+});
+
+test("setTaskDraftAssignee and prepareMeetingOutcomeTaskDraftsForPublish store resolved member ids", () => {
+  const maria = teamMember();
+  const drafts = [
+    taskDraft({ title: "Manual assignment", assignee_id: null, assignee_name: null }),
+    taskDraft({ title: "Name from AI", assignee_id: null, assignee_name: "Мария" }),
+  ];
+
+  assert.deepEqual(setTaskDraftAssignee(drafts, 0, maria), [
+    taskDraft({
+      title: "Manual assignment",
+      assignee_id: "member-1",
+      assignee_name: "Мария Иванова",
+    }),
+    taskDraft({ title: "Name from AI", assignee_id: null, assignee_name: "Мария" }),
+  ]);
+
+  assert.deepEqual(prepareMeetingOutcomeTaskDraftsForPublish(drafts, [maria]), [
+    taskDraft({ title: "Manual assignment", assignee_id: null, assignee_name: null }),
+    taskDraft({
+      title: "Name from AI",
+      assignee_id: "member-1",
+      assignee_name: "Мария Иванова",
+    }),
   ]);
 });
 
