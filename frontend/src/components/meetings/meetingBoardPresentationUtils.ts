@@ -19,10 +19,12 @@ export function getMeetingBoardScopeCounts(settings: MeetingBoardSettings): {
   addedMemberCount: number;
   addedDepartmentCount: number;
   pinnedTaskCount: number;
+  focusLabelCount: number;
 } {
   return {
     addedMemberCount: settings.added_member_ids.length,
     addedDepartmentCount: settings.added_department_ids.length,
     pinnedTaskCount: settings.pinned_task_ids.length,
+    focusLabelCount: settings.focus_label_ids.length,
   };
 }

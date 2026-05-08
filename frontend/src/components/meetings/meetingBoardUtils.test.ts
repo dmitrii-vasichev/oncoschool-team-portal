@@ -37,6 +37,7 @@ function task(overrides: Partial<Task>): Task {
 test("MEETING_BOARD_SECTIONS preserves board group order", () => {
   assert.deepEqual(MEETING_BOARD_SECTIONS, [
     "urgent",
+    "new",
     "in_progress",
     "review",
     "done_this_week",
@@ -55,6 +56,13 @@ test("getMeetingBoardSectionMeta returns metadata for all board groups", () => {
         },
       ],
       [
+        "new",
+        {
+          label: "Новые",
+          tone: "border-border/70 bg-card/70",
+        },
+      ],
+      [
         "in_progress",
         {
           label: "В работе",
@@ -64,14 +72,14 @@ test("getMeetingBoardSectionMeta returns metadata for all board groups", () => {
       [
         "review",
         {
-          label: "На проверке",
+          label: "На согласовании",
           tone: "border-status-review-fg/25 bg-status-review-bg/50",
         },
       ],
       [
         "done_this_week",
         {
-          label: "Выполнено за неделю",
+          label: "Выполнено за 7 дней",
           tone: "border-status-done-fg/25 bg-status-done-bg/50",
         },
       ],

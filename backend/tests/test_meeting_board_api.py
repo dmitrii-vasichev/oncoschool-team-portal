@@ -49,6 +49,7 @@ class MeetingBoardApiTests(unittest.IsolatedAsyncioTestCase):
             added_member_ids=[],
             added_department_ids=[],
             pinned_task_ids=[],
+            focus_label_ids=[],
             materials=[],
             board_notes=None,
             created_by_id=None,
@@ -56,7 +57,13 @@ class MeetingBoardApiTests(unittest.IsolatedAsyncioTestCase):
             created_at=None,
             updated_at=None,
         )
-        groups = SimpleNamespace(urgent=[], in_progress=[], review=[], done_this_week=[])
+        groups = SimpleNamespace(
+            urgent=[],
+            new=[],
+            in_progress=[],
+            review=[],
+            done_this_week=[],
+        )
         session = SimpleNamespace(commit=AsyncMock())
 
         with patch.object(
@@ -76,6 +83,7 @@ class MeetingBoardApiTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(response.settings.meeting_id, meeting_id)
         self.assertEqual(response.urgent, [])
+        self.assertEqual(response.new, [])
         session.commit.assert_awaited_once()
 
     async def test_update_board_settings_persists_board_notes(self) -> None:
@@ -89,6 +97,7 @@ class MeetingBoardApiTests(unittest.IsolatedAsyncioTestCase):
             added_member_ids=[],
             added_department_ids=[],
             pinned_task_ids=[],
+            focus_label_ids=[],
             materials=[],
             board_notes="Notes",
             created_by_id=None,
@@ -130,3 +139,56 @@ class MeetingBoardApiTests(unittest.IsolatedAsyncioTestCase):
         session.commit.assert_awaited_once()
         self.assertEqual(response.board_notes, "Notes")
         self.assertEqual(response.updated_by_id, member.id)
+
+    async def test_update_board_settings_persists_focus_label_ids(self) -> None:
+        meeting_id = uuid.uuid4()
+        focus_label_ids = [uuid.uuid4(), uuid.uuid4()]
+        member = SimpleNamespace(id=uuid.uuid4(), role="moderator")
+        meeting = SimpleNamespace(id=meeting_id)
+        existing_settings = SimpleNamespace(id=uuid.uuid4(), meeting_id=meeting_id)
+        updated_settings = SimpleNamespace(
+            id=existing_settings.id,
+            meeting_id=meeting_id,
+            added_member_ids=[],
+            added_department_ids=[],
+            pinned_task_ids=[],
+            focus_label_ids=focus_label_ids,
+            materials=[],
+            board_notes=None,
+            created_by_id=None,
+            updated_by_id=member.id,
+            created_at=None,
+            updated_at=None,
+        )
+        session = SimpleNamespace(commit=AsyncMock())
+
+        get_or_create = AsyncMock(return_value=existing_settings)
+        update = AsyncMock(return_value=updated_settings)
+        with patch.object(
+            meetings_api.meeting_service,
+            "get_meeting_by_id",
+            AsyncMock(return_value=meeting),
+        ), patch.object(
+            meetings_api.meeting_board_service.board_repo,
+            "get_or_create",
+            get_or_create,
+        ), patch.object(
+            meetings_api.meeting_board_service.board_repo,
+            "update",
+            update,
+        ):
+            response = await meetings_api.update_meeting_board_settings(
+                meeting_id=meeting_id,
+                data=MeetingBoardSettingsUpdate(focus_label_ids=focus_label_ids),
+                member=member,
+                session=session,
+            )
+
+        update.assert_awaited_once_with(
+            session,
+            existing_settings,
+            member=member,
+            focus_label_ids=focus_label_ids,
+        )
+        session.commit.assert_awaited_once()
+        self.assertEqual(response.focus_label_ids, focus_label_ids)

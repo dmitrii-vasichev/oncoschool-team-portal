@@ -696,6 +696,7 @@ async def get_meeting_board(
         meeting=_meeting_response(meeting),
         settings=MeetingBoardSettingsResponse.model_validate(settings),
         urgent=groups.urgent,
+        new=groups.new,
         in_progress=groups.in_progress,
         review=groups.review,
         done_this_week=groups.done_this_week,

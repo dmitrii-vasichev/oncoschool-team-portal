@@ -1,5 +1,29 @@
 # Test Plan
 
+## Meeting Board Focus
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_board_service.py tests/test_meeting_board_api.py -q`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a meeting board with no focus labels and confirm it behaves like the previous board, with the added `Новые` section.
+2. Select a focus label as a moderator and confirm unrelated participant tasks disappear.
+3. Confirm participant, added-member, and added-department tasks with any selected focus label remain visible.
+4. Confirm a pinned task without a selected focus label remains visible when the viewer can access it.
+5. Log in as a user with narrower department visibility and confirm matching focus labels do not reveal hidden tasks.
+6. Confirm cancelled tasks do not appear on the board.
+7. Move a task to `done` and confirm it appears in `Выполнено за 7 дней`.
+8. Confirm the review section displays as `На согласовании`.
+9. Confirm the compact scope summary leaves more room for task sections during screen sharing.
+10. Confirm regular participants see the focus summary read-only and cannot update board settings.
+
 ## Long Meeting Audio Transcription
 
 ### Automated

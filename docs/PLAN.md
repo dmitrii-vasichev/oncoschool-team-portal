@@ -1,4 +1,55 @@
-# Active Plan: Long Meeting Audio Transcription
+# Active Plan: Meeting Board Focus
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-meeting-board-focus.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Add topical focus labels and improved task sections to the meeting board while preserving current behavior when no focus is selected.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-08-meeting-board-focus-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-08-meeting-board-focus.md`
+
+**Milestones:**
+
+1. Extend meeting board settings with `focus_label_ids`.
+2. Filter participant, added-member, and added-department tasks by focus labels when configured.
+3. Keep pinned tasks as focus-filter exceptions without bypassing task visibility.
+4. Add a `New` board section and exclude cancelled tasks.
+5. Rename the board review section to `На согласовании` and clarify completed wording as `Выполнено за 7 дней`.
+6. Replace the persistent scope column with a compact scope summary and moderator settings sheet.
+7. Update docs and run backend/frontend verification.
+
+**Implementation status:**
+
+- Implemented in branch `codex/meeting-board-focus`; automated verification passed.
+- Backend data contract, focus filtering, pinned exceptions, new section grouping, and cancelled exclusion are implemented.
+- Frontend board sections, type contract, restricted focus-label picker, compact scope summary, and settings sheet are implemented.
+
+**Definition of done:**
+
+- Boards without focus labels behave like the previous board, except for the added `New` section and wording cleanup.
+- Boards with focus labels show participant, added-member, and added-department tasks only when tasks have at least one selected focus label.
+- Pinned tasks remain visible despite focus labels when the viewer can already access them.
+- Focus labels never reveal tasks outside existing visibility rules.
+- New tasks appear on the meeting board.
+- Cancelled tasks do not appear on the meeting board.
+- The review section displays as `На согласовании`.
+- Completed tasks are shown by `completed_at` within the last 7 days.
+- The scope UI is compact by default and editable through a moderator-only sheet.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_board_service.py tests/test_meeting_board_api.py -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Long Meeting Audio Transcription
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-07-long-meeting-audio-transcription.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 

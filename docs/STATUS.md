@@ -1,5 +1,32 @@
 # Status
 
+## Meeting Board Focus
+
+- Current phase: implemented; automated verification passed
+- Spec: `docs/superpowers/specs/2026-05-08-meeting-board-focus-design.md`
+- Plan: `docs/superpowers/plans/2026-05-08-meeting-board-focus.md`
+- Scope: meeting board topical focus labels, new section, section wording cleanup, compact scope settings
+- Latest progress:
+  - Added `focus_label_ids` to meeting board settings data contract and migration.
+  - Added backend focus filtering for participant, added-member, and added-department tasks.
+  - Kept pinned tasks as focus-filter exceptions while preserving existing visibility checks.
+  - Added the `new` board group and excluded cancelled tasks from board grouping.
+  - Updated frontend board section order and wording.
+  - Added a restricted meeting-focus label picker, compact scope summary, and moderator settings sheet.
+- Key approved decisions:
+  - Use existing task labels for meeting focus; do not add a Project or Workspace entity.
+  - If no focus labels are selected, preserve current task selection behavior.
+  - Focus labels do not grant visibility and do not attach labels to tasks.
+  - Pinned tasks bypass only the focus filter, not task visibility.
+  - MeetingSchedule-level default focus labels stay a future enhancement.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_board_service.py tests/test_meeting_board_api.py -q` passed: 11 tests.
+  - `cd frontend && npm test` passed: 36 tests.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed, including `/meetings/[id]/board`.
+  - `git diff --check` passed.
+
 ## Long Meeting Audio Transcription
 
 - Current phase: implemented; automated verification passed

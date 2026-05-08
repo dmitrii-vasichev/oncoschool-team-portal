@@ -501,6 +501,9 @@ class MeetingBoardSettings(Base):
     pinned_task_ids: Mapped[list[uuid.UUID]] = mapped_column(
         ARRAY(UUID(as_uuid=True)), default=list, server_default="{}"
     )
+    focus_label_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), default=list, server_default="{}"
+    )
     materials: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default="[]", nullable=False
     )

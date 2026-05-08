@@ -36,7 +36,12 @@ export type MeetingAIProcessingStatus =
   | "draft_ready"
   | "published"
   | "failed";
-export type MeetingBoardSectionKey = "urgent" | "in_progress" | "review" | "done_this_week";
+export type MeetingBoardSectionKey =
+  | "urgent"
+  | "new"
+  | "in_progress"
+  | "review"
+  | "done_this_week";
 export type TelegramBroadcastStatus = "scheduled" | "sent" | "failed" | "cancelled";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
@@ -205,6 +210,7 @@ export interface MeetingBoardSettings {
   added_member_ids: string[];
   added_department_ids: string[];
   pinned_task_ids: string[];
+  focus_label_ids: string[];
   materials: MeetingBoardMaterial[];
   board_notes: string | null;
   created_by_id: string | null;
@@ -217,6 +223,7 @@ export interface MeetingBoardResponse {
   meeting: Meeting;
   settings: MeetingBoardSettings;
   urgent: Task[];
+  new: Task[];
   in_progress: Task[];
   review: Task[];
   done_this_week: Task[];

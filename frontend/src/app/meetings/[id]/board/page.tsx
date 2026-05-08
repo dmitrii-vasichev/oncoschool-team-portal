@@ -18,7 +18,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useTeam } from "@/hooks/useTeam";
 import { api } from "@/lib/api";
 import { PermissionService } from "@/lib/permissions";
-import type { MeetingBoardResponse } from "@/lib/types";
+import type { MeetingBoardResponse, MeetingBoardSettings, TaskLabel } from "@/lib/types";
 
 export default function MeetingBoardPage() {
   const params = useParams();
@@ -30,6 +30,7 @@ export default function MeetingBoardPage() {
   const { setPageTitle } = usePageTitle();
 
   const [board, setBoard] = useState<MeetingBoardResponse | null>(null);
+  const [taskLabels, setTaskLabels] = useState<TaskLabel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,12 @@ export default function MeetingBoardPage() {
       setError(null);
       const data = await api.getMeetingBoard(meetingId);
       setBoard(data);
+      try {
+        const labels = await api.getTaskLabels({ limit: 100 });
+        setTaskLabels(labels);
+      } catch {
+        setTaskLabels([]);
+      }
     } catch (e) {
       const message =
         e instanceof Error ? e.message : "Не удалось загрузить доску встречи";
@@ -54,6 +61,33 @@ export default function MeetingBoardPage() {
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
+
+  const updateBoardSettings = useCallback(
+    async (
+      data: Partial<
+        Pick<
+          MeetingBoardSettings,
+          | "added_member_ids"
+          | "added_department_ids"
+          | "pinned_task_ids"
+          | "focus_label_ids"
+          | "materials"
+          | "board_notes"
+        >
+      >,
+    ) => {
+      await api.updateMeetingBoardSettings(meetingId, data);
+      const nextBoard = await api.getMeetingBoard(meetingId);
+      setBoard(nextBoard);
+      try {
+        const labels = await api.getTaskLabels({ limit: 100 });
+        setTaskLabels(labels);
+      } catch {
+        setTaskLabels([]);
+      }
+    },
+    [meetingId],
+  );
 
   useEffect(() => {
     if (board?.meeting.title) {
@@ -112,23 +146,23 @@ export default function MeetingBoardPage() {
         participantCount={board.meeting.participant_ids.length}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <MeetingBoardScopePanel
-          settings={board.settings}
-          members={members}
-          departments={departments}
-          isModerator={isModerator}
-        />
+      <MeetingBoardScopePanel
+        settings={board.settings}
+        members={members}
+        departments={departments}
+        focusLabels={taskLabels}
+        isModerator={isModerator}
+        onUpdateSettings={updateBoardSettings}
+      />
 
-        <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {MEETING_BOARD_SECTIONS.map((sectionKey) => (
-            <MeetingBoardSection
-              key={sectionKey}
-              sectionKey={sectionKey}
-              tasks={board[sectionKey]}
-            />
-          ))}
-        </div>
+      <div className="grid items-start gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {MEETING_BOARD_SECTIONS.map((sectionKey) => (
+          <MeetingBoardSection
+            key={sectionKey}
+            sectionKey={sectionKey}
+            tasks={board[sectionKey]}
+          />
+        ))}
       </div>
 
       <MeetingBoardMaterials settings={board.settings} />

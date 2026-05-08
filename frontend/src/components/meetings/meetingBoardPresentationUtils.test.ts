@@ -13,6 +13,7 @@ function settings(overrides: Partial<MeetingBoardSettings>): MeetingBoardSetting
     added_member_ids: [],
     added_department_ids: [],
     pinned_task_ids: [],
+    focus_label_ids: [],
     materials: [],
     board_notes: null,
     created_by_id: null,
@@ -49,12 +50,14 @@ test("getMeetingBoardScopeCounts uses raw settings lengths", () => {
         added_member_ids: ["missing-member", "loaded-member"],
         added_department_ids: ["missing-department"],
         pinned_task_ids: ["task-1", "task-2", "task-3"],
+        focus_label_ids: ["label-1", "label-2"],
       })
     ),
     {
       addedMemberCount: 2,
       addedDepartmentCount: 1,
       pinnedTaskCount: 3,
+      focusLabelCount: 2,
     }
   );
 });

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.exc import IntegrityError
 
 from app.db.repositories import MeetingBoardRepository
@@ -80,6 +81,22 @@ def test_group_board_tasks_accepts_timezone_aware_completed_at() -> None:
     assert [t.short_id for t in grouped.done_this_week] == [22]
 
 
+def test_group_board_tasks_includes_new_tasks_and_excludes_cancelled() -> None:
+    grouped = group_board_tasks(
+        [
+            task(short_id=23, status="new", priority="normal"),
+            task(short_id=24, status="cancelled", priority="urgent"),
+            task(short_id=25, status="new", priority="urgent"),
+        ],
+        now=datetime(2026, 5, 7, 12, 0, 0),
+    )
+
+    assert [t.short_id for t in grouped.new] == [23]
+    assert [t.short_id for t in grouped.urgent] == [25]
+    assert grouped.in_progress == []
+    assert grouped.review == []
+
+
 class FakeScalarResult:
     def __init__(self, tasks):
         self.tasks = tasks
@@ -132,6 +149,46 @@ async def test_load_visible_tasks_rechecks_pinned_task_access() -> None:
     assert can_access.await_count == 2
     can_access.assert_any_await(session, viewer, allowed_task)
     can_access.assert_any_await(session, viewer, blocked_task)
+
+
+@pytest.mark.asyncio
+async def test_load_visible_tasks_applies_focus_labels_to_people_scope() -> None:
+    visible_task = task(short_id=32)
+    session = SimpleNamespace(
+        execute=AsyncMock(return_value=FakeExecuteResult([visible_task]))
+    )
+    service = MeetingBoardService()
+    participant_id = uuid.uuid4()
+    pinned_task_id = uuid.uuid4()
+    focus_label_id = uuid.uuid4()
+    meeting = SimpleNamespace(
+        participants=[SimpleNamespace(member_id=participant_id)]
+    )
+    settings = SimpleNamespace(
+        added_member_ids=[],
+        added_department_ids=[],
+        pinned_task_ids=[pinned_task_id],
+        focus_label_ids=[focus_label_id],
+    )
+    viewer = SimpleNamespace(id=uuid.uuid4())
+
+    with patch(
+        "app.services.meeting_board_service.resolve_visible_department_ids",
+        AsyncMock(return_value=None),
+    ), patch(
+        "app.services.meeting_board_service.can_access_task",
+        AsyncMock(return_value=True),
+    ):
+        visible_tasks = await service._load_visible_tasks(
+            session, meeting, settings, viewer
+        )
+
+    assert visible_tasks == [visible_task]
+    stmt = session.execute.await_args.args[0]
+    compiled = str(stmt.compile(dialect=postgresql.dialect()))
+    assert "task_label_links" in compiled
+    assert "label_id" in compiled
+    assert "tasks.id IN" in compiled
 
 
 @pytest.mark.asyncio

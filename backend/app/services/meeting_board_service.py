@@ -2,11 +2,11 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Meeting, MeetingBoardSettings, Task, TeamMember
+from app.db.models import Meeting, MeetingBoardSettings, Task, TaskLabel, TeamMember
 from app.db.repositories import MeetingBoardRepository
 from app.services.task_visibility_service import (
     can_access_task,
@@ -17,6 +17,7 @@ from app.services.task_visibility_service import (
 @dataclass
 class BoardTaskGroups:
     urgent: list[Task] = field(default_factory=list)
+    new: list[Task] = field(default_factory=list)
     in_progress: list[Task] = field(default_factory=list)
     review: list[Task] = field(default_factory=list)
     done_this_week: list[Task] = field(default_factory=list)
@@ -43,6 +44,8 @@ def group_board_tasks(
         if task.id in seen:
             continue
         seen.add(task.id)
+        if task.status == "cancelled":
+            continue
         if task.status == "done":
             completed_at = getattr(task, "completed_at", None)
             if completed_at and _to_utc_naive(completed_at) >= done_cutoff:
@@ -50,6 +53,9 @@ def group_board_tasks(
             continue
         if task.priority == "urgent":
             groups.urgent.append(task)
+            continue
+        if task.status == "new":
+            groups.new.append(task)
             continue
         if task.status == "in_progress":
             groups.in_progress.append(task)
@@ -82,6 +88,7 @@ class MeetingBoardService:
         )
         department_ids = list(settings.added_department_ids or [])
         pinned_ids = list(settings.pinned_task_ids or [])
+        focus_label_ids = list(getattr(settings, "focus_label_ids", []) or [])
 
         visible_department_ids = await resolve_visible_department_ids(session, viewer)
 
@@ -91,11 +98,23 @@ class MeetingBoardService:
             selectinload(Task.labels),
         )
 
-        filters = []
+        people_filters = []
         if member_ids:
-            filters.append(Task.assignee_id.in_(member_ids))
+            people_filters.append(Task.assignee_id.in_(member_ids))
         if department_ids:
-            filters.append(Task.assignee.has(TeamMember.department_id.in_(department_ids)))
+            people_filters.append(
+                Task.assignee.has(TeamMember.department_id.in_(department_ids))
+            )
+
+        filters = []
+        if people_filters:
+            people_scope = or_(*people_filters)
+            if focus_label_ids:
+                people_scope = and_(
+                    people_scope,
+                    Task.labels.any(TaskLabel.id.in_(focus_label_ids)),
+                )
+            filters.append(people_scope)
         if pinned_ids:
             filters.append(Task.id.in_(pinned_ids))
         if not filters:

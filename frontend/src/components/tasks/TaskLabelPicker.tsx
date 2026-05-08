@@ -52,6 +52,8 @@ export function TaskLabelPicker({
   displayMode = "chips",
   triggerClassName,
   showChevron = false,
+  allowCreate = true,
+  showManagementActions = true,
 }: {
   value: TaskLabel[];
   onChange: (labels: TaskLabel[]) => void;
@@ -62,6 +64,8 @@ export function TaskLabelPicker({
   displayMode?: TaskLabelPickerDisplayMode;
   triggerClassName?: string;
   showChevron?: boolean;
+  allowCreate?: boolean;
+  showManagementActions?: boolean;
 }) {
   const { user } = useCurrentUser();
   const { toastError, toastSuccess } = useToast();
@@ -87,6 +91,7 @@ export function TaskLabelPicker({
   const controlsDisabled = disabled || creating;
   const normalizedSearch = search.trim();
   const canCreate =
+    allowCreate &&
     normalizedSearch.length > 0 &&
     !options.some(
       (label) => label.name.toLowerCase() === normalizedSearch.toLowerCase()
@@ -166,7 +171,7 @@ export function TaskLabelPicker({
   }
 
   async function createLabel() {
-    if (!normalizedSearch || controlsDisabled) return;
+    if (!allowCreate || !normalizedSearch || controlsDisabled) return;
     const labelName = normalizedSearch;
     const selectedIdsAtCall = new Set(valueRef.current.map((label) => label.id));
     setCreating(true);
@@ -333,32 +338,33 @@ export function TaskLabelPicker({
                       )}
                     </span>
                   </button>
-                  {(canEditTaskLabel(label) || canArchiveTaskLabel(label)) && (
-                    <span className="flex shrink-0 items-center pr-1">
-                      {canEditTaskLabel(label) && (
-                        <button
-                          type="button"
-                          aria-label={`Редактировать метку ${label.name}`}
-                          disabled={controlsDisabled}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
-                          onClick={() => setEditingLabel(label)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {canArchiveTaskLabel(label) && (
-                        <button
-                          type="button"
-                          aria-label={`Архивировать метку ${label.name}`}
-                          disabled={controlsDisabled}
-                          className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
-                          onClick={() => setArchiveLabel(label)}
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </span>
-                  )}
+                  {showManagementActions &&
+                    (canEditTaskLabel(label) || canArchiveTaskLabel(label)) && (
+                      <span className="flex shrink-0 items-center pr-1">
+                        {canEditTaskLabel(label) && (
+                          <button
+                            type="button"
+                            aria-label={`Редактировать метку ${label.name}`}
+                            disabled={controlsDisabled}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                            onClick={() => setEditingLabel(label)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        {canArchiveTaskLabel(label) && (
+                          <button
+                            type="button"
+                            aria-label={`Архивировать метку ${label.name}`}
+                            disabled={controlsDisabled}
+                            className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                            onClick={() => setArchiveLabel(label)}
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </span>
+                    )}
                 </div>
               ))}
             {!loading && loadError && (
@@ -434,7 +440,7 @@ export function TaskLabelPicker({
               ))}
             </div>
           )}
-          {isModerator && (
+          {isModerator && showManagementActions && (
             <div className="mt-2 border-t border-border/60 pt-2">
               <Link
                 href="/settings?tab=task-labels"

@@ -298,6 +298,7 @@ class MeetingBoardSettingsUpdate(BaseModel):
     added_member_ids: list[uuid.UUID] | None = None
     added_department_ids: list[uuid.UUID] | None = None
     pinned_task_ids: list[uuid.UUID] | None = None
+    focus_label_ids: list[uuid.UUID] | None = None
     materials: list[MeetingBoardMaterial] | None = None
     board_notes: str | None = None
 
@@ -310,6 +311,7 @@ class MeetingBoardSettingsResponse(BaseModel):
     added_member_ids: list[uuid.UUID] = Field(default_factory=list)
     added_department_ids: list[uuid.UUID] = Field(default_factory=list)
     pinned_task_ids: list[uuid.UUID] = Field(default_factory=list)
+    focus_label_ids: list[uuid.UUID] = Field(default_factory=list)
     materials: list[MeetingBoardMaterial] = Field(default_factory=list)
     board_notes: str | None = None
     created_by_id: uuid.UUID | None = None
@@ -322,6 +324,7 @@ class MeetingBoardResponse(BaseModel):
     meeting: MeetingResponse
     settings: MeetingBoardSettingsResponse
     urgent: list[TaskResponse] = Field(default_factory=list)
+    new: list[TaskResponse] = Field(default_factory=list)
     in_progress: list[TaskResponse] = Field(default_factory=list)
     review: list[TaskResponse] = Field(default_factory=list)
     done_this_week: list[TaskResponse] = Field(default_factory=list)

@@ -415,7 +415,7 @@ class ApiClient {
 
   async updateMeetingBoardSettings(
     meetingId: string,
-    data: Partial<Pick<MeetingBoardSettings, "added_member_ids" | "added_department_ids" | "pinned_task_ids" | "materials" | "board_notes">>
+    data: Partial<Pick<MeetingBoardSettings, "added_member_ids" | "added_department_ids" | "pinned_task_ids" | "focus_label_ids" | "materials" | "board_notes">>
   ): Promise<MeetingBoardSettings> {
     return this.request<MeetingBoardSettings>(`/api/meetings/${meetingId}/board/settings`, {
       method: "PATCH",

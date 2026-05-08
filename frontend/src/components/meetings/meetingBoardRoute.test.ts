@@ -41,9 +41,12 @@ test("meeting board components keep the required shareable-board affordances", (
   assert.match(section, /isMeetingBoardTaskOverdue/);
   assert.match(section, /TaskCard/);
   assert.match(section, /dashed/);
-  assert.match(scopePanel, /Добавить/);
-  assert.match(scopePanel, /UserPlus/);
-  assert.match(scopePanel, /disabled/);
+  assert.match(scopePanel, /Настроить/);
+  assert.match(scopePanel, /SheetContent/);
+  assert.match(scopePanel, /TaskLabelPicker/);
+  assert.match(scopePanel, /Фокус встречи/);
+  assert.match(scopePanel, /focus_label_ids/);
+  assert.match(scopePanel, /allowCreate=\{false\}/);
   assert.match(scopePanel, /getMeetingBoardScopeCounts/);
   assert.match(materials, /Материалы пока не добавлены/);
   assert.match(materials, /sanitizeMeetingBoardMaterialUrl/);
