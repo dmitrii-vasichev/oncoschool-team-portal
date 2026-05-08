@@ -1,4 +1,47 @@
-# Active Plan: Dashboard Task Activity Redesign
+# Active Plan: Dashboard Task Columns
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-columns.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Render overdue and active dashboard tasks as readable internal columns on desktop while keeping a stacked, no-scroll mobile layout.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-08-dashboard-task-columns-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-08-dashboard-task-columns.md`
+
+**Milestones:**
+
+1. Add frontend source guards for the grouped-column task block, updated explanatory copy, and no-overdue badge behavior.
+2. Update the dashboard task block presenter so `Просрочено` and `Активные` render as internal responsive groups with independent expansion.
+3. Run frontend verification and update status.
+
+**Implementation status:**
+
+- Planned; implementation not started.
+
+**Definition of done:**
+
+- With overdue and active tasks, the dashboard task block shows two internal groups on desktop: `Просрочено` and `Активные`.
+- Overdue tasks appear only in `Просрочено`.
+- Active non-overdue tasks appear only in `Активные`.
+- The explanatory line reads `Задачи сгруппированы по состоянию и отсортированы по срочности.`
+- With zero overdue tasks, the dashboard shows no empty overdue group, no red zero badge, and active tasks use the available width.
+- With zero open tasks, the existing empty task state appears without group headings.
+- On mobile, groups stack vertically with `Просрочено` before `Активные`.
+- The `Активность за 7 дней` card remains unchanged.
+
+**Validation commands:**
+
+```bash
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Dashboard Task Activity Redesign
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-activity-redesign.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
