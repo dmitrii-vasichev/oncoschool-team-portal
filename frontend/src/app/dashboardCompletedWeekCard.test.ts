@@ -55,3 +55,36 @@ test("dashboard activity card replaces the completed-week task card", () => {
   assert.doesNotMatch(source, /title="Выполнено за 7 дней"/);
   assert.doesNotMatch(source, /blockKey="completed"/);
 });
+
+test("dashboard task block uses responsive grouped columns and universal ordering copy", () => {
+  const source = readSource("app/page.tsx");
+  const block = source.match(
+    /function DashboardTaskBlock[\s\S]*?function DashboardActivityCard/,
+  );
+
+  assert.ok(block, "dashboard task block source should exist");
+  assert.match(source, /type DashboardTaskGroupKey = "overdue" \| "active"/);
+  assert.match(block[0], /groupExpansion/);
+  assert.match(block[0], /xl:grid-cols-2/);
+  assert.match(block[0], /md:grid-cols-2/);
+  assert.match(block[0], /dashboard-\$\{blockKey\}-\$\{group.key\}-tasks/);
+  assert.match(
+    source,
+    /Задачи сгруппированы по состоянию и отсортированы по срочности\./,
+  );
+  assert.doesNotMatch(source, /Сначала просроченные/);
+});
+
+test("dashboard task badges avoid a red zero-overdue state", () => {
+  const source = readSource("app/page.tsx");
+  const badgeBlock = source.match(
+    /const taskBadges: BadgeInfo\[] = \[[\s\S]*?const scopedMeetingsTotal/,
+  );
+
+  assert.ok(badgeBlock, "task badge source should exist");
+  assert.match(
+    badgeBlock[0],
+    /if \(scopedOpenTaskGroups\.overdue\.length > 0\)/,
+  );
+  assert.doesNotMatch(badgeBlock[0], /value:\s*0/);
+});
