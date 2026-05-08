@@ -1,5 +1,25 @@
 # Status
 
+## Dashboard Task Block Expansion
+
+- Current phase: planned; ready for implementation
+- Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-block-expansion-design.md`
+- Plan: `docs/superpowers/plans/2026-05-08-dashboard-task-block-expansion.md`
+- Scope: dashboard task block ordering, inline expand/collapse behavior, completed-week discoverability, source guards, and frontend verification
+- Latest progress:
+  - Confirmed current dashboard cards show a five-task preview without explaining why those tasks were selected.
+  - Confirmed completed-week tasks are sorted by `completed_at_desc` but currently link to a generic Kanban board.
+  - Approved inline expansion inside each dashboard task block rather than a drawer.
+  - Wrote the implementation plan and made it the active repo plan.
+- Key approved decisions:
+  - Keep five tasks visible by default.
+  - Use `Показать ещё N` / `Свернуть` inside each block.
+  - Keep active, overdue, and completed-week blocks independently expandable.
+  - Remove the generic completed-week `Все задачи` link in the first implementation.
+  - Use existing `/api/tasks` pagination with `per_page=200` and show truncation copy if more tasks exist than were loaded.
+- Latest verification:
+  - Planning only; implementation verification pending.
+
 ## Meeting Board Focus
 
 - Current phase: implemented; automated verification passed

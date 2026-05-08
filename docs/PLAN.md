@@ -1,4 +1,50 @@
-# Active Plan: Meeting Board Focus
+# Active Plan: Dashboard Task Block Expansion
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-block-expansion.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Keep dashboard task blocks compact by default while letting users expand each block inline to see every loaded task represented by that block.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-08-dashboard-task-block-expansion-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-08-dashboard-task-block-expansion.md`
+
+**Milestones:**
+
+1. Add dashboard task ordering and preview helpers.
+2. Render active, overdue, and completed-week task blocks through a shared expandable dashboard block.
+3. Keep completed-week tasks on the dashboard instead of sending users to an unrelated Kanban view.
+4. Update dashboard source guards and repo execution docs.
+5. Run frontend verification and browser QA.
+
+**Implementation status:**
+
+- Planned; ready for execution.
+
+**Definition of done:**
+
+- Each dashboard task block shows at most five tasks on first load.
+- Blocks with more than five tasks show `Показать ещё N` and expand inline.
+- Expanded blocks show every loaded task for the current block and scope.
+- Expanded blocks can collapse back to the compact preview.
+- Active tasks are ordered by urgency, overdue state, nearest deadline, then newest creation.
+- Overdue tasks are ordered by urgency, oldest missed deadline, then newest creation.
+- Completed-week tasks remain ordered by most recent completion.
+- The completed-week block no longer depends on a generic `Все задачи` Kanban link to reveal its list.
+- If a loaded API page is truncated, the UI does not imply the list is complete.
+
+**Validation commands:**
+
+```bash
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Meeting Board Focus
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-meeting-board-focus.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
