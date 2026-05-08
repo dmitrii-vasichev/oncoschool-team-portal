@@ -122,6 +122,35 @@ export function sortDashboardOverdueTasks<T extends DashboardTaskLike>(
   });
 }
 
+export type DashboardOpenTaskGroups<T> = {
+  overdue: T[];
+  active: T[];
+};
+
+export function splitDashboardOpenTasks<T extends DashboardTaskLike>(
+  tasks: T[],
+  today = new Date(),
+): DashboardOpenTaskGroups<T> {
+  const overdue: T[] = [];
+  const active: T[] = [];
+
+  for (const task of tasks) {
+    if (task.status === "done" || task.status === "cancelled") {
+      continue;
+    }
+    if (isTaskOverdueForSort(task, today)) {
+      overdue.push(task);
+    } else {
+      active.push(task);
+    }
+  }
+
+  return {
+    overdue: sortDashboardOverdueTasks(overdue),
+    active: sortDashboardActiveTasks(active, today),
+  };
+}
+
 export function sortDashboardCompletedTasks<T extends CompletedTaskLike>(
   tasks: T[],
 ): T[] {

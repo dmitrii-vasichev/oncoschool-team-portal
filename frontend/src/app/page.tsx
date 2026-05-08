@@ -5,7 +5,6 @@ import type { ElementType, ReactNode } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
-  AlertTriangle,
   ArrowRight,
   ClipboardList,
   Mic,
@@ -41,16 +40,17 @@ import { getAccessibleDepartments } from "@/lib/departmentAccess";
 import { api } from "@/lib/api";
 import {
   DASHBOARD_TASK_PREVIEW_LIMIT,
-  completedSinceParam,
-  filterTasksCompletedSince,
   getDashboardTaskPreview,
+  splitDashboardOpenTasks,
   sortDashboardActiveTasks,
-  sortDashboardOverdueTasks,
 } from "@/lib/dashboardTaskUtils";
 import { isTaskUrgent } from "@/lib/taskUrgency";
 import { sanitizeZoomJoinUrl } from "@/lib/zoomLink";
 import { UpcomingBirthdays } from "./team/components/UpcomingBirthdays";
 import type {
+  DashboardActivityAnalytics,
+  DashboardActivityMetric,
+  DashboardActivityScope,
   DashboardTasksAnalytics,
   Task,
   Meeting,
@@ -381,7 +381,8 @@ function SectionHeader({
   );
 }
 
-type DashboardTaskBlockKey = "active" | "overdue" | "completed";
+type DashboardTaskBlockKey = "tasks";
+type ActivityMetricKey = "completed" | "created" | "in_progress_over_7_days";
 
 function DashboardEmptyState({
   icon: Icon,
@@ -428,6 +429,7 @@ function DashboardTaskBlock({
   truncationMessage,
   linkHref,
   linkLabel,
+  groups,
 }: {
   blockKey: DashboardTaskBlockKey;
   title: string;
@@ -445,11 +447,23 @@ function DashboardTaskBlock({
   truncationMessage?: string;
   linkHref?: string;
   linkLabel?: string;
+  groups?: Array<{
+    title: string;
+    tasks: Task[];
+    itemVariant: "default" | "overdue" | "completed";
+  }>;
 }) {
   const visibleTasks = getDashboardTaskPreview(tasks, expanded);
   const hiddenCount = Math.max(0, tasks.length - DASHBOARD_TASK_PREVIEW_LIMIT);
   const listId = `dashboard-${blockKey}-tasks`;
   const canExpand = tasks.length > DASHBOARD_TASK_PREVIEW_LIMIT;
+  const visibleTaskIds = new Set(visibleTasks.map((task) => task.id));
+  const visibleGroups = groups
+    ? groups.map((group) => ({
+        ...group,
+        tasks: group.tasks.filter((task) => visibleTaskIds.has(task.id)),
+      }))
+    : undefined;
 
   return (
     <>
@@ -473,19 +487,37 @@ function DashboardTaskBlock({
       ) : (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">{orderingHint}</p>
-          <div id={listId} className="space-y-2">
-            {visibleTasks.map((task) => (
-              <TaskListItem
-                key={task.id}
-                task={task}
-                variant={
-                  itemVariant === "default" && isOverdue(task)
-                    ? "overdue"
-                    : itemVariant
-                }
-                showAssignee={showAssignee}
-              />
-            ))}
+          <div id={listId} className="space-y-3">
+            {visibleGroups
+              ? visibleGroups
+                  .filter((group) => group.tasks.length > 0)
+                  .map((group) => (
+                    <div key={group.title} className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {group.title}
+                      </p>
+                      {group.tasks.map((task) => (
+                        <TaskListItem
+                          key={task.id}
+                          task={task}
+                          variant={group.itemVariant}
+                          showAssignee={showAssignee}
+                        />
+                      ))}
+                    </div>
+                  ))
+              : visibleTasks.map((task) => (
+                  <TaskListItem
+                    key={task.id}
+                    task={task}
+                    variant={
+                      itemVariant === "default" && isOverdue(task)
+                        ? "overdue"
+                        : itemVariant
+                    }
+                    showAssignee={showAssignee}
+                  />
+                ))}
           </div>
           {truncated && truncationMessage && (
             <p className="text-xs text-muted-foreground">
@@ -505,6 +537,115 @@ function DashboardTaskBlock({
           )}
         </div>
       )}
+    </>
+  );
+}
+
+function DashboardActivityCard({
+  activity,
+  selectedMetric,
+  onSelectedMetricChange,
+  showAssignee,
+}: {
+  activity: DashboardActivityAnalytics | null;
+  selectedMetric: ActivityMetricKey | null;
+  onSelectedMetricChange: (metric: ActivityMetricKey | null) => void;
+  showAssignee: boolean;
+}) {
+  const emptyMetric: DashboardActivityMetric = {
+    count: 0,
+    tasks: [],
+    truncated: false,
+  };
+  const metrics: Array<{
+    key: ActivityMetricKey;
+    label: string;
+    metric: DashboardActivityMetric;
+  }> = [
+    {
+      key: "completed",
+      label: "Выполнено",
+      metric: activity?.completed ?? emptyMetric,
+    },
+    {
+      key: "created",
+      label: "Создано",
+      metric: activity?.created ?? emptyMetric,
+    },
+    {
+      key: "in_progress_over_7_days",
+      label: "В работе > 7 дней",
+      metric: activity?.in_progress_over_7_days ?? emptyMetric,
+    },
+  ];
+  const selected = metrics.find((metric) => metric.key === selectedMetric);
+  const delta = activity?.completed_delta.delta ?? 0;
+  const deltaLabel = delta > 0 ? `+${delta}` : String(delta);
+
+  return (
+    <>
+      <SectionHeader title="Активность за 7 дней" icon={CheckCircle2} />
+      <div className="space-y-3">
+        <div className="grid gap-2">
+          {metrics.map(({ key, label, metric }) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={selectedMetric === key}
+              onClick={() =>
+                onSelectedMetricChange(selectedMetric === key ? null : key)
+              }
+              disabled={metric.count === 0}
+              className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
+                selectedMetric === key
+                  ? "border-primary/40 bg-primary/5 text-foreground"
+                  : "border-border/60 bg-background/70 text-muted-foreground hover:text-foreground"
+              } ${metric.count === 0 ? "opacity-60" : ""}`}
+            >
+              <span className="text-sm font-medium">{label}</span>
+              <span className="text-base font-semibold text-foreground">
+                {metric.count}
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-muted-foreground">
+              К прошлой неделе
+            </span>
+            <span
+              className={
+                delta >= 0
+                  ? "text-sm font-semibold text-emerald-600"
+                  : "text-sm font-semibold text-destructive"
+              }
+            >
+              {deltaLabel}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Сравнение по выполненным задачам
+          </p>
+        </div>
+        {selected && selected.metric.count > 0 && (
+          <div className="space-y-2" aria-label={selected.label}>
+            {selected.metric.tasks.map((task) => (
+              <TaskListItem
+                key={task.id}
+                task={task}
+                variant={task.status === "done" ? "completed" : "default"}
+                showAssignee={showAssignee}
+              />
+            ))}
+            {selected.metric.truncated && (
+              <p className="text-xs text-muted-foreground">
+                Показаны первые {selected.metric.tasks.length} задач.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </>
   );
 }
@@ -622,32 +763,24 @@ export default function DashboardPage() {
   const [dashboardTasksAnalytics, setDashboardTasksAnalytics] =
     useState<DashboardTasksAnalytics | null>(null);
   const [myTasks, setMyTasks] = useState<Task[]>([]);
-  const [myOverdueTasks, setMyOverdueTasks] = useState<Task[]>([]);
   const [departmentTasks, setDepartmentTasks] = useState<Task[]>([]);
-  const [departmentOverdueTasks, setDepartmentOverdueTasks] = useState<Task[]>(
-    []
-  );
-  const [myCompletedWeekTasks, setMyCompletedWeekTasks] = useState<Task[]>([]);
-  const [departmentCompletedWeekTasks, setDepartmentCompletedWeekTasks] =
-    useState<Task[]>([]);
+  const [teamTasks, setTeamTasks] = useState<Task[]>([]);
   const [myTasksTruncated, setMyTasksTruncated] = useState(false);
   const [departmentTasksTruncated, setDepartmentTasksTruncated] =
     useState(false);
-  const [myCompletedWeekTasksTruncated, setMyCompletedWeekTasksTruncated] =
-    useState(false);
-  const [
-    departmentCompletedWeekTasksTruncated,
-    setDepartmentCompletedWeekTasksTruncated,
-  ] = useState(false);
+  const [teamTasksTruncated, setTeamTasksTruncated] = useState(false);
+  const [teamTasksTotal, setTeamTasksTotal] = useState(0);
+  const [selectedActivityMetric, setSelectedActivityMetric] =
+    useState<ActivityMetricKey | null>(null);
+  const [dashboardActivity, setDashboardActivity] =
+    useState<DashboardActivityAnalytics | null>(null);
   const [expandedTaskBlocks, setExpandedTaskBlocks] = useState<
     Record<DashboardTaskBlockKey, boolean>
   >({
-    active: false,
-    overdue: false,
-    completed: false,
+    tasks: false,
   });
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
-  const [taskScope, setTaskScope] = useState<"my" | "department">("my");
+  const [taskScope, setTaskScope] = useState<DashboardActivityScope>("my");
   const [myUpcomingMeetings, setMyUpcomingMeetings] = useState<Meeting[]>([]);
   const [myUpcomingMeetingsTotal, setMyUpcomingMeetingsTotal] = useState(0);
   const [myPastMeetingsTotal, setMyPastMeetingsTotal] = useState(0);
@@ -701,22 +834,31 @@ export default function DashboardPage() {
   const canUseDepartmentView =
     Boolean(selectedDepartmentId) &&
     (isModerator || accessibleDepartmentIds.has(selectedDepartmentId));
+  const canUseTeamView = isModerator;
 
-  const currentScope =
-    canUseDepartmentView && taskScope === "department" ? "department" : "my";
+  const currentScope: DashboardActivityScope =
+    canUseTeamView && taskScope === "team"
+      ? "team"
+      : canUseDepartmentView && taskScope === "department"
+        ? "department"
+        : "my";
 
   useEffect(() => {
-    if (!canUseDepartmentView && taskScope === "department") {
+    if (taskScope === "team" && !canUseTeamView) {
+      setTaskScope("my");
+      return;
+    }
+    if (taskScope === "department" && !canUseDepartmentView) {
       setTaskScope("my");
     }
-  }, [canUseDepartmentView, taskScope]);
+  }, [canUseDepartmentView, canUseTeamView, taskScope]);
 
   useEffect(() => {
     setExpandedTaskBlocks({
-      active: false,
-      overdue: false,
-      completed: false,
+      tasks: false,
     });
+    setSelectedActivityMetric(null);
+    setDashboardActivity(null);
   }, [currentScope, selectedDepartmentId]);
 
   useEffect(() => {
@@ -735,7 +877,6 @@ export default function DashboardPage() {
 
         const openStatuses = "new,in_progress,review";
         const selectedDepartmentParam = selectedDepartmentId || undefined;
-        const completedSince = completedSinceParam();
         const emptyTasksPage = {
           items: [] as Task[],
           total: 0,
@@ -769,29 +910,25 @@ export default function DashboardPage() {
                 })
                 .catch(catchLog("getDepartmentTasks"))
             : Promise.resolve(emptyTasksPage),
-          api
-            .getTasks({
-              assignee_id: userId,
-              ...(selectedDepartmentParam
-                ? { department_id: selectedDepartmentParam }
-                : {}),
-              status: "done",
-              completed_since: completedSince,
-              per_page: "200",
-              sort: "completed_at_desc",
-            })
-            .catch(catchLog("getMyCompletedWeekTasks")),
-          selectedDepartmentParam
+          isModerator && currentScope === "team"
             ? api
                 .getTasks({
-                  department_id: selectedDepartmentParam,
-                  status: "done",
-                  completed_since: completedSince,
+                  status: openStatuses,
                   per_page: "200",
-                  sort: "completed_at_desc",
+                  sort: "created_at_desc",
                 })
-                .catch(catchLog("getDepartmentCompletedWeekTasks"))
+                .catch(catchLog("getTeamTasks"))
             : Promise.resolve(emptyTasksPage),
+          api
+            .getDashboardActivity({
+              scope: currentScope,
+              departmentId:
+                currentScope === "department"
+                  ? selectedDepartmentParam
+                  : undefined,
+              detailLimit: 20,
+            })
+            .catch(catchLog("getDashboardActivity")),
           api.getMeetings({ upcoming: true, member_id: userId }).catch(catchLog("getMyUpcomingMeetings")),
           api.getMeetings({ past: true, member_id: userId }).catch(catchLog("getMyPastMeetings")),
           selectedDepartmentParam
@@ -820,14 +957,11 @@ export default function DashboardPage() {
           items: Task[];
           total?: number;
         } | null;
-        const myCompletedWeekData = results[3] as {
+        const teamTasksData = results[3] as {
           items: Task[];
           total?: number;
         } | null;
-        const departmentCompletedWeekData = results[4] as {
-          items: Task[];
-          total?: number;
-        } | null;
+        const activityData = results[4] as DashboardActivityAnalytics | null;
         const myMeetingsData = results[5] as Meeting[] | null;
         const myPastMeetingsData = results[6] as Meeting[] | null;
         const deptMeetingsData = results[7] as Meeting[] | null;
@@ -841,19 +975,8 @@ export default function DashboardPage() {
         const departmentTaskItems = Array.isArray(departmentTasksData?.items)
           ? departmentTasksData.items.filter(Boolean)
           : [];
-        const myCompletedWeekItems = Array.isArray(myCompletedWeekData?.items)
-          ? filterTasksCompletedSince(
-              myCompletedWeekData.items.filter(Boolean),
-              completedSince,
-            )
-          : [];
-        const departmentCompletedWeekItems = Array.isArray(
-          departmentCompletedWeekData?.items
-        )
-          ? filterTasksCompletedSince(
-              departmentCompletedWeekData.items.filter(Boolean),
-              completedSince,
-            )
+        const teamTaskItems = Array.isArray(teamTasksData?.items)
+          ? teamTasksData.items.filter(Boolean)
           : [];
         const myMeetings = Array.isArray(myMeetingsData)
           ? myMeetingsData.filter(Boolean)
@@ -871,37 +994,26 @@ export default function DashboardPage() {
         const sortedMyTasks = sortDashboardActiveTasks(myTaskItems);
         const sortedDepartmentTasks =
           sortDashboardActiveTasks(departmentTaskItems);
-        const sortedMyOverdueTasks = sortDashboardOverdueTasks(
-          sortedMyTasks.filter(isOverdue),
-        );
-        const sortedDepartmentOverdueTasks = sortDashboardOverdueTasks(
-          sortedDepartmentTasks.filter(isOverdue),
-        );
+        const sortedTeamTasks = sortDashboardActiveTasks(teamTaskItems);
 
         setDashboardTasksAnalytics(dashboardData);
+        setDashboardActivity(activityData);
         setTeamMembers(members);
 
         // Keep full lists for derived slices (overdue/stale/preview)
         setMyTasks(sortedMyTasks);
-        setMyOverdueTasks(sortedMyOverdueTasks);
         setMyTasksTruncated((myTasksData?.total ?? 0) > myTaskItems.length);
 
         // Department tasks
         setDepartmentTasks(sortedDepartmentTasks);
-        setDepartmentOverdueTasks(sortedDepartmentOverdueTasks);
         setDepartmentTasksTruncated(
           (departmentTasksData?.total ?? 0) > departmentTaskItems.length,
         );
-        setMyCompletedWeekTasks(myCompletedWeekItems);
-        setDepartmentCompletedWeekTasks(departmentCompletedWeekItems);
-        setMyCompletedWeekTasksTruncated(
-          (myCompletedWeekData?.total ?? 0) >
-            (myCompletedWeekData?.items?.filter(Boolean).length ?? 0),
-        );
-        setDepartmentCompletedWeekTasksTruncated(
-          (departmentCompletedWeekData?.total ?? 0) >
-            (departmentCompletedWeekData?.items?.filter(Boolean).length ?? 0),
-        );
+
+        // Team tasks
+        setTeamTasks(sortedTeamTasks);
+        setTeamTasksTruncated((teamTasksData?.total ?? 0) > teamTaskItems.length);
+        setTeamTasksTotal(teamTasksData?.total ?? teamTaskItems.length);
 
         // Upcoming meetings (top 3, but keep total count for badge)
         setMyUpcomingMeetings(myMeetings.slice(0, 3));
@@ -931,7 +1043,39 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [departmentsLoading, isModerator, selectedDepartmentId, toastError, userId]);
+  }, [
+    currentScope,
+    departmentsLoading,
+    isModerator,
+    selectedDepartmentId,
+    toastError,
+    userId,
+  ]);
+
+  const scopedDashboardActivity = useMemo(() => {
+    if (!dashboardActivity || dashboardActivity.scope !== currentScope) {
+      return null;
+    }
+
+    if (currentScope === "department") {
+      return dashboardActivity.selected_department_id === selectedDepartmentId
+        ? dashboardActivity
+        : null;
+    }
+
+    return dashboardActivity.selected_department_id === null
+      ? dashboardActivity
+      : null;
+  }, [currentScope, dashboardActivity, selectedDepartmentId]);
+
+  useEffect(() => {
+    if (!selectedActivityMetric) return;
+
+    const metric = scopedDashboardActivity?.[selectedActivityMetric];
+    if (!metric || metric.count === 0) {
+      setSelectedActivityMetric(null);
+    }
+  }, [scopedDashboardActivity, selectedActivityMetric]);
 
   if (!user) return null;
 
@@ -942,76 +1086,60 @@ export default function DashboardPage() {
   const myMetrics = dashboardTasksAnalytics?.my;
   const departmentMetrics = dashboardTasksAnalytics?.department;
 
-  const activeTasks = myMetrics?.active ?? 0;
-  const completedThisWeek = myMetrics?.done_week ?? 0;
-
-  const scopedTasks = currentScope === "department" ? departmentTasks : myTasks;
-  const scopedOverdueTasks =
-    currentScope === "department" ? departmentOverdueTasks : myOverdueTasks;
+  const scopedTasks =
+    currentScope === "team"
+      ? teamTasks
+      : currentScope === "department"
+        ? departmentTasks
+        : myTasks;
   const scopedTasksTruncated =
-    currentScope === "department" ? departmentTasksTruncated : myTasksTruncated;
-  const completedInScopeThisWeek =
-    currentScope === "department"
-      ? (departmentMetrics?.done_week ?? 0)
-      : (myMetrics?.done_week ?? 0);
-  const completedWeekTasks =
-    currentScope === "department"
-      ? departmentCompletedWeekTasks
-      : myCompletedWeekTasks;
-  const completedWeekTasksTruncated =
-    currentScope === "department"
-      ? departmentCompletedWeekTasksTruncated
-      : myCompletedWeekTasksTruncated;
+    currentScope === "team"
+      ? teamTasksTruncated
+      : currentScope === "department"
+        ? departmentTasksTruncated
+        : myTasksTruncated;
+  const scopedOpenTaskGroups = splitDashboardOpenTasks(scopedTasks);
+  const mergedTaskList = [
+    ...scopedOpenTaskGroups.overdue,
+    ...scopedOpenTaskGroups.active,
+  ];
 
   const scopedMeetings = currentScope === "department" ? departmentUpcomingMeetings : myUpcomingMeetings;
 
-  const taskListTitle = currentScope === "department" ? "Задачи отдела" : "Мои задачи";
-  const overdueListTitle =
-    currentScope === "department"
-      ? "Просроченные задачи отдела"
-      : "Просроченные задачи";
+  const taskListTitle =
+    currentScope === "team"
+      ? "Задачи команды"
+      : currentScope === "department"
+        ? "Задачи отдела"
+        : "Мои задачи";
   const emptyTaskTitle =
-    currentScope === "department"
+    currentScope === "team"
+      ? "В команде нет активных задач"
+      : currentScope === "department"
       ? "В отделе нет активных задач"
       : "Нет активных задач";
   const emptyTaskDescription =
-    currentScope === "department"
+    currentScope === "team"
+      ? "По команде сейчас нет активных задач."
+      : currentScope === "department"
       ? "По выбранному отделу сейчас нет активных задач."
       : "Все задачи выполнены — отличная работа!";
-  const overdueEmptyTitle =
-    scopedTasksTruncated && scopedOverdueTasks.length === 0
-      ? "В загруженных задачах просрочек нет"
-      : "Всё в срок";
-  const overdueEmptyDescription =
-    scopedTasksTruncated && scopedOverdueTasks.length === 0
-      ? "Полный список может содержать ещё просроченные задачи."
-      : "Нет просроченных задач";
 
   // Build badges for tasks section
-  const taskBadges: BadgeInfo[] = [];
-  if (currentScope === "my") {
-    taskBadges.push({ label: "активных", value: activeTasks, color: "default" });
-    if (completedThisWeek > 0) {
-      taskBadges.push({ label: "за неделю", value: completedThisWeek, color: "green" });
-    }
-  } else {
-    taskBadges.push({ label: "активных", value: departmentMetrics?.active ?? 0, color: "default" });
-    if ((departmentMetrics?.done_total ?? 0) > 0) {
-      taskBadges.push({ label: "выполнено", value: departmentMetrics?.done_total ?? 0, color: "green" });
-    }
-  }
-
-  const overdueBadges: BadgeInfo[] = [];
-  if (scopedOverdueTasks.length > 0) {
-    overdueBadges.push({ label: "просрочено", value: scopedOverdueTasks.length, color: "red" });
-  }
-
-  const completedWeekBadges: BadgeInfo[] = [];
-  if (completedInScopeThisWeek > 0) {
-    completedWeekBadges.push({
-      label: "за неделю",
-      value: completedInScopeThisWeek,
-      color: "green",
+  const scopedActiveTotal =
+    currentScope === "team"
+      ? teamTasksTotal
+      : currentScope === "department"
+        ? (departmentMetrics?.active ?? scopedTasks.length)
+        : (myMetrics?.active ?? scopedTasks.length);
+  const taskBadges: BadgeInfo[] = [
+    { label: "активных", value: scopedActiveTotal, color: "default" },
+  ];
+  if (scopedOpenTaskGroups.overdue.length > 0) {
+    taskBadges.push({
+      label: "просрочено",
+      value: scopedOpenTaskGroups.overdue.length,
+      color: "red",
     });
   }
 
@@ -1048,7 +1176,6 @@ export default function DashboardPage() {
 
   const todayStr = formatFullDate(new Date());
 
-  const ACCENT_DESTRUCTIVE = "hsl(0, 72%, 51%)";
   const ACCENT_BLUE = "hsl(200, 65%, 48%)";
 
   const setTaskBlockExpanded = (
@@ -1076,7 +1203,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap sm:gap-3">
-            {canUseDepartmentView && (
+            {(canUseDepartmentView || canUseTeamView) && (
               <div className="inline-flex rounded-lg border border-border/60 bg-card p-0.5">
                 <button
                   onClick={() => setTaskScope("my")}
@@ -1098,6 +1225,18 @@ export default function DashboardPage() {
                 >
                   Отдел
                 </button>
+                {canUseTeamView && (
+                  <button
+                    onClick={() => setTaskScope("team")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                      currentScope === "team"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Команда
+                  </button>
+                )}
               </div>
             )}
 
@@ -1139,17 +1278,17 @@ export default function DashboardPage() {
       {/* ═══════════ Task Blocks ═══════════ */}
       <section className="animate-fade-in-up stagger-2">
         <div className="grid gap-4 lg:grid-cols-3">
-          {/* Active Tasks */}
-          <div className="rounded-2xl border border-border/60 bg-card p-4">
+          {/* Scoped Tasks */}
+          <div className="rounded-2xl border border-border/60 bg-card p-4 lg:col-span-2">
             <DashboardTaskBlock
-              blockKey="active"
+              blockKey="tasks"
               title={taskListTitle}
               icon={ClipboardList}
               badges={taskBadges}
-              tasks={scopedTasks}
-              expanded={expandedTaskBlocks.active}
+              tasks={mergedTaskList}
+              expanded={expandedTaskBlocks.tasks}
               onExpandedChange={(expanded) =>
-                setTaskBlockExpanded("active", expanded)
+                setTaskBlockExpanded("tasks", expanded)
               }
               emptyContent={
                 <DashboardEmptyState
@@ -1161,88 +1300,34 @@ export default function DashboardPage() {
                 />
               }
               itemVariant="default"
-              showAssignee={currentScope === "department"}
-              orderingHint="Сначала срочные и ближайшие дедлайны"
+              showAssignee={currentScope !== "my"}
+              orderingHint="Сначала просроченные, затем срочные и ближайшие дедлайны"
               truncated={scopedTasksTruncated}
               truncationMessage={`Загружены первые ${scopedTasks.length} задач; в полном списке может быть больше.`}
               linkHref="/tasks"
               linkLabel="На доску"
+              groups={[
+                {
+                  title: "Просрочено",
+                  tasks: scopedOpenTaskGroups.overdue,
+                  itemVariant: "overdue",
+                },
+                {
+                  title: "Активные",
+                  tasks: scopedOpenTaskGroups.active,
+                  itemVariant: "default",
+                },
+              ]}
             />
           </div>
 
-          {/* Overdue Tasks */}
-          <div
-            className={`rounded-2xl border p-4 ${
-              scopedOverdueTasks.length > 0
-                ? "border-destructive/20 bg-destructive/[0.02]"
-                : "border-border/60 bg-card"
-            }`}
-          >
-            <DashboardTaskBlock
-              blockKey="overdue"
-              title={overdueListTitle}
-              icon={AlertTriangle}
-              iconColor={ACCENT_DESTRUCTIVE}
-              badges={overdueBadges}
-              tasks={scopedOverdueTasks}
-              expanded={expandedTaskBlocks.overdue}
-              onExpandedChange={(expanded) =>
-                setTaskBlockExpanded("overdue", expanded)
-              }
-              emptyContent={
-                <DashboardEmptyState
-                  icon={CheckCircle2}
-                  title={overdueEmptyTitle}
-                  description={overdueEmptyDescription}
-                  iconContainerClassName="bg-status-done-bg"
-                  iconClassName="text-status-done-fg"
-                />
-              }
-              itemVariant="overdue"
-              showAssignee={currentScope === "department"}
-              orderingHint="Сначала срочные и самые старые просрочки"
-              truncated={scopedTasksTruncated}
-              truncationMessage={`Просроченные рассчитаны по первым ${scopedTasks.length} загруженным активным задачам; в полном списке могут быть ещё задачи.`}
-            />
-          </div>
-
-          {/* Completed Tasks */}
-          <div
-            className={`rounded-2xl border p-4 ${
-              completedInScopeThisWeek > 0
-                ? "border-status-done-ring/35 bg-status-done-bg/25"
-                : "border-border/60 bg-card"
-            }`}
-          >
-            <DashboardTaskBlock
-              blockKey="completed"
-              title="Выполнено за 7 дней"
-              icon={completedInScopeThisWeek > 0 ? CheckCircle2 : ListChecks}
-              iconColor={
-                completedInScopeThisWeek > 0
-                  ? "hsl(var(--status-done-fg))"
-                  : "hsl(var(--muted-foreground))"
-              }
-              badges={completedWeekBadges}
-              tasks={completedWeekTasks}
-              expanded={expandedTaskBlocks.completed}
-              onExpandedChange={(expanded) =>
-                setTaskBlockExpanded("completed", expanded)
-              }
-              emptyContent={
-                <DashboardEmptyState
-                  icon={ListChecks}
-                  title="Пока пусто"
-                  description="За последнюю неделю задач не завершали"
-                  iconContainerClassName="bg-muted/60"
-                  iconClassName="text-muted-foreground"
-                />
-              }
-              itemVariant="completed"
-              showAssignee={currentScope === "department"}
-              orderingHint="Сначала недавно выполненные"
-              truncated={completedWeekTasksTruncated}
-              truncationMessage={`Загружены первые ${completedWeekTasks.length} задач; в полном списке может быть больше.`}
+          {/* Activity */}
+          <div className="rounded-2xl border border-border/60 bg-card p-4">
+            <DashboardActivityCard
+              activity={scopedDashboardActivity}
+              selectedMetric={selectedActivityMetric}
+              onSelectedMetricChange={setSelectedActivityMetric}
+              showAssignee={currentScope !== "my"}
             />
           </div>
         </div>

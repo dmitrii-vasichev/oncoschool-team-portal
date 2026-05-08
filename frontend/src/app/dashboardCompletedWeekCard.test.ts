@@ -21,65 +21,37 @@ test("dashboard task empty states use one compact icon pattern", () => {
   assert.match(source, /text-sm font-heading font-semibold text-foreground/);
   assert.match(source, /text-xs text-muted-foreground/);
 
-  const activeBlock = source.match(
-    /\{\/\* Active Tasks \*\/\}[\s\S]*?\{\/\* Overdue Tasks \*\//,
+  const taskBlock = source.match(
+    /\{\/\* Scoped Tasks \*\/\}[\s\S]*?\{\/\* Activity \*\//,
   );
-  assert.ok(activeBlock, "active dashboard block source should exist");
-  assert.match(activeBlock[0], /icon=\{ClipboardList\}/);
-  assert.match(activeBlock[0], /<DashboardEmptyState[\s\S]*icon=\{ClipboardList\}/);
-  assert.doesNotMatch(activeBlock[0], /<EmptyState/);
-  assert.doesNotMatch(activeBlock[0], /variant="tasks"/);
-
-  const emptyStateCalls = source.match(/<DashboardEmptyState/g) ?? [];
-  assert.equal(emptyStateCalls.length, 3);
+  assert.ok(taskBlock, "merged dashboard task block source should exist");
+  assert.match(taskBlock[0], /icon=\{ClipboardList\}/);
+  assert.match(taskBlock[0], /<DashboardEmptyState[\s\S]*icon=\{ClipboardList\}/);
+  assert.doesNotMatch(taskBlock[0], /<EmptyState/);
+  assert.doesNotMatch(taskBlock[0], /variant="tasks"/);
 });
 
-test("dashboard third task card shows completed tasks for the last 7 days", () => {
+test("dashboard task row groups overdue tasks inside the main task block", () => {
   const source = readSource("app/page.tsx");
 
-  assert.match(source, /completedInScopeThisWeek/);
-  assert.match(source, /completedWeekTasks/);
-  assert.match(source, /done_week/);
-  assert.match(source, /completed_since/);
-  assert.match(source, /filterTasksCompletedSince/);
-  assert.match(source, /sort: "completed_at_desc"/);
-  assert.match(source, /Выполнено за 7 дней/);
-  assert.match(source, /За последнюю неделю задач не завершали/);
-  assert.match(source, /DashboardTaskBlock/);
-  assert.match(source, /blockKey="completed"/);
-  assert.match(source, /expandedTaskBlocks\.completed/);
-  assert.match(source, /getDashboardTaskPreview/);
-  assert.match(source, /Показать ещё/);
-  assert.match(source, /Свернуть/);
-  assert.match(source, /Сначала недавно выполненные/);
-  assert.match(source, /itemVariant="completed"/);
-
-  const completedBlock = source.match(
-    /\{\/\* Completed Tasks \*\/\}[\s\S]*?\{\/\* ═══════════ Upcoming Meetings/,
-  );
-  assert.ok(completedBlock, "completed dashboard block source should exist");
-  assert.doesNotMatch(completedBlock[0], /linkHref="\/tasks"/);
-  assert.match(completedBlock[0], /completedInScopeThisWeek > 0\s*\?\s*CheckCircle2\s*:\s*ListChecks/);
-  assert.match(
-    completedBlock[0],
-    /completedInScopeThisWeek > 0[\s\S]*hsl\(var\(--status-done-fg\)\)[\s\S]*hsl\(var\(--muted-foreground\)\)/,
-  );
-  assert.match(completedBlock[0], /bg-muted\/60/);
-  assert.match(completedBlock[0], /text-muted-foreground/);
-  assert.doesNotMatch(completedBlock[0], /bg-status-done-bg">\s*<CheckCircle2/);
-
-  assert.doesNotMatch(source, /completedWeekTasks\.slice\(0, 5\)\.map/);
-  assert.doesNotMatch(source, /Не обновлялись/);
-  assert.doesNotMatch(source, /scopedStaleTasks/);
+  assert.match(source, /splitDashboardOpenTasks/);
+  assert.match(source, /scopedOpenTaskGroups/);
+  assert.match(source, /Просрочено/);
+  assert.match(source, /Активные/);
+  assert.doesNotMatch(source, /\/\* Overdue Tasks \*\//);
+  assert.doesNotMatch(source, /blockKey="overdue"/);
 });
 
-test("dashboard overdue empty state is honest when active task data is truncated", () => {
+test("dashboard activity card replaces the completed-week task card", () => {
   const source = readSource("app/page.tsx");
 
-  assert.match(source, /scopedTasksTruncated/);
-  assert.match(source, /scopedOverdueTasks\.length === 0/);
-  assert.match(source, /В загруженных задачах просрочек нет/);
-  assert.match(source, /Полный список может содержать ещё просроченные задачи\./);
-  assert.match(source, /Всё в срок/);
-  assert.match(source, /Нет просроченных задач/);
+  assert.match(source, /DashboardActivityCard/);
+  assert.match(source, /getDashboardActivity/);
+  assert.match(source, /Активность за 7 дней/);
+  assert.match(source, /Выполнено/);
+  assert.match(source, /Создано/);
+  assert.match(source, /В работе > 7 дней/);
+  assert.match(source, /К прошлой неделе/);
+  assert.doesNotMatch(source, /title="Выполнено за 7 дней"/);
+  assert.doesNotMatch(source, /blockKey="completed"/);
 });

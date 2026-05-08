@@ -8,6 +8,7 @@ import {
   sortDashboardActiveTasks,
   sortDashboardCompletedTasks,
   sortDashboardOverdueTasks,
+  splitDashboardOpenTasks,
 } from "./dashboardTaskUtils.ts";
 
 type TaskFixture = {
@@ -68,6 +69,25 @@ test("sortDashboardActiveTasks prioritizes urgent overdue and nearest deadlines"
   assert.deepEqual(
     sortDashboardActiveTasks(tasks, today).map((item) => item.id),
     ["urgent-overdue", "urgent-future", "normal-overdue", "normal-nearest", "newest-generic"],
+  );
+});
+
+test("splitDashboardOpenTasks separates overdue tasks without duplicating ids", () => {
+  const today = new Date("2026-05-08T12:00:00.000Z");
+  const tasks = [
+    task({ id: "normal", deadline: "2026-05-10" }),
+    task({ id: "overdue", deadline: "2026-05-01" }),
+    task({ id: "done-overdue", status: "done", deadline: "2026-05-01" }),
+    task({ id: "cancelled-overdue", status: "cancelled", deadline: "2026-05-01" }),
+  ];
+
+  const grouped = splitDashboardOpenTasks(tasks, today);
+
+  assert.deepEqual(grouped.overdue.map((item) => item.id), ["overdue"]);
+  assert.deepEqual(grouped.active.map((item) => item.id), ["normal"]);
+  assert.deepEqual(
+    [...grouped.overdue, ...grouped.active].map((item) => item.id),
+    ["overdue", "normal"],
   );
 });
 

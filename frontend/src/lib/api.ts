@@ -18,6 +18,8 @@ import type {
   TeamTreeResponse,
   OverviewAnalytics,
   DashboardTasksAnalytics,
+  DashboardActivityAnalytics,
+  DashboardActivityScope,
   MemberStats,
   MeetingAnalytics,
   ReminderSettings,
@@ -937,6 +939,24 @@ class ApiClient {
     }
     const query = params.toString() ? `?${params.toString()}` : "";
     return this.request<DashboardTasksAnalytics>(`/api/analytics/dashboard-tasks${query}`);
+  }
+
+  async getDashboardActivity(params: {
+    scope: DashboardActivityScope;
+    departmentId?: string;
+    detailLimit?: number;
+  }): Promise<DashboardActivityAnalytics> {
+    const searchParams = new URLSearchParams();
+    searchParams.set("scope", params.scope);
+    if (params.departmentId) {
+      searchParams.set("department_id", params.departmentId);
+    }
+    if (params.detailLimit) {
+      searchParams.set("detail_limit", String(params.detailLimit));
+    }
+    return this.request<DashboardActivityAnalytics>(
+      `/api/analytics/dashboard-activity?${searchParams.toString()}`,
+    );
   }
 
   async getMembersAnalytics(departmentId?: string): Promise<{ members: MemberStats[] }> {

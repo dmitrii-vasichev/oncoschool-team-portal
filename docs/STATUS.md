@@ -2,7 +2,7 @@
 
 ## Dashboard Task Activity Redesign
 
-- Current phase: plan written; implementation not started
+- Current phase: implemented; automated verification passed
 - Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-activity-redesign-design.md`
 - Plan: `docs/superpowers/plans/2026-05-08-dashboard-task-activity-redesign.md`
 - Scope: dashboard task/overdue deduplication, activity-card metrics, role-aware team scope, and metric drill-down behavior
@@ -15,6 +15,10 @@
   - Confirmed `Команда` scope must be visible only to admin/moderator users.
   - Confirmed `В работе > 7 дней` should use task status-transition history, not `updated_at`.
   - Wrote the implementation plan and made it the active repo plan.
+  - Implemented merged dashboard task block with `Просрочено` and `Активные` groups.
+  - Implemented role-aware `Команда` scope for admin/moderator users.
+  - Implemented dashboard activity API and inline activity card drill-downs.
+  - Verified `В работе > 7 дней` uses status-transition history.
 - Key approved decisions:
   - A task appears only once in the dashboard task area.
   - Overdue work is represented inside the main task block, not repeated in the activity card.
@@ -23,7 +27,12 @@
   - `In progress > 7 days` is calculated from the latest `task_updates.new_status = in_progress` transition.
   - Multi-department selection and leaderboard-style gamification remain deferred.
 - Latest verification:
-  - Design-only change; implementation verification not started.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_dashboard_activity_api.py -q` passed.
+  - `cd frontend && npm test` passed.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed.
+  - `git diff --check` passed.
 
 ## Dashboard Task Block Expansion
 

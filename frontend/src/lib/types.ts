@@ -825,6 +825,29 @@ export interface DashboardTasksAnalytics {
   meta: DashboardTasksMeta;
 }
 
+export type DashboardActivityScope = "my" | "department" | "team";
+
+export interface DashboardActivityMetric {
+  count: number;
+  tasks: Task[];
+  truncated: boolean;
+}
+
+export interface DashboardActivityDelta {
+  current: number;
+  previous: number;
+  delta: number;
+}
+
+export interface DashboardActivityAnalytics {
+  scope: DashboardActivityScope;
+  selected_department_id: string | null;
+  completed: DashboardActivityMetric;
+  created: DashboardActivityMetric;
+  in_progress_over_7_days: DashboardActivityMetric;
+  completed_delta: DashboardActivityDelta;
+}
+
 export interface MemberStats {
   id: string;
   full_name: string;
