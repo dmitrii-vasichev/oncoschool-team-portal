@@ -1192,8 +1192,12 @@ export default function DashboardPage() {
             <DashboardTaskBlock
               blockKey="completed"
               title="Выполнено за 7 дней"
-              icon={CheckCircle2}
-              iconColor="hsl(var(--status-done-fg))"
+              icon={completedInScopeThisWeek > 0 ? CheckCircle2 : ListChecks}
+              iconColor={
+                completedInScopeThisWeek > 0
+                  ? "hsl(var(--status-done-fg))"
+                  : "hsl(var(--muted-foreground))"
+              }
               badges={completedWeekBadges}
               tasks={completedWeekTasks}
               expanded={expandedTaskBlocks.completed}
@@ -1202,8 +1206,8 @@ export default function DashboardPage() {
               }
               emptyContent={
                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-status-done-bg">
-                    <CheckCircle2 className="h-5 w-5 text-status-done-fg" />
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/60">
+                    <ListChecks className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <p className="mb-0.5 text-sm font-heading font-semibold text-foreground">
                     Пока пусто

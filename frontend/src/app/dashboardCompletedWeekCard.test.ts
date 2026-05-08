@@ -38,6 +38,14 @@ test("dashboard third task card shows completed tasks for the last 7 days", () =
   );
   assert.ok(completedBlock, "completed dashboard block source should exist");
   assert.doesNotMatch(completedBlock[0], /linkHref="\/tasks"/);
+  assert.match(completedBlock[0], /completedInScopeThisWeek > 0\s*\?\s*CheckCircle2\s*:\s*ListChecks/);
+  assert.match(
+    completedBlock[0],
+    /completedInScopeThisWeek > 0[\s\S]*hsl\(var\(--status-done-fg\)\)[\s\S]*hsl\(var\(--muted-foreground\)\)/,
+  );
+  assert.match(completedBlock[0], /bg-muted\/60/);
+  assert.match(completedBlock[0], /text-muted-foreground/);
+  assert.doesNotMatch(completedBlock[0], /bg-status-done-bg">\s*<CheckCircle2/);
 
   assert.doesNotMatch(source, /completedWeekTasks\.slice\(0, 5\)\.map/);
   assert.doesNotMatch(source, /Не обновлялись/);
