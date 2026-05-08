@@ -1,5 +1,28 @@
 # Status
 
+## Dashboard Task Activity Redesign
+
+- Current phase: design approved; spec written
+- Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-activity-redesign-design.md`
+- Scope: dashboard task/overdue deduplication, activity-card metrics, role-aware team scope, and metric drill-down behavior
+- Latest progress:
+  - Identified that overdue dashboard tasks are duplicated because they are both active tasks and a separate overdue list.
+  - Approved merging overdue tasks into the main task block as a `Просрочено` group above other active tasks.
+  - Approved giving the task block two desktop columns instead of replacing the removed overdue card with another task list.
+  - Approved transforming `Выполнено за 7 дней` into `Активность за 7 дней`.
+  - Approved activity metrics: completed, created, `В работе > 7 дней`, and completed-task delta versus the previous week.
+  - Confirmed `Команда` scope must be visible only to admin/moderator users.
+  - Confirmed `В работе > 7 дней` should use task status-transition history, not `updated_at`.
+- Key approved decisions:
+  - A task appears only once in the dashboard task area.
+  - Overdue work is represented inside the main task block, not repeated in the activity card.
+  - Activity drill-down opens inline inside the activity card rather than in a modal.
+  - Created activity is scoped by assigned work, not by creator identity.
+  - `In progress > 7 days` is calculated from the latest `task_updates.new_status = in_progress` transition.
+  - Multi-department selection and leaderboard-style gamification remain deferred.
+- Latest verification:
+  - Design-only change; implementation verification not started.
+
 ## Dashboard Task Block Expansion
 
 - Current phase: implemented; automated verification passed
