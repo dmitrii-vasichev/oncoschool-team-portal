@@ -58,14 +58,28 @@ class MeetingTranscriptionSchedulerService:
 
         stale_before = datetime.utcnow() - timedelta(minutes=self.stale_after_minutes)
         async with self.session_maker() as session:
+            failed_count = (
+                await self.processing_repo.mark_exhausted_stale_transcription_jobs_failed(
+                    session,
+                    stale_before=stale_before,
+                    max_attempts=self.max_attempts,
+                )
+            )
+            if failed_count:
+                logger.warning(
+                    "Marked %s exhausted meeting transcription job(s) as failed",
+                    failed_count,
+                )
+
             processing = await self.processing_repo.get_next_transcription_job(
                 session,
                 stale_before=stale_before,
                 max_attempts=self.max_attempts,
             )
+            if failed_count or processing:
+                await session.commit()
             if not processing:
                 return
-            await session.commit()
 
             try:
                 await self.outcomes_service.process_transcription_job(

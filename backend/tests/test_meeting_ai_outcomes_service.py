@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 import uuid
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -154,6 +155,60 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(params["status"], "queued")
         self.assertEqual(params["transcription_phase"], "queued")
         self.assertEqual(params["transcription_requested_by_id"], requester_id)
+
+    async def test_get_next_transcription_job_retries_active_job_without_heartbeat(
+        self,
+    ) -> None:
+        repo = MeetingAIProcessingRepository()
+        result = SimpleNamespace(scalar_one_or_none=lambda: None)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        await repo.get_next_transcription_job(
+            session,
+            stale_before=datetime(2026, 5, 8, 12, 0, 0),
+            max_attempts=2,
+        )
+
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        self.assertIn(
+            "meeting_ai_processing.transcription_last_heartbeat_at IS NULL",
+            compiled,
+        )
+
+    async def test_mark_exhausted_stale_transcription_jobs_failed_uses_active_guard(
+        self,
+    ) -> None:
+        repo = MeetingAIProcessingRepository()
+        result = SimpleNamespace(rowcount=2)
+        session = SimpleNamespace(execute=AsyncMock(return_value=result))
+
+        count = await repo.mark_exhausted_stale_transcription_jobs_failed(
+            session,
+            stale_before=datetime(2026, 5, 8, 12, 0, 0),
+            max_attempts=2,
+        )
+
+        self.assertEqual(count, 2)
+        stmt = session.execute.await_args.args[0]
+        compiled = str(stmt.compile(dialect=postgresql.dialect()))
+        params = stmt.compile().params
+        self.assertIn("meeting_ai_processing.status = %(status_1)s", compiled)
+        self.assertIn(
+            "meeting_ai_processing.transcription_attempt_count >= %(transcription_attempt_count_1)s",
+            compiled,
+        )
+        self.assertIn(
+            "meeting_ai_processing.transcription_last_heartbeat_at < %(transcription_last_heartbeat_at_1)s",
+            compiled,
+        )
+        self.assertIn(
+            "meeting_ai_processing.transcription_last_heartbeat_at IS NULL",
+            compiled,
+        )
+        self.assertEqual(params["status"], "failed")
+        self.assertEqual(params["transcription_phase"], "failed")
+        self.assertIn("исчерпала лимит", params["error_message"])
 
     async def test_claim_publish_uses_draft_ready_guard(self) -> None:
         repo = MeetingAIProcessingRepository()
@@ -394,6 +449,43 @@ class MeetingAIOutcomesServiceTests(unittest.IsolatedAsyncioTestCase):
             None, source_path=None
         )
         self.assertGreaterEqual(session.commit.await_count, 2)
+
+    async def test_process_transcription_job_preflight_failure_marks_failed(self) -> None:
+        service = MeetingAIOutcomesService()
+        processing = SimpleNamespace(
+            meeting_id=uuid.uuid4(),
+            meeting=None,
+            transcription_model="gpt-4o-mini-transcribe",
+            transcription_requested_by_id=None,
+        )
+        service.processing_repo = SimpleNamespace(
+            mark_transcription_failed=AsyncMock(return_value=SimpleNamespace(status="failed")),
+        )
+        service.audio_preparation_service = SimpleNamespace(cleanup=AsyncMock())
+        session = SimpleNamespace(
+            get=AsyncMock(return_value=None),
+            flush=AsyncMock(),
+            commit=AsyncMock(),
+        )
+
+        with self.assertRaisesRegex(ValueError, "Zoom-запись недоступна"):
+            await service.process_transcription_job(
+                session,
+                processing=processing,
+                zoom_service=SimpleNamespace(),
+                bot=None,
+                frontend_url="https://portal.example",
+            )
+
+        service.processing_repo.mark_transcription_failed.assert_awaited_once_with(
+            session,
+            meeting_id=processing.meeting_id,
+            error_message="Zoom-запись недоступна",
+        )
+        service.audio_preparation_service.cleanup.assert_awaited_once_with(
+            None, source_path=None
+        )
+        session.commit.assert_awaited_once()
 
     async def test_transcribe_audio_deletes_temporary_file_on_failure(self) -> None:
         service = MeetingAIOutcomesService()
@@ -896,6 +988,7 @@ class MeetingTranscriptionSchedulerServiceTests(unittest.IsolatedAsyncioTestCase
             frontend_url="https://portal.example",
         )
         scheduler.processing_repo = SimpleNamespace(
+            mark_exhausted_stale_transcription_jobs_failed=AsyncMock(return_value=0),
             get_next_transcription_job=AsyncMock(return_value=processing)
         )
         scheduler.outcomes_service = SimpleNamespace(
@@ -905,6 +998,7 @@ class MeetingTranscriptionSchedulerServiceTests(unittest.IsolatedAsyncioTestCase
         await scheduler._process_due_jobs()
 
         scheduler.processing_repo.get_next_transcription_job.assert_awaited_once()
+        scheduler.processing_repo.mark_exhausted_stale_transcription_jobs_failed.assert_awaited_once()
         session.commit.assert_awaited_once()
         scheduler.outcomes_service.process_transcription_job.assert_awaited_once_with(
             session,
@@ -913,6 +1007,42 @@ class MeetingTranscriptionSchedulerServiceTests(unittest.IsolatedAsyncioTestCase
             bot=scheduler.bot,
             frontend_url="https://portal.example",
         )
+
+    async def test_scheduler_marks_exhausted_stale_jobs_before_claiming_next(
+        self,
+    ) -> None:
+        session = SimpleNamespace(commit=AsyncMock())
+
+        class FakeSessionMaker:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                return session
+
+            async def __aexit__(self, *_args):
+                return False
+
+        scheduler = MeetingTranscriptionSchedulerService(
+            bot=SimpleNamespace(),
+            session_maker=FakeSessionMaker(),
+            zoom_service=SimpleNamespace(),
+            frontend_url="https://portal.example",
+        )
+        scheduler.processing_repo = SimpleNamespace(
+            mark_exhausted_stale_transcription_jobs_failed=AsyncMock(return_value=1),
+            get_next_transcription_job=AsyncMock(return_value=None),
+        )
+        scheduler.outcomes_service = SimpleNamespace(
+            process_transcription_job=AsyncMock()
+        )
+
+        await scheduler._process_due_jobs()
+
+        scheduler.processing_repo.mark_exhausted_stale_transcription_jobs_failed.assert_awaited_once()
+        scheduler.processing_repo.get_next_transcription_job.assert_awaited_once()
+        scheduler.outcomes_service.process_transcription_job.assert_not_awaited()
+        self.assertEqual(session.commit.await_count, 1)
 
 
 class ZoomAudioRecordingDownloadTests(unittest.IsolatedAsyncioTestCase):

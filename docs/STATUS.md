@@ -72,15 +72,17 @@
   - Added in-app and Telegram notifications for the moderator who started transcription.
   - Added frontend processing polling, progress labels, and leave-the-page guidance.
   - Added `ffmpeg` to backend Docker images for Railway deployment.
+  - Fixed stale active-job recovery so missing-heartbeat transcription jobs retry and exhausted jobs are marked `failed` instead of staying `transcribing`.
+  - Fixed early transcription-job preflight failures so they mark the processing record as `failed` instead of leaving an active job behind.
 - Key approved decisions:
   - Keep the first release in the existing backend service rather than adding Redis/Celery or a separate Railway worker.
   - Use PostgreSQL as the durable queue.
   - Transcribe chunks sequentially for simpler reliability and rate-limit behavior.
   - Keep Zoom audio temporary only; store the final transcript and metadata.
 - Latest verification:
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_service.py tests/test_meeting_ai_outcomes_api.py -q` passed: 38 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_meeting_ai_outcomes_api.py tests/test_meeting_ai_outcomes_service.py -q` passed: 42 tests.
   - `cd frontend && npm test -- MeetingAiOutcomesPanelUtils.test.ts` passed: 34 tests.
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 363 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 371 tests.
   - `cd frontend && npm test` passed: 34 tests.
   - `cd frontend && npx tsc --noEmit` passed.
   - `cd frontend && npm run lint` passed.

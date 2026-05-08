@@ -98,13 +98,14 @@ class MeetingAIOutcomesService:
         bot=None,
         frontend_url: str = settings.NEXT_PUBLIC_FRONTEND_URL,
     ) -> MeetingAIProcessing:
-        meeting = await self._resolve_processing_meeting(session, processing)
-        if not meeting or not meeting.zoom_meeting_id or not zoom_service:
-            raise ValueError("Zoom-запись недоступна")
-
+        meeting: Meeting | None = None
         source_path: str | None = None
         prepared: PreparedAudioChunks | None = None
         try:
+            meeting = await self._resolve_processing_meeting(session, processing)
+            if not meeting or not meeting.zoom_meeting_id or not zoom_service:
+                raise ValueError("Zoom-запись недоступна")
+
             await self._set_transcription_progress(
                 session, meeting.id, phase="downloading", progress_percent=5
             )
@@ -187,20 +188,22 @@ class MeetingAIOutcomesService:
             )
             return completed_processing or processing
         except Exception as exc:
+            failed_meeting_id = getattr(meeting, "id", None) or processing.meeting_id
             await self.processing_repo.mark_transcription_failed(
                 session,
-                meeting_id=meeting.id,
+                meeting_id=failed_meeting_id,
                 error_message=str(exc),
             )
             await session.commit()
-            await self._notify_transcription_failed(
-                session,
-                meeting=meeting,
-                processing=processing,
-                error_message=str(exc),
-                bot=bot,
-                frontend_url=frontend_url,
-            )
+            if meeting:
+                await self._notify_transcription_failed(
+                    session,
+                    meeting=meeting,
+                    processing=processing,
+                    error_message=str(exc),
+                    bot=bot,
+                    frontend_url=frontend_url,
+                )
             raise
         finally:
             if prepared:

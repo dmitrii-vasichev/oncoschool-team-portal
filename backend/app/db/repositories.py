@@ -813,16 +813,19 @@ class MeetingAIProcessingRepository:
         stale_before: datetime,
         max_attempts: int,
     ) -> MeetingAIProcessing | None:
+        stale_transcribing = and_(
+            MeetingAIProcessing.status == "transcribing",
+            or_(
+                MeetingAIProcessing.transcription_last_heartbeat_at < stale_before,
+                MeetingAIProcessing.transcription_last_heartbeat_at.is_(None),
+            ),
+        )
         stmt = (
             select(MeetingAIProcessing)
             .where(
                 or_(
                     MeetingAIProcessing.status == "queued",
-                    and_(
-                        MeetingAIProcessing.status == "transcribing",
-                        MeetingAIProcessing.transcription_last_heartbeat_at
-                        < stale_before,
-                    ),
+                    stale_transcribing,
                 ),
                 MeetingAIProcessing.transcription_attempt_count < max_attempts,
             )
@@ -848,6 +851,38 @@ class MeetingAIProcessingRepository:
         processing.error_message = None
         await session.flush()
         return processing
+
+    async def mark_exhausted_stale_transcription_jobs_failed(
+        self,
+        session: AsyncSession,
+        *,
+        stale_before: datetime,
+        max_attempts: int,
+    ) -> int:
+        stale_transcribing = and_(
+            MeetingAIProcessing.status == "transcribing",
+            or_(
+                MeetingAIProcessing.transcription_last_heartbeat_at < stale_before,
+                MeetingAIProcessing.transcription_last_heartbeat_at.is_(None),
+            ),
+            MeetingAIProcessing.transcription_attempt_count >= max_attempts,
+        )
+        stmt = (
+            update(MeetingAIProcessing)
+            .where(stale_transcribing)
+            .values(
+                status="failed",
+                transcription_phase="failed",
+                transcription_last_heartbeat_at=datetime.utcnow(),
+                error_message=(
+                    "Транскрибация зависла и исчерпала лимит повторных попыток. "
+                    "Запустите транскрибацию ещё раз."
+                ),
+                completed_at=datetime.utcnow(),
+            )
+        )
+        result = await session.execute(stmt)
+        return result.rowcount or 0
 
     async def update_transcription_progress(
         self,
