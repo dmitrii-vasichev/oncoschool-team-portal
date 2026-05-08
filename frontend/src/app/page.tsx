@@ -950,6 +950,14 @@ export default function DashboardPage() {
     currentScope === "department"
       ? "По выбранному отделу сейчас нет активных задач."
       : "Все задачи выполнены — отличная работа!";
+  const overdueEmptyTitle =
+    scopedTasksTruncated && scopedOverdueTasks.length === 0
+      ? "В загруженных задачах просрочек нет"
+      : "Всё в срок";
+  const overdueEmptyDescription =
+    scopedTasksTruncated && scopedOverdueTasks.length === 0
+      ? "Полный список может содержать ещё просроченные задачи."
+      : "Нет просроченных задач";
 
   // Build badges for tasks section
   const taskBadges: BadgeInfo[] = [];
@@ -1158,10 +1166,10 @@ export default function DashboardPage() {
                     <CheckCircle2 className="h-5 w-5 text-status-done-fg" />
                   </div>
                   <p className="mb-0.5 text-sm font-heading font-semibold text-foreground">
-                    Всё в срок
+                    {overdueEmptyTitle}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Нет просроченных задач
+                    {overdueEmptyDescription}
                   </p>
                 </div>
               }
