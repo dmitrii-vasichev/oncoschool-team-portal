@@ -17,6 +17,15 @@ export function toggleTaskDraftSelected(
   );
 }
 
+export function setAllTaskDraftsSelected(
+  taskDrafts: MeetingAITaskDraft[],
+  selected: boolean
+): MeetingAITaskDraft[] {
+  return taskDrafts.map((task) =>
+    task.selected === selected ? task : { ...task, selected }
+  );
+}
+
 export function buildMeetingOutcomePublishPayload({
   summary,
   decisionsText,

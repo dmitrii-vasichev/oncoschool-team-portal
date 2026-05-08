@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bot, FileAudio, Loader2, Send, ListChecks } from "lucide-react";
+import { Bot, CheckSquare, FileAudio, Loader2, Send, ListChecks, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import {
   formatMeetingProcessingBadge,
   formatMeetingTranscriptionStatus,
   isMeetingTranscriptionActive,
+  setAllTaskDraftsSelected,
   shouldShowMeetingTranscriptionStatus,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils";
@@ -143,6 +144,7 @@ export function MeetingAiOutcomesPanel({
   };
 
   const selectedTaskCount = taskDrafts.filter((task) => task.selected).length;
+  const hasSelectedTasks = selectedTaskCount > 0;
   const canPublish = canPublishMeetingOutcomes(processing?.status, isBusy);
   const processingBadge = formatMeetingProcessingBadge(processing?.status);
 
@@ -293,9 +295,35 @@ export function MeetingAiOutcomesPanel({
                 <ListChecks className="h-3.5 w-3.5" />
                 Кандидаты задач
               </Label>
-              <span className="text-2xs text-muted-foreground">
-                Выбрано {selectedTaskCount} из {taskDrafts.length}
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span className="text-2xs text-muted-foreground">
+                  Выбрано {selectedTaskCount} из {taskDrafts.length}
+                </span>
+                {taskDrafts.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setTaskDrafts((current) =>
+                        setAllTaskDraftsSelected(
+                          current,
+                          !current.some((task) => task.selected)
+                        )
+                      )
+                    }
+                    disabled={isBusy}
+                    className="h-7 rounded-lg px-2 text-2xs"
+                  >
+                    {hasSelectedTasks ? (
+                      <Square className="h-3.5 w-3.5" />
+                    ) : (
+                      <CheckSquare className="h-3.5 w-3.5" />
+                    )}
+                    {hasSelectedTasks ? "Снять все" : "Выбрать все"}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {taskDrafts.length === 0 ? (

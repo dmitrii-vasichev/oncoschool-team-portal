@@ -8,6 +8,7 @@ import {
   isMeetingTranscriptionActive,
   shouldShowMeetingTranscriptionStatus,
   splitDraftDecisionsText,
+  setAllTaskDraftsSelected,
   toggleTaskDraftSelected,
 } from "./MeetingAiOutcomesPanelUtils.ts";
 import type { MeetingAITaskDraft } from "../../lib/types.ts";
@@ -41,6 +42,25 @@ test("toggleTaskDraftSelected updates only the requested task", () => {
   assert.deepEqual(toggleTaskDraftSelected(drafts, 1, true), [
     taskDraft({ title: "First", selected: true }),
     taskDraft({ title: "Second", selected: true }),
+  ]);
+});
+
+test("setAllTaskDraftsSelected updates every task draft", () => {
+  const drafts = [
+    taskDraft({ title: "First", selected: true }),
+    taskDraft({ title: "Second", selected: false }),
+    taskDraft({ title: "Third", selected: true }),
+  ];
+
+  assert.deepEqual(setAllTaskDraftsSelected(drafts, false), [
+    taskDraft({ title: "First", selected: false }),
+    taskDraft({ title: "Second", selected: false }),
+    taskDraft({ title: "Third", selected: false }),
+  ]);
+  assert.deepEqual(setAllTaskDraftsSelected(drafts, true), [
+    taskDraft({ title: "First", selected: true }),
+    taskDraft({ title: "Second", selected: true }),
+    taskDraft({ title: "Third", selected: true }),
   ]);
 });
 
