@@ -79,6 +79,12 @@ function isOverdue(task: Task): boolean {
   return parseLocalDate(task.deadline) < todayStart;
 }
 
+function completedSinceParam(): string {
+  const completedSince = new Date();
+  completedSince.setDate(completedSince.getDate() - 7);
+  return completedSince.toISOString();
+}
+
 function normalizePersonName(
   fullName: string | null | undefined,
   fallback = "Без имени"
@@ -98,23 +104,6 @@ function firstAndLastName(fullName: string | null | undefined): string {
   const parts = safeFullName.split(/\s+/).filter(Boolean);
   if (parts.length <= 2) return parts.join(" ");
   return `${parts[0]} ${parts[1]}`;
-}
-
-function formatTaskCount(count: number): string {
-  const normalizedCount = Math.abs(count);
-  const lastTwoDigits = normalizedCount % 100;
-  const lastDigit = normalizedCount % 10;
-
-  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
-    return `${count} задач`;
-  }
-  if (lastDigit === 1) {
-    return `${count} задача`;
-  }
-  if (lastDigit >= 2 && lastDigit <= 4) {
-    return `${count} задачи`;
-  }
-  return `${count} задач`;
 }
 
 // ────────────────────────────────────────────
@@ -177,7 +166,7 @@ function TaskListItem({
   showAssignee = false,
 }: {
   task: Task;
-  variant?: "default" | "overdue" | "unassigned";
+  variant?: "default" | "overdue" | "unassigned" | "completed";
   showAssignee?: boolean;
 }) {
   const overdue = variant === "overdue" || isOverdue(task);
@@ -186,7 +175,9 @@ function TaskListItem({
     ? "border border-destructive/35 bg-destructive/[0.06] hover:bg-destructive/[0.1] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset]"
     : variant === "unassigned"
       ? "border border-dashed border-muted-foreground/20 hover:bg-secondary/50"
-      : "border border-border/60 hover:bg-secondary/50";
+      : variant === "completed"
+        ? "border border-status-done-ring/35 bg-status-done-bg/20 hover:bg-status-done-bg/35"
+        : "border border-border/60 hover:bg-secondary/50";
 
   const sourceIcon =
     task.source === "voice" ? (
@@ -277,6 +268,12 @@ function TaskListItem({
                   size="sm"
                 />
                 {createdByName}
+              </span>
+            )}
+            {variant === "completed" && (
+              <span className="text-xs text-status-done-fg flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Выполнено: {formatDate(task.completed_at || task.updated_at)}
               </span>
             )}
             {showAssignee && (
@@ -499,6 +496,9 @@ export default function DashboardPage() {
   const [departmentOverdueTasks, setDepartmentOverdueTasks] = useState<Task[]>(
     []
   );
+  const [myCompletedWeekTasks, setMyCompletedWeekTasks] = useState<Task[]>([]);
+  const [departmentCompletedWeekTasks, setDepartmentCompletedWeekTasks] =
+    useState<Task[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [taskScope, setTaskScope] = useState<"my" | "department">("my");
   const [myUpcomingMeetings, setMyUpcomingMeetings] = useState<Meeting[]>([]);
@@ -577,6 +577,7 @@ export default function DashboardPage() {
 
         const openStatuses = "new,in_progress,review";
         const selectedDepartmentParam = selectedDepartmentId || undefined;
+        const completedSince = completedSinceParam();
         const emptyTasksPage = {
           items: [] as Task[],
           total: 0,
@@ -610,6 +611,29 @@ export default function DashboardPage() {
                 })
                 .catch(catchLog("getDepartmentTasks"))
             : Promise.resolve(emptyTasksPage),
+          api
+            .getTasks({
+              assignee_id: userId,
+              ...(selectedDepartmentParam
+                ? { department_id: selectedDepartmentParam }
+                : {}),
+              status: "done",
+              completed_since: completedSince,
+              per_page: "5",
+              sort: "completed_at_desc",
+            })
+            .catch(catchLog("getMyCompletedWeekTasks")),
+          selectedDepartmentParam
+            ? api
+                .getTasks({
+                  department_id: selectedDepartmentParam,
+                  status: "done",
+                  completed_since: completedSince,
+                  per_page: "5",
+                  sort: "completed_at_desc",
+                })
+                .catch(catchLog("getDepartmentCompletedWeekTasks"))
+            : Promise.resolve(emptyTasksPage),
           api.getMeetings({ upcoming: true, member_id: userId }).catch(catchLog("getMyUpcomingMeetings")),
           api.getMeetings({ past: true, member_id: userId }).catch(catchLog("getMyPastMeetings")),
           selectedDepartmentParam
@@ -632,11 +656,13 @@ export default function DashboardPage() {
         const dashboardData = results[0] as DashboardTasksAnalytics | null;
         const myTasksData = results[1] as { items: Task[] } | null;
         const departmentTasksData = results[2] as { items: Task[] } | null;
-        const myMeetingsData = results[3] as Meeting[] | null;
-        const myPastMeetingsData = results[4] as Meeting[] | null;
-        const deptMeetingsData = results[5] as Meeting[] | null;
-        const teamData = results[6] as TeamMember[] | null;
-        const unassignedData = results[7] as { items: Task[] } | null;
+        const myCompletedWeekData = results[3] as { items: Task[] } | null;
+        const departmentCompletedWeekData = results[4] as { items: Task[] } | null;
+        const myMeetingsData = results[5] as Meeting[] | null;
+        const myPastMeetingsData = results[6] as Meeting[] | null;
+        const deptMeetingsData = results[7] as Meeting[] | null;
+        const teamData = results[8] as TeamMember[] | null;
+        const unassignedData = results[9] as { items: Task[] } | null;
 
         const hasError = results.some((r) => r === null);
         const myTaskItems = Array.isArray(myTasksData?.items)
@@ -644,6 +670,14 @@ export default function DashboardPage() {
           : [];
         const departmentTaskItems = Array.isArray(departmentTasksData?.items)
           ? departmentTasksData.items.filter(Boolean)
+          : [];
+        const myCompletedWeekItems = Array.isArray(myCompletedWeekData?.items)
+          ? myCompletedWeekData.items.filter(Boolean)
+          : [];
+        const departmentCompletedWeekItems = Array.isArray(
+          departmentCompletedWeekData?.items
+        )
+          ? departmentCompletedWeekData.items.filter(Boolean)
           : [];
         const myMeetings = Array.isArray(myMeetingsData)
           ? myMeetingsData.filter(Boolean)
@@ -669,6 +703,8 @@ export default function DashboardPage() {
         // Department tasks
         setDepartmentTasks(departmentTaskItems);
         setDepartmentOverdueTasks(departmentTaskItems.filter(isOverdue));
+        setMyCompletedWeekTasks(myCompletedWeekItems);
+        setDepartmentCompletedWeekTasks(departmentCompletedWeekItems);
 
         // Upcoming meetings (top 3, but keep total count for badge)
         setMyUpcomingMeetings(myMeetings.slice(0, 3));
@@ -721,6 +757,10 @@ export default function DashboardPage() {
     currentScope === "department"
       ? (departmentMetrics?.done_week ?? 0)
       : (myMetrics?.done_week ?? 0);
+  const completedWeekTasks =
+    currentScope === "department"
+      ? departmentCompletedWeekTasks
+      : myCompletedWeekTasks;
 
   const scopedMeetings = currentScope === "department" ? departmentUpcomingMeetings : myUpcomingMeetings;
 
@@ -755,6 +795,15 @@ export default function DashboardPage() {
   const overdueBadges: BadgeInfo[] = [];
   if (scopedOverdueTasks.length > 0) {
     overdueBadges.push({ label: "просрочено", value: scopedOverdueTasks.length, color: "red" });
+  }
+
+  const completedWeekBadges: BadgeInfo[] = [];
+  if (completedInScopeThisWeek > 0) {
+    completedWeekBadges.push({
+      label: "за неделю",
+      value: completedInScopeThisWeek,
+      color: "green",
+    });
   }
 
   const scopedMeetingsTotal = currentScope === "department" ? departmentUpcomingMeetingsTotal : myUpcomingMeetingsTotal;
@@ -955,10 +1004,11 @@ export default function DashboardPage() {
               title="Выполнено за 7 дней"
               icon={CheckCircle2}
               iconColor="hsl(var(--status-done-fg))"
+              badges={completedWeekBadges}
               linkHref="/tasks"
               linkLabel="Все задачи"
             />
-            {completedInScopeThisWeek === 0 ? (
+            {completedWeekTasks.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-status-done-bg">
                   <CheckCircle2 className="h-5 w-5 text-status-done-fg" />
@@ -971,18 +1021,15 @@ export default function DashboardPage() {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-status-done-bg">
-                  <CheckCircle2 className="h-5 w-5 text-status-done-fg" />
-                </div>
-                <p className="mb-1 text-3xl font-heading font-bold text-status-done-fg">
-                  {formatTaskCount(completedInScopeThisWeek)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {currentScope === "department"
-                    ? "Закрыто отделом за последние 7 дней"
-                    : "Закрыто вами за последние 7 дней"}
-                </p>
+              <div className="space-y-2">
+                {completedWeekTasks.slice(0, 5).map((task) => (
+                  <TaskListItem
+                    key={task.id}
+                    task={task}
+                    variant="completed"
+                    showAssignee={currentScope === "department"}
+                  />
+                ))}
               </div>
             )}
           </div>

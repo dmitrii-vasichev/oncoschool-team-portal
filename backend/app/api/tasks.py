@@ -145,6 +145,7 @@ async def list_tasks(
     search: str | None = Query(None),
     label_ids: str | None = Query(None),
     has_overdue: bool | None = Query(None),
+    completed_since: datetime | None = Query(None),
     sort: str = Query("created_at_desc"),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -197,6 +198,8 @@ async def list_tasks(
         )
     if has_overdue:
         base_stmt = base_stmt.where(Task.deadline < date.today(), Task.status.notin_(["done", "cancelled"]))
+    if completed_since:
+        base_stmt = base_stmt.where(Task.completed_at >= _to_utc_naive(completed_since))
     try:
         parsed_label_ids = _parse_label_ids_filter(label_ids)
     except ValueError:
@@ -214,6 +217,8 @@ async def list_tasks(
         "deadline_asc": Task.deadline.asc().nullslast(),
         "deadline_desc": Task.deadline.desc().nullsfirst(),
         "priority_desc": case((Task.priority == "urgent", 1), else_=0).desc(),
+        "completed_at_desc": Task.completed_at.desc().nullslast(),
+        "completed_at_asc": Task.completed_at.asc().nullslast(),
         "short_id_desc": Task.short_id.desc(),
         "short_id_asc": Task.short_id.asc(),
     }

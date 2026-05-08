@@ -95,6 +95,7 @@ class TaskUrgencyTests(unittest.IsolatedAsyncioTestCase):
                 search=None,
                 label_ids=None,
                 has_overdue=None,
+                completed_since=None,
                 sort="created_at_desc",
                 page=1,
                 per_page=50,
