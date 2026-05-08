@@ -38,6 +38,10 @@ import { useIsTruncated } from "@/hooks/useIsTruncated";
 import { PermissionService } from "@/lib/permissions";
 import { getAccessibleDepartments } from "@/lib/departmentAccess";
 import { api } from "@/lib/api";
+import {
+  completedSinceParam,
+  filterTasksCompletedSince,
+} from "@/lib/dashboardTaskUtils";
 import { isTaskUrgent } from "@/lib/taskUrgency";
 import { sanitizeZoomJoinUrl } from "@/lib/zoomLink";
 import { UpcomingBirthdays } from "./team/components/UpcomingBirthdays";
@@ -77,12 +81,6 @@ function isOverdue(task: Task): boolean {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   return parseLocalDate(task.deadline) < todayStart;
-}
-
-function completedSinceParam(): string {
-  const completedSince = new Date();
-  completedSince.setDate(completedSince.getDate() - 7);
-  return completedSince.toISOString();
 }
 
 function normalizePersonName(
@@ -619,7 +617,7 @@ export default function DashboardPage() {
                 : {}),
               status: "done",
               completed_since: completedSince,
-              per_page: "5",
+              per_page: "50",
               sort: "completed_at_desc",
             })
             .catch(catchLog("getMyCompletedWeekTasks")),
@@ -629,7 +627,7 @@ export default function DashboardPage() {
                   department_id: selectedDepartmentParam,
                   status: "done",
                   completed_since: completedSince,
-                  per_page: "5",
+                  per_page: "50",
                   sort: "completed_at_desc",
                 })
                 .catch(catchLog("getDepartmentCompletedWeekTasks"))
@@ -672,12 +670,18 @@ export default function DashboardPage() {
           ? departmentTasksData.items.filter(Boolean)
           : [];
         const myCompletedWeekItems = Array.isArray(myCompletedWeekData?.items)
-          ? myCompletedWeekData.items.filter(Boolean)
+          ? filterTasksCompletedSince(
+              myCompletedWeekData.items.filter(Boolean),
+              completedSince,
+            )
           : [];
         const departmentCompletedWeekItems = Array.isArray(
           departmentCompletedWeekData?.items
         )
-          ? departmentCompletedWeekData.items.filter(Boolean)
+          ? filterTasksCompletedSince(
+              departmentCompletedWeekData.items.filter(Boolean),
+              completedSince,
+            )
           : [];
         const myMeetings = Array.isArray(myMeetingsData)
           ? myMeetingsData.filter(Boolean)

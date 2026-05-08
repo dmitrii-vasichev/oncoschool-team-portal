@@ -20,6 +20,7 @@ test("dashboard third task card shows completed tasks for the last 7 days", () =
   assert.match(source, /completedWeekTasks/);
   assert.match(source, /done_week/);
   assert.match(source, /completed_since/);
+  assert.match(source, /filterTasksCompletedSince/);
   assert.match(source, /sort: "completed_at_desc"/);
   assert.match(source, /Выполнено за 7 дней/);
   assert.match(source, /За последнюю неделю задач не завершали/);
