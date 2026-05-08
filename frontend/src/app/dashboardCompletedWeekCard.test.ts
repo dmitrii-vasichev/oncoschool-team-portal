@@ -24,8 +24,15 @@ test("dashboard third task card shows completed tasks for the last 7 days", () =
   assert.match(source, /sort: "completed_at_desc"/);
   assert.match(source, /Выполнено за 7 дней/);
   assert.match(source, /За последнюю неделю задач не завершали/);
-  assert.match(source, /completedWeekTasks\.slice\(0, 5\)\.map/);
-  assert.match(source, /variant="completed"/);
+  assert.match(source, /DashboardTaskBlock/);
+  assert.match(source, /blockKey="completed"/);
+  assert.match(source, /expandedTaskBlocks\.completed/);
+  assert.match(source, /getDashboardTaskPreview/);
+  assert.match(source, /Показать ещё/);
+  assert.match(source, /Свернуть/);
+  assert.match(source, /Сначала недавно выполненные/);
+  assert.match(source, /itemVariant="completed"/);
+  assert.doesNotMatch(source, /completedWeekTasks\.slice\(0, 5\)\.map/);
   assert.doesNotMatch(source, /Не обновлялись/);
   assert.doesNotMatch(source, /scopedStaleTasks/);
 });

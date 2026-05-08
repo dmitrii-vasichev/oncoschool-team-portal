@@ -397,6 +397,7 @@ function DashboardTaskBlock({
   showAssignee,
   orderingHint,
   truncated,
+  truncationMessage,
   linkHref,
   linkLabel,
 }: {
@@ -413,6 +414,7 @@ function DashboardTaskBlock({
   showAssignee: boolean;
   orderingHint: string;
   truncated?: boolean;
+  truncationMessage?: string;
   linkHref?: string;
   linkLabel?: string;
 }) {
@@ -432,7 +434,14 @@ function DashboardTaskBlock({
         linkLabel={linkLabel}
       />
       {tasks.length === 0 ? (
-        emptyContent
+        <>
+          {emptyContent}
+          {truncated && truncationMessage && (
+            <p className="text-xs text-muted-foreground">
+              {truncationMessage}
+            </p>
+          )}
+        </>
       ) : (
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">{orderingHint}</p>
@@ -450,9 +459,9 @@ function DashboardTaskBlock({
               />
             ))}
           </div>
-          {truncated && (
+          {truncated && truncationMessage && (
             <p className="text-xs text-muted-foreground">
-              Показаны первые {tasks.length}; в списке может быть больше задач.
+              {truncationMessage}
             </p>
           )}
           {canExpand && (
@@ -1118,6 +1127,7 @@ export default function DashboardPage() {
               showAssignee={currentScope === "department"}
               orderingHint="Сначала срочные и ближайшие дедлайны"
               truncated={scopedTasksTruncated}
+              truncationMessage={`Загружены первые ${scopedTasks.length} задач; в полном списке может быть больше.`}
               linkHref="/tasks"
               linkLabel="На доску"
             />
@@ -1159,6 +1169,7 @@ export default function DashboardPage() {
               showAssignee={currentScope === "department"}
               orderingHint="Сначала срочные и самые старые просрочки"
               truncated={scopedTasksTruncated}
+              truncationMessage={`Просроченные рассчитаны по первым ${scopedTasks.length} загруженным активным задачам; в полном списке могут быть ещё задачи.`}
             />
           </div>
 
@@ -1198,6 +1209,7 @@ export default function DashboardPage() {
               showAssignee={currentScope === "department"}
               orderingHint="Сначала недавно выполненные"
               truncated={completedWeekTasksTruncated}
+              truncationMessage={`Загружены первые ${completedWeekTasks.length} задач; в полном списке может быть больше.`}
             />
           </div>
         </div>
