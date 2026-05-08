@@ -1,5 +1,21 @@
 # Status
 
+## Dashboard Task Column Layout
+
+- Current phase: design approved
+- Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-columns-design.md`
+- Scope: dashboard task-block internal grouping layout, explanatory copy, no-overdue state, and responsive behavior
+- Latest progress:
+  - Confirmed the current merged task block solves duplication but makes overdue task cards feel too stretched in the wide desktop layout.
+  - Approved keeping overdue tasks inside the same task block while rendering `Просрочено` and `Активные` as separate internal columns on desktop.
+  - Approved mobile behavior: stack groups vertically, with overdue tasks first.
+  - Approved replacing the ordering hint with `Задачи сгруппированы по состоянию и отсортированы по срочности.`
+  - Approved no-overdue behavior: hide the overdue group and red zero badge, avoid reserving an empty column, and let active tasks use the available width.
+- Key approved decisions:
+  - The dashboard should not reintroduce a separate overdue card.
+  - The right-side `Активность за 7 дней` card remains unchanged.
+  - Empty task state remains the only content when there are no open tasks.
+
 ## Dashboard Task Activity Redesign
 
 - Current phase: implemented; automated verification passed
