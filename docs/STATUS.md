@@ -2,8 +2,9 @@
 
 ## Dashboard Task Activity Redesign
 
-- Current phase: design approved; spec written
+- Current phase: plan written; implementation not started
 - Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-activity-redesign-design.md`
+- Plan: `docs/superpowers/plans/2026-05-08-dashboard-task-activity-redesign.md`
 - Scope: dashboard task/overdue deduplication, activity-card metrics, role-aware team scope, and metric drill-down behavior
 - Latest progress:
   - Identified that overdue dashboard tasks are duplicated because they are both active tasks and a separate overdue list.
@@ -13,6 +14,7 @@
   - Approved activity metrics: completed, created, `В работе > 7 дней`, and completed-task delta versus the previous week.
   - Confirmed `Команда` scope must be visible only to admin/moderator users.
   - Confirmed `В работе > 7 дней` should use task status-transition history, not `updated_at`.
+  - Wrote the implementation plan and made it the active repo plan.
 - Key approved decisions:
   - A task appears only once in the dashboard task area.
   - Overdue work is represented inside the main task block, not repeated in the activity card.

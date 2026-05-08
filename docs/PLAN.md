@@ -1,4 +1,52 @@
-# Active Plan: Dashboard Task Block Expansion
+# Active Plan: Dashboard Task Activity Redesign
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-activity-redesign.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Redesign the dashboard task row so overdue tasks are grouped inside the main task block and the former completed-week card becomes a scoped activity card with drill-down task lists.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-08-dashboard-task-activity-redesign-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-08-dashboard-task-activity-redesign.md`
+
+**Milestones:**
+
+1. Add backend dashboard activity analytics with role-aware `my`, `department`, and `team` scopes.
+2. Add frontend task grouping helpers so overdue tasks appear once inside the main task block.
+3. Add frontend activity API/types.
+4. Replace the separate overdue and completed-week dashboard cards with a two-column task block plus an activity card.
+5. Run backend/frontend verification and update status.
+
+**Implementation status:**
+
+- Planned; implementation not started.
+
+**Definition of done:**
+
+- Dashboard task area shows no duplicate task cards.
+- Overdue tasks appear as a `Просрочено` group inside the main task block.
+- Non-overdue open tasks appear as an `Активные` group inside the same block.
+- The old separate overdue dashboard card is removed.
+- The old completed-week card is replaced by `Активность за 7 дней`.
+- Activity metrics include completed, created, `В работе > 7 дней`, and completed-task delta versus the previous week.
+- Activity drill-down opens inline inside the activity card.
+- `Команда` scope is visible only to admin/moderator users.
+- Backend activity calculations enforce the same visibility rules as the task block.
+- `В работе > 7 дней` is calculated from `task_updates.new_status = in_progress`, not from `updated_at`.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_dashboard_activity_api.py -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Dashboard Task Block Expansion
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-block-expansion.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
