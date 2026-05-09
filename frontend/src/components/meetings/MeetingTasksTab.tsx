@@ -4,31 +4,27 @@ import Link from "next/link";
 import {
   ListChecks,
   ChevronRight,
-  Bot,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import type { Task, Meeting } from "@/lib/types";
+import { getMeetingSummaryDisplayState } from "./meetingOutcomeFlowUtils";
 
 interface MeetingTasksTabProps {
   tasks: Task[];
   meeting: Meeting;
-  isModerator: boolean;
-  onSwitchToSummary: () => void;
 }
 
 export function MeetingTasksTab({
   tasks,
   meeting,
-  isModerator,
-  onSwitchToSummary,
 }: MeetingTasksTabProps) {
   const doneCount = tasks.filter((t) => t.status === "done").length;
   const taskProgress =
     tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
+  const summaryState = getMeetingSummaryDisplayState(meeting);
 
   if (tasks.length === 0) {
     return (
@@ -39,21 +35,10 @@ export function MeetingTasksTab({
         <p className="text-sm text-muted-foreground">
           К этой встрече ещё не привязано задач
         </p>
-        {meeting.transcript && !meeting.parsed_summary && isModerator && (
-          <>
-            <p className="text-xs text-muted-foreground/60 mt-1">
-              Обработайте транскрипцию через AI для автоматического создания
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onSwitchToSummary}
-              className="mt-3 text-xs gap-1 text-primary"
-            >
-              <Bot className="h-3.5 w-3.5" />
-              Обработать через AI
-            </Button>
-          </>
+        {summaryState === "awaiting_outcomes" && (
+          <p className="mt-1 text-xs text-muted-foreground/60">
+            Задачи появятся после публикации итогов встречи.
+          </p>
         )}
       </div>
     );

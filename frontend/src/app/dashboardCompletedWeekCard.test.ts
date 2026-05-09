@@ -75,6 +75,23 @@ test("dashboard activity metric rows expose icons and expansion affordance", () 
   assert.match(card[0], /<ChevronDown[\s\S]*aria-hidden="true"/);
 });
 
+test("dashboard activity expansion stays inside the selected metric card", () => {
+  const source = readSource("app/page.tsx");
+  const card = source.match(
+    /function DashboardActivityCard[\s\S]*?\/\/ ────────────────────────────────────────────\n\/\/ Upcoming meeting card/,
+  );
+
+  assert.ok(card, "dashboard activity card source should exist");
+  assert.match(card[0], /overflow-hidden rounded-xl border/);
+  assert.match(card[0], /grid-cols-\[minmax\(0,1fr\)_3rem_1\.25rem\]/);
+  assert.match(card[0], /w-12 text-right/);
+  assert.match(card[0], /tabular-nums/);
+  assert.match(card[0], /isSelected && metric\.count > 0/);
+  assert.match(card[0], /id=\{detailsId\}/);
+  assert.match(card[0], /border-t border-border\/60/);
+  assert.doesNotMatch(card[0], /selected && selected\.metric\.count > 0/);
+});
+
 test("dashboard task block uses responsive grouped columns and universal ordering copy", () => {
   const source = readSource("app/page.tsx");
   const block = source.match(

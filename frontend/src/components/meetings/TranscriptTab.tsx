@@ -7,7 +7,7 @@ import {
   Check,
   Loader2,
   Download,
-  Bot,
+  FileAudio,
   Upload,
   RefreshCw,
   CircleCheck,
@@ -22,6 +22,10 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
 import type { Meeting, ZoomStatusResponse } from "@/lib/types";
+import {
+  getMeetingTranscriptSourceLabel,
+  hasPublishedMeetingSummary,
+} from "./meetingOutcomeFlowUtils";
 
 interface TranscriptTabProps {
   meeting: Meeting;
@@ -246,6 +250,13 @@ export function TranscriptTab({
 
   // ── State A: Transcript exists ──
   if (meeting.transcript) {
+    const transcriptSourceLabel = getMeetingTranscriptSourceLabel(
+      meeting.transcript_source
+    );
+    const hasPublishedSummary = hasPublishedMeetingSummary(
+      meeting.parsed_summary
+    );
+
     return (
       <div className="space-y-4">
         {/* Header with source + actions */}
@@ -258,12 +269,17 @@ export function TranscriptTab({
               {meeting.transcript_source === "zoom_api" ? (
                 <>
                   <Download className="h-3 w-3" />
-                  Zoom API
+                  {transcriptSourceLabel}
+                </>
+              ) : meeting.transcript_source === "openai_audio" ? (
+                <>
+                  <FileAudio className="h-3 w-3" />
+                  {transcriptSourceLabel}
                 </>
               ) : (
                 <>
                   <Upload className="h-3 w-3" />
-                  Вставлено вручную
+                  {transcriptSourceLabel}
                 </>
               )}
             </Badge>
@@ -291,15 +307,15 @@ export function TranscriptTab({
                 </>
               )}
             </Button>
-            {isModerator && (
+            {hasPublishedSummary && (
               <Button
                 variant="default"
                 size="sm"
                 onClick={onSwitchToSummary}
                 className="h-7 text-xs gap-1.5 rounded-lg bg-accent hover:bg-accent/90 text-accent-foreground"
               >
-                <Bot className="h-3.5 w-3.5" />
-                Распознать AI
+                <FileText className="h-3.5 w-3.5" />
+                К резюме
               </Button>
             )}
           </div>

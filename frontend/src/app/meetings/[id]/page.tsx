@@ -232,11 +232,6 @@ export default function MeetingDetailPage() {
     }
   };
 
-  const handleTasksCreated = () => {
-    api.getMeetingTasks(id).then(setTasks).catch(() => {});
-    setActiveTab("tasks");
-  };
-
   const handleUpdateSchedule = async (data: MeetingScheduleCreateRequest) => {
     if (!schedule) return;
     const previousUpdatedAt = schedule.updated_at;
@@ -498,9 +493,6 @@ export default function MeetingDetailPage() {
             {activeTab === "summary" && (
               <SummaryTab
                 meeting={meeting}
-                isModerator={isModerator}
-                onMeetingUpdate={handleMeetingUpdate}
-                onTasksCreated={handleTasksCreated}
                 onSwitchToTranscript={() => setActiveTab("transcript")}
               />
             )}
@@ -509,8 +501,6 @@ export default function MeetingDetailPage() {
               <MeetingTasksTab
                 tasks={tasks}
                 meeting={meeting}
-                isModerator={isModerator}
-                onSwitchToSummary={() => setActiveTab("summary")}
               />
             )}
 

@@ -666,7 +666,6 @@ function DashboardActivityCard({
       iconClass: "bg-amber-500/12 text-amber-700 ring-amber-500/25",
     },
   ];
-  const selected = metrics.find((metric) => metric.key === selectedMetric);
   const delta = activity?.completed_delta.delta ?? 0;
   const deltaLabel = delta > 0 ? `+${delta}` : String(delta);
 
@@ -680,45 +679,70 @@ function DashboardActivityCard({
             const detailsId = `dashboard-activity-${key}-tasks`;
 
             return (
-              <button
+              <div
                 key={key}
-                type="button"
-                aria-pressed={isSelected}
-                aria-expanded={selectedMetric === key}
-                aria-controls={metric.count > 0 ? detailsId : undefined}
-                aria-label={`${label}: ${metric.count}. ${
-                  isSelected ? "Свернуть список" : "Открыть список"
-                }`}
-                onClick={() =>
-                  onSelectedMetricChange(isSelected ? null : key)
-                }
-                disabled={metric.count === 0}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                className={`overflow-hidden rounded-xl border transition-colors ${
                   isSelected
                     ? "border-primary/40 bg-primary/5 text-foreground"
                     : "border-border/60 bg-background/70 text-muted-foreground hover:border-primary/25 hover:bg-secondary/40 hover:text-foreground"
-                } ${metric.count === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+                } ${metric.count === 0 ? "opacity-60" : ""}`}
               >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${iconClass}`}
-                  >
-                    <Icon aria-hidden="true" className="h-4 w-4" />
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  aria-expanded={selectedMetric === key}
+                  aria-controls={metric.count > 0 ? detailsId : undefined}
+                  aria-label={`${label}: ${metric.count}. ${
+                    isSelected ? "Свернуть список" : "Открыть список"
+                  }`}
+                  onClick={() =>
+                    onSelectedMetricChange(isSelected ? null : key)
+                  }
+                  disabled={metric.count === 0}
+                  className={`grid w-full grid-cols-[minmax(0,1fr)_3rem_1.25rem] items-center gap-2 px-3 py-2.5 text-left transition-colors ${
+                    metric.count === 0 ? "cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${iconClass}`}
+                    >
+                      <Icon aria-hidden="true" className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 text-sm font-medium">{label}</span>
                   </span>
-                  <span className="min-w-0 text-sm font-medium">{label}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="text-base font-semibold text-foreground">
+                  <span className="w-12 text-right text-base font-semibold tabular-nums text-foreground">
                     {metric.count}
                   </span>
                   <ChevronDown
                     aria-hidden="true"
-                    className={`h-4 w-4 text-muted-foreground transition-transform duration-150 ${
+                    className={`h-4 w-4 justify-self-end text-muted-foreground transition-transform duration-150 ${
                       isSelected ? "rotate-180 text-foreground" : ""
                     } ${metric.count === 0 ? "opacity-40" : ""}`}
                   />
-                </span>
-              </button>
+                </button>
+                {isSelected && metric.count > 0 && (
+                  <div
+                    id={detailsId}
+                    className="space-y-2 border-t border-border/60 bg-card/60 p-2.5"
+                    aria-label={label}
+                  >
+                    {metric.tasks.map((task) => (
+                      <TaskListItem
+                        key={task.id}
+                        task={task}
+                        variant={task.status === "done" ? "completed" : "default"}
+                        showAssignee={showAssignee}
+                      />
+                    ))}
+                    {metric.truncated && (
+                      <p className="text-xs text-muted-foreground">
+                        Показаны первые {metric.tasks.length} задач.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -741,27 +765,6 @@ function DashboardActivityCard({
             Сравнение по выполненным задачам
           </p>
         </div>
-        {selected && selected.metric.count > 0 && (
-          <div
-            id={`dashboard-activity-${selected.key}-tasks`}
-            className="space-y-2"
-            aria-label={selected.label}
-          >
-            {selected.metric.tasks.map((task) => (
-              <TaskListItem
-                key={task.id}
-                task={task}
-                variant={task.status === "done" ? "completed" : "default"}
-                showAssignee={showAssignee}
-              />
-            ))}
-            {selected.metric.truncated && (
-              <p className="text-xs text-muted-foreground">
-                Показаны первые {selected.metric.tasks.length} задач.
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </>
   );
