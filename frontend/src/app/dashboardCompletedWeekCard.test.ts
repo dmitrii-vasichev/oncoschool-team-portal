@@ -56,6 +56,25 @@ test("dashboard activity card replaces the completed-week task card", () => {
   assert.doesNotMatch(source, /blockKey="completed"/);
 });
 
+test("dashboard activity metric rows expose icons and expansion affordance", () => {
+  const source = readSource("app/page.tsx");
+  const card = source.match(
+    /function DashboardActivityCard[\s\S]*?\/\/ ────────────────────────────────────────────\n\/\/ Upcoming meeting card/,
+  );
+
+  assert.ok(card, "dashboard activity card source should exist");
+  assert.match(source, /ChevronDown/);
+  assert.match(source, /PlusCircle/);
+  assert.match(source, /TimerReset/);
+  assert.match(card[0], /icon:\s*ElementType/);
+  assert.match(card[0], /icon:\s*CheckCircle2/);
+  assert.match(card[0], /icon:\s*PlusCircle/);
+  assert.match(card[0], /icon:\s*TimerReset/);
+  assert.match(card[0], /aria-expanded=\{selectedMetric === key\}/);
+  assert.match(card[0], /<Icon aria-hidden="true"/);
+  assert.match(card[0], /<ChevronDown[\s\S]*aria-hidden="true"/);
+});
+
 test("dashboard task block uses responsive grouped columns and universal ordering copy", () => {
   const source = readSource("app/page.tsx");
   const block = source.match(

@@ -5,6 +5,7 @@ import type { ElementType, ReactNode } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
+  ChevronDown,
   ArrowRight,
   ClipboardList,
   Mic,
@@ -14,6 +15,8 @@ import {
   ExternalLink,
   CalendarDays,
   ListChecks,
+  PlusCircle,
+  TimerReset,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -637,21 +640,30 @@ function DashboardActivityCard({
     key: ActivityMetricKey;
     label: string;
     metric: DashboardActivityMetric;
+    icon: ElementType;
+    iconClass: string;
   }> = [
     {
       key: "completed",
       label: "Выполнено",
       metric: activity?.completed ?? emptyMetric,
+      icon: CheckCircle2,
+      iconClass:
+        "bg-status-done-bg text-status-done-fg ring-status-done-ring/40",
     },
     {
       key: "created",
       label: "Создано",
       metric: activity?.created ?? emptyMetric,
+      icon: PlusCircle,
+      iconClass: "bg-sky-500/10 text-sky-700 ring-sky-500/25",
     },
     {
       key: "in_progress_over_7_days",
       label: "В работе > 7 дней",
       metric: activity?.in_progress_over_7_days ?? emptyMetric,
+      icon: TimerReset,
+      iconClass: "bg-amber-500/12 text-amber-700 ring-amber-500/25",
     },
   ];
   const selected = metrics.find((metric) => metric.key === selectedMetric);
@@ -663,27 +675,52 @@ function DashboardActivityCard({
       <SectionHeader title="Активность за 7 дней" icon={CheckCircle2} />
       <div className="space-y-3">
         <div className="grid gap-2">
-          {metrics.map(({ key, label, metric }) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={selectedMetric === key}
-              onClick={() =>
-                onSelectedMetricChange(selectedMetric === key ? null : key)
-              }
-              disabled={metric.count === 0}
-              className={`flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
-                selectedMetric === key
-                  ? "border-primary/40 bg-primary/5 text-foreground"
-                  : "border-border/60 bg-background/70 text-muted-foreground hover:text-foreground"
-              } ${metric.count === 0 ? "opacity-60" : ""}`}
-            >
-              <span className="text-sm font-medium">{label}</span>
-              <span className="text-base font-semibold text-foreground">
-                {metric.count}
-              </span>
-            </button>
-          ))}
+          {metrics.map(({ key, label, metric, icon: Icon, iconClass }) => {
+            const isSelected = selectedMetric === key;
+            const detailsId = `dashboard-activity-${key}-tasks`;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={isSelected}
+                aria-expanded={selectedMetric === key}
+                aria-controls={metric.count > 0 ? detailsId : undefined}
+                aria-label={`${label}: ${metric.count}. ${
+                  isSelected ? "Свернуть список" : "Открыть список"
+                }`}
+                onClick={() =>
+                  onSelectedMetricChange(isSelected ? null : key)
+                }
+                disabled={metric.count === 0}
+                className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                  isSelected
+                    ? "border-primary/40 bg-primary/5 text-foreground"
+                    : "border-border/60 bg-background/70 text-muted-foreground hover:border-primary/25 hover:bg-secondary/40 hover:text-foreground"
+                } ${metric.count === 0 ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${iconClass}`}
+                  >
+                    <Icon aria-hidden="true" className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 text-sm font-medium">{label}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <span className="text-base font-semibold text-foreground">
+                    {metric.count}
+                  </span>
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-4 w-4 text-muted-foreground transition-transform duration-150 ${
+                      isSelected ? "rotate-180 text-foreground" : ""
+                    } ${metric.count === 0 ? "opacity-40" : ""}`}
+                  />
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="rounded-xl border border-border/60 bg-background/70 px-3 py-2">
           <div className="flex items-center justify-between gap-3">
@@ -705,7 +742,11 @@ function DashboardActivityCard({
           </p>
         </div>
         {selected && selected.metric.count > 0 && (
-          <div className="space-y-2" aria-label={selected.label}>
+          <div
+            id={`dashboard-activity-${selected.key}-tasks`}
+            className="space-y-2"
+            aria-label={selected.label}
+          >
             {selected.metric.tasks.map((task) => (
               <TaskListItem
                 key={task.id}
