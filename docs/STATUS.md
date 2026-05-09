@@ -2,7 +2,7 @@
 
 ## Dashboard Task Column Layout
 
-- Current phase: plan written; implementation not started
+- Current phase: implemented; automated verification passed
 - Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-columns-design.md`
 - Plan: `docs/superpowers/plans/2026-05-08-dashboard-task-columns.md`
 - Scope: dashboard task-block internal grouping layout, explanatory copy, no-overdue state, and responsive behavior
@@ -12,11 +12,18 @@
   - Approved mobile behavior: stack groups vertically, with overdue tasks first.
   - Approved replacing the ordering hint with `Задачи сгруппированы по состоянию и отсортированы по срочности.`
   - Approved no-overdue behavior: hide the overdue group and red zero badge, avoid reserving an empty column, and let active tasks use the available width.
-  - Wrote the implementation plan and made it the active repo plan.
+  - Implemented grouped dashboard task rendering with independent `Просрочено` and `Активные` expansion controls.
+  - Verified the frontend source guard, TypeScript, lint, and production build.
 - Key approved decisions:
   - The dashboard should not reintroduce a separate overdue card.
   - The right-side `Активность за 7 дней` card remains unchanged.
   - Empty task state remains the only content when there are no open tasks.
+- Latest verification:
+  - `cd frontend && npm test` passed.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed.
+  - `git diff --check` passed.
 
 ## Dashboard Task Activity Redesign
 
