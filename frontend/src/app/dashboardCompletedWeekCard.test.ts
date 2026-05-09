@@ -42,6 +42,17 @@ test("dashboard task row groups overdue tasks inside the main task block", () =>
   assert.doesNotMatch(source, /blockKey="overdue"/);
 });
 
+test("dashboard task list items show urgent state with edge only", () => {
+  const source = readSource("app/page.tsx");
+  const item = source.match(
+    /function TaskListItem[\s\S]*?\/\/ ────────────────────────────────────────────\n\/\/ Section header/,
+  );
+
+  assert.ok(item, "dashboard task list item source should exist");
+  assert.match(item[0], /bg-priority-urgent-dot/);
+  assert.doesNotMatch(item[0], />\s*Срочно\s*</);
+});
+
 test("dashboard activity card replaces the completed-week task card", () => {
   const source = readSource("app/page.tsx");
 

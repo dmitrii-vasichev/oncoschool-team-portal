@@ -240,67 +240,62 @@ function TaskListItem({
               )}
             </div>
             <div className="mt-2 flex items-center gap-x-2 gap-y-1.5 flex-wrap">
-            {urgent && (
-              <span className="inline-flex items-center rounded-full bg-priority-urgent-bg px-2 py-0.5 text-[11px] font-medium text-priority-urgent-fg ring-1 ring-inset ring-priority-urgent-dot/35">
-                Срочно
-              </span>
-            )}
-            {overdue && (
-              <span className="inline-flex items-center rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
-                Просрочено
-              </span>
-            )}
-            {task.deadline && (
-              <span
-                className={`text-xs flex items-center gap-1 ${
-                  overdue ? "text-destructive font-medium" : "text-muted-foreground"
-                }`}
-              >
-                <CalendarDays className="h-3 w-3" />
-                {formatDate(task.deadline)}
-              </span>
-            )}
-            {checklist.length > 0 && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <ListChecks className="h-3 w-3" />
-                {completedChecklist}/{checklist.length}
-              </span>
-            )}
-            {variant === "unassigned" && task.created_by && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <UserAvatar
-                  name={createdByName}
-                  avatarUrl={task.created_by.avatar_url}
-                  size="sm"
-                />
-                {createdByName}
-              </span>
-            )}
-            {variant === "completed" && (
-              <span className="text-xs text-status-done-fg flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Выполнено: {formatDate(task.completed_at || task.updated_at)}
-              </span>
-            )}
-            {showAssignee && (
-              task.assignee ? (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+              {overdue && (
+                <span className="inline-flex items-center rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                  Просрочено
+                </span>
+              )}
+              {task.deadline && (
+                <span
+                  className={`text-xs flex items-center gap-1 ${
+                    overdue ? "text-destructive font-medium" : "text-muted-foreground"
+                  }`}
+                >
+                  <CalendarDays className="h-3 w-3" />
+                  {formatDate(task.deadline)}
+                </span>
+              )}
+              {checklist.length > 0 && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <ListChecks className="h-3 w-3" />
+                  {completedChecklist}/{checklist.length}
+                </span>
+              )}
+              {variant === "unassigned" && task.created_by && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <UserAvatar
-                    name={assigneeName}
-                    avatarUrl={task.assignee.avatar_url}
+                    name={createdByName}
+                    avatarUrl={task.created_by.avatar_url}
                     size="sm"
                   />
-                  <span className="truncate max-w-[150px]">
-                    {firstAndLastName(assigneeName)}
+                  {createdByName}
+                </span>
+              )}
+              {variant === "completed" && (
+                <span className="text-xs text-status-done-fg flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Выполнено: {formatDate(task.completed_at || task.updated_at)}
+                </span>
+              )}
+              {showAssignee && (
+                task.assignee ? (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 min-w-0">
+                    <UserAvatar
+                      name={assigneeName}
+                      avatarUrl={task.assignee.avatar_url}
+                      size="sm"
+                    />
+                    <span className="truncate max-w-[150px]">
+                      {firstAndLastName(assigneeName)}
+                    </span>
                   </span>
-                </span>
-              ) : (
-                <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
-                  <UserX className="h-3 w-3" />
-                  Не назначен
-                </span>
-              )
-            )}
+                ) : (
+                  <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
+                    <UserX className="h-3 w-3" />
+                    Не назначен
+                  </span>
+                )
+              )}
             </div>
           </div>
         </div>
