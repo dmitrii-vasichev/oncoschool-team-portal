@@ -16,7 +16,7 @@
 
 **Implementation status:**
 
-- Planned; implementation not started.
+- Implemented; automated verification passed.
 
 **Definition of done:**
 

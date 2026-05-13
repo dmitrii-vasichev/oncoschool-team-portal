@@ -2,22 +2,27 @@
 
 ## Dashboard Task Card Height Sync
 
-- Current phase: plan written; implementation not started
+- Current phase: implemented; automated verification passed
 - Spec: `docs/superpowers/specs/2026-05-08-dashboard-task-card-height-sync-design.md`
 - Plan: `docs/superpowers/plans/2026-05-08-dashboard-task-card-height-sync.md`
 - Scope: dashboard task-block card height synchronization between overdue and active desktop columns
 - Latest progress:
   - Approved row-level synchronization between `Просрочено` and `Активные`.
-  - Confirmed the synchronization applies only inside the dashboard task block.
-  - Confirmed the `Активность за 7 дней` card remains independent.
-  - Wrote the implementation plan and made it the active repo plan.
+  - Kept the `Активность за 7 дней` card independent.
+  - Added a desktop synchronized task grid and kept stacked natural-height groups below the desktop breakpoint.
+  - Preserved independent group expansion controls.
 - Key approved decisions:
   - Synchronize only task cards inside the dashboard task block.
   - Do not assign one fixed global height to all dashboard task cards.
   - Do not show visible empty alignment cells when one group has more tasks than the other.
   - Keep mobile layout stacked with overdue tasks first.
 - Latest verification:
-  - Not run yet; implementation has not started.
+  - `cd frontend && node --test --experimental-strip-types src/app/dashboardCompletedWeekCard.test.ts` passed.
+  - `cd frontend && npm test` passed.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed.
+  - `git diff --check` passed.
 
 ## Dashboard Task Column Layout
 
