@@ -1,9 +1,11 @@
+import asyncio
 import unittest
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
 
 from pydantic import ValidationError
+from sqlalchemy.dialects import postgresql
 from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.orm import configure_mappers
 
@@ -50,26 +52,94 @@ class IdeaModelSmokeTests(unittest.TestCase):
 
 
 class IdeaRepositoryTests(unittest.TestCase):
-    def test_detail_options_eager_load_task_labels_for_idea_links(self) -> None:
+    def test_detail_options_eager_loads_task_response_relationships_for_idea_links(self) -> None:
         option_paths = [str(option.path) for option in IdeaRepository().detail_options()]
 
-        self.assertTrue(
-            any(
-                "Idea.departments" in path
-                and "IdeaDepartment.task_links" in path
-                and "IdeaTask.task" in path
-                and "Task.labels" in path
-                for path in option_paths
+        for relationship in ("Task.assignee", "Task.created_by", "Task.labels"):
+            self.assertTrue(
+                any(
+                    "Idea.departments" in path
+                    and "IdeaDepartment.task_links" in path
+                    and "IdeaTask.task" in path
+                    and relationship in path
+                    for path in option_paths
+                )
+            )
+            self.assertTrue(
+                any(
+                    "Idea.task_links" in path
+                    and "IdeaTask.task" in path
+                    and relationship in path
+                    for path in option_paths
+                )
+            )
+
+    def test_list_filters_by_search_term_in_title_or_description(self) -> None:
+        class FakeScalarResult:
+            def unique(self):
+                return self
+
+            def all(self):
+                return []
+
+        class FakeResult:
+            def scalar_one(self):
+                return 0
+
+            def scalars(self):
+                return FakeScalarResult()
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.statements = []
+
+            async def execute(self, stmt):
+                self.statements.append(stmt)
+                return FakeResult()
+
+        async def run_list() -> FakeSession:
+            session = FakeSession()
+            await IdeaRepository().list(session, search=" Reports ")
+            return session
+
+        session = asyncio.run(run_list())
+        list_stmt = session.statements[1]
+        compiled = str(
+            list_stmt.compile(
+                dialect=postgresql.dialect(),
+                compile_kwargs={"literal_binds": True},
             )
         )
-        self.assertTrue(
-            any(
-                "Idea.task_links" in path
-                and "IdeaTask.task" in path
-                and "Task.labels" in path
-                for path in option_paths
+
+        self.assertIn("ideas.title ILIKE '%%Reports%%'", compiled)
+        self.assertIn("ideas.description ILIKE '%%Reports%%'", compiled)
+
+    def test_add_task_link_sets_idea_and_department_ids(self) -> None:
+        class FakeSession:
+            def __init__(self) -> None:
+                self.added = None
+
+            def add(self, item) -> None:
+                self.added = item
+
+            async def flush(self) -> None:
+                pass
+
+        async def run_add() -> FakeSession:
+            session = FakeSession()
+            await IdeaRepository().add_task_link(
+                session,
+                idea_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                idea_department_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
+                task_id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
+                created_by_id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
             )
-        )
+            return session
+
+        session = asyncio.run(run_add())
+
+        self.assertEqual(session.added.idea_id, uuid.UUID("00000000-0000-0000-0000-000000000001"))
+        self.assertEqual(session.added.idea_department_id, uuid.UUID("00000000-0000-0000-0000-000000000002"))
 
 
 class IdeaSchemaTests(unittest.TestCase):

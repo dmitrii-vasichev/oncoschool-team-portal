@@ -523,6 +523,7 @@ class IdeaRepository:
         session: AsyncSession,
         *,
         status: str | None = None,
+        search: str | None = None,
         author_id: uuid.UUID | None = None,
         review_owner_id: uuid.UUID | None = None,
         department_id: uuid.UUID | None = None,
@@ -534,6 +535,16 @@ class IdeaRepository:
         stmt = select(Idea).options(*self.detail_options())
         if status:
             stmt = stmt.where(Idea.status.in_([item.strip() for item in status.split(",") if item.strip()]))
+        if search:
+            normalized_search = search.strip()
+            if normalized_search:
+                search_pattern = f"%{normalized_search}%"
+                stmt = stmt.where(
+                    or_(
+                        Idea.title.ilike(search_pattern),
+                        Idea.description.ilike(search_pattern),
+                    )
+                )
         if author_id:
             stmt = stmt.where(Idea.author_id == author_id)
         if review_owner_id:
