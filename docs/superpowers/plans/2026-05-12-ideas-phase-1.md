@@ -116,18 +116,47 @@ Create `backend/tests/test_idea_service.py` with initial model import coverage:
 ```python
 import unittest
 
+from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
+from sqlalchemy.orm import configure_mappers
+
 from app.db import models
 
 
 class IdeaModelSmokeTests(unittest.TestCase):
     def test_idea_models_are_registered(self) -> None:
-        table_names = {table.name for table in models.Base.metadata.sorted_tables}
+        table_names = set(models.Base.metadata.tables)
 
         self.assertIn("ideas", table_names)
         self.assertIn("idea_departments", table_names)
         self.assertIn("idea_tasks", table_names)
         self.assertIn("idea_comments", table_names)
         self.assertIn("idea_events", table_names)
+
+    def test_idea_relationship_mappers_configure(self) -> None:
+        configure_mappers()
+        self.assertTrue(models.IdeaDepartment.task_links.property.viewonly)
+        self.assertTrue(models.IdeaTask.idea_department.property.viewonly)
+
+    def test_idea_task_department_link_is_scoped_to_same_idea(self) -> None:
+        idea_departments = models.IdeaDepartment.__table__
+        idea_tasks = models.IdeaTask.__table__
+
+        unique_constraints = {
+            constraint.name
+            for constraint in idea_departments.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
+        composite_fk_targets = {
+            tuple(element.target_fullname for element in constraint.elements)
+            for constraint in idea_tasks.constraints
+            if isinstance(constraint, ForeignKeyConstraint)
+        }
+
+        self.assertIn("uq_idea_departments_idea_id_id", unique_constraints)
+        self.assertIn(
+            ("idea_departments.idea_id", "idea_departments.id"),
+            composite_fk_targets,
+        )
 ```
 
 - [ ] **Step 2: Run the test and verify it fails**
@@ -143,6 +172,15 @@ Expected: FAIL because the idea tables are not registered yet.
 - [ ] **Step 3: Add SQLAlchemy models**
 
 In `backend/app/db/models.py`, add the models after `TaskUpdate` and before `MeetingParticipant` so the task-adjacent domain stays together:
+
+Keep these persistence safety rules in the implementation:
+
+- Extend imports with `ForeignKeyConstraint`, `and_`, and `foreign` if they are not already present.
+- Mandatory historical references to `team_members` (`Idea.author_id`, `Idea.review_owner_id`, `IdeaDepartment.owner_id`, and `IdeaComment.author_id`) use the default FK behavior, not cascade delete, so deleting a member cannot erase idea history.
+- Optional actor references (`decision_by_id`, `created_by_id`, and `actor_id`) use `ondelete="SET NULL"`.
+- `IdeaTask` must enforce that a department-scoped task link belongs to the same idea as its `IdeaDepartment`. Use a composite FK from `(idea_id, idea_department_id)` to `(idea_departments.idea_id, idea_departments.id)`.
+- The composite `IdeaTask.idea_department` relationship is read-only (`viewonly=True`); repository/service code must set `idea_id` and `idea_department_id` explicitly.
+- Do not create a separate `idx_idea_tasks_task_id`; `uq_idea_tasks_task_id` already creates an index for `task_id`.
 
 ```python
 class Idea(Base):
@@ -163,10 +201,10 @@ class Idea(Base):
         String(30), default="new", server_default="new", nullable=False
     )
     author_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("team_members.id"), nullable=False
     )
     review_owner_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("team_members.id"), nullable=False
     )
     decision_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     decision_by_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -201,6 +239,7 @@ class IdeaDepartment(Base):
     __tablename__ = "idea_departments"
     __table_args__ = (
         UniqueConstraint("idea_id", "department_id", name="uq_idea_departments_idea_department"),
+        UniqueConstraint("idea_id", "id", name="uq_idea_departments_idea_id_id"),
         Index("idx_idea_departments_idea_id", "idea_id"),
         Index("idx_idea_departments_department_id", "department_id"),
         Index("idx_idea_departments_owner_id", "owner_id"),
@@ -217,7 +256,7 @@ class IdeaDepartment(Base):
         ForeignKey("departments.id", ondelete="CASCADE"), nullable=False
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("team_members.id"), nullable=False
     )
     status: Mapped[str] = mapped_column(
         String(30), default="not_started", server_default="not_started", nullable=False
@@ -235,16 +274,27 @@ class IdeaDepartment(Base):
     department: Mapped["Department"] = relationship()
     owner: Mapped["TeamMember"] = relationship(foreign_keys=[owner_id])
     created_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[created_by_id])
-    task_links: Mapped[list["IdeaTask"]] = relationship(back_populates="idea_department")
+    task_links: Mapped[list["IdeaTask"]] = relationship(
+        back_populates="idea_department",
+        primaryjoin=lambda: and_(
+            IdeaDepartment.idea_id == IdeaTask.idea_id,
+            IdeaDepartment.id == foreign(IdeaTask.idea_department_id),
+        ),
+        viewonly=True,
+    )
 
 
 class IdeaTask(Base):
     __tablename__ = "idea_tasks"
     __table_args__ = (
         UniqueConstraint("task_id", name="uq_idea_tasks_task_id"),
+        ForeignKeyConstraint(
+            ["idea_id", "idea_department_id"],
+            ["idea_departments.idea_id", "idea_departments.id"],
+            name="fk_idea_tasks_idea_department_same_idea",
+        ),
         Index("idx_idea_tasks_idea_id", "idea_id"),
         Index("idx_idea_tasks_idea_department_id", "idea_department_id"),
-        Index("idx_idea_tasks_task_id", "task_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -254,7 +304,7 @@ class IdeaTask(Base):
         ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False
     )
     idea_department_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("idea_departments.id", ondelete="SET NULL"), nullable=True
+        nullable=True
     )
     task_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
@@ -265,7 +315,14 @@ class IdeaTask(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     idea: Mapped["Idea"] = relationship(back_populates="task_links")
-    idea_department: Mapped["IdeaDepartment | None"] = relationship(back_populates="task_links")
+    idea_department: Mapped["IdeaDepartment | None"] = relationship(
+        back_populates="task_links",
+        primaryjoin=lambda: and_(
+            IdeaDepartment.idea_id == IdeaTask.idea_id,
+            IdeaDepartment.id == foreign(IdeaTask.idea_department_id),
+        ),
+        viewonly=True,
+    )
     task: Mapped["Task"] = relationship()
     created_by: Mapped["TeamMember | None"] = relationship()
 
@@ -284,7 +341,7 @@ class IdeaComment(Base):
         ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False
     )
     author_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("team_members.id"), nullable=False
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -353,8 +410,8 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=300), nullable=False),
         sa.Column("description", sa.Text(), nullable=False),
         sa.Column("status", sa.String(length=30), server_default="new", nullable=False),
-        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("review_owner_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id"), nullable=False),
+        sa.Column("review_owner_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id"), nullable=False),
         sa.Column("decision_comment", sa.Text(), nullable=True),
         sa.Column("decision_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True),
         sa.Column("decision_at", sa.DateTime(), nullable=True),
@@ -373,13 +430,14 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("idea_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False),
         sa.Column("department_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("departments.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("owner_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("owner_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id"), nullable=False),
         sa.Column("status", sa.String(length=30), server_default="not_started", nullable=False),
         sa.Column("note", sa.Text(), nullable=True),
         sa.Column("created_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("idea_id", "department_id", name="uq_idea_departments_idea_department"),
+        sa.UniqueConstraint("idea_id", "id", name="uq_idea_departments_idea_id_id"),
     )
     op.create_index("idx_idea_departments_idea_id", "idea_departments", ["idea_id"])
     op.create_index("idx_idea_departments_department_id", "idea_departments", ["department_id"])
@@ -390,21 +448,25 @@ def upgrade() -> None:
         "idea_tasks",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("idea_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("idea_department_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("idea_departments.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("idea_department_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("task_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False),
         sa.Column("created_by_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(
+            ["idea_id", "idea_department_id"],
+            ["idea_departments.idea_id", "idea_departments.id"],
+            name="fk_idea_tasks_idea_department_same_idea",
+        ),
         sa.UniqueConstraint("task_id", name="uq_idea_tasks_task_id"),
     )
     op.create_index("idx_idea_tasks_idea_id", "idea_tasks", ["idea_id"])
     op.create_index("idx_idea_tasks_idea_department_id", "idea_tasks", ["idea_department_id"])
-    op.create_index("idx_idea_tasks_task_id", "idea_tasks", ["task_id"])
 
     op.create_table(
         "idea_comments",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("idea_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("ideas.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("team_members.id"), nullable=False),
         sa.Column("body", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
@@ -432,7 +494,6 @@ def downgrade() -> None:
     op.drop_index("idx_idea_comments_created_at", table_name="idea_comments")
     op.drop_index("idx_idea_comments_idea_id", table_name="idea_comments")
     op.drop_table("idea_comments")
-    op.drop_index("idx_idea_tasks_task_id", table_name="idea_tasks")
     op.drop_index("idx_idea_tasks_idea_department_id", table_name="idea_tasks")
     op.drop_index("idx_idea_tasks_idea_id", table_name="idea_tasks")
     op.drop_table("idea_tasks")
