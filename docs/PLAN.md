@@ -1,12 +1,14 @@
-# Active Plan: Projects Phase 2 Design
+# Active Plan: Projects Phase 2
 
-> **For agentic workers:** Phase 2 is currently at the design-review gate. Do not implement project tables or UI until the design spec is reviewed and an implementation plan is written.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-13-projects-phase-2.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
 **Goal:** Add a Phase 2 Projects layer that connects larger accepted ideas to organized project execution while preserving direct Idea -> Tasks support for small ideas.
 
 **Approved base spec:** `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
 
-**Phase 2 design draft:** `docs/superpowers/specs/2026-05-13-projects-phase-2-design.md`
+**Approved Phase 2 spec:** `docs/superpowers/specs/2026-05-13-projects-phase-2-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-13-projects-phase-2.md`
 
 **Milestones:**
 
@@ -18,7 +20,8 @@
 
 **Implementation status:**
 
-- Design draft written; awaiting user review.
+- Phase 2 design approved for implementation.
+- Detailed implementation plan written; awaiting execution approach selection.
 - No Phase 2 project code has been implemented yet.
 
 **Definition of done:**

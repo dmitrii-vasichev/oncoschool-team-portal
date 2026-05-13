@@ -5,7 +5,7 @@
 | Field | Value |
 | --- | --- |
 | Date | 2026-05-13 |
-| Status | Draft for user review |
+| Status | Approved for implementation planning |
 | Parent Spec | `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md` |
 | Feature | Projects layer for Ideas and Tasks |
 | Scope | Web portal Phase 2 MVP |
