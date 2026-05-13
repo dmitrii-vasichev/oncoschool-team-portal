@@ -500,6 +500,9 @@ class Idea(Base):
     deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
     )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
@@ -509,6 +512,10 @@ class Idea(Base):
     review_owner: Mapped["TeamMember"] = relationship(foreign_keys=[review_owner_id])
     decision_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[decision_by_id])
     deleted_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[deleted_by_id])
+    project: Mapped["Project | None"] = relationship(
+        foreign_keys=[project_id],
+        post_update=True,
+    )
     departments: Mapped[list["IdeaDepartment"]] = relationship(
         back_populates="idea", cascade="all, delete-orphan"
     )
@@ -664,6 +671,239 @@ class IdeaEvent(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     idea: Mapped["Idea"] = relationship(back_populates="events")
+    actor: Mapped["TeamMember | None"] = relationship()
+
+
+class Project(Base):
+    __tablename__ = "projects"
+    __table_args__ = (
+        Index("idx_projects_status", "status"),
+        Index("idx_projects_owner_id", "owner_id"),
+        Index("idx_projects_source_idea_id", "source_idea_id"),
+        Index("idx_projects_created_at", "created_at"),
+        Index("idx_projects_deleted_at", "deleted_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), default="planned", server_default="planned", nullable=False
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("team_members.id"), nullable=False
+    )
+    source_idea_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ideas.id", ondelete="SET NULL"), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    deleted_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    owner: Mapped["TeamMember"] = relationship(foreign_keys=[owner_id])
+    source_idea: Mapped["Idea | None"] = relationship(
+        foreign_keys=[source_idea_id],
+        post_update=True,
+    )
+    deleted_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[deleted_by_id])
+    departments: Mapped[list["ProjectDepartment"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    milestones: Mapped[list["ProjectMilestone"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    task_links: Mapped[list["ProjectTask"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    comments: Mapped[list["ProjectComment"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    events: Mapped[list["ProjectEvent"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+class ProjectDepartment(Base):
+    __tablename__ = "project_departments"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "department_id",
+            name="uq_project_departments_project_department",
+        ),
+        UniqueConstraint("project_id", "id", name="uq_project_departments_project_id_id"),
+        Index("idx_project_departments_project_id", "project_id"),
+        Index("idx_project_departments_department_id", "department_id"),
+        Index("idx_project_departments_owner_id", "owner_id"),
+        Index("idx_project_departments_status", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    department_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("departments.id", ondelete="CASCADE"), nullable=False
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("team_members.id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(30), default="not_started", server_default="not_started", nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="departments")
+    department: Mapped["Department"] = relationship()
+    owner: Mapped["TeamMember"] = relationship(foreign_keys=[owner_id])
+    created_by: Mapped["TeamMember | None"] = relationship(foreign_keys=[created_by_id])
+    task_links: Mapped[list["ProjectTask"]] = relationship(
+        back_populates="project_department",
+        primaryjoin=lambda: and_(
+            ProjectDepartment.project_id == ProjectTask.project_id,
+            ProjectDepartment.id == foreign(ProjectTask.project_department_id),
+        ),
+        viewonly=True,
+    )
+
+
+class ProjectMilestone(Base):
+    __tablename__ = "project_milestones"
+    __table_args__ = (
+        Index("idx_project_milestones_project_id", "project_id"),
+        Index("idx_project_milestones_status", "status"),
+        Index("idx_project_milestones_due_date", "due_date"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(30), default="planned", server_default="planned", nullable=False
+    )
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="milestones")
+
+
+class ProjectTask(Base):
+    __tablename__ = "project_tasks"
+    __table_args__ = (
+        UniqueConstraint("task_id", name="uq_project_tasks_task_id"),
+        ForeignKeyConstraint(
+            ["project_id", "project_department_id"],
+            ["project_departments.project_id", "project_departments.id"],
+            name="fk_project_tasks_project_department_same_project",
+        ),
+        Index("idx_project_tasks_project_id", "project_id"),
+        Index("idx_project_tasks_project_department_id", "project_department_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    project_department_id: Mapped[uuid.UUID | None] = mapped_column(
+        nullable=True
+    )
+    task_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    project: Mapped["Project"] = relationship(back_populates="task_links")
+    project_department: Mapped["ProjectDepartment | None"] = relationship(
+        back_populates="task_links",
+        primaryjoin=lambda: and_(
+            ProjectDepartment.project_id == ProjectTask.project_id,
+            ProjectDepartment.id == foreign(ProjectTask.project_department_id),
+        ),
+        viewonly=True,
+    )
+    task: Mapped["Task"] = relationship()
+    created_by: Mapped["TeamMember | None"] = relationship()
+
+
+class ProjectComment(Base):
+    __tablename__ = "project_comments"
+    __table_args__ = (
+        Index("idx_project_comments_project_id", "project_id"),
+        Index("idx_project_comments_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    author_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("team_members.id"), nullable=False
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), onupdate=func.now()
+    )
+
+    project: Mapped["Project"] = relationship(back_populates="comments")
+    author: Mapped["TeamMember"] = relationship()
+
+
+class ProjectEvent(Base):
+    __tablename__ = "project_events"
+    __table_args__ = (
+        Index("idx_project_events_project_id", "project_id"),
+        Index("idx_project_events_created_at", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="SET NULL"), nullable=True
+    )
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, default=dict, server_default="{}", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    project: Mapped["Project"] = relationship(back_populates="events")
     actor: Mapped["TeamMember | None"] = relationship()
 
 
