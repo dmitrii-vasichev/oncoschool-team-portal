@@ -17,7 +17,7 @@ import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useToast } from "@/components/shared/Toast";
 import { parseUTCDate } from "@/lib/dateUtils";
 import { api } from "@/lib/api";
-import type { Idea, TeamMember } from "@/lib/types";
+import type { Department, Idea, IdeaTaskLink, TeamMember } from "@/lib/types";
 
 function formatDateTime(value: string): string {
   const parsed = parseUTCDate(value);
@@ -86,7 +86,9 @@ export default function IdeaDetailPage() {
   const { toastError } = useToast();
   const [idea, setIdea] = useState<Idea | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskDialogDepartmentId, setTaskDialogDepartmentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const latestRequestSeqRef = useRef(0);
 
@@ -97,13 +99,15 @@ export default function IdeaDetailPage() {
 
     setLoading(true);
     try {
-      const [loadedIdea, loadedMembers] = await Promise.all([
+      const [loadedIdea, loadedMembers, loadedDepartments] = await Promise.all([
         api.getIdea(id),
-        api.getTeam().catch(() => []),
+        api.getTeam().catch(() => [] as TeamMember[]),
+        api.getDepartments().catch(() => [] as Department[]),
       ]);
       if (!isLatestRequest()) return;
       setIdea(loadedIdea);
       setMembers(loadedMembers);
+      setDepartments(loadedDepartments);
     } catch (error) {
       if (isLatestRequest()) {
         toastError(error instanceof Error ? error.message : "Не удалось загрузить идею");
@@ -149,6 +153,27 @@ export default function IdeaDetailPage() {
   const authorName = idea.author?.full_name || "Автор не указан";
   const reviewOwnerName = idea.review_owner?.full_name || "Ответственный не указан";
   const canCreateTask = idea.status === "accepted" || idea.status === "in_tasks";
+  const linkedTaskLinks: IdeaTaskLink[] = [
+    ...idea.task_links,
+    ...idea.departments.flatMap((department) => department.task_links),
+  ];
+
+  function openDirectTaskDialog() {
+    setTaskDialogDepartmentId(null);
+    setTaskDialogOpen(true);
+  }
+
+  function openDepartmentTaskDialog(ideaDepartmentId: string) {
+    setTaskDialogDepartmentId(ideaDepartmentId);
+    setTaskDialogOpen(true);
+  }
+
+  function handleTaskDialogOpenChange(nextOpen: boolean) {
+    setTaskDialogOpen(nextOpen);
+    if (!nextOpen) {
+      setTaskDialogDepartmentId(null);
+    }
+  }
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300">
@@ -196,7 +221,7 @@ export default function IdeaDetailPage() {
             <Button
               type="button"
               size="sm"
-              onClick={() => setTaskDialogOpen(true)}
+              onClick={openDirectTaskDialog}
               disabled={!canCreateTask}
               title={
                 canCreateTask
@@ -217,8 +242,9 @@ export default function IdeaDetailPage() {
 
       <CreateIdeaTaskDialog
         open={taskDialogOpen}
-        onOpenChange={setTaskDialogOpen}
+        onOpenChange={handleTaskDialogOpenChange}
         idea={idea}
+        ideaDepartmentId={taskDialogDepartmentId}
         members={members}
         onCreated={setIdea}
       />
@@ -226,8 +252,14 @@ export default function IdeaDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <main className="space-y-4">
           <IdeaDecisionPanel idea={idea} onUpdated={setIdea} />
-          <IdeaDepartmentPanel idea={idea} onUpdated={setIdea} />
-          <IdeaLinkedTasks links={idea.task_links} />
+          <IdeaDepartmentPanel
+            idea={idea}
+            departments={departments}
+            members={members}
+            onUpdated={setIdea}
+            onCreateTask={openDepartmentTaskDialog}
+          />
+          <IdeaLinkedTasks links={linkedTaskLinks} />
           <IdeaComments idea={idea} onUpdated={setIdea} />
         </main>
 

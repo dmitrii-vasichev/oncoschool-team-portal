@@ -20,6 +20,8 @@
   - Added the `/ideas` register page with status/member/department filters and create dialog.
   - Added the `/ideas/[id]` detail page with decision actions, department implementation status, linked tasks, comments, and event history.
   - Added linked task creation and department status actions from the idea detail page.
+  - Added final review follow-up for multi-department execution: departments can be selected during idea creation, added later from the idea detail page, assigned an owner, and used as the target for department-scoped task creation.
+  - Department-scoped tasks are visible in both department rows and the overall linked-task list while preserving hidden-task access handling.
 - Key approved decisions:
   - No Telegram bot flow, idea tags, idea dashboard, or Projects implementation in Phase 1.
   - Rejected and deferred ideas require reasons.

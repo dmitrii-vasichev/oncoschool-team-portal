@@ -32,11 +32,15 @@ export function CreateIdeaTaskDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   idea: Idea;
-  ideaDepartmentId?: string;
+  ideaDepartmentId?: string | null;
   members: TeamMember[];
   onCreated: (idea: Idea) => void;
 }) {
   const { toastSuccess, toastError } = useToast();
+  const targetDepartmentName = ideaDepartmentId
+    ? idea.departments.find((department) => department.id === ideaDepartmentId)?.department
+        ?.name || null
+    : null;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
@@ -100,7 +104,9 @@ export function CreateIdeaTaskDialog({
         <DialogHeader>
           <DialogTitle className="text-lg">Новая задача по идее</DialogTitle>
           <DialogDescription>
-            Создайте связанную задачу без перехода из карточки идеи.
+            {targetDepartmentName
+              ? `Создайте связанную задачу для отдела ${targetDepartmentName}.`
+              : "Создайте связанную задачу без перехода из карточки идеи."}
           </DialogDescription>
         </DialogHeader>
 

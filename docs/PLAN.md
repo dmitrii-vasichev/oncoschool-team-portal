@@ -20,6 +20,7 @@
 
 - Implemented; automated verification passed.
 - Phase 1 includes backend persistence, schemas, repository, service rules, API routes, frontend API/types, the Ideas register, idea detail, department status actions, linked task creation, comments, and event history.
+- Accepted ideas can add departments after review, assign department owners, and create tasks scoped to a specific department contribution.
 
 **Definition of done:**
 

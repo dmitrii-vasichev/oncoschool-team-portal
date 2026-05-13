@@ -159,6 +159,7 @@ export default function IdeasPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         members={members}
+        departments={departments}
         onCreated={handleIdeaCreated}
       />
     </div>
