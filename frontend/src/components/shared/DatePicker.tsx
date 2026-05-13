@@ -144,6 +144,7 @@ export function DatePicker({
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <button
+              type="button"
               className={cn(
                 "text-sm font-medium border-b border-dashed border-border/60 hover:border-foreground/40 focus:border-foreground focus:outline-none cursor-pointer px-0 py-0.5 text-left",
                 !displayText && "text-muted-foreground",
@@ -175,6 +176,7 @@ export function DatePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           className={cn(
             "justify-start text-left font-normal",

@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight, Building2, ListChecks, Loader2, Lock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useToast } from "@/components/shared/Toast";
 import { IDEA_DEPARTMENT_STATUS_LABELS } from "@/lib/ideaUtils";
@@ -22,8 +29,8 @@ const DEPARTMENT_ACTION_STATUSES: IdeaDepartmentStatus[] = [
   "not_required",
 ];
 
-const SELECT_CLASS =
-  "h-8 min-w-0 rounded-md border border-border/70 bg-background px-2 text-xs text-foreground outline-none transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
+const SELECT_TRIGGER_CLASS =
+  "h-8 min-w-0 border-border/70 bg-background px-2 text-xs shadow-sm transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-primary/20";
 
 function DepartmentTaskLinks({ links }: { links: IdeaTaskLink[] }) {
   if (links.length === 0) {
@@ -165,38 +172,44 @@ export function IdeaDepartmentPanel({
       <div className="space-y-2 px-4 py-3">
         {canManageImplementation && (
           <div className="grid gap-2 rounded-md border border-dashed border-border/70 bg-muted/10 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <select
-              value={newDepartmentId || "none"}
-              onChange={(event) =>
-                setNewDepartmentId(event.target.value === "none" ? "" : event.target.value)
-              }
-              className={SELECT_CLASS}
+            <Select
+              value={newDepartmentId || undefined}
+              onValueChange={setNewDepartmentId}
               disabled={addingDepartment || availableDepartments.length === 0}
             >
-              <option value="none">
-                {availableDepartments.length === 0 ? "Все отделы добавлены" : "Добавить отдел"}
-              </option>
-              {availableDepartments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newOwnerId || "none"}
-              onChange={(event) =>
-                setNewOwnerId(event.target.value === "none" ? "" : event.target.value)
-              }
-              className={SELECT_CLASS}
+              <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                <SelectValue
+                  placeholder={
+                    availableDepartments.length === 0
+                      ? "Все отделы добавлены"
+                      : "Добавить отдел"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent className="z-[70] max-h-64 border-border/70 shadow-xl">
+                {availableDepartments.map((department) => (
+                  <SelectItem key={department.id} value={department.id}>
+                    {department.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={newOwnerId || undefined}
+              onValueChange={setNewOwnerId}
               disabled={addingDepartment || activeMembers.length === 0}
             >
-              <option value="none">Владелец отдела</option>
-              {activeMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.full_name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className={SELECT_TRIGGER_CLASS}>
+                <SelectValue placeholder="Владелец отдела" />
+              </SelectTrigger>
+              <SelectContent className="z-[70] max-h-64 border-border/70 shadow-xl">
+                {activeMembers.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
               size="sm"

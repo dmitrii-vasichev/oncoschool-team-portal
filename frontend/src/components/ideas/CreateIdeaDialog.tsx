@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -13,13 +13,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { Department, Idea, TeamMember } from "@/lib/types";
-
-const SELECT_CLASS =
-  "h-9 w-full rounded-md border border-border/70 bg-background px-3 text-sm text-foreground shadow-sm outline-none transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function CreateIdeaDialog({
   open,
@@ -55,6 +60,14 @@ export function CreateIdeaDialog({
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && !saving) resetForm();
     onOpenChange(nextOpen);
+  }
+
+  function toggleDepartment(departmentId: string) {
+    setDepartmentIds((current) =>
+      current.includes(departmentId)
+        ? current.filter((id) => id !== departmentId)
+        : [...current, departmentId],
+    );
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -139,22 +152,25 @@ export function CreateIdeaDialog({
 
           <div className="space-y-2">
             <Label htmlFor="idea-review-owner">Ответственный за review</Label>
-            <select
-              id="idea-review-owner"
-              value={reviewOwnerId || "all"}
-              onChange={(event) =>
-                setReviewOwnerId(event.target.value === "all" ? "" : event.target.value)
-              }
-              className={SELECT_CLASS}
+            <Select
+              value={reviewOwnerId || undefined}
+              onValueChange={setReviewOwnerId}
               disabled={saving}
             >
-              <option value="all">Выберите участника</option>
-              {activeMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.full_name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                id="idea-review-owner"
+                className="h-9 border-border/70 bg-muted/20 text-sm shadow-sm transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-primary/20"
+              >
+                <SelectValue placeholder="Выберите участника" />
+              </SelectTrigger>
+              <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
+                {activeMembers.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -169,25 +185,31 @@ export function CreateIdeaDialog({
                   const checked = departmentIds.includes(department.id);
 
                   return (
-                    <label
+                    <button
                       key={department.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-background/70"
+                      type="button"
+                      role="checkbox"
+                      aria-checked={checked}
+                      disabled={saving}
+                      onClick={() => toggleDepartment(department.id)}
+                      className={cn(
+                        "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+                        "hover:bg-background/70 focus:outline-none focus:ring-1 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60",
+                        checked && "bg-primary/10 text-foreground",
+                      )}
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={saving}
-                        onChange={(event) =>
-                          setDepartmentIds((current) =>
-                            event.target.checked
-                              ? [...current, department.id]
-                              : current.filter((id) => id !== department.id),
-                          )
-                        }
-                        className="h-4 w-4 rounded border-border"
-                      />
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          checked
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border/80 bg-background text-transparent",
+                        )}
+                      >
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
                       <span className="min-w-0 truncate">{department.name}</span>
-                    </label>
+                    </button>
                   );
                 })
               )}

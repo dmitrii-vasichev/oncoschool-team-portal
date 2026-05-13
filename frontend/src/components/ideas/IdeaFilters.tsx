@@ -1,6 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { IDEA_STATUS_TABS } from "@/lib/ideaUtils";
 import { cn } from "@/lib/utils";
 import type { Department, IdeaStatus, TeamMember } from "@/lib/types";
@@ -19,33 +25,38 @@ export const EMPTY_IDEA_FILTERS: IdeaFilterValues = {
   department_id: "",
 };
 
-const SELECT_CLASS =
-  "h-8 w-full rounded-md border border-border/70 bg-background px-2.5 text-xs text-foreground shadow-sm outline-none transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
-
 function FilterSelect({
   label,
   value,
   onChange,
-  children,
+  options,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  children: ReactNode;
+  options: Array<{ value: string; label: string }>;
 }) {
   return (
-    <label className="min-w-0 space-y-1">
+    <div className="min-w-0 space-y-1">
       <span className="text-2xs font-medium uppercase text-muted-foreground">
         {label}
       </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={SELECT_CLASS}
-      >
-        {children}
-      </select>
-    </label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          aria-label={label}
+          className="h-8 w-full border-border/70 bg-background px-2.5 text-xs shadow-sm transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-primary/20"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="z-[60] max-h-64 border-border/70 shadow-xl">
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -60,6 +71,15 @@ export function IdeaFilters({
   departments: Department[];
   onChange: (filters: IdeaFilterValues) => void;
 }) {
+  const memberOptions = members.map((member) => ({
+    value: member.id,
+    label: member.full_name,
+  }));
+  const departmentOptions = departments.map((department) => ({
+    value: department.id,
+    label: department.name,
+  }));
+
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -92,14 +112,11 @@ export function IdeaFilters({
               review_owner_id: value === "all" ? "" : value,
             })
           }
-        >
-          <option value="all">Все ответственные</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.full_name}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: "all", label: "Все ответственные" },
+            ...memberOptions,
+          ]}
+        />
 
         <FilterSelect
           label="Автор"
@@ -107,14 +124,11 @@ export function IdeaFilters({
           onChange={(value) =>
             onChange({ ...filters, author_id: value === "all" ? "" : value })
           }
-        >
-          <option value="all">Все авторы</option>
-          {members.map((member) => (
-            <option key={member.id} value={member.id}>
-              {member.full_name}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: "all", label: "Все авторы" },
+            ...memberOptions,
+          ]}
+        />
 
         <FilterSelect
           label="Отдел"
@@ -125,14 +139,11 @@ export function IdeaFilters({
               department_id: value === "all" ? "" : value,
             })
           }
-        >
-          <option value="all">Все отделы</option>
-          {departments.map((department) => (
-            <option key={department.id} value={department.id}>
-              {department.name}
-            </option>
-          ))}
-        </FilterSelect>
+          options={[
+            { value: "all", label: "Все отделы" },
+            ...departmentOptions,
+          ]}
+        />
       </div>
     </div>
   );

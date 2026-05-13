@@ -13,13 +13,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/shared/DatePicker";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
 import type { Idea, IdeaLinkedTaskCreateRequest, TeamMember } from "@/lib/types";
-
-const SELECT_CLASS =
-  "h-9 w-full rounded-md border border-border/70 bg-background px-3 text-sm text-foreground shadow-sm outline-none transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-1 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function CreateIdeaTaskDialog({
   open,
@@ -47,6 +52,7 @@ export function CreateIdeaTaskDialog({
   const [deadline, setDeadline] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const activeMembers = members.filter((member) => member.is_active);
 
   function resetForm() {
     setTitle("");
@@ -142,35 +148,38 @@ export function CreateIdeaTaskDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="idea-task-assignee">Исполнитель</Label>
-              <select
-                id="idea-task-assignee"
+              <Select
                 value={assigneeId || "none"}
-                onChange={(event) =>
-                  setAssigneeId(event.target.value === "none" ? "" : event.target.value)
+                onValueChange={(value) =>
+                  setAssigneeId(value === "none" ? "" : value)
                 }
-                className={SELECT_CLASS}
                 disabled={saving}
               >
-                <option value="none">Не назначен</option>
-                {members
-                  .filter((member) => member.is_active)
-                  .map((member) => (
-                    <option key={member.id} value={member.id}>
+                <SelectTrigger
+                  id="idea-task-assignee"
+                  className="h-9 border-border/70 bg-muted/20 text-sm shadow-sm transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-primary/20"
+                >
+                  <SelectValue placeholder="Не назначен" />
+                </SelectTrigger>
+                <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
+                  <SelectItem value="none">Не назначен</SelectItem>
+                  {activeMembers.map((member) => (
+                    <SelectItem key={member.id} value={member.id}>
                       {member.full_name}
-                    </option>
+                    </SelectItem>
                   ))}
-              </select>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="idea-task-deadline">Дедлайн</Label>
-              <Input
-                id="idea-task-deadline"
-                type="date"
+              <DatePicker
                 value={deadline}
-                onChange={(event) => setDeadline(event.target.value)}
-                className="h-9 border-border/70 bg-muted/20"
-                disabled={saving}
+                onChange={setDeadline}
+                placeholder="Не указан"
+                clearable
+                className="h-9 w-full border-border/70 bg-muted/20 text-sm shadow-sm transition-colors hover:border-primary/30 focus:border-primary/40 focus:ring-primary/20"
               />
             </div>
           </div>
