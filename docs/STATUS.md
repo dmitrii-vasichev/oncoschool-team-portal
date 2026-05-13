@@ -2,7 +2,7 @@
 
 ## Ideas Phase 1
 
-- Current phase: planned; implementation not started
+- Current phase: implemented; automated verification passed
 - Spec: `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
 - Plan: `docs/superpowers/plans/2026-05-12-ideas-phase-1.md`
 - Scope: web portal Ideas section, idea review decisions, department implementation, linked task creation, comments, event history, and Phase 2 Projects compatibility
@@ -14,13 +14,25 @@
   - Approved multi-department implementation with department heads and department implementation owners.
   - Approved final status `Завершена`; `В задачах` is an implementation stage.
   - Wrote the implementation plan for Phase 1 and made it the active repo plan.
+  - Added Ideas persistence tables, relationships, migration, and model smoke tests.
+  - Added Ideas schemas, repository methods, service rules, and API endpoints.
+  - Added frontend Ideas types, API client methods, utility helpers, and default test coverage.
+  - Added the `/ideas` register page with status/member/department filters and create dialog.
+  - Added the `/ideas/[id]` detail page with decision actions, department implementation status, linked tasks, comments, and event history.
+  - Added linked task creation and department status actions from the idea detail page.
 - Key approved decisions:
   - No Telegram bot flow, idea tags, idea dashboard, or Projects implementation in Phase 1.
   - Rejected and deferred ideas require reasons.
   - Linked task details must follow existing task visibility permissions.
   - Completion requires all departments to be ready/not required, or all direct linked tasks closed when no departments are involved.
 - Latest verification:
-  - Planning only; implementation verification not run yet.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_idea_service.py tests/test_ideas_api.py -q` passed: 31 tests.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 409 tests, with existing warnings.
+  - `cd frontend && npm test` passed: 64 tests, with existing `MODULE_TYPELESS_PACKAGE_JSON` warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed.
+  - `cd frontend && npm run build` passed, including `/ideas` and `/ideas/[id]`.
+  - `git diff --check` passed.
 
 ## Dashboard Task Card Height Sync
 

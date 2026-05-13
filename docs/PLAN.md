@@ -18,7 +18,8 @@
 
 **Implementation status:**
 
-- Planned; implementation not started.
+- Implemented; automated verification passed.
+- Phase 1 includes backend persistence, schemas, repository, service rules, API routes, frontend API/types, the Ideas register, idea detail, department status actions, linked task creation, comments, and event history.
 
 **Definition of done:**
 
@@ -43,6 +44,16 @@ cd frontend && npm run lint
 cd frontend && npm run build
 git diff --check
 ```
+
+**Latest verification result:**
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_idea_service.py tests/test_ideas_api.py -q` passed: 31 tests.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q` passed: 409 tests.
+- `cd frontend && npm test` passed: 64 tests.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed.
+- `cd frontend && npm run build` passed, including `/ideas` and `/ideas/[id]`.
+- `git diff --check` passed.
 
 ---
 
