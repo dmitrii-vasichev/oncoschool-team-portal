@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ElementType, ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -209,7 +209,7 @@ function TaskListItem({
     <TooltipProvider delayDuration={120}>
       <Link
         href={`/tasks/${task.short_id}`}
-        className={`relative block overflow-hidden rounded-xl p-3 transition-all duration-150 ${urgent ? "pl-4" : ""} ${borderClass}`}
+        className={`relative flex h-full flex-col overflow-hidden rounded-xl p-3 transition-all duration-150 ${urgent ? "pl-4" : ""} ${borderClass}`}
       >
         {urgent && (
           <span className="absolute inset-y-0 left-0 w-1 bg-priority-urgent-dot" />
@@ -391,6 +391,20 @@ type DashboardTaskGroup = {
   itemVariant: DashboardTaskItemVariant;
 };
 
+type DashboardVisibleTaskGroup = DashboardTaskGroup & {
+  expanded: boolean;
+  visibleTasks: Task[];
+  hiddenCount: number;
+  canExpand: boolean;
+  listId: string;
+};
+
+type DashboardSynchronizedTaskRow = {
+  rowIndex: number;
+  overdueTask?: Task;
+  activeTask?: Task;
+};
+
 function DashboardEmptyState({
   icon: Icon,
   title,
@@ -415,6 +429,201 @@ function DashboardEmptyState({
         {title}
       </p>
       <p className="text-xs text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function DashboardTaskGroupHeading({
+  group,
+  headingId,
+}: {
+  group: DashboardVisibleTaskGroup;
+  headingId: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <h3
+        id={headingId}
+        className="text-xs font-medium text-muted-foreground"
+      >
+        {group.title}
+      </h3>
+      <span className="text-xs text-muted-foreground/70">
+        {group.tasks.length}
+      </span>
+    </div>
+  );
+}
+
+function DashboardTaskGroupExpandButton({
+  group,
+  controlsId,
+  onExpandedChange,
+}: {
+  group: DashboardVisibleTaskGroup;
+  controlsId: string;
+  onExpandedChange: (groupKey: DashboardTaskGroupKey, expanded: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={group.expanded}
+      aria-controls={controlsId}
+      onClick={() => onExpandedChange(group.key, !group.expanded)}
+      className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
+    >
+      {group.expanded ? "Свернуть" : `Показать ещё ${group.hiddenCount}`}
+    </button>
+  );
+}
+
+function DashboardStackedTaskGroups({
+  id,
+  visibleGroups,
+  showAssignee,
+  onGroupExpandedChange,
+  singleGroupTaskGridClassName,
+  className,
+}: {
+  id?: string;
+  visibleGroups: DashboardVisibleTaskGroup[];
+  showAssignee: boolean;
+  onGroupExpandedChange: (
+    groupKey: DashboardTaskGroupKey,
+    expanded: boolean,
+  ) => void;
+  singleGroupTaskGridClassName: string;
+  className: string;
+}) {
+  return (
+    <div id={id} className={className}>
+      {visibleGroups.map((group) => {
+        const headingId = `${group.listId}-heading`;
+        const taskGridClassName =
+          visibleGroups.length === 1
+            ? singleGroupTaskGridClassName
+            : "space-y-2";
+
+        return (
+          <section
+            key={group.key}
+            aria-labelledby={headingId}
+            className="space-y-2"
+          >
+            <DashboardTaskGroupHeading group={group} headingId={headingId} />
+            <div id={group.listId} className={taskGridClassName}>
+              {group.visibleTasks.map((task) => (
+                <TaskListItem
+                  key={task.id}
+                  task={task}
+                  variant={group.itemVariant}
+                  showAssignee={showAssignee}
+                />
+              ))}
+            </div>
+            {group.canExpand && (
+              <DashboardTaskGroupExpandButton
+                group={group}
+                controlsId={group.listId}
+                onExpandedChange={onGroupExpandedChange}
+              />
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function DashboardSynchronizedTaskGroups({
+  listId,
+  overdueGroup,
+  activeGroup,
+  showAssignee,
+  onGroupExpandedChange,
+}: {
+  listId: string;
+  overdueGroup: DashboardVisibleTaskGroup;
+  activeGroup: DashboardVisibleTaskGroup;
+  showAssignee: boolean;
+  onGroupExpandedChange: (
+    groupKey: DashboardTaskGroupKey,
+    expanded: boolean,
+  ) => void;
+}) {
+  const synchronizedTaskRows: DashboardSynchronizedTaskRow[] = Array.from({
+    length: Math.max(
+      overdueGroup.visibleTasks.length,
+      activeGroup.visibleTasks.length,
+    ),
+  }, (_, rowIndex) => ({
+    rowIndex,
+    overdueTask: overdueGroup.visibleTasks[rowIndex],
+    activeTask: activeGroup.visibleTasks[rowIndex],
+  }),
+  );
+  const overdueHeadingId = `${overdueGroup.listId}-synced-heading`;
+  const activeHeadingId = `${activeGroup.listId}-synced-heading`;
+  const hasExpandControls = overdueGroup.canExpand || activeGroup.canExpand;
+
+  return (
+    <div id={listId} className="hidden gap-x-4 gap-y-2 xl:grid xl:grid-cols-2">
+      <DashboardTaskGroupHeading
+        group={overdueGroup}
+        headingId={overdueHeadingId}
+      />
+      <DashboardTaskGroupHeading
+        group={activeGroup}
+        headingId={activeHeadingId}
+      />
+      {synchronizedTaskRows.map(({ rowIndex, overdueTask, activeTask }) => (
+        <Fragment key={rowIndex}>
+          {overdueTask ? (
+            <div className="h-full" aria-labelledby={overdueHeadingId}>
+              <TaskListItem
+                task={overdueTask}
+                variant={overdueGroup.itemVariant}
+                showAssignee={showAssignee}
+              />
+            </div>
+          ) : (
+            <div aria-hidden="true" />
+          )}
+          {activeTask ? (
+            <div className="h-full" aria-labelledby={activeHeadingId}>
+              <TaskListItem
+                task={activeTask}
+                variant={activeGroup.itemVariant}
+                showAssignee={showAssignee}
+              />
+            </div>
+          ) : (
+            <div aria-hidden="true" />
+          )}
+        </Fragment>
+      ))}
+      {hasExpandControls && (
+        <>
+          <div>
+            {overdueGroup.canExpand && (
+              <DashboardTaskGroupExpandButton
+                group={overdueGroup}
+                controlsId={`${overdueGroup.listId} ${listId}`}
+                onExpandedChange={onGroupExpandedChange}
+              />
+            )}
+          </div>
+          <div>
+            {activeGroup.canExpand && (
+              <DashboardTaskGroupExpandButton
+                group={activeGroup}
+                controlsId={`${activeGroup.listId} ${listId}`}
+                onExpandedChange={onGroupExpandedChange}
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -467,7 +676,7 @@ function DashboardTaskBlock({
   const hiddenCount = Math.max(0, tasks.length - DASHBOARD_TASK_PREVIEW_LIMIT);
   const listId = `dashboard-${blockKey}-tasks`;
   const canExpand = tasks.length > DASHBOARD_TASK_PREVIEW_LIMIT;
-  const visibleGroups = groups
+  const visibleGroups: DashboardVisibleTaskGroup[] | undefined = groups
     ?.filter((group) => group.tasks.length > 0)
     .map((group) => {
       const groupExpanded = groupExpansion?.[group.key] ?? expanded;
@@ -484,6 +693,10 @@ function DashboardTaskBlock({
       };
     });
   const hasVisibleGroups = Boolean(visibleGroups?.length);
+  const overdueGroup = visibleGroups?.find((group) => group.key === "overdue");
+  const activeGroup = visibleGroups?.find((group) => group.key === "active");
+  const shouldSynchronizeTaskRows = Boolean(overdueGroup && activeGroup);
+  const singleGroupTaskGridClassName = "grid gap-3 md:grid-cols-2";
   const groupLayoutClassName =
     visibleGroups && visibleGroups.length > 1
       ? "grid gap-4 xl:grid-cols-2"
@@ -523,60 +736,33 @@ function DashboardTaskBlock({
         <div className="space-y-3">
           <p className="text-xs text-muted-foreground">{orderingHint}</p>
           {hasVisibleGroups && visibleGroups ? (
-            <div id={listId} className={groupLayoutClassName}>
-              {visibleGroups.map((group) => {
-                const headingId = `${group.listId}-heading`;
-                const taskGridClassName =
-                  visibleGroups.length === 1
-                    ? "grid gap-3 md:grid-cols-2"
-                    : "space-y-2";
-
-                return (
-                  <section
-                    key={group.key}
-                    aria-labelledby={headingId}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <h3
-                        id={headingId}
-                        className="text-xs font-medium text-muted-foreground"
-                      >
-                        {group.title}
-                      </h3>
-                      <span className="text-xs text-muted-foreground/70">
-                        {group.tasks.length}
-                      </span>
-                    </div>
-                    <div id={group.listId} className={taskGridClassName}>
-                      {group.visibleTasks.map((task) => (
-                        <TaskListItem
-                          key={task.id}
-                          task={task}
-                          variant={group.itemVariant}
-                          showAssignee={showAssignee}
-                        />
-                      ))}
-                    </div>
-                    {group.canExpand && (
-                      <button
-                        type="button"
-                        aria-expanded={group.expanded}
-                        aria-controls={group.listId}
-                        onClick={() =>
-                          setGroupExpanded(group.key, !group.expanded)
-                        }
-                        className="w-full rounded-xl border border-border/60 bg-background/70 px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground"
-                      >
-                        {group.expanded
-                          ? "Свернуть"
-                          : `Показать ещё ${group.hiddenCount}`}
-                      </button>
-                    )}
-                  </section>
-                );
-              })}
-            </div>
+            shouldSynchronizeTaskRows && overdueGroup && activeGroup ? (
+              <>
+                <DashboardStackedTaskGroups
+                  visibleGroups={visibleGroups}
+                  showAssignee={showAssignee}
+                  onGroupExpandedChange={setGroupExpanded}
+                  singleGroupTaskGridClassName={singleGroupTaskGridClassName}
+                  className="space-y-3 xl:hidden"
+                />
+                <DashboardSynchronizedTaskGroups
+                  listId={listId}
+                  overdueGroup={overdueGroup}
+                  activeGroup={activeGroup}
+                  showAssignee={showAssignee}
+                  onGroupExpandedChange={setGroupExpanded}
+                />
+              </>
+            ) : (
+              <DashboardStackedTaskGroups
+                id={listId}
+                visibleGroups={visibleGroups}
+                showAssignee={showAssignee}
+                onGroupExpandedChange={setGroupExpanded}
+                singleGroupTaskGridClassName={singleGroupTaskGridClassName}
+                className={groupLayoutClassName}
+              />
+            )
           ) : (
             <div id={listId} className="space-y-3">
               {visibleTasks.map((task) => (
