@@ -8,6 +8,7 @@ from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.orm import configure_mappers
 
 from app.db import models
+from app.db.repositories import IdeaRepository
 from app.db.schemas import IdeaCreate, IdeaStatusChange, IdeaTaskResponse
 
 
@@ -45,6 +46,29 @@ class IdeaModelSmokeTests(unittest.TestCase):
         self.assertIn(
             ("idea_departments.idea_id", "idea_departments.id"),
             composite_fk_targets,
+        )
+
+
+class IdeaRepositoryTests(unittest.TestCase):
+    def test_detail_options_eager_load_task_labels_for_idea_links(self) -> None:
+        option_paths = [str(option.path) for option in IdeaRepository().detail_options()]
+
+        self.assertTrue(
+            any(
+                "Idea.departments" in path
+                and "IdeaDepartment.task_links" in path
+                and "IdeaTask.task" in path
+                and "Task.labels" in path
+                for path in option_paths
+            )
+        )
+        self.assertTrue(
+            any(
+                "Idea.task_links" in path
+                and "IdeaTask.task" in path
+                and "Task.labels" in path
+                for path in option_paths
+            )
         )
 
 

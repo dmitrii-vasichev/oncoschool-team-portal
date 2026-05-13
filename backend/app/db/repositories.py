@@ -490,22 +490,25 @@ class TaskRepository:
 
 class IdeaRepository:
     def detail_options(self):
+        department_task_links = (
+            selectinload(Idea.departments)
+            .selectinload(IdeaDepartment.task_links)
+            .selectinload(IdeaTask.task)
+        )
+        task_links = selectinload(Idea.task_links).selectinload(IdeaTask.task)
+
         return (
             selectinload(Idea.author),
             selectinload(Idea.review_owner),
             selectinload(Idea.decision_by),
             selectinload(Idea.departments).selectinload(IdeaDepartment.department),
             selectinload(Idea.departments).selectinload(IdeaDepartment.owner),
-            selectinload(Idea.departments)
-            .selectinload(IdeaDepartment.task_links)
-            .selectinload(IdeaTask.task)
-            .selectinload(Task.assignee),
-            selectinload(Idea.departments)
-            .selectinload(IdeaDepartment.task_links)
-            .selectinload(IdeaTask.task)
-            .selectinload(Task.created_by),
-            selectinload(Idea.task_links).selectinload(IdeaTask.task).selectinload(Task.assignee),
-            selectinload(Idea.task_links).selectinload(IdeaTask.task).selectinload(Task.created_by),
+            department_task_links.selectinload(Task.assignee),
+            department_task_links.selectinload(Task.created_by),
+            department_task_links.selectinload(Task.labels),
+            task_links.selectinload(Task.assignee),
+            task_links.selectinload(Task.created_by),
+            task_links.selectinload(Task.labels),
             selectinload(Idea.comments).selectinload(IdeaComment.author),
             selectinload(Idea.events).selectinload(IdeaEvent.actor),
         )
