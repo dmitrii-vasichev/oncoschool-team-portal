@@ -1,5 +1,27 @@
 # Status
 
+## Ideas Phase 1
+
+- Current phase: planned; implementation not started
+- Spec: `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
+- Plan: `docs/superpowers/plans/2026-05-12-ideas-phase-1.md`
+- Scope: web portal Ideas section, idea review decisions, department implementation, linked task creation, comments, event history, and Phase 2 Projects compatibility
+- Latest progress:
+  - Reviewed the source presentation `ideas_oncoschool (2).pdf`.
+  - Approved the phased product model: Ideas in Phase 1, Projects in Phase 2, Tasks as the existing execution layer.
+  - Approved Phase 1 web-only scope.
+  - Approved shared idea visibility for all active users.
+  - Approved multi-department implementation with department heads and department implementation owners.
+  - Approved final status `Завершена`; `В задачах` is an implementation stage.
+  - Wrote the implementation plan for Phase 1 and made it the active repo plan.
+- Key approved decisions:
+  - No Telegram bot flow, idea tags, idea dashboard, or Projects implementation in Phase 1.
+  - Rejected and deferred ideas require reasons.
+  - Linked task details must follow existing task visibility permissions.
+  - Completion requires all departments to be ready/not required, or all direct linked tasks closed when no departments are involved.
+- Latest verification:
+  - Planning only; implementation verification not run yet.
+
 ## Dashboard Task Card Height Sync
 
 - Current phase: implemented; automated verification passed

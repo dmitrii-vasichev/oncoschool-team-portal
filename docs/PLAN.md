@@ -1,4 +1,52 @@
-# Active Plan: Dashboard Task Card Height Sync
+# Active Plan: Ideas Phase 1
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-12-ideas-phase-1.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
+
+**Goal:** Add the Phase 1 web portal Ideas section with review decisions, department implementation, linked task creation, comments, and event history.
+
+**Approved spec:** `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-12-ideas-phase-1.md`
+
+**Milestones:**
+
+1. Add the backend Ideas data model and migration.
+2. Add Ideas schemas, repository, service rules, and API routes.
+3. Add frontend Ideas types, API client methods, register page, and detail page.
+4. Add department contribution actions and linked task creation.
+5. Run backend/frontend verification and update status.
+
+**Implementation status:**
+
+- Planned; implementation not started.
+
+**Definition of done:**
+
+- Every active user can create ideas and see the shared ideas register.
+- The Ideas register supports status, author, review owner, involved department, and created date filters.
+- The idea detail page shows description, decision, departments, linked tasks, comments, and history.
+- Rejected and deferred ideas require a reason.
+- Accepted ideas can involve multiple departments with department owners and contribution statuses.
+- Linked task creation uses the existing task service.
+- Idea completion is gated by completed department contributions or by closed direct linked tasks when no departments are involved.
+- Linked task details respect existing task visibility.
+- Projects remain documented as Phase 2 and are not implemented in Phase 1.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_idea_service.py tests/test_ideas_api.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
+# Previous Plan: Dashboard Task Card Height Sync
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-08-dashboard-task-card-height-sync.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 
