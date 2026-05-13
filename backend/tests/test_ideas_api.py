@@ -7,7 +7,12 @@ from fastapi import HTTPException
 
 from app.api import ideas as ideas_api
 from app.db.models import Department, TeamMember
-from app.db.schemas import IdeaCreate, IdeaLinkedTaskCreate, IdeaStatusChange
+from app.db.schemas import (
+    IdeaCreate,
+    IdeaDepartmentUpdate,
+    IdeaLinkedTaskCreate,
+    IdeaStatusChange,
+)
 
 
 def request_with_no_bot():
@@ -268,3 +273,79 @@ async def test_create_idea_department_task_rejects_invalid_idea_status(monkeypat
 
     assert exc_info.value.status_code == 400
     create_linked_task.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_idea_department_rejects_invalid_idea_status(monkeypatch):
+    member = active_member()
+    idea_department = SimpleNamespace(
+        id=uuid.uuid4(),
+        department_id=uuid.uuid4(),
+        owner_id=member.id,
+        department=active_department(),
+        task_links=[],
+    )
+    idea = SimpleNamespace(
+        id=uuid.uuid4(),
+        status="new",
+        review_owner_id=member.id,
+        departments=[idea_department],
+    )
+    session = AsyncMock()
+    monkeypatch.setattr(
+        ideas_api.idea_service.repo,
+        "get_by_id",
+        AsyncMock(return_value=idea),
+    )
+    monkeypatch.setattr(ideas_api.idea_service.repo, "add_event", AsyncMock())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await ideas_api.update_idea_department(
+            idea_id=idea.id,
+            idea_department_id=idea_department.id,
+            data=IdeaDepartmentUpdate(note="Ready soon"),
+            member=member,
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 400
+    session.flush.assert_not_awaited()
+    ideas_api.idea_service.repo.add_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_update_idea_department_returns_404_for_inactive_department(monkeypatch):
+    member = active_member()
+    idea_department = SimpleNamespace(
+        id=uuid.uuid4(),
+        department_id=uuid.uuid4(),
+        owner_id=member.id,
+        department=SimpleNamespace(id=uuid.uuid4(), is_active=False),
+        task_links=[],
+    )
+    idea = SimpleNamespace(
+        id=uuid.uuid4(),
+        status="accepted",
+        review_owner_id=member.id,
+        departments=[idea_department],
+    )
+    session = AsyncMock()
+    monkeypatch.setattr(
+        ideas_api.idea_service.repo,
+        "get_by_id",
+        AsyncMock(return_value=idea),
+    )
+    monkeypatch.setattr(ideas_api.idea_service.repo, "add_event", AsyncMock())
+
+    with pytest.raises(HTTPException) as exc_info:
+        await ideas_api.update_idea_department(
+            idea_id=idea.id,
+            idea_department_id=idea_department.id,
+            data=IdeaDepartmentUpdate(note="Ready soon"),
+            member=member,
+            session=session,
+        )
+
+    assert exc_info.value.status_code == 404
+    session.flush.assert_not_awaited()
+    ideas_api.idea_service.repo.add_event.assert_not_awaited()

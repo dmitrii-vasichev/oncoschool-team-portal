@@ -68,6 +68,18 @@ def _bot_from_request(request: Request):
     return getattr(app_state, "bot", None)
 
 
+async def _ensure_active_department(
+    session: AsyncSession,
+    idea_department: IdeaDepartment,
+) -> Department:
+    department = getattr(idea_department, "department", None)
+    if department is None:
+        department = await session.get(Department, idea_department.department_id)
+    if department is None or not department.is_active:
+        raise HTTPException(status_code=404, detail="Отдел не найден")
+    return department
+
+
 def _dedupe_uuids(values: list[uuid.UUID]) -> list[uuid.UUID]:
     seen = set()
     deduped = []
@@ -328,6 +340,8 @@ async def update_idea_department(
 ) -> IdeaResponse:
     idea = await _get_idea_or_404(session, idea_id)
     idea_department = _find_idea_department_or_404(idea, idea_department_id)
+    await _ensure_linkable_idea_status(idea)
+    await _ensure_active_department(session, idea_department)
     if not idea_service.can_manage_idea_department(member, idea, idea_department):
         raise HTTPException(status_code=403, detail="Недостаточно прав для изменения отдела")
 
