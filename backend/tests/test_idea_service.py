@@ -12,6 +12,46 @@ from sqlalchemy.orm import configure_mappers
 from app.db import models
 from app.db.repositories import IdeaRepository
 from app.db.schemas import IdeaCreate, IdeaStatusChange, IdeaTaskResponse
+from app.services.idea_service import IdeaService
+
+
+def member(role: str = "member", *, member_id: uuid.UUID | None = None):
+    return SimpleNamespace(id=member_id or uuid.uuid4(), role=role)
+
+
+def idea(**overrides):
+    base = {
+        "id": uuid.uuid4(),
+        "status": "accepted",
+        "review_owner_id": uuid.uuid4(),
+        "departments": [],
+        "task_links": [],
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def idea_department(**overrides):
+    base = {
+        "id": uuid.uuid4(),
+        "department_id": uuid.uuid4(),
+        "owner_id": uuid.uuid4(),
+        "status": "not_started",
+        "task_links": [],
+        "department": SimpleNamespace(head_id=None),
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def department(**overrides):
+    base = {"id": uuid.uuid4(), "head_id": None, "is_active": True}
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def task_link(status: str):
+    return SimpleNamespace(task=SimpleNamespace(status=status))
 
 
 class IdeaModelSmokeTests(unittest.TestCase):
@@ -188,3 +228,94 @@ class IdeaSchemaTests(unittest.TestCase):
 
         self.assertEqual(data.id, link.id)
         self.assertEqual(data.task_id, link.task_id)
+
+
+class IdeaServiceRuleTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.service = IdeaService()
+
+    def test_rejected_and_deferred_status_changes_require_reason(self) -> None:
+        for status in ("rejected", "deferred"):
+            with self.subTest(status=status, comment=None):
+                with self.assertRaises(ValueError):
+                    self.service.validate_status_change(status, None)
+
+            with self.subTest(status=status, comment="   "):
+                with self.assertRaises(ValueError):
+                    self.service.validate_status_change(status, "   ")
+
+        self.service.validate_status_change("accepted", None)
+
+    def test_review_owner_can_manage_idea(self) -> None:
+        owner_id = uuid.uuid4()
+        item = idea(review_owner_id=owner_id)
+
+        self.assertTrue(self.service.can_manage_idea(member(member_id=owner_id), item))
+        self.assertTrue(self.service.can_manage_idea(member("moderator"), item))
+        self.assertFalse(self.service.can_manage_idea(member(), item))
+
+    def test_department_head_can_manage_own_department(self) -> None:
+        head_id = uuid.uuid4()
+        dept = idea_department(department=SimpleNamespace(head_id=head_id))
+
+        self.assertTrue(
+            self.service.can_manage_idea_department(
+                member(member_id=head_id),
+                idea(review_owner_id=uuid.uuid4()),
+                dept,
+            )
+        )
+
+    def test_department_head_can_add_own_department_to_accepted_idea(self) -> None:
+        head_id = uuid.uuid4()
+        dept = department(head_id=head_id)
+
+        self.assertTrue(
+            self.service.can_add_department(
+                member(member_id=head_id),
+                idea(status="accepted"),
+                dept,
+            )
+        )
+        self.assertFalse(
+            self.service.can_add_department(
+                member(member_id=head_id),
+                idea(status="new"),
+                dept,
+            )
+        )
+
+    def test_no_department_completion_requires_direct_closed_task_links(self) -> None:
+        self.assertFalse(self.service.can_complete_idea(idea(task_links=[])))
+        self.assertTrue(
+            self.service.can_complete_idea(
+                idea(task_links=[task_link("done"), task_link("cancelled")])
+            )
+        )
+        self.assertFalse(
+            self.service.can_complete_idea(
+                idea(task_links=[task_link("done"), task_link("in_progress")])
+            )
+        )
+
+    def test_department_completion_requires_every_department_ready_or_not_required(self) -> None:
+        self.assertTrue(
+            self.service.can_complete_idea(
+                idea(
+                    departments=[
+                        idea_department(status="ready"),
+                        idea_department(status="not_required"),
+                    ]
+                )
+            )
+        )
+        self.assertFalse(
+            self.service.can_complete_idea(
+                idea(
+                    departments=[
+                        idea_department(status="ready"),
+                        idea_department(status="not_started"),
+                    ]
+                )
+            )
+        )
