@@ -26,6 +26,7 @@ from app.services.task_service import TaskService
 router = APIRouter(prefix="/ideas", tags=["ideas"])
 idea_service = IdeaService()
 task_service = TaskService()
+LINKABLE_IDEA_STATUSES = {"accepted", "in_tasks"}
 
 
 async def _get_idea_or_404(session: AsyncSession, idea_id: uuid.UUID) -> Idea:
@@ -67,6 +68,25 @@ def _bot_from_request(request: Request):
     return getattr(app_state, "bot", None)
 
 
+def _dedupe_uuids(values: list[uuid.UUID]) -> list[uuid.UUID]:
+    seen = set()
+    deduped = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        deduped.append(value)
+    return deduped
+
+
+async def _ensure_linkable_idea_status(idea: Idea) -> None:
+    if idea.status not in LINKABLE_IDEA_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Задачи можно создавать только для принятой идеи или идеи в задачах",
+        )
+
+
 @router.get("", response_model=PaginatedIdeasResponse)
 async def list_ideas(
     status_filter: str | None = Query(None, alias="status"),
@@ -102,38 +122,57 @@ async def create_idea(
     member: TeamMember = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> IdeaResponse:
-    idea = await idea_service.repo.create(
-        session,
-        title=data.title,
-        description=data.description,
-        author_id=member.id,
-        review_owner_id=data.review_owner_id,
-    )
-    await idea_service.repo.add_event(
-        session,
-        idea_id=idea.id,
-        actor_id=member.id,
-        event_type="idea_created",
-        payload={"title": data.title},
-    )
-    for department_id in data.department_ids:
-        await idea_service.repo.add_department(
+    review_owner = await session.get(TeamMember, data.review_owner_id)
+    if review_owner is None or not review_owner.is_active:
+        raise HTTPException(status_code=404, detail="Ответственный не найден")
+
+    department_ids = _dedupe_uuids(data.department_ids)
+    for department_id in department_ids:
+        department = await session.get(Department, department_id)
+        if department is None or not department.is_active:
+            raise HTTPException(status_code=404, detail="Отдел не найден")
+
+    try:
+        idea = await idea_service.repo.create(
             session,
-            idea_id=idea.id,
-            department_id=department_id,
-            owner_id=data.review_owner_id,
-            created_by_id=member.id,
+            title=data.title,
+            description=data.description,
+            author_id=member.id,
+            review_owner_id=data.review_owner_id,
         )
         await idea_service.repo.add_event(
             session,
             idea_id=idea.id,
             actor_id=member.id,
-            event_type="department_added",
-            payload={
-                "department_id": str(department_id),
-                "owner_id": str(data.review_owner_id),
-            },
+            event_type="idea_created",
+            payload={"title": data.title},
         )
+        for department_id in department_ids:
+            await idea_service.repo.add_department(
+                session,
+                idea_id=idea.id,
+                department_id=department_id,
+                owner_id=data.review_owner_id,
+                created_by_id=member.id,
+            )
+            await idea_service.repo.add_event(
+                session,
+                idea_id=idea.id,
+                actor_id=member.id,
+                event_type="department_added",
+                payload={
+                    "department_id": str(department_id),
+                    "owner_id": str(data.review_owner_id),
+                },
+            )
+    except IntegrityError as exc:
+        await session.rollback()
+        if _is_duplicate_idea_department_error(exc):
+            raise HTTPException(
+                status_code=409,
+                detail="Отдел уже добавлен к идее",
+            ) from exc
+        raise
 
     await session.commit()
     return await _reload_and_shape(session, member, idea.id)
@@ -331,6 +370,7 @@ async def create_idea_task(
     session: AsyncSession = Depends(get_session),
 ) -> IdeaResponse:
     idea = await _get_idea_or_404(session, idea_id)
+    await _ensure_linkable_idea_status(idea)
     if not idea_service.can_manage_idea(member, idea):
         raise HTTPException(status_code=403, detail="Недостаточно прав для создания задачи")
 
@@ -354,6 +394,7 @@ async def create_idea_department_task(
     session: AsyncSession = Depends(get_session),
 ) -> IdeaResponse:
     idea = await _get_idea_or_404(session, idea_id)
+    await _ensure_linkable_idea_status(idea)
     idea_department = _find_idea_department_or_404(idea, idea_department_id)
     if not idea_service.can_manage_idea_department(member, idea, idea_department):
         raise HTTPException(status_code=403, detail="Недостаточно прав для создания задачи")
