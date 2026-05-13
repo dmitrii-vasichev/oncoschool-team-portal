@@ -17,6 +17,16 @@ import type {
   IdeaDepartmentCreateRequest,
   IdeaDepartmentUpdateRequest,
   IdeaLinkedTaskCreateRequest,
+  Project,
+  ProjectCreateRequest,
+  ProjectUpdateRequest,
+  ProjectStatusChangeRequest,
+  ProjectDepartmentCreateRequest,
+  ProjectDepartmentUpdateRequest,
+  ProjectMilestoneCreateRequest,
+  ProjectMilestoneUpdateRequest,
+  ProjectCommentCreateRequest,
+  ProjectLinkedTaskCreateRequest,
   PaginatedResponse,
   Meeting,
   TeamMember,
@@ -431,6 +441,124 @@ class ApiClient {
     data: IdeaLinkedTaskCreateRequest
   ): Promise<Idea> {
     return this.request<Idea>(`/api/ideas/${id}/departments/${ideaDepartmentId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ==================== Projects ====================
+
+  async getProjects(params?: Record<string, string>): Promise<PaginatedResponse<Project>> {
+    const query = params ? "?" + new URLSearchParams(params).toString() : "";
+    return this.request<PaginatedResponse<Project>>(`/api/projects${query}`);
+  }
+
+  async createProject(data: ProjectCreateRequest): Promise<Project> {
+    return this.request<Project>("/api/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getProject(id: string): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}`);
+  }
+
+  async updateProject(
+    id: string,
+    data: ProjectUpdateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    return this.request<void>(`/api/projects/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async changeProjectStatus(
+    id: string,
+    data: ProjectStatusChangeRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addProjectDepartment(
+    id: string,
+    data: ProjectDepartmentCreateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/departments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProjectDepartment(
+    id: string,
+    projectDepartmentId: string,
+    data: ProjectDepartmentUpdateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/departments/${projectDepartmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addProjectMilestone(
+    id: string,
+    data: ProjectMilestoneCreateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/milestones`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateProjectMilestone(
+    id: string,
+    projectMilestoneId: string,
+    data: ProjectMilestoneUpdateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/milestones/${projectMilestoneId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addProjectComment(
+    id: string,
+    data: ProjectCommentCreateRequest | string
+  ): Promise<Project> {
+    const payload = typeof data === "string" ? { body: data } : data;
+    return this.request<Project>(`/api/projects/${id}/comments`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createProjectTask(
+    id: string,
+    data: ProjectLinkedTaskCreateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createProjectDepartmentTask(
+    id: string,
+    projectDepartmentId: string,
+    data: ProjectLinkedTaskCreateRequest
+  ): Promise<Project> {
+    return this.request<Project>(`/api/projects/${id}/departments/${projectDepartmentId}/tasks`, {
       method: "POST",
       body: JSON.stringify(data),
     });

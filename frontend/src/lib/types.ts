@@ -56,6 +56,18 @@ export type IdeaDepartmentStatus =
   | "in_progress"
   | "ready"
   | "not_required";
+export type ProjectStatus =
+  | "planned"
+  | "in_progress"
+  | "paused"
+  | "completed"
+  | "cancelled";
+export type ProjectDepartmentStatus =
+  | "not_started"
+  | "in_progress"
+  | "ready"
+  | "not_required";
+export type ProjectMilestoneStatus = "planned" | "in_progress" | "done";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   new: "Новые",
@@ -226,11 +238,24 @@ export interface IdeaEvent {
   actor: TeamMember | null;
 }
 
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  status: ProjectStatus;
+}
+
+export interface IdeaSummary {
+  id: string;
+  title: string;
+  status: IdeaStatus;
+}
+
 export interface Idea {
   id: string;
   title: string;
   description: string;
   status: IdeaStatus;
+  project_id: string | null;
   author_id: string;
   review_owner_id: string;
   decision_comment: string | null;
@@ -245,6 +270,7 @@ export interface Idea {
   author: TeamMember | null;
   review_owner: TeamMember | null;
   decision_by: TeamMember | null;
+  project: ProjectSummary | null;
   departments: IdeaDepartment[];
   task_links: IdeaTaskLink[];
   comments: IdeaComment[];
@@ -255,6 +281,94 @@ export interface Idea {
   hidden_linked_task_count: number;
   ready_department_count: number;
   required_department_count: number;
+  can_complete: boolean;
+  can_delete: boolean;
+}
+
+export interface ProjectTaskLink {
+  id: string;
+  project_id: string;
+  project_department_id: string | null;
+  task_id: string;
+  created_by_id: string | null;
+  created_at: string;
+  task: Task | null;
+  hidden: boolean;
+}
+
+export interface ProjectDepartment {
+  id: string;
+  project_id: string;
+  department_id: string;
+  owner_id: string;
+  status: ProjectDepartmentStatus;
+  note: string | null;
+  created_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+  department: Department | null;
+  owner: TeamMember | null;
+  task_links: ProjectTaskLink[];
+}
+
+export interface ProjectMilestone {
+  id: string;
+  project_id: string;
+  title: string;
+  status: ProjectMilestoneStatus;
+  due_date: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectComment {
+  id: string;
+  project_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  author: TeamMember | null;
+}
+
+export interface ProjectEvent {
+  id: string;
+  project_id: string;
+  actor_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  actor: TeamMember | null;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  status: ProjectStatus;
+  owner_id: string;
+  source_idea_id: string | null;
+  completed_at: string | null;
+  deleted_at: string | null;
+  deleted_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+  owner: TeamMember | null;
+  source_idea: IdeaSummary | null;
+  departments: ProjectDepartment[];
+  milestones: ProjectMilestone[];
+  task_links: ProjectTaskLink[];
+  comments: ProjectComment[];
+  events: ProjectEvent[];
+  linked_task_count: number;
+  visible_linked_task_count: number;
+  completed_linked_task_count: number;
+  hidden_linked_task_count: number;
+  ready_department_count: number;
+  required_department_count: number;
+  completed_milestone_count: number;
+  milestone_count: number;
   can_complete: boolean;
   can_delete: boolean;
 }
@@ -840,6 +954,60 @@ export interface IdeaDepartmentUpdateRequest {
 }
 
 export interface IdeaLinkedTaskCreateRequest {
+  title: string;
+  description?: string | null;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  deadline?: string | null;
+  label_ids?: string[];
+}
+
+export interface ProjectCreateRequest {
+  title: string;
+  description: string;
+  owner_id: string;
+  source_idea_id?: string | null;
+  department_ids?: string[];
+}
+
+export interface ProjectUpdateRequest {
+  title?: string | null;
+  description?: string | null;
+  owner_id?: string | null;
+}
+
+export interface ProjectStatusChangeRequest {
+  status: ProjectStatus;
+}
+
+export interface ProjectDepartmentCreateRequest {
+  department_id: string;
+  owner_id: string;
+}
+
+export interface ProjectDepartmentUpdateRequest {
+  owner_id?: string | null;
+  status?: ProjectDepartmentStatus | null;
+  note?: string | null;
+}
+
+export interface ProjectMilestoneCreateRequest {
+  title: string;
+  due_date?: string | null;
+}
+
+export interface ProjectMilestoneUpdateRequest {
+  title?: string;
+  status?: ProjectMilestoneStatus | null;
+  due_date?: string | null;
+  sort_order?: number | null;
+}
+
+export interface ProjectCommentCreateRequest {
+  body: string;
+}
+
+export interface ProjectLinkedTaskCreateRequest {
   title: string;
   description?: string | null;
   priority?: TaskPriority;
