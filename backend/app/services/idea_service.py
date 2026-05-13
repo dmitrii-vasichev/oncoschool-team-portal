@@ -129,6 +129,16 @@ class IdeaService:
                 )
             )
 
+        all_raw_links = self._dedupe_task_links(
+            [
+                *direct_links,
+                *[
+                    link
+                    for department in (getattr(idea, "departments", []) or [])
+                    for link in (getattr(department, "task_links", []) or [])
+                ],
+            ]
+        )
         all_shaped_links = self._dedupe_task_links(
             [
                 *shaped_direct_links,
@@ -152,8 +162,8 @@ class IdeaService:
                 ),
                 "completed_linked_task_count": sum(
                     1
-                    for link in all_shaped_links
-                    if getattr(link.task, "status", None) in CLOSED_TASK_STATUSES
+                    for link in all_raw_links
+                    if self._is_closed_task_link(link)
                 ),
                 "hidden_linked_task_count": sum(
                     1 for link in all_shaped_links if link.hidden
@@ -262,10 +272,7 @@ class IdeaService:
         task = getattr(link, "task", None)
         return getattr(task, "status", None) in CLOSED_TASK_STATUSES
 
-    def _dedupe_task_links(
-        self,
-        links: list[IdeaTaskResponse],
-    ) -> list[IdeaTaskResponse]:
+    def _dedupe_task_links(self, links: list) -> list:
         seen = set()
         deduped = []
         for link in links:

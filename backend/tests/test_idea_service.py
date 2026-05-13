@@ -3,6 +3,7 @@ import unittest
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from pydantic import ValidationError
 from sqlalchemy.dialects import postgresql
@@ -22,10 +23,22 @@ def member(role: str = "member", *, member_id: uuid.UUID | None = None):
 def idea(**overrides):
     base = {
         "id": uuid.uuid4(),
+        "title": "Improve reports",
+        "description": "Useful details",
         "status": "accepted",
+        "author_id": uuid.uuid4(),
         "review_owner_id": uuid.uuid4(),
+        "decision_comment": None,
+        "decision_by_id": None,
+        "decision_at": None,
+        "deferred_until": None,
+        "completed_at": None,
+        "created_at": datetime(2026, 1, 1, 12, 0, 0),
+        "updated_at": datetime(2026, 1, 1, 12, 0, 0),
         "departments": [],
         "task_links": [],
+        "comments": [],
+        "events": [],
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -50,8 +63,39 @@ def department(**overrides):
     return SimpleNamespace(**base)
 
 
-def task_link(status: str):
-    return SimpleNamespace(task=SimpleNamespace(status=status))
+def task_link(status: str, **overrides):
+    now = datetime(2026, 1, 1, 12, 0, 0)
+    base = {
+        "id": uuid.uuid4(),
+        "idea_id": uuid.uuid4(),
+        "idea_department_id": None,
+        "task_id": uuid.uuid4(),
+        "created_by_id": None,
+        "created_at": now,
+        "task": SimpleNamespace(
+            id=uuid.uuid4(),
+            short_id=1,
+            title="Linked task",
+            description=None,
+            checklist=[],
+            status=status,
+            priority="normal",
+            assignee_id=None,
+            created_by_id=None,
+            meeting_id=None,
+            source="text",
+            deadline=None,
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
+            completed_at=now if status == "done" else None,
+            created_at=now,
+            updated_at=now,
+            labels=[],
+        ),
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 class IdeaModelSmokeTests(unittest.TestCase):
@@ -319,3 +363,26 @@ class IdeaServiceRuleTests(unittest.TestCase):
                 )
             )
         )
+
+    def test_shape_response_counts_hidden_closed_task_as_completed(self) -> None:
+        item = idea()
+        link = task_link("done", idea_id=item.id)
+        item.task_links = [link]
+
+        async def run_shape():
+            with patch(
+                "app.services.idea_service.can_access_task",
+                new=AsyncMock(return_value=False),
+            ):
+                return await self.service.shape_response(
+                    SimpleNamespace(),
+                    member(),
+                    item,
+                )
+
+        response = asyncio.run(run_shape())
+
+        self.assertEqual(response.linked_task_count, 1)
+        self.assertEqual(response.hidden_linked_task_count, 1)
+        self.assertEqual(response.completed_linked_task_count, 1)
+        self.assertIsNone(response.task_links[0].task)
