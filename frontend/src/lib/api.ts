@@ -11,6 +11,12 @@ import type {
   TaskEditRequest,
   TaskUpdate,
   TaskUpdateCreateRequest,
+  Idea,
+  IdeaCreateRequest,
+  IdeaStatusChangeRequest,
+  IdeaDepartmentCreateRequest,
+  IdeaDepartmentUpdateRequest,
+  IdeaLinkedTaskCreateRequest,
   PaginatedResponse,
   Meeting,
   TeamMember,
@@ -344,6 +350,83 @@ class ApiClient {
   async restoreTaskLabel(labelId: string): Promise<TaskLabel> {
     return this.request<TaskLabel>(`/api/task-labels/${labelId}/restore`, {
       method: "POST",
+    });
+  }
+
+  // ==================== Ideas ====================
+
+  async getIdeas(params?: Record<string, string>): Promise<PaginatedResponse<Idea>> {
+    const query = params ? "?" + new URLSearchParams(params).toString() : "";
+    return this.request<PaginatedResponse<Idea>>(`/api/ideas${query}`);
+  }
+
+  async createIdea(data: IdeaCreateRequest): Promise<Idea> {
+    return this.request<Idea>("/api/ideas", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getIdea(id: string): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}`);
+  }
+
+  async updateIdeaStatus(
+    id: string,
+    data: IdeaStatusChangeRequest
+  ): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/status`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addIdeaComment(id: string, body: string): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    });
+  }
+
+  async addIdeaDepartment(
+    id: string,
+    data: IdeaDepartmentCreateRequest
+  ): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/departments`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateIdeaDepartment(
+    id: string,
+    ideaDepartmentId: string,
+    data: IdeaDepartmentUpdateRequest
+  ): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/departments/${ideaDepartmentId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createIdeaTask(
+    id: string,
+    data: IdeaLinkedTaskCreateRequest
+  ): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createIdeaDepartmentTask(
+    id: string,
+    ideaDepartmentId: string,
+    data: IdeaLinkedTaskCreateRequest
+  ): Promise<Idea> {
+    return this.request<Idea>(`/api/ideas/${id}/departments/${ideaDepartmentId}/tasks`, {
+      method: "POST",
+      body: JSON.stringify(data),
     });
   }
 

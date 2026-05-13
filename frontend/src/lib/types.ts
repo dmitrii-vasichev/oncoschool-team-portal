@@ -43,6 +43,19 @@ export type MeetingBoardSectionKey =
   | "review"
   | "done_this_week";
 export type TelegramBroadcastStatus = "scheduled" | "sent" | "failed" | "cancelled";
+export type IdeaStatus =
+  | "new"
+  | "in_review"
+  | "accepted"
+  | "in_tasks"
+  | "completed"
+  | "rejected"
+  | "deferred";
+export type IdeaDepartmentStatus =
+  | "not_started"
+  | "in_progress"
+  | "ready"
+  | "not_required";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   new: "Новые",
@@ -165,6 +178,82 @@ export interface TaskUpdate {
   source: string;
   created_at: string;
   author: TeamMember | null;
+}
+
+export interface IdeaTaskLink {
+  id: string;
+  idea_id: string;
+  idea_department_id: string | null;
+  task_id: string;
+  created_by_id: string | null;
+  created_at: string;
+  task: Task | null;
+  hidden: boolean;
+}
+
+export interface IdeaDepartment {
+  id: string;
+  idea_id: string;
+  department_id: string;
+  owner_id: string;
+  status: IdeaDepartmentStatus;
+  note: string | null;
+  created_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+  department: Department | null;
+  owner: TeamMember | null;
+  task_links: IdeaTaskLink[];
+}
+
+export interface IdeaComment {
+  id: string;
+  idea_id: string;
+  author_id: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  author: TeamMember | null;
+}
+
+export interface IdeaEvent {
+  id: string;
+  idea_id: string;
+  actor_id: string | null;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+  actor: TeamMember | null;
+}
+
+export interface Idea {
+  id: string;
+  title: string;
+  description: string;
+  status: IdeaStatus;
+  author_id: string;
+  review_owner_id: string;
+  decision_comment: string | null;
+  decision_by_id: string | null;
+  decision_at: string | null;
+  deferred_until: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  author: TeamMember | null;
+  review_owner: TeamMember | null;
+  decision_by: TeamMember | null;
+  departments: IdeaDepartment[];
+  task_links: IdeaTaskLink[];
+  comments: IdeaComment[];
+  events: IdeaEvent[];
+  linked_task_count: number;
+  visible_linked_task_count: number;
+  completed_linked_task_count: number;
+  hidden_linked_task_count: number;
+  ready_department_count: number;
+  required_department_count: number;
+  can_complete: boolean;
 }
 
 export interface TaskChecklistItem {
@@ -721,6 +810,39 @@ export interface TaskUpdateCreateRequest {
   update_type?: UpdateType;
   progress_percent?: number | null;
   source?: string;
+}
+
+export interface IdeaCreateRequest {
+  title: string;
+  description: string;
+  review_owner_id: string;
+  department_ids?: string[];
+}
+
+export interface IdeaStatusChangeRequest {
+  status: IdeaStatus;
+  comment?: string | null;
+  deferred_until?: string | null;
+}
+
+export interface IdeaDepartmentCreateRequest {
+  department_id: string;
+  owner_id: string;
+}
+
+export interface IdeaDepartmentUpdateRequest {
+  owner_id?: string | null;
+  status?: IdeaDepartmentStatus | null;
+  note?: string | null;
+}
+
+export interface IdeaLinkedTaskCreateRequest {
+  title: string;
+  description?: string | null;
+  priority?: TaskPriority;
+  assignee_id?: string | null;
+  deadline?: string | null;
+  label_ids?: string[];
 }
 
 export interface TeamMemberUpdateRequest {
