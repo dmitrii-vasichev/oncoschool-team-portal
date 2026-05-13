@@ -1,4 +1,59 @@
-# Active Plan: Ideas Phase 1
+# Active Plan: Projects Phase 2 Design
+
+> **For agentic workers:** Phase 2 is currently at the design-review gate. Do not implement project tables or UI until the design spec is reviewed and an implementation plan is written.
+
+**Goal:** Add a Phase 2 Projects layer that connects larger accepted ideas to organized project execution while preserving direct Idea -> Tasks support for small ideas.
+
+**Approved base spec:** `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
+
+**Phase 2 design draft:** `docs/superpowers/specs/2026-05-13-projects-phase-2-design.md`
+
+**Milestones:**
+
+1. Review and approve the Phase 2 Projects MVP design.
+2. Write a detailed Projects Phase 2 implementation plan.
+3. Implement backend project persistence, services, permissions, and API routes.
+4. Implement frontend project register/detail flows and idea integration.
+5. Run backend/frontend verification and update status.
+
+**Implementation status:**
+
+- Design draft written; awaiting user review.
+- No Phase 2 project code has been implemented yet.
+
+**Definition of done:**
+
+- A new `Проекты` section exists in the web portal.
+- Admin/moderator users can create direct projects.
+- Accepted ideas can be converted into linked projects.
+- Idea detail pages show linked projects.
+- Project register supports status, owner, department, source idea, and created date filtering.
+- Project detail pages show departments, milestones, linked tasks, comments, and history.
+- Project tasks are created through the existing task service.
+- Linked task details follow existing task visibility rules.
+- Project completion is blocked until linked tasks are closed.
+- Project deletion is soft deletion and is blocked once linked tasks exist.
+- Direct `Idea -> Tasks` remains available for small ideas.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_project_service.py tests/test_projects_api.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest -q
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not run yet for Phase 2 implementation; design-only change.
+
+---
+
+# Previous Plan: Ideas Phase 1
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-12-ideas-phase-1.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 

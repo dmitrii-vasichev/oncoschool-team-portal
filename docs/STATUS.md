@@ -1,5 +1,25 @@
 # Status
 
+## Projects Phase 2
+
+- Current phase: design draft written; awaiting user review
+- Base spec: `docs/superpowers/specs/2026-05-12-ideas-projects-tasks-design.md`
+- Phase 2 spec: `docs/superpowers/specs/2026-05-13-projects-phase-2-design.md`
+- Scope: web portal Projects MVP, project creation from accepted ideas, direct admin/moderator project creation, project owners, departments, lightweight milestones, linked tasks, comments, event history, soft deletion, and existing task visibility preservation
+- Latest progress:
+  - Confirmed Phase 2 should implement Projects now.
+  - Approved the MVP direction: Projects as an organizing layer between larger ideas and tasks, while small ideas can still create tasks directly.
+  - Wrote the Projects Phase 2 design draft and made it the active repo planning item.
+- Key proposed decisions:
+  - Projects have statuses `planned`, `in_progress`, `paused`, `completed`, and `cancelled`.
+  - Projects can be created from accepted or in-task ideas, and can also be created directly by admin/moderator users.
+  - Creating a project from an idea links existing idea tasks to the project by default while keeping them visible from the idea.
+  - Milestones are lightweight project markers; tasks are not assigned to milestones in the Phase 2 MVP.
+  - Project deletion is soft deletion and is blocked once linked tasks exist.
+  - Direct Idea -> Tasks support remains available.
+- Latest verification:
+  - Not run yet for Phase 2 implementation; design-only change.
+
 ## Ideas Phase 1
 
 - Current phase: implemented; automated verification passed
