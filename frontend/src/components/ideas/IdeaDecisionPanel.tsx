@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/shared/Toast";
 import { IDEA_STATUS_LABELS } from "@/lib/ideaUtils";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import type { Idea, IdeaStatus } from "@/lib/types";
 
 const DECISION_STATUSES: IdeaStatus[] = [
@@ -99,10 +100,14 @@ export function IdeaDecisionPanel({
                 key={status}
                 type="button"
                 size="sm"
-                variant={status === "rejected" ? "destructive" : "outline"}
+                variant="outline"
                 disabled={isDisabled}
                 onClick={() => handleStatusChange(status)}
-                className="h-8 rounded-md px-3 text-xs"
+                className={cn(
+                  "h-8 rounded-md px-3 text-xs",
+                  status === "rejected" &&
+                    "border-destructive/35 text-destructive hover:border-destructive/50 hover:bg-destructive/10 hover:text-destructive",
+                )}
                 title={
                   isCompletedBlocked
                     ? "Нельзя завершить: не все условия выполнены"
