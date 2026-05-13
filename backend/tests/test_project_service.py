@@ -3,6 +3,7 @@ import unittest
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import ForeignKeyConstraint, UniqueConstraint
 from sqlalchemy.dialects import postgresql
@@ -47,7 +48,47 @@ def task_link(status: str, **overrides):
         "task_id": uuid.uuid4(),
         "created_by_id": None,
         "created_at": now,
-        "task": SimpleNamespace(status=status),
+        "task": SimpleNamespace(
+            id=uuid.uuid4(),
+            short_id=1,
+            title="Linked project task",
+            description=None,
+            checklist=[],
+            status=status,
+            priority="normal",
+            assignee_id=None,
+            created_by_id=None,
+            meeting_id=None,
+            source="text",
+            deadline=None,
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
+            completed_at=now if status == "done" else None,
+            created_at=now,
+            updated_at=now,
+            labels=[],
+        ),
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def project_department(**overrides):
+    now = datetime(2026, 5, 13, 12, 0, 0)
+    base = {
+        "id": uuid.uuid4(),
+        "project_id": uuid.uuid4(),
+        "department_id": uuid.uuid4(),
+        "owner_id": uuid.uuid4(),
+        "status": "not_started",
+        "note": None,
+        "created_by_id": None,
+        "created_at": now,
+        "updated_at": now,
+        "department": None,
+        "owner": None,
+        "task_links": [],
     }
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -178,3 +219,43 @@ class ProjectServiceRuleTests(unittest.TestCase):
         item = project(task_links=[task_link("done")])
 
         self.assertFalse(self.service.can_delete_project(member("admin"), item))
+
+    def test_shape_response_counts_hidden_tasks_without_returning_rows(self) -> None:
+        project_id = uuid.uuid4()
+        department_id = uuid.uuid4()
+        visible_link = task_link("done", project_id=project_id)
+        hidden_direct_link = task_link("in_progress", project_id=project_id)
+        hidden_link = task_link(
+            "in_progress",
+            project_id=project_id,
+            project_department_id=department_id,
+        )
+        department = project_department(
+            id=department_id,
+            project_id=project_id,
+            task_links=[hidden_link],
+        )
+        item = project(
+            id=project_id,
+            task_links=[visible_link, hidden_direct_link],
+            departments=[department],
+        )
+
+        async def run_shape():
+            with patch(
+                "app.services.project_service.can_access_task",
+                new=AsyncMock(side_effect=[True, False, False]),
+            ):
+                return await self.service.shape_response(
+                    SimpleNamespace(),
+                    member(),
+                    item,
+                )
+
+        response = asyncio.run(run_shape())
+
+        self.assertEqual(response.linked_task_count, 3)
+        self.assertEqual(response.visible_linked_task_count, 1)
+        self.assertEqual(response.hidden_linked_task_count, 2)
+        self.assertEqual([link.id for link in response.task_links], [visible_link.id])
+        self.assertEqual(response.departments[0].task_links, [])

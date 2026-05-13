@@ -17,6 +17,15 @@ test("projects route exposes register and create affordances", () => {
   assert.match(source, /ProjectRegisterRow/);
 });
 
+test("projects filters expose text search and forward it to the API query", () => {
+  const filters = readSource("components/projects/ProjectFilters.tsx");
+  const page = readSource("app/projects/page.tsx");
+
+  assert.match(filters, /search/);
+  assert.match(filters, /Поиск/);
+  assert.match(page, /params\.search/);
+});
+
 test("sidebar exposes projects navigation", () => {
   const source = readSource("components/layout/Sidebar.tsx");
 

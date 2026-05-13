@@ -16,6 +16,7 @@ import type { Department, ProjectStatus, TeamMember } from "@/lib/types";
 
 export interface ProjectFilterValues {
   status: "all" | ProjectStatus;
+  search: string;
   owner_id: string;
   department_id: string;
   source_idea_id: string;
@@ -25,6 +26,7 @@ export interface ProjectFilterValues {
 
 export const EMPTY_PROJECT_FILTERS: ProjectFilterValues = {
   status: "all",
+  search: "",
   owner_id: "",
   department_id: "",
   source_idea_id: "",
@@ -108,6 +110,7 @@ function FilterTextInput({
 function hasActiveFilters(filters: ProjectFilterValues): boolean {
   return (
     filters.status !== "all" ||
+    Boolean(filters.search.trim()) ||
     Boolean(filters.owner_id) ||
     Boolean(filters.department_id) ||
     Boolean(filters.source_idea_id.trim()) ||
@@ -174,7 +177,14 @@ export function ProjectFilters({
         )}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+        <FilterTextInput
+          label="Поиск"
+          value={filters.search}
+          onChange={(value) => onChange({ ...filters, search: value })}
+          placeholder="Название или описание"
+        />
+
         <FilterSelect
           label="Владелец"
           value={filters.owner_id || "all"}

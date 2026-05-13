@@ -19,6 +19,7 @@ function buildProjectParams(filters: ProjectFilterValues): Record<string, string
   const params: Record<string, string> = { per_page: "100" };
 
   if (filters.status !== "all") params.status = filters.status;
+  if (filters.search.trim()) params.search = filters.search.trim();
   if (filters.owner_id) params.owner_id = filters.owner_id;
   if (filters.department_id) params.department_id = filters.department_id;
   if (filters.source_idea_id.trim()) {

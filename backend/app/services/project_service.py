@@ -127,16 +127,24 @@ class ProjectService:
         shaped_direct_links = [
             await self.shape_task_link(session, member, link) for link in direct_links
         ]
+        visible_direct_links = [
+            link for link in shaped_direct_links if not link.hidden
+        ]
 
         shaped_departments = []
+        shaped_department_task_links = []
         for department in getattr(project, "departments", []) or []:
             shaped_department_links = [
                 await self.shape_task_link(session, member, link)
                 for link in (getattr(department, "task_links", []) or [])
             ]
+            shaped_department_task_links.extend(shaped_department_links)
+            visible_department_links = [
+                link for link in shaped_department_links if not link.hidden
+            ]
             shaped_departments.append(
                 ProjectDepartmentResponse.model_validate(department).model_copy(
-                    update={"task_links": shaped_department_links}
+                    update={"task_links": visible_department_links}
                 )
             )
 
@@ -144,11 +152,7 @@ class ProjectService:
         all_shaped_links = self._dedupe_task_links(
             [
                 *shaped_direct_links,
-                *[
-                    link
-                    for department in shaped_departments
-                    for link in department.task_links
-                ],
+                *shaped_department_task_links,
             ]
         )
         milestones = list(getattr(project, "milestones", []) or [])
@@ -156,7 +160,7 @@ class ProjectService:
         return response.model_copy(
             update={
                 "departments": shaped_departments,
-                "task_links": shaped_direct_links,
+                "task_links": visible_direct_links,
                 "comments": response.comments if include_comments else [],
                 "events": response.events if include_events else [],
                 "linked_task_count": len(all_shaped_links),
