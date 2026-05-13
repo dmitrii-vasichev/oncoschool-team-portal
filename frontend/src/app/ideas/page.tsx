@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Lightbulb, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,8 +57,13 @@ export default function IdeasPage() {
   const [filters, setFilters] = useState<IdeaFilterValues>(EMPTY_IDEA_FILTERS);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const latestRequestSeqRef = useRef(0);
 
   const fetchData = useCallback(async () => {
+    const requestSeq = latestRequestSeqRef.current + 1;
+    latestRequestSeqRef.current = requestSeq;
+    const isLatestRequest = () => latestRequestSeqRef.current === requestSeq;
+
     setLoading(true);
     try {
       const [ideasRes, membersRes, departmentsRes] = await Promise.all([
@@ -66,13 +71,18 @@ export default function IdeasPage() {
         api.getTeam().catch(() => [] as TeamMember[]),
         api.getDepartments().catch(() => [] as Department[]),
       ]);
+      if (!isLatestRequest()) return;
       setIdeas(ideasRes.items);
       setMembers(membersRes);
       setDepartments(departmentsRes);
     } catch {
-      toastError("Не удалось загрузить идеи");
+      if (isLatestRequest()) {
+        toastError("Не удалось загрузить идеи");
+      }
     } finally {
-      setLoading(false);
+      if (isLatestRequest()) {
+        setLoading(false);
+      }
     }
   }, [filters, toastError]);
 
