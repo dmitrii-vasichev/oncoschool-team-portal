@@ -32,3 +32,14 @@ test("sidebar exposes projects navigation", () => {
   assert.match(source, /href:\s*"\/projects"/);
   assert.match(source, /label:\s*"Проекты"/);
 });
+
+test("project detail route composes operational detail panels", () => {
+  const source = readSource("app/projects/[id]/page.tsx");
+
+  assert.match(source, /ProjectStatusPanel/);
+  assert.match(source, /ProjectDepartmentPanel/);
+  assert.match(source, /ProjectMilestones/);
+  assert.match(source, /ProjectLinkedTasks/);
+  assert.match(source, /ProjectComments/);
+  assert.match(source, /ProjectEventHistory/);
+});
