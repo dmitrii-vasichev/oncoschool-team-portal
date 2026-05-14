@@ -99,7 +99,13 @@ import type {
   CFPublicationVersion,
   CFPublicationListParams,
   CFExternalSegment,
+  CFExternalSegmentCreateRequest,
+  CFPublicationSegmentTarget,
+  CFPublicationSegmentTargetCreateRequest,
+  CFSegmentRefreshRequest,
+  CFSegmentSnapshot,
   CFMetricSnapshot,
+  CFMetricSnapshotCreateRequest,
   CFRetroNote,
   CFRetroListParams,
   // Reports
@@ -699,9 +705,81 @@ class ApiClient {
     );
   }
 
+  async createCFSegment(
+    data: CFExternalSegmentCreateRequest
+  ): Promise<CFExternalSegment> {
+    return this.request<CFExternalSegment>("/api/content-factory/segments", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async refreshCFSegment(
+    segmentId: string,
+    data: CFSegmentRefreshRequest
+  ): Promise<CFExternalSegment> {
+    return this.request<CFExternalSegment>(
+      `/api/content-factory/segments/${segmentId}/refresh`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async getCFSegmentSnapshots(segmentId: string): Promise<CFSegmentSnapshot[]> {
+    return this.request<CFSegmentSnapshot[]>(
+      `/api/content-factory/segments/${segmentId}/snapshots`
+    );
+  }
+
+  async getCFPublicationSegmentTargets(
+    publicationId: string
+  ): Promise<CFPublicationSegmentTarget[]> {
+    return this.request<CFPublicationSegmentTarget[]>(
+      `/api/content-factory/publications/${publicationId}/segment-targets`
+    );
+  }
+
+  async addCFPublicationSegmentTarget(
+    publicationId: string,
+    data: CFPublicationSegmentTargetCreateRequest
+  ): Promise<CFPublicationSegmentTarget> {
+    return this.request<CFPublicationSegmentTarget>(
+      `/api/content-factory/publications/${publicationId}/segment-targets`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async removeCFPublicationSegmentTarget(
+    publicationId: string,
+    externalSegmentId: string
+  ): Promise<void> {
+    return this.request<void>(
+      `/api/content-factory/publications/${publicationId}/segment-targets/${externalSegmentId}`,
+      { method: "DELETE" }
+    );
+  }
+
   async getCFMetrics(publicationId: string): Promise<CFMetricSnapshot[]> {
     return this.request<CFMetricSnapshot[]>(
       `/api/content-factory/publications/${publicationId}/metrics`
+    );
+  }
+
+  async recordCFMetric(
+    publicationId: string,
+    data: CFMetricSnapshotCreateRequest
+  ): Promise<CFMetricSnapshot> {
+    return this.request<CFMetricSnapshot>(
+      `/api/content-factory/publications/${publicationId}/metrics`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
     );
   }
 

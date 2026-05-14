@@ -15,19 +15,25 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/Toast";
+import { ContentFactoryMetricHistory } from "@/components/content-factory/ContentFactoryMetricHistory";
 import { ContentFactoryPublicationDialog } from "@/components/content-factory/ContentFactoryPublicationDialog";
 import { ContentFactoryPublicationVersionList } from "@/components/content-factory/ContentFactoryPublicationVersionList";
+import { ContentFactorySegmentTargetsPanel } from "@/components/content-factory/ContentFactorySegmentTargetsPanel";
 import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentFactoryStatusBadge";
+import { ContentFactoryUtmHelper } from "@/components/content-factory/ContentFactoryUtmHelper";
 import { api } from "@/lib/api";
 import {
   getContentFactoryDisplayName,
 } from "@/lib/contentFactoryUtils";
 import type {
   CFBundle,
+  CFExternalSegment,
   CFFormat,
+  CFMetricSnapshot,
   CFNosology,
   CFPlatform,
   CFPublication,
+  CFPublicationSegmentTarget,
   CFPublicationVersion,
   CFRubric,
   TeamMember,
@@ -48,14 +54,6 @@ function formatDateTime(value: string | null): string {
 
 function publicationTitle(publication: CFPublication): string {
   return publication.title?.trim() || "Без названия";
-}
-
-function JsonBlock({ value }: { value: Record<string, unknown> }) {
-  return (
-    <pre className="overflow-x-auto rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
 }
 
 function PublicationLoadingSkeleton() {
@@ -83,6 +81,11 @@ export default function ContentFactoryPublicationDetailPage() {
   const [formats, setFormats] = useState<CFFormat[]>([]);
   const [rubrics, setRubrics] = useState<CFRubric[]>([]);
   const [nosologies, setNosologies] = useState<CFNosology[]>([]);
+  const [segments, setSegments] = useState<CFExternalSegment[]>([]);
+  const [segmentTargets, setSegmentTargets] = useState<
+    CFPublicationSegmentTarget[]
+  >([]);
+  const [metrics, setMetrics] = useState<CFMetricSnapshot[]>([]);
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const latestRequestSeqRef = useRef(0);
@@ -102,6 +105,9 @@ export default function ContentFactoryPublicationDetailPage() {
         formatRes,
         rubricRes,
         nosologyRes,
+        segmentRes,
+        segmentTargetRes,
+        metricRes,
       ] = await Promise.all([
         api.getCFPublication(id),
         api.getCFPublicationVersions(id),
@@ -110,6 +116,10 @@ export default function ContentFactoryPublicationDetailPage() {
         api.getCFFormats().catch(() => [] as CFFormat[]),
         api.getCFRubrics().catch(() => [] as CFRubric[]),
         api.getCFNosologies().catch(() => [] as CFNosology[]),
+        api.getCFSegments({ only_active: true }).catch(() => [] as CFExternalSegment[]),
+        api.getCFPublicationSegmentTargets(id)
+          .catch(() => [] as CFPublicationSegmentTarget[]),
+        api.getCFMetrics(id).catch(() => [] as CFMetricSnapshot[]),
       ]);
       const bundleRes = await api
         .getCFBundle(publicationRes.bundle_id)
@@ -123,6 +133,9 @@ export default function ContentFactoryPublicationDetailPage() {
       setFormats(formatRes);
       setRubrics(rubricRes);
       setNosologies(nosologyRes);
+      setSegments(segmentRes);
+      setSegmentTargets(segmentTargetRes);
+      setMetrics(metricRes);
     } catch (err) {
       if (isLatestRequest()) {
         toastError(
@@ -279,6 +292,13 @@ export default function ContentFactoryPublicationDetailPage() {
           </section>
 
           <ContentFactoryPublicationVersionList versions={versions} members={members} />
+
+          <ContentFactoryMetricHistory
+            publicationId={publication.id}
+            metrics={metrics}
+            members={members}
+            onRecorded={handleSaved}
+          />
         </div>
 
         <aside className="space-y-4">
@@ -345,12 +365,22 @@ export default function ContentFactoryPublicationDetailPage() {
             </dl>
           </section>
 
-          <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-foreground">UTM</h2>
-            <div className="mt-3">
-              <JsonBlock value={publication.utm} />
-            </div>
-          </section>
+          <ContentFactorySegmentTargetsPanel
+            publicationId={publication.id}
+            segments={segments}
+            targets={segmentTargets}
+            onChanged={handleSaved}
+          />
+
+          <ContentFactoryUtmHelper
+            publication={publication}
+            bundle={bundle}
+            platforms={platforms}
+            formats={formats}
+            segments={segments}
+            segmentTargets={segmentTargets}
+            onApplied={handleSaved}
+          />
         </aside>
       </div>
 

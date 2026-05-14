@@ -5,12 +5,16 @@ import {
   CF_BUNDLE_STATUS_LABELS,
   CF_PUBLICATION_STATUS_LABELS,
   buildContentFactoryBundleParams,
+  buildContentFactoryUtm,
   canAccessContentFactory,
   cleanContentFactoryPublicationUpdate,
   filterContentFactoryPublications,
   formatContentFactoryBundleCount,
+  formatContentFactoryMetricValue,
   formatContentFactoryPublicationCount,
+  getAvailableContentFactorySegments,
   getContentFactoryDisplayName,
+  getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
   summarizeContentFactoryDashboard,
 } from "./contentFactoryUtils.ts";
@@ -193,5 +197,81 @@ test("getContentFactoryDisplayName falls back to an id fragment", () => {
       { id: "member-1", full_name: "Мария Смирнова" },
     ]),
     "Мария Смирнова",
+  );
+});
+
+test("buildContentFactoryUtm composes campaign context", () => {
+  assert.deepEqual(
+    buildContentFactoryUtm({
+      bundleId: "bundle-rmj-may",
+      publicationId: "pub-telegram-reminder",
+      platformCode: "telegram",
+      formatCode: "post",
+      segmentId: "segment-survivors",
+      cta: "register",
+    }),
+    {
+      utm_source: "telegram",
+      utm_medium: "post",
+      utm_campaign: "bundle-rmj-may",
+      utm_content: "pub-telegram-reminder",
+      utm_term: "segment-survivors",
+      cf_cta: "register",
+    },
+  );
+});
+
+test("formatContentFactoryMetricValue renders numeric and text metrics", () => {
+  assert.equal(
+    formatContentFactoryMetricValue({
+      metric_value: "1234.5000",
+      metric_value_text: null,
+    }),
+    "1 234,5",
+  );
+  assert.equal(
+    formatContentFactoryMetricValue({
+      metric_value: null,
+      metric_value_text: "high engagement",
+    }),
+    "high engagement",
+  );
+});
+
+test("getContentFactoryReviewQueueGroups groups review statuses", () => {
+  const groups = getContentFactoryReviewQueueGroups([
+    { id: "copy", status: "needs_copy", scheduled_at: null },
+    { id: "fact", status: "factcheck", scheduled_at: null },
+    { id: "doctor", status: "doctor_review", scheduled_at: null },
+    { id: "approved", status: "approved", scheduled_at: null },
+    { id: "scheduled", status: "scheduled", scheduled_at: null },
+    { id: "failed", status: "failed", scheduled_at: null },
+  ]);
+
+  assert.deepEqual(
+    groups.map((group) => [group.key, group.publications.map((item) => item.id)]),
+    [
+      ["production", ["copy"]],
+      ["factcheck", ["fact"]],
+      ["doctor_review", ["doctor"]],
+      ["approval", ["approved"]],
+      ["scheduling", ["scheduled"]],
+      ["failed", ["failed"]],
+    ],
+  );
+});
+
+test("getAvailableContentFactorySegments excludes selected segment targets", () => {
+  const segments = [
+    { id: "keep", is_active: true },
+    { id: "drop", is_active: true },
+    { id: "inactive", is_active: false },
+  ];
+
+  assert.deepEqual(
+    getAvailableContentFactorySegments(segments, [
+      { external_segment_id: "drop" },
+    ]).map((segment) => segment.id),
+    ["keep"],
   );
 });

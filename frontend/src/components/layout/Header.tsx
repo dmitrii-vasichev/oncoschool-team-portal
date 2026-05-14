@@ -16,6 +16,7 @@ import {
   FileText,
   FolderKanban,
   LayoutDashboard,
+  ListChecks,
   Loader2,
   MessageSquareWarning,
   Megaphone,
@@ -55,6 +56,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/dashboard": { title: "Content Factory", icon: Factory },
   "/content-factory/calendar": { title: "Календарь контента", icon: CalendarDays },
   "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
+  "/content-factory/review": { title: "CF Review", icon: ListChecks },
   "/content-factory/publications": {
     title: "CF Publication",
     icon: FileText,

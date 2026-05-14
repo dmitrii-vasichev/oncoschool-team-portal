@@ -24,6 +24,7 @@ test("header knows content factory workspace routes", () => {
   assert.match(source, /\/content-factory\/calendar/);
   assert.match(source, /\/content-factory\/bundles/);
   assert.match(source, /\/content-factory\/publications/);
+  assert.match(source, /\/content-factory\/review/);
 });
 
 test("content factory layout uses dedicated access guard", () => {
@@ -56,6 +57,10 @@ test("bundle and publication workspace routes exist", () => {
   assert.match(
     readSource("app/content-factory/publications/[id]/page.tsx"),
     /ContentFactoryPublicationDetailPage/,
+  );
+  assert.match(
+    readSource("app/content-factory/review/page.tsx"),
+    /ContentFactoryReviewPage/,
   );
 });
 
@@ -95,4 +100,23 @@ test("workspace routes use bundle and publication APIs", () => {
   assert.match(publicationSource, /api\.getCFPublication/);
   assert.match(publicationSource, /api\.getCFPublicationVersions/);
   assert.match(publicationSource, /ContentFactoryPublicationVersionList/);
+});
+
+test("publication detail route exposes Sprint 5 outcomes panels", () => {
+  const source = readSource("app/content-factory/publications/[id]/page.tsx");
+
+  assert.match(source, /api\.getCFSegments/);
+  assert.match(source, /api\.getCFPublicationSegmentTargets/);
+  assert.match(source, /api\.getCFMetrics/);
+  assert.match(source, /ContentFactorySegmentTargetsPanel/);
+  assert.match(source, /ContentFactoryMetricHistory/);
+  assert.match(source, /ContentFactoryUtmHelper/);
+});
+
+test("review queue route groups publications by workflow status", () => {
+  const source = readSource("app/content-factory/review/page.tsx");
+
+  assert.match(source, /api\.getCFPublications/);
+  assert.match(source, /getContentFactoryReviewQueueGroups/);
+  assert.match(source, /\/content-factory\/publications\/\$\{publication\.id\}/);
 });

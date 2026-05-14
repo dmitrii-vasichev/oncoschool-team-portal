@@ -1,6 +1,8 @@
 import type {
   CFBundleStatus,
+  CFExternalSegment,
   CFProductStream,
+  CFPublicationSegmentTarget,
   CFPublicationUpdateRequest,
   CFPublicationStatus,
   MemberRole,
@@ -73,6 +75,7 @@ type PublicationScheduleLike = {
 };
 
 type PublicationStatusLike = PublicationScheduleLike & {
+  id?: string;
   status: CFPublicationStatus | string;
   actual_published_at?: string | null;
 };
@@ -99,10 +102,39 @@ export type ContentFactoryPublicationFilters = {
   responsible_id?: string | null;
 };
 
+export type ContentFactoryUtmInput = {
+  bundleId: string;
+  publicationId: string;
+  platformCode: string;
+  formatCode: string;
+  segmentId?: string | null;
+  cta?: string | null;
+};
+
+export type ContentFactoryReviewQueueKey =
+  | "production"
+  | "factcheck"
+  | "doctor_review"
+  | "approval"
+  | "scheduling"
+  | "failed"
+  | "cancelled";
+
+export type ContentFactoryReviewQueueGroup<TPublication> = {
+  key: ContentFactoryReviewQueueKey;
+  label: string;
+  publications: TPublication[];
+};
+
 export type ContentFactoryBundleFilterValues = {
   status: "all" | CFBundleStatus;
   product_stream: "" | CFProductStream;
   owner_id: string;
+};
+
+type MetricValueLike = {
+  metric_value?: string | number | null;
+  metric_value_text?: string | null;
 };
 
 type DisplayNameRecord = {
@@ -268,6 +300,85 @@ export function cleanContentFactoryPublicationUpdate(
   return Object.fromEntries(
     Object.entries(cleaned).filter(([, value]) => value !== undefined),
   ) as CFPublicationUpdateRequest;
+}
+
+function compactUtmValue(value: string): string {
+  return value.trim().replace(/\s+/g, "-").toLowerCase();
+}
+
+export function buildContentFactoryUtm(input: ContentFactoryUtmInput): Record<string, string> {
+  const utm: Record<string, string> = {
+    utm_source: compactUtmValue(input.platformCode),
+    utm_medium: compactUtmValue(input.formatCode),
+    utm_campaign: compactUtmValue(input.bundleId),
+    utm_content: compactUtmValue(input.publicationId),
+  };
+  if (input.segmentId?.trim()) {
+    utm.utm_term = compactUtmValue(input.segmentId);
+  }
+  if (input.cta?.trim()) {
+    utm.cf_cta = compactUtmValue(input.cta);
+  }
+  return utm;
+}
+
+export function formatContentFactoryMetricValue(metric: MetricValueLike): string {
+  if (metric.metric_value_text?.trim()) return metric.metric_value_text.trim();
+  if (metric.metric_value === null || metric.metric_value === undefined) return "—";
+  const numericValue =
+    typeof metric.metric_value === "number"
+      ? metric.metric_value
+      : Number(metric.metric_value);
+  if (Number.isNaN(numericValue)) return String(metric.metric_value);
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 4,
+  })
+    .format(numericValue)
+    .replace(/\u00a0/g, " ");
+}
+
+export function getAvailableContentFactorySegments<
+  TSegment extends Pick<CFExternalSegment, "id" | "is_active">,
+  TTarget extends Pick<CFPublicationSegmentTarget, "external_segment_id">,
+>(segments: TSegment[], targets: TTarget[]): TSegment[] {
+  const selectedSegmentIds = new Set(
+    targets.map((target) => target.external_segment_id),
+  );
+  return segments.filter(
+    (segment) => segment.is_active && !selectedSegmentIds.has(segment.id),
+  );
+}
+
+const REVIEW_QUEUE_META: Array<{
+  key: ContentFactoryReviewQueueKey;
+  label: string;
+  statuses: CFPublicationStatus[];
+}> = [
+  { key: "production", label: "Производство", statuses: ["needs_copy", "needs_design"] },
+  { key: "factcheck", label: "Factcheck", statuses: ["factcheck"] },
+  { key: "doctor_review", label: "Проверка врача", statuses: ["doctor_review"] },
+  { key: "approval", label: "Approval", statuses: ["approved"] },
+  { key: "scheduling", label: "Scheduling", statuses: ["scheduled"] },
+  { key: "failed", label: "Failed", statuses: ["failed"] },
+  { key: "cancelled", label: "Cancelled", statuses: ["cancelled"] },
+];
+
+export function getContentFactoryReviewQueueGroups<
+  TPublication extends PublicationStatusLike,
+>(publications: TPublication[]): ContentFactoryReviewQueueGroup<TPublication>[] {
+  return REVIEW_QUEUE_META.map((queue) => ({
+    key: queue.key,
+    label: queue.label,
+    publications: publications
+      .filter((publication) =>
+        queue.statuses.includes(publication.status as CFPublicationStatus),
+      )
+      .sort(
+        (a, b) =>
+          (dateTime(a.scheduled_at) ?? Number.MAX_SAFE_INTEGER) -
+          (dateTime(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER),
+      ),
+  })).filter((queue) => queue.publications.length > 0);
 }
 
 export function summarizeContentFactoryDashboard<

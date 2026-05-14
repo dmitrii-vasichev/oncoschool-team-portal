@@ -1,5 +1,43 @@
 # Status
 
+## Content Factory Sprint 5 Outcomes
+
+- Current phase: implemented; automated verification passed on branch `codex/content-factory-sprint-5`
+- Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, Sprint 3 visibility frontend, and Sprint 4 workspace frontend
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/content-factory-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-5-outcomes.md`
+- Scope: segment targeting UI, UTM helper, manual metric entry/history, and review queues
+- Latest progress:
+  - Merged Sprint 4 workspace through PR #182.
+  - Confirmed local `main` is clean and aligned with `origin/main`.
+  - Created branch `codex/content-factory-sprint-5`.
+  - Wrote the Sprint 5 implementation plan in tracked repo docs.
+  - Made Sprint 5 the active repository plan in `docs/PLAN.md`.
+  - Added frontend API methods for external segments, segment refresh/snapshots, publication segment targets, and metric snapshots.
+  - Added pure helpers for UTM composition, metric display, available segment choices, and review queue grouping.
+  - Added publication detail panels for segment targets, UTM generation/application, manual metric capture, and metric history.
+  - Added `/content-factory/review` with production, factcheck, doctor review, approval, scheduling, failed, and cancelled queues.
+  - Added Content Factory review navigation in the sidebar and header metadata.
+  - Ran Sprint 5 frontend verification successfully.
+  - Committed and pushed Sprint 5 to `origin/codex/content-factory-sprint-5`.
+  - Opened draft PR #183: `https://github.com/dmitrii-vasichev/oncoschool-team-portal/pull/183`.
+- Key decisions:
+  - Treat `docs/content-factory-design.md` as the approved Sprint 5 design source; no new product discovery is needed before implementation.
+  - Keep Sprint 5 frontend-heavy because backend segment targets and metric snapshots already exist.
+  - Defer API publishing integrations, AI drafting, patient CRM, and retrospectives to later sprints.
+- Next actions:
+  - Run authenticated manual QA for segment targets, UTM helper, manual metrics, and review queues.
+  - Review and merge PR #183 when ready.
+  - After merge, start Sprint 6 planning from `docs/content-factory-design.md` and `docs/BACKLOG.md`.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 29 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 113 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/review` and updated `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 4 Workspace
 
 - Current phase: implemented; automated verification passed

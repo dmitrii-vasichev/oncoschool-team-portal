@@ -1,5 +1,28 @@
 # Test Plan
 
+## Content Factory Sprint 5 Outcomes
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page and confirm segment targets load.
+2. Add a target, exclusion, control, and retargeting segment where test data is available.
+3. Remove a segment target and confirm the list refreshes.
+4. Use the UTM helper to generate a campaign/content/term/CTA object and apply it to the publication.
+5. Record manual metric snapshots for 3h, 24h, 7d, final, and a custom window where useful.
+6. Confirm metric history shows value, source method, confidence, note, and captured time.
+7. Open `/content-factory/review` and confirm production, factcheck, doctor review, approval, scheduling, failed, and cancelled queues link to publication detail pages.
+8. Confirm unauthenticated access to `/content-factory/review` reaches the existing login flow instead of a blank page or runtime crash.
+9. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 4 Workspace
 
 ### Automated

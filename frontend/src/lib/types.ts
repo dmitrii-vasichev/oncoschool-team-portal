@@ -1251,6 +1251,17 @@ export interface CFExternalSegment {
   updated_at: string;
 }
 
+export interface CFExternalSegmentCreateRequest {
+  source?: CFSegmentSource;
+  source_segment_id: string;
+  source_url?: string | null;
+  name: string;
+  description?: string | null;
+  population_count?: number;
+  is_active?: boolean;
+  owner_id?: string | null;
+}
+
 export interface CFSegmentSnapshot {
   id: string;
   external_segment_id: string;
