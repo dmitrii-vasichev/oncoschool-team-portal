@@ -107,6 +107,8 @@ import type {
   CFMetricSnapshot,
   CFMetricSnapshotCreateRequest,
   CFRetroNote,
+  CFRetroNoteCreateRequest,
+  CFRetroNoteUpdateRequest,
   CFRetroListParams,
   // Reports
   DailyMetric,
@@ -786,6 +788,27 @@ class ApiClient {
   async getCFRetros(params?: CFRetroListParams): Promise<CFRetroNote[]> {
     const query = this.buildQuery(params);
     return this.request<CFRetroNote[]>(`/api/content-factory/retros${query}`);
+  }
+
+  async getCFRetro(id: string): Promise<CFRetroNote> {
+    return this.request<CFRetroNote>(`/api/content-factory/retros/${id}`);
+  }
+
+  async createCFRetro(data: CFRetroNoteCreateRequest): Promise<CFRetroNote> {
+    return this.request<CFRetroNote>("/api/content-factory/retros", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFRetro(
+    id: string,
+    data: CFRetroNoteUpdateRequest
+  ): Promise<CFRetroNote> {
+    return this.request<CFRetroNote>(`/api/content-factory/retros/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
 
   // ==================== Task Updates ====================

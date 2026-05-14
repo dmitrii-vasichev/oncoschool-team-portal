@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CF_BUNDLE_STATUS_LABELS,
   CF_PUBLICATION_STATUS_LABELS,
+  CF_RETRO_TYPE_LABELS,
   buildContentFactoryBundleParams,
   buildContentFactoryUtm,
   canAccessContentFactory,
@@ -12,10 +13,13 @@ import {
   formatContentFactoryBundleCount,
   formatContentFactoryMetricValue,
   formatContentFactoryPublicationCount,
+  formatContentFactoryRetroPeriod,
   getAvailableContentFactorySegments,
   getContentFactoryDisplayName,
+  getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
+  summarizeContentFactoryRetroSections,
   summarizeContentFactoryDashboard,
 } from "./contentFactoryUtils.ts";
 
@@ -273,5 +277,52 @@ test("getAvailableContentFactorySegments excludes selected segment targets", () 
       { external_segment_id: "drop" },
     ]).map((segment) => segment.id),
     ["keep"],
+  );
+});
+
+test("retro labels expose retrospective types", () => {
+  assert.equal(CF_RETRO_TYPE_LABELS.weekly, "Weekly");
+  assert.equal(CF_RETRO_TYPE_LABELS.monthly, "Monthly");
+  assert.equal(CF_RETRO_TYPE_LABELS.bundle, "Bundle");
+  assert.equal(CF_RETRO_TYPE_LABELS.adhoc, "Ad-hoc");
+});
+
+test("formatContentFactoryRetroPeriod renders period range", () => {
+  assert.equal(
+    formatContentFactoryRetroPeriod({
+      period_start: "2026-05-01",
+      period_end: "2026-05-07",
+    }),
+    "01 мая 2026 — 07 мая 2026",
+  );
+});
+
+test("getContentFactoryRetroTitle combines type and period", () => {
+  assert.equal(
+    getContentFactoryRetroTitle({
+      retro_type: "bundle",
+      period_start: "2026-05-01",
+      period_end: "2026-05-31",
+    }),
+    "Bundle · 01 мая 2026 — 31 мая 2026",
+  );
+});
+
+test("summarizeContentFactoryRetroSections counts structured evidence", () => {
+  assert.deepEqual(
+    summarizeContentFactoryRetroSections({
+      best_by_objective: { awareness: "vk", registration: "email" },
+      broken: [{ id: "late" }, { id: "wrong-cta" }],
+      learnings: { cadence: "weekly" },
+      decisions: { keep: "segment-first" },
+      actions: [{ owner: "copy" }, { owner: "doctor" }, { owner: "analytics" }],
+    }),
+    {
+      bestByObjective: 2,
+      broken: 2,
+      learnings: 1,
+      decisions: 1,
+      actions: 3,
+    },
   );
 });

@@ -21,6 +21,7 @@ import {
   ChevronsRight,
   Menu,
   GraduationCap,
+  History,
   Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/content-factory/review",
     label: "CF Review",
     icon: ListChecks,
+    contentFactoryAccess: true,
+    section: "content",
+  },
+  {
+    href: "/content-factory/retros",
+    label: "CF Retros",
+    icon: History,
     contentFactoryAccess: true,
     section: "content",
   },

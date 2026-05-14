@@ -25,6 +25,7 @@ test("header knows content factory workspace routes", () => {
   assert.match(source, /\/content-factory\/bundles/);
   assert.match(source, /\/content-factory\/publications/);
   assert.match(source, /\/content-factory\/review/);
+  assert.match(source, /\/content-factory\/retros/);
 });
 
 test("content factory layout uses dedicated access guard", () => {
@@ -61,6 +62,14 @@ test("bundle and publication workspace routes exist", () => {
   assert.match(
     readSource("app/content-factory/review/page.tsx"),
     /ContentFactoryReviewPage/,
+  );
+  assert.match(
+    readSource("app/content-factory/retros/page.tsx"),
+    /ContentFactoryRetrosPage/,
+  );
+  assert.match(
+    readSource("app/content-factory/retros/[id]/page.tsx"),
+    /ContentFactoryRetroDetailPage/,
   );
 });
 
@@ -119,4 +128,34 @@ test("review queue route groups publications by workflow status", () => {
   assert.match(source, /api\.getCFPublications/);
   assert.match(source, /getContentFactoryReviewQueueGroups/);
   assert.match(source, /\/content-factory\/publications\/\$\{publication\.id\}/);
+});
+
+test("retro dialog exposes create and update fields", () => {
+  const source = readSource(
+    "components/content-factory/ContentFactoryRetroDialog.tsx",
+  );
+
+  assert.match(source, /api\.createCFRetro/);
+  assert.match(source, /api\.updateCFRetro/);
+  assert.match(source, /best_by_objective/);
+  assert.match(source, /learnings/);
+  assert.match(source, /decisions/);
+  assert.match(source, /actions/);
+});
+
+test("retros route lists retro cards and opens create dialog", () => {
+  const source = readSource("app/content-factory/retros/page.tsx");
+
+  assert.match(source, /api\.getCFRetros/);
+  assert.match(source, /ContentFactoryRetroDialog/);
+  assert.match(source, /getContentFactoryRetroTitle/);
+  assert.match(source, /\/content-factory\/retros\/\$\{retro\.id\}/);
+});
+
+test("retro detail route loads and edits retrospective notes", () => {
+  const source = readSource("app/content-factory/retros/[id]/page.tsx");
+
+  assert.match(source, /api\.getCFRetro/);
+  assert.match(source, /ContentFactoryRetroDialog/);
+  assert.match(source, /summarizeContentFactoryRetroSections/);
 });

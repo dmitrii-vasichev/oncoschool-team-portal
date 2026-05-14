@@ -4,12 +4,11 @@
 
 ### Active
 
-- Sprint 5 segments, UTM, manual metrics, and review discipline is implemented on `codex/content-factory-sprint-5` and pending merge.
+- Review and merge Sprint 6 retrospective workspace for weekly, monthly, bundle, and ad-hoc learning loops.
 
 ### Next
 
 - Add reference-table admin CRUD for platforms, formats, rubrics, nosologies, and funnel templates.
-- Add retro workspace for weekly, monthly, bundle, and ad-hoc retrospectives.
 
 ### Later
 

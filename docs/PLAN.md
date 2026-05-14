@@ -1,38 +1,41 @@
-# Active Plan: Content Factory Sprint 5 Outcomes
+# Active Plan: Content Factory Sprint 6 Retrospective Workspace
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-5-outcomes.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-6-retros.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Connect Content Factory publications to segment targeting, UTM discipline, manual metric evidence, and review queues without introducing brittle publishing integrations.
+**Goal:** Build the Content Factory retrospective workspace so weekly, monthly, bundle, and ad-hoc learning is captured in the portal instead of scattered across chats and meetings.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-5-outcomes.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-6-retros-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-6-retros.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add frontend API methods for segments, segment targets, segment snapshots, and metric snapshots.
-2. Add pure helpers for UTM composition, metric display, available segment choices, and review queue grouping.
-3. Add publication detail panels for segment targets, UTM helper, manual metric entry, and metric history.
-4. Add `/content-factory/review` queues for production, factcheck, doctor review, approval, scheduling, failed, and cancelled work.
-5. Run frontend verification and update durable repo docs.
+1. Add frontend API methods and pure helpers for retrospectives.
+2. Add a JSON-backed create/edit retro dialog.
+3. Add `/content-factory/retros` list route with type filtering and detail links.
+4. Add `/content-factory/retros/[id]` detail route with structured evidence sections.
+5. Add sidebar/header navigation, run verification, and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented; automated verification passed.
+- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-6-retros`.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.
+- Sprint 5 segments, UTM, manual metrics, and review queues are merged to `main`.
 
 **Definition of done:**
 
-- Publication detail can show, add, and remove segment targets with target/exclusion/control/retargeting roles.
-- Publication detail can compose and apply UTM values from bundle/publication/platform/format/segment/CTA context.
-- Publication detail can record manual metric snapshots and show metric history with source, method, confidence, notes, and captured time.
-- `/content-factory/review` groups active publications into production, review, scheduling, failed, and cancelled queues.
+- `/content-factory/retros` lists weekly, monthly, bundle, and ad-hoc retrospectives.
+- Users with Content Factory access can create retrospectives with period, type, facilitator, optional bundle, structured JSON sections, and notes.
+- `/content-factory/retros/[id]` shows period, type, facilitator, linked bundle, structured evidence sections, and notes.
+- Existing supported retro fields can be edited from the detail page.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
@@ -45,6 +48,28 @@ cd frontend && npm run lint
 cd frontend && npm run build
 git diff --check
 ```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 37 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 121 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/retros` and `/content-factory/retros/[id]`.
+- Browser smoke passed on `http://localhost:3003` with a temporary local mock API: authenticated login, `/content-factory/retros` list, `/content-factory/retros/retro-1` detail, and edit dialog rendered.
+- `git diff --check` passed.
+
+---
+
+# Previous Plan: Content Factory Sprint 5 Outcomes
+
+> **For agentic workers:** Sprint 5 is complete and merged. The implementation plan is `docs/superpowers/plans/2026-05-14-content-factory-sprint-5-outcomes.md`.
+
+**Goal:** Connect Content Factory publications to segment targeting, UTM discipline, manual metric evidence, and review queues without introducing brittle publishing integrations.
+
+**Implementation status:**
+
+- Implemented; automated verification passed; merged to `main` through PR #183.
 
 **Latest verification result:**
 

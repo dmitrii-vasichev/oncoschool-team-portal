@@ -5,6 +5,7 @@ import type {
   CFPublicationSegmentTarget,
   CFPublicationUpdateRequest,
   CFPublicationStatus,
+  CFRetroType,
   MemberRole,
 } from "./types";
 
@@ -37,6 +38,13 @@ export const CF_PUBLICATION_STATUS_LABELS: Record<CFPublicationStatus, string> =
   published: "Опубликовано",
   failed: "Ошибка",
   cancelled: "Отменено",
+};
+
+export const CF_RETRO_TYPE_LABELS: Record<CFRetroType, string> = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  bundle: "Bundle",
+  adhoc: "Ad-hoc",
 };
 
 export const CF_BUNDLE_STATUSES: CFBundleStatus[] = [
@@ -78,6 +86,23 @@ type PublicationStatusLike = PublicationScheduleLike & {
   id?: string;
   status: CFPublicationStatus | string;
   actual_published_at?: string | null;
+};
+
+type RetroPeriodLike = {
+  period_start: string | null;
+  period_end: string | null;
+};
+
+type RetroTitleLike = RetroPeriodLike & {
+  retro_type: CFRetroType | string;
+};
+
+type RetroSectionsLike = {
+  best_by_objective?: Record<string, unknown> | null;
+  broken?: unknown[] | null;
+  learnings?: Record<string, unknown> | null;
+  decisions?: Record<string, unknown> | null;
+  actions?: unknown[] | null;
 };
 
 export type ContentFactoryPublicationGroup<T> = {
@@ -124,6 +149,14 @@ export type ContentFactoryReviewQueueGroup<TPublication> = {
   key: ContentFactoryReviewQueueKey;
   label: string;
   publications: TPublication[];
+};
+
+export type ContentFactoryRetroSectionSummary = {
+  bestByObjective: number;
+  broken: number;
+  learnings: number;
+  decisions: number;
+  actions: number;
 };
 
 export type ContentFactoryBundleFilterValues = {
@@ -263,6 +296,48 @@ function russianPublicationNoun(count: number): string {
 
 export function formatContentFactoryPublicationCount(count: number): string {
   return `${count} ${russianPublicationNoun(count)}`;
+}
+
+function formatRetroDate(value: string | null | undefined): string {
+  if (!value) return "Без даты";
+  const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return "Без даты";
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const month = parts.find((part) => part.type === "month")?.value ?? "";
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  return [day, month, year].filter(Boolean).join(" ");
+}
+
+export function formatContentFactoryRetroPeriod(retro: RetroPeriodLike): string {
+  return `${formatRetroDate(retro.period_start)} — ${formatRetroDate(retro.period_end)}`;
+}
+
+export function getContentFactoryRetroTitle(retro: RetroTitleLike): string {
+  const label =
+    CF_RETRO_TYPE_LABELS[retro.retro_type as CFRetroType] ?? retro.retro_type;
+  return `${label} · ${formatContentFactoryRetroPeriod(retro)}`;
+}
+
+function objectKeyCount(value: Record<string, unknown> | null | undefined): number {
+  return value ? Object.keys(value).length : 0;
+}
+
+export function summarizeContentFactoryRetroSections(
+  retro: RetroSectionsLike,
+): ContentFactoryRetroSectionSummary {
+  return {
+    bestByObjective: objectKeyCount(retro.best_by_objective),
+    broken: retro.broken?.length ?? 0,
+    learnings: objectKeyCount(retro.learnings),
+    decisions: objectKeyCount(retro.decisions),
+    actions: retro.actions?.length ?? 0,
+  };
 }
 
 export function getContentFactoryDisplayName(
