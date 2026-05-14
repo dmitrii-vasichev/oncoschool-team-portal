@@ -1,0 +1,97 @@
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.models import CFPublication, CFPublicationVersion
+from app.db.schemas import CFPublicationCreate, CFPublicationUpdate
+
+
+class PublicationService:
+    @staticmethod
+    async def create(
+        session: AsyncSession,
+        payload: CFPublicationCreate,
+        *,
+        editor_id: uuid.UUID,
+    ) -> CFPublication:
+        pub = CFPublication(
+            bundle_id=payload.bundle_id,
+            platform_id=payload.platform_id,
+            format_id=payload.format_id,
+            rubric_id=payload.rubric_id,
+            nosology_id=payload.nosology_id,
+            title=payload.title,
+            body_text=payload.body_text,
+            media_refs=payload.media_refs,
+            scheduled_at=payload.scheduled_at,
+            responsible_id=payload.responsible_id,
+            status=payload.status,
+            utm=payload.utm,
+            version_number=1,
+        )
+        session.add(pub)
+        await session.flush()
+
+        version = CFPublicationVersion(
+            publication_id=pub.id,
+            version_number=1,
+            body_text=pub.body_text,
+            edited_by_id=editor_id,
+            approval_event="drafted",
+            source_materials_refs=[],
+        )
+        session.add(version)
+        await session.flush()
+        await session.refresh(pub)
+        return pub
+
+    @staticmethod
+    async def get(session: AsyncSession, pub_id: uuid.UUID) -> CFPublication | None:
+        result = await session.execute(select(CFPublication).where(CFPublication.id == pub_id))
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    async def list_by_bundle(session: AsyncSession, bundle_id: uuid.UUID) -> list[CFPublication]:
+        result = await session.execute(
+            select(CFPublication).where(CFPublication.bundle_id == bundle_id).order_by(CFPublication.scheduled_at)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def update(
+        session: AsyncSession,
+        pub_id: uuid.UUID,
+        payload: CFPublicationUpdate,
+        *,
+        editor_id: uuid.UUID,
+        approval_event: str = "reviewed",
+    ) -> CFPublication | None:
+        pub = await PublicationService.get(session, pub_id)
+        if pub is None:
+            return None
+
+        changes = payload.model_dump(exclude_unset=True)
+        body_changed = "body_text" in changes and changes["body_text"] != pub.body_text
+
+        for field, value in changes.items():
+            setattr(pub, field, value)
+
+        if body_changed:
+            pub.version_number = (pub.version_number or 1) + 1
+            version = CFPublicationVersion(
+                publication_id=pub.id,
+                version_number=pub.version_number,
+                body_text=pub.body_text,
+                edited_by_id=editor_id,
+                approval_event=approval_event,
+                source_materials_refs=[],
+            )
+            session.add(version)
+
+        if "status" in changes and changes["status"] == "published" and pub.actual_published_at is None:
+            pub.actual_published_at = datetime.now(timezone.utc)
+
+        await session.flush()
+        return pub

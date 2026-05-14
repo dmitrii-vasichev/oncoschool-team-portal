@@ -119,3 +119,33 @@ class PermissionService:
         is required. This static method covers the fast path only.
         """
         return PermissionService.is_admin(member)
+
+    # ── Content Factory (moderator+) ──
+
+    @staticmethod
+    def can_access_content_factory(member: TeamMember) -> bool:
+        return bool(getattr(member, "is_active", True)) and PermissionService.is_moderator(member)
+
+    @staticmethod
+    def can_edit_cf_bundle(member: TeamMember) -> bool:
+        return PermissionService.can_access_content_factory(member)
+
+    @staticmethod
+    def can_edit_cf_publication(member: TeamMember) -> bool:
+        return PermissionService.can_access_content_factory(member)
+
+    @staticmethod
+    def can_approve_cf_publication(member: TeamMember) -> bool:
+        return PermissionService.can_access_content_factory(member)
+
+    @staticmethod
+    def can_publish_cf_publication(member: TeamMember) -> bool:
+        return PermissionService.can_access_content_factory(member)
+
+    @staticmethod
+    def can_edit_cf_reference_tables(member: TeamMember) -> bool:
+        return PermissionService.is_admin(member)
+
+    @staticmethod
+    def can_create_cf_retro(member: TeamMember) -> bool:
+        return PermissionService.can_access_content_factory(member)

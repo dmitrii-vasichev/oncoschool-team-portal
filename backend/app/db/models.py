@@ -1497,3 +1497,264 @@ class AIFeatureConfig(Base):
     updated_at: Mapped[datetime] = mapped_column(
         server_default=func.now(), onupdate=func.now()
     )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Content Factory (cf_*) — internal content production module
+# Design doc: docs/plans/2026-05-13-content-factory-design.md
+# ─────────────────────────────────────────────────────────────────────
+
+
+class CFPlatform(Base):
+    __tablename__ = "cf_platform"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    capabilities: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CFFormat(Base):
+    __tablename__ = "cf_format"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    default_objective: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    requires_medical_review: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CFRubric(Base):
+    __tablename__ = "cf_rubric"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    deprecated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CFNosology(Base):
+    __tablename__ = "cf_nosology"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    display_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    deprecated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CFFunnelTemplate(Base):
+    __tablename__ = "cf_funnel_template"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    template_publications: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, default=list, server_default="[]"
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CFExternalSegment(Base):
+    __tablename__ = "cf_external_segment"
+    __table_args__ = (UniqueConstraint("source", "source_segment_id", name="uq_cf_segment_source"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(30), nullable=False, default="getcourse", server_default="getcourse")
+    source_segment_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    population_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    filter_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    snapshots: Mapped[list["CFSegmentSnapshot"]] = relationship(
+        back_populates="external_segment", cascade="all, delete-orphan"
+    )
+
+
+class CFSegmentSnapshot(Base):
+    __tablename__ = "cf_segment_snapshot"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    external_segment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_external_segment.id", ondelete="CASCADE"), nullable=False
+    )
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    population_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    external_segment: Mapped["CFExternalSegment"] = relationship(back_populates="snapshots")
+
+
+class CFBundle(Base):
+    __tablename__ = "cf_bundle"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    product_stream: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="planning", server_default="planning")
+    event_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=False)
+    brief: Mapped[str | None] = mapped_column(Text, nullable=True)
+    funnel_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_funnel_template.id"), nullable=True
+    )
+    source_material_refs: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    publications: Mapped[list["CFPublication"]] = relationship(
+        back_populates="bundle", cascade="all, delete-orphan"
+    )
+
+
+class CFPublication(Base):
+    __tablename__ = "cf_publication"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    bundle_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_bundle.id", ondelete="CASCADE"), nullable=False
+    )
+    platform_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cf_platform.id"), nullable=False)
+    format_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cf_format.id"), nullable=False)
+    rubric_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("cf_rubric.id"), nullable=True)
+    nosology_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("cf_nosology.id"), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_refs: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    actual_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    responsible_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, default="draft", server_default="draft")
+    platform_post_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    platform_post_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    utm: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    cancelled_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    bundle: Mapped["CFBundle"] = relationship(back_populates="publications")
+    versions: Mapped[list["CFPublicationVersion"]] = relationship(
+        back_populates="publication", cascade="all, delete-orphan",
+        order_by="CFPublicationVersion.version_number",
+    )
+    segment_targets: Mapped[list["CFPublicationSegmentTarget"]] = relationship(
+        back_populates="publication", cascade="all, delete-orphan"
+    )
+    metric_snapshots: Mapped[list["CFMetricSnapshot"]] = relationship(
+        back_populates="publication", cascade="all, delete-orphan"
+    )
+
+
+class CFPublicationVersion(Base):
+    __tablename__ = "cf_publication_version"
+    __table_args__ = (UniqueConstraint("publication_id", "version_number", name="uq_cf_pub_version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    publication_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_publication.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    edited_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=False)
+    edited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    approval_event: Mapped[str] = mapped_column(String(30), nullable=False)
+    source_materials_refs: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    publication: Mapped["CFPublication"] = relationship(back_populates="versions")
+
+
+class CFPublicationRelation(Base):
+    __tablename__ = "cf_publication_relation"
+    __table_args__ = (
+        UniqueConstraint("from_publication_id", "to_publication_id", "relation_type", name="uq_cf_pub_relation"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    from_publication_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_publication.id", ondelete="CASCADE"), nullable=False
+    )
+    to_publication_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_publication.id", ondelete="CASCADE"), nullable=False
+    )
+    relation_type: Mapped[str] = mapped_column(String(30), nullable=False)
+
+
+class CFPublicationSegmentTarget(Base):
+    __tablename__ = "cf_publication_segment_target"
+
+    publication_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_publication.id", ondelete="CASCADE"), primary_key=True
+    )
+    external_segment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_external_segment.id"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="target", server_default="target")
+    expected_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    actual_count_at_send: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    publication: Mapped["CFPublication"] = relationship(back_populates="segment_targets")
+
+
+class CFMetricSnapshot(Base):
+    __tablename__ = "cf_metric_snapshot"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    publication_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_publication.id", ondelete="CASCADE"), nullable=False
+    )
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    window: Mapped[str] = mapped_column(String(20), nullable=False)
+    metric_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    metric_value: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
+    metric_value_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(30), nullable=False, default="manual", server_default="manual")
+    source_method: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    confidence: Mapped[str] = mapped_column(String(10), nullable=False, default="high", server_default="high")
+    raw_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    captured_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True
+    )
+
+    publication: Mapped["CFPublication"] = relationship(back_populates="metric_snapshots")
+
+
+class CFRetroNote(Base):
+    __tablename__ = "cf_retro_note"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    retro_type: Mapped[str] = mapped_column(String(20), nullable=False, default="weekly", server_default="weekly")
+    bundle_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_bundle.id", ondelete="SET NULL"), nullable=True
+    )
+    facilitator_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=False)
+    best_by_objective: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    broken: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    learnings: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    decisions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    actions: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

@@ -58,6 +58,33 @@ ProjectEventType = Literal[
     "project_completed",
     "project_deleted",
 ]
+# ── Content Factory types ──
+CFProductStreamType = Literal[
+    "onco_school", "nko", "medtourism", "alternative",
+    "patient_live", "expert_live", "seasonal",
+]
+CFBundleStatusType = Literal["planning", "production", "live", "retrospective", "archived"]
+CFPublicationStatusType = Literal[
+    "draft", "needs_copy", "needs_design", "factcheck", "doctor_review",
+    "approved", "scheduled", "published", "failed", "cancelled",
+]
+CFApprovalEventType = Literal[
+    "drafted", "reviewed", "factchecked", "doctor_approved",
+    "scheduled", "published", "rolled_back",
+]
+CFPublicationRelationType = Literal[
+    "adapted_from", "follow_up_to", "reminder_for",
+    "digest_includes", "replaces", "crosspost_of",
+]
+CFSegmentRoleType = Literal["target", "exclusion", "control", "retargeting"]
+CFMetricWindowType = Literal["3h", "24h", "72h", "7d", "final", "custom"]
+CFMetricSourceType = Literal[
+    "manual", "api", "tgstat", "telemetr", "vk_api",
+    "email_provider", "getcourse", "parser", "import",
+]
+CFConfidenceType = Literal["high", "medium", "low"]
+CFRetroType = Literal["weekly", "monthly", "bundle", "adhoc"]
+CFSegmentSourceType = Literal["getcourse"]
 MeetingAIProcessingStatusType = Literal[
     "idle",
     "queued",
@@ -1226,3 +1253,285 @@ class GetCourseCredentialsResponse(BaseModel):
 class GetCourseCredentialsUpdate(BaseModel):
     base_url: str
     api_key: str
+
+
+# ── Content Factory: reference schemas ──
+
+class CFPlatformBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    display_name: str = Field(..., max_length=100)
+    is_active: bool = True
+    capabilities: dict = Field(default_factory=dict)
+    display_order: int = 0
+
+
+class CFPlatformCreate(CFPlatformBase):
+    pass
+
+
+class CFPlatformUpdate(BaseModel):
+    display_name: str | None = None
+    is_active: bool | None = None
+    capabilities: dict | None = None
+    display_order: int | None = None
+
+
+class CFPlatformResponse(CFPlatformBase):
+    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFFormatBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    display_name: str = Field(..., max_length=100)
+    default_objective: str | None = None
+    requires_medical_review: bool = False
+    is_active: bool = True
+    display_order: int = 0
+
+
+class CFFormatCreate(CFFormatBase):
+    pass
+
+
+class CFFormatResponse(CFFormatBase):
+    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFRubricBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    display_name: str = Field(..., max_length=100)
+    is_active: bool = True
+
+
+class CFRubricCreate(CFRubricBase):
+    pass
+
+
+class CFRubricResponse(CFRubricBase):
+    id: uuid.UUID
+    deprecated_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFNosologyBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    display_name: str = Field(..., max_length=100)
+    is_active: bool = True
+
+
+class CFNosologyCreate(CFNosologyBase):
+    pass
+
+
+class CFNosologyResponse(CFNosologyBase):
+    id: uuid.UUID
+    deprecated_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFFunnelTemplateBase(BaseModel):
+    code: str = Field(..., max_length=50)
+    name: str = Field(..., max_length=200)
+    description: str | None = None
+    template_publications: list = Field(default_factory=list)
+    is_active: bool = True
+
+
+class CFFunnelTemplateCreate(CFFunnelTemplateBase):
+    pass
+
+
+class CFFunnelTemplateResponse(CFFunnelTemplateBase):
+    id: uuid.UUID
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Content Factory: core schemas ──
+
+class CFExternalSegmentBase(BaseModel):
+    source: CFSegmentSourceType = "getcourse"
+    source_segment_id: str = Field(..., max_length=100)
+    source_url: str | None = None
+    name: str = Field(..., max_length=500)
+    description: str | None = None
+    population_count: int = 0
+    is_active: bool = True
+
+
+class CFExternalSegmentCreate(CFExternalSegmentBase):
+    owner_id: uuid.UUID | None = None
+
+
+class CFExternalSegmentUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    population_count: int | None = None
+    is_active: bool | None = None
+    source_url: str | None = None
+
+
+class CFExternalSegmentResponse(CFExternalSegmentBase):
+    id: uuid.UUID
+    last_fetched_at: datetime | None = None
+    owner_id: uuid.UUID | None = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFSegmentSnapshotResponse(BaseModel):
+    id: uuid.UUID
+    external_segment_id: uuid.UUID
+    fetched_at: datetime
+    population_count: int
+    notes: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFBundleBase(BaseModel):
+    name: str = Field(..., max_length=500)
+    product_stream: CFProductStreamType
+    status: CFBundleStatusType = "planning"
+    event_date: datetime | None = None
+    brief: str | None = None
+    funnel_template_id: uuid.UUID | None = None
+    source_material_refs: list = Field(default_factory=list)
+
+
+class CFBundleCreate(CFBundleBase):
+    owner_id: uuid.UUID
+
+
+class CFBundleUpdate(BaseModel):
+    name: str | None = None
+    status: CFBundleStatusType | None = None
+    event_date: datetime | None = None
+    brief: str | None = None
+    funnel_template_id: uuid.UUID | None = None
+    source_material_refs: list | None = None
+
+
+class CFBundleResponse(CFBundleBase):
+    id: uuid.UUID
+    owner_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFPublicationBase(BaseModel):
+    bundle_id: uuid.UUID
+    platform_id: uuid.UUID
+    format_id: uuid.UUID
+    rubric_id: uuid.UUID | None = None
+    nosology_id: uuid.UUID | None = None
+    title: str | None = Field(default=None, max_length=500)
+    body_text: str | None = None
+    media_refs: list = Field(default_factory=list)
+    scheduled_at: datetime | None = None
+    status: CFPublicationStatusType = "draft"
+    utm: dict = Field(default_factory=dict)
+
+
+class CFPublicationCreate(CFPublicationBase):
+    responsible_id: uuid.UUID
+
+
+class CFPublicationUpdate(BaseModel):
+    title: str | None = None
+    body_text: str | None = None
+    media_refs: list | None = None
+    scheduled_at: datetime | None = None
+    status: CFPublicationStatusType | None = None
+    utm: dict | None = None
+    actual_published_at: datetime | None = None
+    platform_post_url: str | None = None
+    platform_post_id: str | None = None
+    cancelled_reason: str | None = None
+
+
+class CFPublicationResponse(CFPublicationBase):
+    id: uuid.UUID
+    responsible_id: uuid.UUID
+    actual_published_at: datetime | None = None
+    platform_post_url: str | None = None
+    platform_post_id: str | None = None
+    version_number: int
+    cancelled_reason: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFPublicationVersionResponse(BaseModel):
+    id: uuid.UUID
+    publication_id: uuid.UUID
+    version_number: int
+    body_text: str | None = None
+    edited_by_id: uuid.UUID
+    edited_at: datetime
+    approval_event: CFApprovalEventType
+    source_materials_refs: list
+    notes: str | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFPublicationSegmentTargetCreate(BaseModel):
+    external_segment_id: uuid.UUID
+    role: CFSegmentRoleType = "target"
+    expected_count: int | None = None
+
+
+class CFPublicationSegmentTargetResponse(BaseModel):
+    publication_id: uuid.UUID
+    external_segment_id: uuid.UUID
+    role: CFSegmentRoleType
+    expected_count: int | None = None
+    actual_count_at_send: int | None = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFMetricSnapshotCreate(BaseModel):
+    publication_id: uuid.UUID
+    window: CFMetricWindowType
+    metric_name: str = Field(..., max_length=50)
+    metric_value: Decimal | None = None
+    metric_value_text: str | None = None
+    source: CFMetricSourceType = "manual"
+    source_method: str | None = None
+    confidence: CFConfidenceType = "high"
+    raw_payload: dict | None = None
+    note: str | None = None
+    captured_by_id: uuid.UUID | None = None
+
+
+class CFMetricSnapshotResponse(CFMetricSnapshotCreate):
+    id: uuid.UUID
+    captured_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFRetroNoteBase(BaseModel):
+    period_start: date
+    period_end: date
+    retro_type: CFRetroType = "weekly"
+    bundle_id: uuid.UUID | None = None
+    best_by_objective: dict = Field(default_factory=dict)
+    broken: list = Field(default_factory=list)
+    learnings: dict = Field(default_factory=dict)
+    decisions: dict = Field(default_factory=dict)
+    actions: list = Field(default_factory=list)
+    notes: str | None = None
+
+
+class CFRetroNoteCreate(CFRetroNoteBase):
+    facilitator_id: uuid.UUID
+
+
+class CFRetroNoteResponse(CFRetroNoteBase):
+    id: uuid.UUID
+    facilitator_id: uuid.UUID
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
