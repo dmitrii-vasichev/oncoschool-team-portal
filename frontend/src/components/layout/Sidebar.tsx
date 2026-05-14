@@ -128,6 +128,13 @@ const NAV_ITEMS: NavItem[] = [
     section: "content",
   },
   {
+    href: "/content-factory/segments/analytics",
+    label: "CF Segment Analytics",
+    icon: BarChart3,
+    contentFactoryAccess: true,
+    section: "content",
+  },
+  {
     href: "/content-factory/review",
     label: "CF Review",
     icon: ListChecks,
@@ -219,6 +226,13 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
+    if (href === "/content-factory/segments") {
+      return (
+        pathname === href ||
+        (pathname.startsWith(`${href}/`) &&
+          !pathname.startsWith("/content-factory/segments/analytics"))
+      );
+    }
     return pathname.startsWith(href);
   }
 

@@ -1,8 +1,48 @@
 # Status
 
+## Content Factory Sprint 9 Segment Usage Analytics
+
+- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-9-segment-analytics`
+- Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-8 frontend workspace
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-9-segment-analytics-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`
+- Scope: segment usage analytics across publications, bundles, targeting roles, publication status, and manual metric evidence
+- Latest progress:
+  - Merged Sprint 8 through PR #186.
+  - Confirmed production Vercel route `/content-factory/segments` returns HTTP 200.
+  - Confirmed production frontend auth proxy returns HTTP 401 for unauthenticated `/api/auth/me`.
+  - Confirmed Railway backend health returns HTTP 200.
+  - Created branch `codex/content-factory-sprint-9-segment-analytics`.
+  - Confirmed existing APIs can provide segments, publications, bundles, publication segment targets, and manual metric snapshots.
+  - Wrote Sprint 9 design and implementation plan.
+  - Added failing Sprint 9 helper/source guard tests and verified the red state.
+  - Added segment usage helper types and pure aggregators for publication count, bundle count, role mix, bundle status mix, published publications, metric evidence, expected counts, actual send counts, latest activity, summary cards, and filters.
+  - Added `ContentFactorySegmentUsageTable` for compact segment rows with segment links, publication links, roles, bundle states, and latest activity.
+  - Added `/content-factory/segments/analytics` with core list loading and per-publication target/metric evidence fan-out with partial-failure handling.
+  - Added segment analytics navigation in the segment registry, sidebar, and header.
+  - Ran Sprint 9 frontend verification successfully.
+  - Ran a local dev server smoke for `/content-factory/segments/analytics`.
+- Key decisions:
+  - Keep Sprint 9 frontend-heavy and reuse existing endpoints.
+  - Treat metric snapshots as evidence count and freshness signal, not a numeric performance rollup.
+  - Defer backend aggregate endpoint until browser-side fan-out becomes a real operational problem.
+- Next actions:
+  - Commit and push Sprint 9.
+  - Open a PR for review and merge when checks pass.
+  - Run authenticated manual QA against real segment usage data when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 48 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 138 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/segments/analytics`.
+  - Local dev server smoke on `http://127.0.0.1:3008/content-factory/segments/analytics` returned HTTP 200 and compiled the route.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 8 Segment Workspace
 
-- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-8-segments`
+- Current phase: implemented; automated verification passed; merged to `main` through PR #186
 - Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-7 frontend workspace
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-8-segments-design.md`
@@ -26,14 +66,14 @@
   - Added Content Factory segment navigation in the sidebar and header breadcrumbs.
   - Ran Sprint 8 frontend verification successfully.
   - Ran a local dev server smoke for `/content-factory/segments`.
+  - Committed and pushed Sprint 8 to `origin/codex/content-factory-sprint-8-segments`.
+  - Opened PR #186 and merged it into `main`.
 - Key decisions:
   - Keep Sprint 8 frontend-heavy and reuse existing backend segment endpoints.
   - Follow the backend permission contract: Content Factory access users can create segment mirrors and refresh population counts.
   - Avoid snapshot notes in the first UI because the current backend service does not persist them.
   - Defer automatic GetCourse synchronization and segment update/deactivate/delete endpoints.
 - Next actions:
-  - Commit and push Sprint 8.
-  - Open a PR for review and merge when checks pass.
   - Run authenticated manual QA against real segment data when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 50 tests, with existing Node module-type warnings.

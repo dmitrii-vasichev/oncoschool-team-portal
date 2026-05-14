@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Plus, RefreshCw, Search, Users } from "lucide-react";
+import { BarChart3, Plus, RefreshCw, Search, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -140,6 +140,18 @@ export default function ContentFactorySegmentsPage() {
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-full gap-1.5 px-2.5 text-xs sm:w-auto"
+            asChild
+          >
+            <Link href="/content-factory/segments/analytics">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Analytics
+            </Link>
+          </Button>
           <Button
             type="button"
             variant="ghost"

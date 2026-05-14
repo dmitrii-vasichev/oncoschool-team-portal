@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 9 Segment Usage Analytics
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/segments/analytics` and confirm summary cards load.
+2. Confirm used and unused segment filters work without a page reload.
+3. Confirm role filtering works for target, exclusion, control, and retargeting segment usage.
+4. Confirm search matches segment name, source ID, and related publication titles.
+5. Confirm segment rows show publication count, bundle count, role mix, bundle status mix, published count, metric evidence count, and latest activity.
+6. Open a segment detail link from the analytics page.
+7. Open recent publication links from a segment row.
+8. Confirm the segment registry exposes the analytics action.
+9. Confirm unauthenticated access reaches the existing login flow instead of a blank page or runtime crash.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 8 Segment Workspace
 
 ### Automated

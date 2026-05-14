@@ -4,11 +4,11 @@
 
 ### Active
 
-- Build Sprint 8 segment registry, detail workspace, population refresh, and snapshot comparison.
+- Build Sprint 9 segment usage analytics across publications, bundles, targeting roles, and manual metric evidence.
 
 ### Next
 
-- Add segment usage analytics across publications and bundle outcomes.
+- Run authenticated manual QA across Content Factory segment registry, segment detail, and segment usage analytics with real production data.
 
 ### Later
 

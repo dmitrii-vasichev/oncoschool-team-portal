@@ -1,59 +1,78 @@
-# Active Plan: Content Factory Sprint 8 Segment Workspace
+# Active Plan: Content Factory Sprint 9 Segment Usage Analytics
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a Content Factory segment registry and detail workspace for segment mirrors, population refreshes, and snapshot comparisons.
+**Goal:** Add a Content Factory segment usage analytics workspace across publications, bundles, targeting roles, and manual metric evidence.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-8-segments-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-9-segment-analytics-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add frontend API detail method and pure helpers for segment filtering, summaries, and snapshot comparison.
-2. Add a segment create dialog for manual external segment mirrors.
-3. Add a segment refresh dialog for population-count snapshots.
-4. Add a snapshot list/comparison component.
-5. Add `/content-factory/segments` registry with search, active/source filters, create, refresh, and detail links.
-6. Add `/content-factory/segments/[id]` detail with metadata and snapshot history.
-7. Add sidebar/header navigation, run verification, and update durable repo docs.
+1. Add pure helpers for segment usage rows, summaries, and filters.
+2. Add a compact segment usage table component.
+3. Add `/content-factory/segments/analytics` with summary cards, filters, segment rows, and publication links.
+4. Link the analytics workspace from the segment registry, sidebar, and header.
+5. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-8-segments`.
+- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-9-segment-analytics`.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.
 - Sprint 5 segments, UTM, manual metrics, and review queues are merged to `main`.
 - Sprint 6 retrospective workspace is merged to `main`.
 - Sprint 7 reference admin workspace is merged to `main`.
+- Sprint 8 segment workspace is merged to `main`.
 
 **Definition of done:**
 
-- `/content-factory/segments` lists active and inactive segment mirrors.
-- Users with Content Factory access can create manual segment mirrors.
-- Users with Content Factory access can refresh segment population counts and create snapshots.
-- `/content-factory/segments/[id]` shows segment metadata, latest/previous snapshot comparison, and snapshot history.
-- Search, source, and active filters work without a page reload.
-- Snapshot comparison handles zero, one, and many snapshots safely.
+- `/content-factory/segments/analytics` loads segments, publications, bundles, target links, and manual metric evidence from existing APIs.
+- Segment usage rows show publication count, bundle count, role mix, bundle status mix, published count, metric evidence count, and latest activity.
+- Search, usage-state, and role filters work without a page reload.
+- The segment registry, sidebar, and header expose the analytics route.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
 
 ```bash
-cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
 cd frontend && npm run lint
 cd frontend && npm run build
 git diff --check
 ```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 48 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 138 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/segments/analytics`.
+- Local dev server smoke on `http://127.0.0.1:3008/content-factory/segments/analytics` returned HTTP 200 and compiled the route.
+- `git diff --check` passed.
+
+---
+
+# Previous Plan: Content Factory Sprint 8 Segment Workspace
+
+> **For agentic workers:** Sprint 8 is complete and merged. The implementation plan is `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`.
+
+**Goal:** Add a Content Factory segment registry and detail workspace for segment mirrors, population refreshes, and snapshot comparisons.
+
+**Implementation status:**
+
+- Implemented; automated verification passed; merged to `main` through PR #186.
 
 **Latest verification result:**
 

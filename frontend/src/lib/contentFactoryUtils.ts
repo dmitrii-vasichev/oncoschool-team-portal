@@ -1,11 +1,14 @@
 import type {
+  CFBundle,
   CFBundleStatus,
   CFExternalSegment,
+  CFMetricSnapshot,
   CFProductStream,
   CFPublicationSegmentTarget,
   CFPublicationUpdateRequest,
   CFPublicationStatus,
   CFRetroType,
+  CFSegmentRole,
   CFSegmentSnapshot,
   CFSegmentSource,
   MemberRole,
@@ -91,6 +94,20 @@ export const CF_PUBLICATION_STATUSES: CFPublicationStatus[] = [
   "failed",
   "cancelled",
 ];
+
+export const CF_SEGMENT_ROLES: CFSegmentRole[] = [
+  "target",
+  "exclusion",
+  "control",
+  "retargeting",
+];
+
+export const CF_SEGMENT_ROLE_LABELS: Record<CFSegmentRole, string> = {
+  target: "Target",
+  exclusion: "Exclusion",
+  control: "Control",
+  retargeting: "Retargeting",
+};
 
 type ContentFactoryAccessMember = {
   role: MemberRole | string;
@@ -233,6 +250,40 @@ type SegmentSnapshotLike = Pick<
   id?: string;
 };
 
+type SegmentUsageSegmentLike = SegmentLike & {
+  id: string;
+  name: string;
+};
+
+type SegmentUsagePublicationLike = {
+  id: string;
+  bundle_id: string;
+  title?: string | null;
+  status: CFPublicationStatus | string;
+  scheduled_at?: string | null;
+  actual_published_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+type SegmentUsageBundleLike = Pick<CFBundle, "id" | "name" | "status">;
+
+type SegmentUsageTargetLike = Pick<
+  CFPublicationSegmentTarget,
+  | "publication_id"
+  | "external_segment_id"
+  | "role"
+  | "expected_count"
+  | "actual_count_at_send"
+>;
+
+type SegmentUsageMetricLike = Pick<
+  CFMetricSnapshot,
+  "publication_id" | "captured_at"
+> & {
+  id?: string;
+};
+
 export type ContentFactorySegmentSummary = {
   total: number;
   active: number;
@@ -245,6 +296,73 @@ export type ContentFactorySegmentSnapshotComparison<TSnapshot> = {
   previous: TSnapshot | null;
   delta: number | null;
   deltaPercent: number | null;
+};
+
+export type ContentFactorySegmentUsageInput<
+  TSegment extends SegmentUsageSegmentLike,
+  TPublication extends SegmentUsagePublicationLike,
+  TBundle extends SegmentUsageBundleLike,
+  TTarget extends SegmentUsageTargetLike,
+  TMetric extends SegmentUsageMetricLike,
+> = {
+  segments: TSegment[];
+  publications: TPublication[];
+  bundles: TBundle[];
+  segmentTargetsByPublicationId: Record<string, TTarget[] | undefined>;
+  metricsByPublicationId: Record<string, TMetric[] | undefined>;
+};
+
+export type ContentFactorySegmentUsagePublication<
+  TPublication extends SegmentUsagePublicationLike,
+  TBundle extends SegmentUsageBundleLike,
+  TTarget extends SegmentUsageTargetLike,
+  TMetric extends SegmentUsageMetricLike,
+> = {
+  publication: TPublication;
+  bundle: TBundle | null;
+  target: TTarget;
+  metrics: TMetric[];
+  metricCount: number;
+  latestMetricAt: string | null;
+  latestActivityAt: string | null;
+};
+
+export type ContentFactorySegmentUsageRow<
+  TSegment extends SegmentUsageSegmentLike = SegmentUsageSegmentLike,
+  TPublication extends SegmentUsagePublicationLike = SegmentUsagePublicationLike,
+  TBundle extends SegmentUsageBundleLike = SegmentUsageBundleLike,
+  TTarget extends SegmentUsageTargetLike = SegmentUsageTargetLike,
+  TMetric extends SegmentUsageMetricLike = SegmentUsageMetricLike,
+> = {
+  segment: TSegment;
+  publications: Array<
+    ContentFactorySegmentUsagePublication<TPublication, TBundle, TTarget, TMetric>
+  >;
+  totalTargetLinks: number;
+  publicationCount: number;
+  bundleCount: number;
+  roleCounts: Record<CFSegmentRole, number>;
+  bundleStatusCounts: Record<CFBundleStatus, number>;
+  publishedPublicationCount: number;
+  metricEvidenceCount: number;
+  expectedCount: number;
+  actualCountAtSend: number;
+  latestActivityAt: string | null;
+};
+
+export type ContentFactorySegmentUsageSummary = {
+  totalSegments: number;
+  segmentsInUse: number;
+  unusedActiveSegments: number;
+  totalTargetLinks: number;
+  publishedPublications: number;
+  metricEvidenceCount: number;
+};
+
+export type ContentFactorySegmentUsageFilters = {
+  search?: string | null;
+  usage?: "all" | "used" | "unused";
+  role?: "all" | CFSegmentRole;
 };
 
 export function canAccessContentFactory(
@@ -273,6 +391,21 @@ function dateLabel(key: string): string {
     month: "long",
     weekday: "short",
   }).format(new Date(`${key}T00:00:00Z`));
+}
+
+function isoFromTime(time: number | null): string | null {
+  if (time === null) return null;
+  const iso = new Date(time).toISOString();
+  return iso.endsWith(".000Z") ? iso.replace(".000Z", "Z") : iso;
+}
+
+function latestIso(values: Array<string | null | undefined>): string | null {
+  const latest = values.reduce<number | null>((max, value) => {
+    const time = dateTime(value);
+    if (time === null) return max;
+    return max === null ? time : Math.max(max, time);
+  }, null);
+  return isoFromTime(latest);
 }
 
 function emptyStatusCounts<TStatus extends string>(
@@ -594,6 +727,193 @@ export function compareContentFactorySegmentSnapshots<
         ? null
         : (delta / previous.population_count) * 100,
   };
+}
+
+export function buildContentFactorySegmentUsageRows<
+  TSegment extends SegmentUsageSegmentLike,
+  TPublication extends SegmentUsagePublicationLike,
+  TBundle extends SegmentUsageBundleLike,
+  TTarget extends SegmentUsageTargetLike,
+  TMetric extends SegmentUsageMetricLike,
+>({
+  segments,
+  publications,
+  bundles,
+  segmentTargetsByPublicationId,
+  metricsByPublicationId,
+}: ContentFactorySegmentUsageInput<
+  TSegment,
+  TPublication,
+  TBundle,
+  TTarget,
+  TMetric
+>): Array<ContentFactorySegmentUsageRow<TSegment, TPublication, TBundle, TTarget, TMetric>> {
+  const bundlesById = new Map(bundles.map((bundle) => [bundle.id, bundle]));
+  const rowsBySegmentId = new Map<
+    string,
+    ContentFactorySegmentUsageRow<TSegment, TPublication, TBundle, TTarget, TMetric>
+  >(
+    segments.map((segment) => [
+      segment.id,
+      {
+        segment,
+        publications: [],
+        totalTargetLinks: 0,
+        publicationCount: 0,
+        bundleCount: 0,
+        roleCounts: emptyStatusCounts(CF_SEGMENT_ROLES),
+        bundleStatusCounts: emptyStatusCounts(CF_BUNDLE_STATUSES),
+        publishedPublicationCount: 0,
+        metricEvidenceCount: 0,
+        expectedCount: 0,
+        actualCountAtSend: 0,
+        latestActivityAt: null,
+      },
+    ]),
+  );
+
+  for (const publication of publications) {
+    const targets = segmentTargetsByPublicationId[publication.id] ?? [];
+    const metrics = metricsByPublicationId[publication.id] ?? [];
+    const latestMetricAt = latestIso(metrics.map((metric) => metric.captured_at));
+    const bundle = bundlesById.get(publication.bundle_id) ?? null;
+
+    for (const target of targets) {
+      const row = rowsBySegmentId.get(target.external_segment_id);
+      if (!row) continue;
+
+      const latestActivityAt = latestIso([
+        latestMetricAt,
+        publication.actual_published_at,
+        publication.scheduled_at,
+        publication.updated_at,
+        publication.created_at,
+      ]);
+
+      row.publications.push({
+        publication,
+        bundle,
+        target,
+        metrics,
+        metricCount: metrics.length,
+        latestMetricAt,
+        latestActivityAt,
+      });
+      row.totalTargetLinks += 1;
+      if (CF_SEGMENT_ROLES.includes(target.role)) {
+        row.roleCounts[target.role] += 1;
+      }
+      if (bundle && CF_BUNDLE_STATUSES.includes(bundle.status as CFBundleStatus)) {
+        row.bundleStatusCounts[bundle.status as CFBundleStatus] += 1;
+      }
+      row.expectedCount += target.expected_count ?? 0;
+      row.actualCountAtSend += target.actual_count_at_send ?? 0;
+      row.metricEvidenceCount += metrics.length;
+    }
+  }
+
+  for (const row of Array.from(rowsBySegmentId.values())) {
+    const publicationIds = new Set(
+      row.publications.map((item) => item.publication.id),
+    );
+    const bundleIds = new Set(
+      row.publications
+        .map((item) => item.bundle?.id ?? item.publication.bundle_id)
+        .filter(Boolean),
+    );
+    row.publicationCount = publicationIds.size;
+    row.bundleCount = bundleIds.size;
+    row.publishedPublicationCount = new Set(
+      row.publications
+        .filter((item) => item.publication.status === "published")
+        .map((item) => item.publication.id),
+    ).size;
+    row.latestActivityAt =
+      latestIso(row.publications.map((item) => item.latestMetricAt)) ??
+      latestIso(
+        row.publications.map((item) => item.publication.actual_published_at),
+      ) ??
+      latestIso(row.publications.map((item) => item.publication.scheduled_at)) ??
+      latestIso(row.publications.map((item) => item.publication.updated_at)) ??
+      latestIso(row.publications.map((item) => item.publication.created_at));
+    row.publications.sort(
+      (left, right) =>
+        (dateTime(right.latestActivityAt) ?? 0) -
+        (dateTime(left.latestActivityAt) ?? 0),
+    );
+  }
+
+  return Array.from(rowsBySegmentId.values()).sort((left, right) => {
+    if (right.totalTargetLinks !== left.totalTargetLinks) {
+      return right.totalTargetLinks - left.totalTargetLinks;
+    }
+    return left.segment.name.localeCompare(right.segment.name, "ru");
+  });
+}
+
+export function summarizeContentFactorySegmentUsage(
+  rows: ContentFactorySegmentUsageRow[],
+): ContentFactorySegmentUsageSummary {
+  const publishedPublicationIds = new Set<string>();
+
+  for (const row of rows) {
+    for (const item of row.publications) {
+      if (item.publication.status === "published") {
+        publishedPublicationIds.add(item.publication.id);
+      }
+    }
+  }
+
+  return {
+    totalSegments: rows.length,
+    segmentsInUse: rows.filter((row) => row.totalTargetLinks > 0).length,
+    unusedActiveSegments: rows.filter(
+      (row) => row.segment.is_active && row.totalTargetLinks === 0,
+    ).length,
+    totalTargetLinks: rows.reduce((total, row) => total + row.totalTargetLinks, 0),
+    publishedPublications: publishedPublicationIds.size,
+    metricEvidenceCount: rows.reduce(
+      (total, row) => total + row.metricEvidenceCount,
+      0,
+    ),
+  };
+}
+
+export function filterContentFactorySegmentUsageRows<
+  TRow extends ContentFactorySegmentUsageRow,
+>(
+  rows: TRow[],
+  filters: ContentFactorySegmentUsageFilters,
+): TRow[] {
+  const search = filters.search?.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (filters.usage === "used" && row.totalTargetLinks === 0) return false;
+    if (filters.usage === "unused" && row.totalTargetLinks > 0) return false;
+    if (
+      filters.role &&
+      filters.role !== "all" &&
+      row.roleCounts[filters.role] === 0
+    ) {
+      return false;
+    }
+    if (!search) return true;
+
+    const haystack = [
+      row.segment.name,
+      row.segment.source_segment_id,
+      row.segment.source,
+      row.segment.id,
+      ...row.publications.flatMap((item) => [
+        item.publication.title ?? "",
+        item.publication.id,
+        item.bundle?.name ?? "",
+      ]),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(search);
+  });
 }
 
 const REVIEW_QUEUE_META: Array<{

@@ -59,6 +59,10 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/calendar": { title: "Календарь контента", icon: CalendarDays },
   "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
   "/content-factory/segments": { title: "CF Segments", icon: Users },
+  "/content-factory/segments/analytics": {
+    title: "CF Segment Analytics",
+    icon: BarChart3,
+  },
   "/content-factory/review": { title: "CF Review", icon: ListChecks },
   "/content-factory/retros": { title: "CF Retros", icon: History },
   "/content-factory/references": { title: "CF References", icon: Settings2 },

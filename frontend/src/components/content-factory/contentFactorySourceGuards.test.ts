@@ -20,6 +20,7 @@ test("sidebar exposes content factory navigation", () => {
   assert.match(source, /href:\s*"\/content-factory\/dashboard"/);
   assert.match(source, /href:\s*"\/content-factory\/bundles"/);
   assert.match(source, /href:\s*"\/content-factory\/segments"/);
+  assert.match(source, /href:\s*"\/content-factory\/segments\/analytics"/);
   assert.match(source, /href:\s*"\/content-factory\/references"/);
   assert.match(source, /label:\s*"Content Factory"/);
 });
@@ -33,6 +34,7 @@ test("header knows content factory workspace routes", () => {
   assert.match(source, /\/content-factory\/publications/);
   assert.match(source, /\/content-factory\/review/);
   assert.match(source, /\/content-factory\/segments/);
+  assert.match(source, /\/content-factory\/segments\/analytics/);
   assert.match(source, /\/content-factory\/retros/);
   assert.match(source, /\/content-factory\/references/);
 });
@@ -266,4 +268,40 @@ test("segment workspace routes load registry detail and snapshot history", () =>
   assert.match(detailSource, /api\.getCFSegmentSnapshots/);
   assert.match(detailSource, /ContentFactorySegmentRefreshDialog/);
   assert.match(detailSource, /ContentFactorySegmentSnapshotList/);
+});
+
+test("segment analytics route loads usage evidence and is linked from registry", () => {
+  assert.equal(
+    sourceExists("app/content-factory/segments/analytics/page.tsx"),
+    true,
+  );
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactorySegmentUsageTable.tsx"),
+    true,
+  );
+
+  const registrySource = readSource("app/content-factory/segments/page.tsx");
+  const analyticsSource = readSource(
+    "app/content-factory/segments/analytics/page.tsx",
+  );
+  const tableSource = readSource(
+    "components/content-factory/ContentFactorySegmentUsageTable.tsx",
+  );
+
+  assert.match(registrySource, /\/content-factory\/segments\/analytics/);
+  assert.match(analyticsSource, /ContentFactorySegmentAnalyticsPage/);
+  assert.match(analyticsSource, /api\.getCFSegments\(\{ only_active: false \}\)/);
+  assert.match(analyticsSource, /api\.getCFPublications\(\{ limit: 500 \}\)/);
+  assert.match(analyticsSource, /api\.getCFBundles\(\{ limit: 500 \}\)/);
+  assert.match(analyticsSource, /api\.getCFPublicationSegmentTargets/);
+  assert.match(analyticsSource, /api\.getCFMetrics/);
+  assert.match(analyticsSource, /buildContentFactorySegmentUsageRows/);
+  assert.match(analyticsSource, /summarizeContentFactorySegmentUsage/);
+  assert.match(analyticsSource, /filterContentFactorySegmentUsageRows/);
+  assert.match(tableSource, /ContentFactorySegmentUsageTable/);
+  assert.match(tableSource, /\/content-factory\/segments\/\$\{row\.segment\.id\}/);
+  assert.match(
+    tableSource,
+    /\/content-factory\/publications\/\$\{item\.publication\.id\}/,
+  );
 });

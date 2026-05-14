@@ -10,10 +10,12 @@ const {
   CF_RETRO_TYPE_LABELS,
   CF_SEGMENT_SOURCE_LABELS,
   buildContentFactoryBundleParams,
+  buildContentFactorySegmentUsageRows,
   buildContentFactoryUtm,
   canAccessContentFactory,
   cleanContentFactoryPublicationUpdate,
   compareContentFactorySegmentSnapshots,
+  filterContentFactorySegmentUsageRows,
   filterContentFactoryPublications,
   filterContentFactorySegments,
   formatContentFactoryBundleCount,
@@ -28,6 +30,7 @@ const {
   getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
   summarizeContentFactorySegments,
+  summarizeContentFactorySegmentUsage,
   summarizeContentFactoryReferenceRecords,
   summarizeContentFactoryRetroSections,
   summarizeContentFactoryDashboard,
@@ -440,6 +443,268 @@ test("compareContentFactorySegmentSnapshots returns latest previous and delta", 
     delta: null,
     deltaPercent: null,
   });
+});
+
+test("buildContentFactorySegmentUsageRows aggregates publication bundle role and metric evidence", () => {
+  assert.equal(typeof buildContentFactorySegmentUsageRows, "function");
+
+  const rows = buildContentFactorySegmentUsageRows({
+    segments: [
+      {
+        id: "seg-used",
+        name: "Breast cancer survivors",
+        source_segment_id: "gc-001",
+        source: "getcourse",
+        is_active: true,
+        population_count: 120,
+      },
+      {
+        id: "seg-unused",
+        name: "Dormant webinars",
+        source_segment_id: "gc-002",
+        source: "getcourse",
+        is_active: true,
+        population_count: 40,
+      },
+    ],
+    publications: [
+      {
+        id: "pub-1",
+        bundle_id: "bundle-live",
+        title: "Breast webinar reminder",
+        status: "published",
+        scheduled_at: "2026-05-14T10:00:00Z",
+        actual_published_at: "2026-05-14T11:00:00Z",
+        updated_at: "2026-05-14T11:10:00Z",
+      },
+      {
+        id: "pub-2",
+        bundle_id: "bundle-production",
+        title: "VK follow-up",
+        status: "scheduled",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        actual_published_at: null,
+        updated_at: "2026-05-14T12:00:00Z",
+      },
+    ],
+    bundles: [
+      { id: "bundle-live", name: "May webinar", status: "live" },
+      { id: "bundle-production", name: "Follow-up", status: "production" },
+    ],
+    segmentTargetsByPublicationId: {
+      "pub-1": [
+        {
+          publication_id: "pub-1",
+          external_segment_id: "seg-used",
+          role: "target",
+          expected_count: 100,
+          actual_count_at_send: 90,
+        },
+      ],
+      "pub-2": [
+        {
+          publication_id: "pub-2",
+          external_segment_id: "seg-used",
+          role: "exclusion",
+          expected_count: 20,
+          actual_count_at_send: null,
+        },
+      ],
+    },
+    metricsByPublicationId: {
+      "pub-1": [
+        {
+          id: "metric-1",
+          publication_id: "pub-1",
+          captured_at: "2026-05-14T13:00:00Z",
+        },
+        {
+          id: "metric-2",
+          publication_id: "pub-1",
+          captured_at: "2026-05-15T12:00:00Z",
+        },
+      ],
+      "pub-2": [] as Array<{
+        id: string;
+        publication_id: string;
+        captured_at: string;
+      }>,
+    },
+  });
+
+  const used = rows.find((row) => row.segment.id === "seg-used");
+  assert.ok(used);
+  assert.equal(used.totalTargetLinks, 2);
+  assert.equal(used.publicationCount, 2);
+  assert.equal(used.bundleCount, 2);
+  assert.equal(used.roleCounts.target, 1);
+  assert.equal(used.roleCounts.exclusion, 1);
+  assert.equal(used.bundleStatusCounts.live, 1);
+  assert.equal(used.bundleStatusCounts.production, 1);
+  assert.equal(used.publishedPublicationCount, 1);
+  assert.equal(used.metricEvidenceCount, 2);
+  assert.equal(used.expectedCount, 120);
+  assert.equal(used.actualCountAtSend, 90);
+  assert.equal(used.latestActivityAt, "2026-05-15T12:00:00Z");
+  assert.deepEqual(
+    used.publications.map((item) => item.publication.id),
+    ["pub-2", "pub-1"],
+  );
+});
+
+test("summarizeContentFactorySegmentUsage counts unused active segments and unique published publications", () => {
+  assert.equal(typeof summarizeContentFactorySegmentUsage, "function");
+
+  const rows = buildContentFactorySegmentUsageRows({
+    segments: [
+      {
+        id: "seg-used",
+        name: "Survivors",
+        source_segment_id: "gc-001",
+        source: "getcourse",
+        is_active: true,
+      },
+      {
+        id: "seg-unused",
+        name: "Unused active",
+        source_segment_id: "gc-002",
+        source: "getcourse",
+        is_active: true,
+      },
+      {
+        id: "seg-inactive",
+        name: "Inactive unused",
+        source_segment_id: "gc-003",
+        source: "getcourse",
+        is_active: false,
+      },
+    ],
+    publications: [
+      {
+        id: "pub-1",
+        bundle_id: "bundle-1",
+        title: "Published post",
+        status: "published",
+        scheduled_at: null,
+        actual_published_at: "2026-05-14T10:00:00Z",
+      },
+    ],
+    bundles: [{ id: "bundle-1", name: "Bundle", status: "live" }],
+    segmentTargetsByPublicationId: {
+      "pub-1": [
+        {
+          publication_id: "pub-1",
+          external_segment_id: "seg-used",
+          role: "target",
+          expected_count: null,
+          actual_count_at_send: null,
+        },
+      ],
+    },
+    metricsByPublicationId: {
+      "pub-1": [
+        {
+          id: "metric-1",
+          publication_id: "pub-1",
+          captured_at: "2026-05-14T12:00:00Z",
+        },
+      ],
+    } as Record<string, Array<{
+      id: string;
+      publication_id: string;
+      captured_at: string;
+    }>>,
+  });
+
+  assert.deepEqual(summarizeContentFactorySegmentUsage(rows), {
+    totalSegments: 3,
+    segmentsInUse: 1,
+    unusedActiveSegments: 1,
+    totalTargetLinks: 1,
+    publishedPublications: 1,
+    metricEvidenceCount: 1,
+  });
+});
+
+test("filterContentFactorySegmentUsageRows combines search usage and role filters", () => {
+  assert.equal(typeof filterContentFactorySegmentUsageRows, "function");
+
+  const rows = buildContentFactorySegmentUsageRows({
+    segments: [
+      {
+        id: "seg-target",
+        name: "Survivors",
+        source_segment_id: "gc-001",
+        source: "getcourse",
+        is_active: true,
+      },
+      {
+        id: "seg-exclusion",
+        name: "Students",
+        source_segment_id: "gc-002",
+        source: "getcourse",
+        is_active: true,
+      },
+      {
+        id: "seg-unused",
+        name: "Unused",
+        source_segment_id: "gc-003",
+        source: "getcourse",
+        is_active: true,
+      },
+    ],
+    publications: [
+      {
+        id: "pub-1",
+        bundle_id: "bundle-1",
+        title: "Survivor webinar",
+        status: "scheduled",
+        scheduled_at: "2026-05-14T10:00:00Z",
+        actual_published_at: null,
+      },
+    ],
+    bundles: [{ id: "bundle-1", name: "Bundle", status: "production" }],
+    segmentTargetsByPublicationId: {
+      "pub-1": [
+        {
+          publication_id: "pub-1",
+          external_segment_id: "seg-target",
+          role: "target",
+          expected_count: null,
+          actual_count_at_send: null,
+        },
+        {
+          publication_id: "pub-1",
+          external_segment_id: "seg-exclusion",
+          role: "exclusion",
+          expected_count: null,
+          actual_count_at_send: null,
+        },
+      ],
+    },
+    metricsByPublicationId: {} as Record<string, Array<{
+      id: string;
+      publication_id: string;
+      captured_at: string;
+    }>>,
+  });
+
+  assert.deepEqual(
+    filterContentFactorySegmentUsageRows(rows, {
+      search: "survivor",
+      usage: "used",
+      role: "target",
+    }).map((row) => row.segment.id),
+    ["seg-target"],
+  );
+  assert.deepEqual(
+    filterContentFactorySegmentUsageRows(rows, {
+      search: "",
+      usage: "unused",
+      role: "all",
+    }).map((row) => row.segment.id),
+    ["seg-unused"],
+  );
 });
 
 test("retro labels expose retrospective types", () => {
