@@ -78,6 +78,21 @@ test("content factory internal navigation exposes Russian sections", () => {
   assert.match(uiSource, /Справка/);
 });
 
+test("content factory chrome avoids repeated module titles", () => {
+  const navSource = readSource(
+    "components/content-factory/ContentFactoryWorkspaceNav.tsx",
+  );
+  const dashboardSource = readSource("app/content-factory/dashboard/page.tsx");
+
+  assert.doesNotMatch(navSource, /CONTENT_FACTORY_TITLE/);
+  assert.doesNotMatch(navSource, /Единое рабочее пространство/);
+  assert.match(dashboardSource, /Обзор/);
+  assert.doesNotMatch(
+    dashboardSource,
+    /<h1[\s\S]*?Контент-фабрика[\s\S]*?<\/h1>/,
+  );
+});
+
 test("content factory help route explains the workspace", () => {
   assert.equal(sourceExists("app/content-factory/help/page.tsx"), true);
 

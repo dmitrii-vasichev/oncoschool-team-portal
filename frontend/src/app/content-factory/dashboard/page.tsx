@@ -234,7 +234,7 @@ export default function ContentFactoryDashboardPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Контент-фабрика
+              Обзор
             </h1>
             <p className="text-sm text-muted-foreground">
               Статусы, ближайшие публикации и производственные задержки
