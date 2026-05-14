@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 10 Effectiveness Analytics
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/effectiveness` and confirm summary cards load.
+2. Confirm rows show publication, campaign, platform, format, objective, status, metric state, latest metric, metric count, and target evidence.
+3. Confirm search matches publication title, campaign name, platform name, format name, objective, and metric name.
+4. Confirm objective filtering works without a page reload.
+5. Confirm metric-state filtering works for fresh, stale, and missing evidence.
+6. Confirm platform filtering works without a page reload.
+7. Open publication and campaign links from the effectiveness table.
+8. Confirm the internal Content Factory navigation and header expose `Эффективность`.
+9. Confirm partial metric/target evidence failures show a clear warning while available rows still render.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 9.5 UX Consolidation
 
 ### Automated

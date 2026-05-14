@@ -1,5 +1,33 @@
 # Status
 
+## Content Factory Sprint 10 Effectiveness Analytics
+
+- Current phase: planning pack created on branch `codex/content-factory-sprint-10-effectiveness`
+- Source: user approval on 2026-05-14, preserved research, restored Content Factory design doc, Sprint 1-9.5 implementation, and user UX feedback after navigation consolidation
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-10-effectiveness-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-10-effectiveness.md`
+- Scope: objective-aware effectiveness page, publication metric evidence aggregation, metric freshness states, filters, navigation, and durable docs
+- Latest progress:
+  - Confirmed Sprint 9.5 UX consolidation is merged to `main`.
+  - Confirmed follow-up fixes for repeated Content Factory titles and internal nav scroll controls are merged to `main`.
+  - Confirmed backlog points to Sprint 10 outcome and metrics analytics after UX consolidation.
+  - Created branch `codex/content-factory-sprint-10-effectiveness`.
+  - Wrote Sprint 10 design and implementation plan.
+  - Made Sprint 10 the active repository plan.
+- Key decisions:
+  - Keep Sprint 10 frontend-heavy and reuse existing endpoints before adding a backend aggregate endpoint.
+  - Name the new workspace `Эффективность`.
+  - Infer objective from `CFFormat.default_objective` and fall back to `unknown`.
+  - Treat metric snapshots as evidence with freshness and confidence, not as a universal reaction-based score.
+  - Use an 8-day freshness window so the 7-day metric window has one operational day of slack.
+- Next actions:
+  - Add failing helper and source guard tests.
+  - Implement effectiveness helpers, table, route, and navigation.
+  - Run frontend verification and push Sprint 10.
+- Latest verification:
+  - Not run yet for Sprint 10 implementation.
+
 ## Content Factory Sprint 9.5 UX Consolidation
 
 - Current phase: implemented and verified on branch `codex/content-factory-ux-consolidation`
@@ -19,6 +47,8 @@
   - Added `/content-factory/help` with workflow, glossary, section, manual-data, and integration notes.
   - Reworked retrospective create/edit and detail UI to use readable Russian fields instead of raw JSON labels.
   - Replaced the most visible English/system labels across campaigns, publications, review queue, audiences, audience analytics, retrospectives, references, UTM, metrics, and version history.
+  - Follow-up fix: reduced repeated `Контент-фабрика` titles in the workspace chrome.
+  - Follow-up fix: replaced the two-line internal navigation with a single-line scroll rail, visible chevron controls, edge fades, and active-section auto-scroll.
 - Key decisions:
   - Do UX consolidation before Sprint 10 outcome analytics.
   - Keep backend contracts unchanged and translate only user-facing interface language.

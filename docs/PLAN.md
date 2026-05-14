@@ -1,4 +1,60 @@
-# Active Plan: Content Factory Sprint 9.5 UX Consolidation
+# Active Plan: Content Factory Sprint 10 Effectiveness Analytics
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-10-effectiveness.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Build an objective-aware effectiveness workspace that turns Content Factory publication metric snapshots into a practical operating view.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-10-effectiveness-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-10-effectiveness.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add pure effectiveness helpers for objective inference, metric freshness, summary counts, and filters.
+2. Add source guards for the new `/content-factory/effectiveness` route and navigation.
+3. Build a compact `Эффективность` page using existing publications, bundles, platforms, formats, segment targets, and metric snapshots.
+4. Add the section to internal Content Factory navigation, header metadata, and help.
+5. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Planning pack created on branch `codex/content-factory-sprint-10-effectiveness`.
+- Sprint 1 through Sprint 9.5 work is merged to `main`.
+- Sprint 9.5 follow-up UX fixes for repeated titles and internal nav scroll controls are merged to `main`.
+
+**Definition of done:**
+
+- `/content-factory/effectiveness` lists publication effectiveness rows with campaign, platform, format, objective, metric state, latest metric, target evidence, and detail links.
+- The page shows summary cards for analyzed rows, published rows, rows with evidence, rows without evidence, and stale evidence.
+- Search, objective, metric-state, and platform filters work without a page reload.
+- Per-publication metric/target request failures show partial evidence instead of blanking the page.
+- Internal Content Factory navigation and header expose `Эффективность`.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not run yet for Sprint 10 implementation.
+
+---
+
+# Previous Plan: Content Factory Sprint 9.5 UX Consolidation
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-ux-consolidation.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 

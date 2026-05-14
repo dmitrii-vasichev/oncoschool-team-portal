@@ -5,10 +5,11 @@
 ### Next
 
 - Run authenticated manual QA across the consolidated Content Factory workspace.
-- Build Sprint 10 outcome and metrics analytics after UX consolidation is merged.
+- Build Sprint 10 effectiveness analytics using existing publication metric snapshots.
 
 ### Later
 
+- Add a backend aggregate endpoint for effectiveness analytics if browser-side fan-out becomes slow.
 - Add backend segment update/deactivate/delete endpoints if operational use shows they are needed.
 - Explore publishing and metric API integrations after the manual workflow is usable.
 - Keep the preserved deep research at `docs/content-factory-market-context-report.md` and restored design at `docs/content-factory-design.md` as planning inputs for later slices.
