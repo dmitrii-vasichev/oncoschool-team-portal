@@ -24,7 +24,7 @@
 
 **Implementation status:**
 
-- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-9-segment-analytics`.
+- Implemented; automated verification passed; merged to `main` through PR #187.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.
@@ -60,6 +60,7 @@ git diff --check
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
 - `cd frontend && npm run build` passed, including `/content-factory/segments/analytics`.
 - Local dev server smoke on `http://127.0.0.1:3008/content-factory/segments/analytics` returned HTTP 200 and compiled the route.
+- Production smoke passed after merge: `https://task-manager-oncoschool.vercel.app/content-factory/segments/analytics` returned HTTP 200, `/api/auth/me` returned the expected unauthenticated HTTP 401, and Railway `/health` returned HTTP 200.
 - `git diff --check` passed.
 
 ---

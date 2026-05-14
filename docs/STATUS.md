@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 9 Segment Usage Analytics
 
-- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-9-segment-analytics`
+- Current phase: implemented; automated verification passed; merged to `main` through PR #187
 - Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-8 frontend workspace
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-9-segment-analytics-design.md`
@@ -23,14 +23,18 @@
   - Added segment analytics navigation in the segment registry, sidebar, and header.
   - Ran Sprint 9 frontend verification successfully.
   - Ran a local dev server smoke for `/content-factory/segments/analytics`.
+  - Committed and pushed Sprint 9 to `origin/codex/content-factory-sprint-9-segment-analytics`.
+  - Opened PR #187 and merged it into `main`.
+  - Confirmed production Vercel route `/content-factory/segments/analytics` returns HTTP 200.
+  - Confirmed production frontend auth proxy returns HTTP 401 for unauthenticated `/api/auth/me`.
+  - Confirmed Railway backend health returns HTTP 200 after deployment completed.
 - Key decisions:
   - Keep Sprint 9 frontend-heavy and reuse existing endpoints.
   - Treat metric snapshots as evidence count and freshness signal, not a numeric performance rollup.
   - Defer backend aggregate endpoint until browser-side fan-out becomes a real operational problem.
 - Next actions:
-  - Commit and push Sprint 9.
-  - Open a PR for review and merge when checks pass.
   - Run authenticated manual QA against real segment usage data when useful.
+  - Choose the next Content Factory slice from the restored design and current backlog.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 48 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 138 tests, with existing Node module-type warnings.
@@ -38,6 +42,7 @@
   - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
   - `cd frontend && npm run build` passed, including `/content-factory/segments/analytics`.
   - Local dev server smoke on `http://127.0.0.1:3008/content-factory/segments/analytics` returned HTTP 200 and compiled the route.
+  - Production smoke passed after merge: `https://task-manager-oncoschool.vercel.app/content-factory/segments/analytics` returned HTTP 200, `/api/auth/me` returned the expected unauthenticated HTTP 401, and Railway `/health` returned HTTP 200.
   - `git diff --check` passed.
 
 ## Content Factory Sprint 8 Segment Workspace

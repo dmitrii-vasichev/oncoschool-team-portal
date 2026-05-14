@@ -4,11 +4,11 @@
 
 ### Active
 
-- Build Sprint 9 segment usage analytics across publications, bundles, targeting roles, and manual metric evidence.
+- Run authenticated manual QA across Content Factory segment registry, segment detail, and segment usage analytics with real production data.
 
 ### Next
 
-- Run authenticated manual QA across Content Factory segment registry, segment detail, and segment usage analytics with real production data.
+- Choose the next Content Factory slice from the restored design and current product gaps.
 
 ### Later
 
