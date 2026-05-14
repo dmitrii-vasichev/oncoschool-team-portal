@@ -49,7 +49,7 @@ export function ContentFactoryMetricHistory({
       <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
+          <h2 className="text-sm font-semibold text-foreground">Метрики</h2>
           <span className="text-xs text-muted-foreground">{metrics.length}</span>
         </div>
         <Button
@@ -59,7 +59,7 @@ export function ContentFactoryMetricHistory({
           onClick={() => setDialogOpen(true)}
         >
           <Plus className="h-3.5 w-3.5" />
-          Add metric
+          Добавить метрику
         </Button>
       </div>
 
@@ -77,7 +77,7 @@ export function ContentFactoryMetricHistory({
                     {metric.metric_name}
                   </p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {metric.window} · {metric.source} · confidence {metric.confidence}
+                    {metric.window} · {metric.source} · доверие {metric.confidence}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-foreground">
@@ -92,7 +92,7 @@ export function ContentFactoryMetricHistory({
                 <span>
                   {metric.captured_by_id
                     ? memberNames.get(metric.captured_by_id) ?? "Автор"
-                    : "System"}
+                    : "Система"}
                 </span>
                 {metric.source_method && <span>{metric.source_method}</span>}
               </div>

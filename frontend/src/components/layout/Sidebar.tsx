@@ -15,15 +15,12 @@ import {
   Megaphone,
   Lightbulb,
   FolderKanban,
-  ListChecks,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
   Menu,
   GraduationCap,
-  History,
   Search,
-  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -108,50 +105,8 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/content-factory/dashboard",
-    label: "Content Factory",
+    label: "Контент-фабрика",
     icon: Factory,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/bundles",
-    label: "CF Bundles",
-    icon: FolderKanban,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/segments",
-    label: "CF Segments",
-    icon: Users,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/segments/analytics",
-    label: "CF Segment Analytics",
-    icon: BarChart3,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/review",
-    label: "CF Review",
-    icon: ListChecks,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/retros",
-    label: "CF Retros",
-    icon: History,
-    contentFactoryAccess: true,
-    section: "content",
-  },
-  {
-    href: "/content-factory/references",
-    label: "CF References",
-    icon: Settings2,
     contentFactoryAccess: true,
     section: "content",
   },
@@ -226,13 +181,6 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
 
   function isActive(href: string) {
     if (href === "/") return pathname === "/";
-    if (href === "/content-factory/segments") {
-      return (
-        pathname === href ||
-        (pathname.startsWith(`${href}/`) &&
-          !pathname.startsWith("/content-factory/segments/analytics"))
-      );
-    }
     return pathname.startsWith(href);
   }
 

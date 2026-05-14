@@ -42,11 +42,11 @@ test("content factory labels expose production wording", () => {
 });
 
 test("reference table labels expose Sprint 7 dictionaries", () => {
-  assert.equal(CF_REFERENCE_TABLE_LABELS?.platforms, "Platforms");
-  assert.equal(CF_REFERENCE_TABLE_LABELS?.formats, "Formats");
-  assert.equal(CF_REFERENCE_TABLE_LABELS?.rubrics, "Rubrics");
-  assert.equal(CF_REFERENCE_TABLE_LABELS?.nosologies, "Nosologies");
-  assert.equal(CF_REFERENCE_TABLE_LABELS?.funnel_templates, "Funnel templates");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.platforms, "Площадки");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.formats, "Форматы");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.rubrics, "Рубрики");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.nosologies, "Нозологии");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.funnel_templates, "Шаблоны кампаний");
 });
 
 test("segment source labels expose Sprint 8 segment sources", () => {
@@ -213,8 +213,9 @@ test("cleanContentFactoryPublicationUpdate trims strings and nulls blank optiona
 });
 
 test("Content Factory count labels use expected plural forms", () => {
-  assert.equal(formatContentFactoryBundleCount(1), "1 bundle");
-  assert.equal(formatContentFactoryBundleCount(2), "2 bundles");
+  assert.equal(formatContentFactoryBundleCount(1), "1 кампания");
+  assert.equal(formatContentFactoryBundleCount(2), "2 кампании");
+  assert.equal(formatContentFactoryBundleCount(5), "5 кампаний");
   assert.equal(formatContentFactoryPublicationCount(5), "5 публикаций");
   assert.equal(formatContentFactoryPublicationCount(21), "21 публикация");
 });
@@ -708,10 +709,10 @@ test("filterContentFactorySegmentUsageRows combines search usage and role filter
 });
 
 test("retro labels expose retrospective types", () => {
-  assert.equal(CF_RETRO_TYPE_LABELS.weekly, "Weekly");
-  assert.equal(CF_RETRO_TYPE_LABELS.monthly, "Monthly");
-  assert.equal(CF_RETRO_TYPE_LABELS.bundle, "Bundle");
-  assert.equal(CF_RETRO_TYPE_LABELS.adhoc, "Ad-hoc");
+  assert.equal(CF_RETRO_TYPE_LABELS.weekly, "Еженедельная");
+  assert.equal(CF_RETRO_TYPE_LABELS.monthly, "Ежемесячная");
+  assert.equal(CF_RETRO_TYPE_LABELS.bundle, "По кампании");
+  assert.equal(CF_RETRO_TYPE_LABELS.adhoc, "Разовая");
 });
 
 test("formatContentFactoryRetroPeriod renders period range", () => {
@@ -731,7 +732,7 @@ test("getContentFactoryRetroTitle combines type and period", () => {
       period_start: "2026-05-01",
       period_end: "2026-05-31",
     }),
-    "Bundle · 01 мая 2026 — 31 мая 2026",
+    "По кампании · 01 мая 2026 — 31 мая 2026",
   );
 });
 

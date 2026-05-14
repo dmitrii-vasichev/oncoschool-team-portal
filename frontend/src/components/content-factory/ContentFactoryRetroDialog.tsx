@@ -46,37 +46,61 @@ function toDateInputValue(value: string | null | undefined): string {
   return date.toISOString().slice(0, 10);
 }
 
-function toJsonText(value: unknown): string {
-  return JSON.stringify(value ?? {}, null, 2);
-}
-
-function toArrayJsonText(value: unknown): string {
-  return JSON.stringify(Array.isArray(value) ? value : [], null, 2);
-}
-
 function nullableText(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
 }
 
-function isJsonObject(value: unknown): value is CFJsonObject {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+function readableValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
 }
 
-function parseJsonObject(label: string, value: string): CFJsonObject {
-  const parsed = JSON.parse(value || "{}") as unknown;
-  if (!isJsonObject(parsed)) {
-    throw new Error(`${label} должен быть JSON object`);
+function linesFromValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => readableValue(item).trim())
+      .filter(Boolean);
   }
-  return parsed;
+  if (value && typeof value === "object") {
+    const objectValue = value as Record<string, unknown>;
+    const notes = objectValue.notes;
+    if (Array.isArray(notes)) {
+      return notes
+        .map((item) => readableValue(item).trim())
+        .filter(Boolean);
+    }
+    return Object.entries(objectValue)
+      .flatMap(([key, item]) => {
+        if (Array.isArray(item)) {
+          return item.map((entry) => `${key}: ${readableValue(entry)}`);
+        }
+        const text = readableValue(item);
+        return text ? [`${key}: ${text}`] : [];
+      })
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  const text = readableValue(value).trim();
+  return text ? [text] : [];
 }
 
-function parseJsonArray(label: string, value: string): unknown[] {
-  const parsed = JSON.parse(value || "[]") as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${label} должен быть JSON array`);
-  }
-  return parsed;
+function textFromValue(value: unknown): string {
+  return linesFromValue(value).join("\n");
+}
+
+function linesFromText(value: string): string[] {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function objectFromText(value: string): CFJsonObject {
+  const notes = linesFromText(value);
+  return notes.length > 0 ? { notes } : {};
 }
 
 export function ContentFactoryRetroDialog({
@@ -101,11 +125,11 @@ export function ContentFactoryRetroDialog({
   const [retroType, setRetroType] = useState<CFRetroType>("weekly");
   const [bundleId, setBundleId] = useState("none");
   const [facilitatorId, setFacilitatorId] = useState("");
-  const [bestByObjectiveText, setBestByObjectiveText] = useState("{}");
-  const [brokenText, setBrokenText] = useState("[]");
-  const [learningsText, setLearningsText] = useState("{}");
-  const [decisionsText, setDecisionsText] = useState("{}");
-  const [actionsText, setActionsText] = useState("[]");
+  const [bestByObjectiveText, setBestByObjectiveText] = useState("");
+  const [brokenText, setBrokenText] = useState("");
+  const [learningsText, setLearningsText] = useState("");
+  const [decisionsText, setDecisionsText] = useState("");
+  const [actionsText, setActionsText] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,11 +151,11 @@ export function ContentFactoryRetroDialog({
     setRetroType(retro?.retro_type ?? "weekly");
     setBundleId(retro?.bundle_id ?? "none");
     setFacilitatorId(retro?.facilitator_id ?? user?.id ?? activeMembers[0]?.id ?? "");
-    setBestByObjectiveText(toJsonText(retro?.best_by_objective));
-    setBrokenText(toArrayJsonText(retro?.broken));
-    setLearningsText(toJsonText(retro?.learnings));
-    setDecisionsText(toJsonText(retro?.decisions));
-    setActionsText(toArrayJsonText(retro?.actions));
+    setBestByObjectiveText(textFromValue(retro?.best_by_objective));
+    setBrokenText(textFromValue(retro?.broken));
+    setLearningsText(textFromValue(retro?.learnings));
+    setDecisionsText(textFromValue(retro?.decisions));
+    setActionsText(textFromValue(retro?.actions));
     setNotes(retro?.notes ?? "");
     setError(null);
   }, [activeMembers, open, retro, user?.id]);
@@ -152,21 +176,11 @@ export function ContentFactoryRetroDialog({
       return;
     }
 
-    let best_by_objective: CFJsonObject;
-    let broken: unknown[];
-    let learnings: CFJsonObject;
-    let decisions: CFJsonObject;
-    let actions: unknown[];
-    try {
-      best_by_objective = parseJsonObject("best_by_objective", bestByObjectiveText);
-      broken = parseJsonArray("broken", brokenText);
-      learnings = parseJsonObject("learnings", learningsText);
-      decisions = parseJsonObject("decisions", decisionsText);
-      actions = parseJsonArray("actions", actionsText);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Некорректный JSON");
-      return;
-    }
+    const best_by_objective = objectFromText(bestByObjectiveText);
+    const broken = linesFromText(brokenText);
+    const learnings = objectFromText(learningsText);
+    const decisions = objectFromText(decisionsText);
+    const actions = linesFromText(actionsText);
 
     setSaving(true);
     setError(null);
@@ -210,7 +224,7 @@ export function ContentFactoryRetroDialog({
       <DialogContent className="max-h-[calc(100vh-1.5rem)] overflow-y-auto sm:max-w-[760px]">
         <DialogHeader>
           <DialogTitle className="text-lg">
-            {editing ? "Редактировать ретро" : "Новая ретроспектива"}
+            {editing ? "Редактировать ретроспективу" : "Новая ретроспектива"}
           </DialogTitle>
           <DialogDescription>
             Зафиксируйте лучшие связки, сбои, решения и следующие действия команды.
@@ -245,7 +259,7 @@ export function ContentFactoryRetroDialog({
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label>Тип</Label>
+              <Label>Формат ретроспективы</Label>
               <Select
                 value={retroType}
                 onValueChange={(value) => setRetroType(value as CFRetroType)}
@@ -264,13 +278,13 @@ export function ContentFactoryRetroDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Bundle</Label>
+              <Label>Кампания</Label>
               <Select value={bundleId} onValueChange={setBundleId} disabled={saving || editing}>
                 <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
-                  <SelectItem value="none">Без bundle</SelectItem>
+                  <SelectItem value="none">Без кампании</SelectItem>
                   {activeBundles.map((bundle) => (
                     <SelectItem key={bundle.id} value={bundle.id}>
                       {bundle.name}
@@ -301,37 +315,40 @@ export function ContentFactoryRetroDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-retro-best-by-objective">best_by_objective</Label>
+            <Label htmlFor="cf-retro-best-by-objective">Что сработало</Label>
             <Textarea
               id="cf-retro-best-by-objective"
               value={bestByObjectiveText}
               onChange={(event) => setBestByObjectiveText(event.target.value)}
+              placeholder="Одна мысль на строку: удачные связки, каналы, форматы, офферы, решения команды."
               rows={5}
-              className="min-h-[120px] resize-y border-border/70 bg-muted/20 font-mono text-xs"
+              className="min-h-[120px] resize-y border-border/70 bg-muted/20 text-sm"
               disabled={saving}
             />
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-retro-broken">broken</Label>
+              <Label htmlFor="cf-retro-broken">Что сломалось</Label>
               <Textarea
                 id="cf-retro-broken"
                 value={brokenText}
                 onChange={(event) => setBrokenText(event.target.value)}
+                placeholder="Сбои, задержки, спорные места, всё, что мешало выпуску."
                 rows={5}
-                className="min-h-[120px] resize-y border-border/70 bg-muted/20 font-mono text-xs"
+                className="min-h-[120px] resize-y border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cf-retro-actions">actions</Label>
+              <Label htmlFor="cf-retro-actions">Следующие действия</Label>
               <Textarea
                 id="cf-retro-actions"
                 value={actionsText}
                 onChange={(event) => setActionsText(event.target.value)}
+                placeholder="Конкретные шаги: кто, что делает, что проверяем дальше."
                 rows={5}
-                className="min-h-[120px] resize-y border-border/70 bg-muted/20 font-mono text-xs"
+                className="min-h-[120px] resize-y border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
@@ -339,35 +356,38 @@ export function ContentFactoryRetroDialog({
 
           <div className="grid gap-3 lg:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-retro-learnings">learnings</Label>
+              <Label htmlFor="cf-retro-learnings">Выводы</Label>
               <Textarea
                 id="cf-retro-learnings"
                 value={learningsText}
                 onChange={(event) => setLearningsText(event.target.value)}
+                placeholder="Что поняли про аудиторию, контент, процесс или измерение результата."
                 rows={5}
-                className="min-h-[120px] resize-y border-border/70 bg-muted/20 font-mono text-xs"
+                className="min-h-[120px] resize-y border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cf-retro-decisions">decisions</Label>
+              <Label htmlFor="cf-retro-decisions">Решения</Label>
               <Textarea
                 id="cf-retro-decisions"
                 value={decisionsText}
                 onChange={(event) => setDecisionsText(event.target.value)}
+                placeholder="Что меняем в правилах, шаблонах, сроках, каналах или ответственности."
                 rows={5}
-                className="min-h-[120px] resize-y border-border/70 bg-muted/20 font-mono text-xs"
+                className="min-h-[120px] resize-y border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-retro-notes">Notes</Label>
+            <Label htmlFor="cf-retro-notes">Дополнительные заметки</Label>
             <Textarea
               id="cf-retro-notes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
+              placeholder="Контекст, который важно сохранить целиком."
               rows={3}
               className="min-h-[84px] resize-y border-border/70 bg-muted/20"
               disabled={saving}

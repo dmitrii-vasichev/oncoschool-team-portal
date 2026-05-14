@@ -18,32 +18,79 @@ test("sidebar exposes content factory navigation", () => {
   const source = readSource("components/layout/Sidebar.tsx");
 
   assert.match(source, /href:\s*"\/content-factory\/dashboard"/);
-  assert.match(source, /href:\s*"\/content-factory\/bundles"/);
-  assert.match(source, /href:\s*"\/content-factory\/segments"/);
-  assert.match(source, /href:\s*"\/content-factory\/segments\/analytics"/);
-  assert.match(source, /href:\s*"\/content-factory\/references"/);
-  assert.match(source, /label:\s*"Content Factory"/);
+  assert.match(source, /label:\s*"Контент-фабрика"/);
+  assert.doesNotMatch(source, /label:\s*"CF Bundles"/);
+  assert.doesNotMatch(source, /label:\s*"CF Segments"/);
+  assert.doesNotMatch(source, /label:\s*"CF Segment Analytics"/);
+  assert.doesNotMatch(source, /label:\s*"CF Review"/);
+  assert.doesNotMatch(source, /label:\s*"CF Retros"/);
+  assert.doesNotMatch(source, /label:\s*"CF References"/);
 });
 
 test("header knows content factory workspace routes", () => {
   const source = readSource("components/layout/Header.tsx");
 
-  assert.match(source, /\/content-factory\/dashboard/);
-  assert.match(source, /\/content-factory\/calendar/);
-  assert.match(source, /\/content-factory\/bundles/);
-  assert.match(source, /\/content-factory\/publications/);
-  assert.match(source, /\/content-factory\/review/);
-  assert.match(source, /\/content-factory\/segments/);
-  assert.match(source, /\/content-factory\/segments\/analytics/);
-  assert.match(source, /\/content-factory\/retros/);
-  assert.match(source, /\/content-factory\/references/);
+  assert.match(source, /Контент-фабрика/);
+  assert.match(source, /Календарь/);
+  assert.match(source, /Кампании/);
+  assert.match(source, /Публикация/);
+  assert.match(source, /Очередь проверки/);
+  assert.match(source, /Аудитории/);
+  assert.match(source, /Аналитика аудиторий/);
+  assert.match(source, /Ретроспективы/);
+  assert.match(source, /Справочники/);
+  assert.match(source, /Справка/);
+  assert.doesNotMatch(source, /CF Bundles/);
+  assert.doesNotMatch(source, /CF Segments/);
+  assert.doesNotMatch(source, /CF Segment Analytics/);
 });
 
 test("content factory layout uses dedicated access guard", () => {
   const source = readSource("app/content-factory/layout.tsx");
 
   assert.match(source, /ContentFactoryGuard/);
+  assert.match(source, /ContentFactoryWorkspaceNav/);
   assert.doesNotMatch(source, /useContentAccess/);
+});
+
+test("content factory internal navigation exposes Russian sections", () => {
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryWorkspaceNav.tsx"),
+    true,
+  );
+  assert.equal(sourceExists("lib/contentFactoryUi.ts"), true);
+
+  const navSource = readSource(
+    "components/content-factory/ContentFactoryWorkspaceNav.tsx",
+  );
+  const uiSource = readSource("lib/contentFactoryUi.ts");
+
+  assert.match(navSource, /CONTENT_FACTORY_SECTIONS/);
+  assert.match(uiSource, /Контент-фабрика/);
+  assert.match(uiSource, /Обзор/);
+  assert.match(uiSource, /Календарь/);
+  assert.match(uiSource, /Кампании/);
+  assert.match(uiSource, /Очередь проверки/);
+  assert.match(uiSource, /Аудитории/);
+  assert.match(uiSource, /Аналитика аудиторий/);
+  assert.match(uiSource, /Ретроспективы/);
+  assert.match(uiSource, /Справочники/);
+  assert.match(uiSource, /Справка/);
+});
+
+test("content factory help route explains the workspace", () => {
+  assert.equal(sourceExists("app/content-factory/help/page.tsx"), true);
+
+  const source = readSource("app/content-factory/help/page.tsx");
+
+  assert.match(source, /ContentFactoryHelpPage/);
+  assert.match(source, /Что такое Контент-фабрика/);
+  assert.match(source, /Кампания/);
+  assert.match(source, /Публикация/);
+  assert.match(source, /Аудитория/);
+  assert.match(source, /Ретроспектива/);
+  assert.match(source, /ручн/);
+  assert.match(source, /интеграц/);
 });
 
 test("dashboard and calendar routes exist", () => {
@@ -148,10 +195,18 @@ test("retro dialog exposes create and update fields", () => {
 
   assert.match(source, /api\.createCFRetro/);
   assert.match(source, /api\.updateCFRetro/);
-  assert.match(source, /best_by_objective/);
-  assert.match(source, /learnings/);
-  assert.match(source, /decisions/);
-  assert.match(source, /actions/);
+  assert.match(source, /Что сработало/);
+  assert.match(source, /Что сломалось/);
+  assert.match(source, /Выводы/);
+  assert.match(source, /Решения/);
+  assert.match(source, /Следующие действия/);
+  assert.doesNotMatch(source, />best_by_objective</);
+  assert.doesNotMatch(source, />broken</);
+  assert.doesNotMatch(source, />learnings</);
+  assert.doesNotMatch(source, />decisions</);
+  assert.doesNotMatch(source, />actions</);
+  assert.doesNotMatch(source, /JSON object/);
+  assert.doesNotMatch(source, /JSON array/);
 });
 
 test("retros route lists retro cards and opens create dialog", () => {
@@ -169,6 +224,13 @@ test("retro detail route loads and edits retrospective notes", () => {
   assert.match(source, /api\.getCFRetro/);
   assert.match(source, /ContentFactoryRetroDialog/);
   assert.match(source, /summarizeContentFactoryRetroSections/);
+  assert.match(source, /Что сработало/);
+  assert.match(source, /Что сломалось/);
+  assert.match(source, /Выводы/);
+  assert.match(source, /Решения/);
+  assert.match(source, /Следующие действия/);
+  assert.doesNotMatch(source, /title="Broken"/);
+  assert.doesNotMatch(source, /title="Actions"/);
 });
 
 test("reference admin components expose table and dialog behavior", () => {

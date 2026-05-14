@@ -191,7 +191,7 @@ export default function ContentFactoryDashboardPage() {
       setMembers(memberRes);
     } catch {
       if (isLatestRequest()) {
-        toastError("Не удалось загрузить Content Factory");
+        toastError("Не удалось загрузить Контент-фабрику");
       }
     } finally {
       if (isLatestRequest()) {
@@ -234,7 +234,7 @@ export default function ContentFactoryDashboardPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Content Factory
+              Контент-фабрика
             </h1>
             <p className="text-sm text-muted-foreground">
               Статусы, ближайшие публикации и производственные задержки
@@ -256,7 +256,7 @@ export default function ContentFactoryDashboardPage() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-3 border-y border-border/60 py-2">
-          <h2 className="text-sm font-semibold text-foreground">Bundles</h2>
+          <h2 className="text-sm font-semibold text-foreground">Кампании</h2>
           <p className="text-xs text-muted-foreground">{bundles.length} всего</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">

@@ -40,9 +40,9 @@ const METRIC_SOURCES: CFMetricSource[] = [
 const CONFIDENCES: CFConfidence[] = ["high", "medium", "low"];
 
 const CONFIDENCE_LABELS: Record<CFConfidence, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
+  high: "Высокое",
+  medium: "Среднее",
+  low: "Низкое",
 };
 
 function nullableText(value: string): string | null {
@@ -55,7 +55,7 @@ function parseMetricValue(value: string): number | null {
   if (!trimmed) return null;
   const parsed = Number(trimmed.replace(",", "."));
   if (Number.isNaN(parsed)) {
-    throw new Error("Metric value должен быть числом");
+    throw new Error("Значение метрики должно быть числом");
   }
   return parsed;
 }
@@ -105,7 +105,7 @@ export function ContentFactoryMetricDialog({
     event.preventDefault();
     const cleanMetricName = metricName.trim();
     if (!cleanMetricName) {
-      setError("Укажите metric name");
+      setError("Укажите название метрики");
       return;
     }
 
@@ -150,14 +150,14 @@ export function ContentFactoryMetricDialog({
         <DialogHeader>
           <DialogTitle className="text-lg">Новая метрика</DialogTitle>
           <DialogDescription>
-            Ручной срез результата: окно, источник, confidence и короткая заметка.
+            Ручной срез результата: окно измерения, источник, уровень доверия и короткая заметка.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label>Window</Label>
+              <Label>Окно измерения</Label>
               <Select
                 value={window}
                 onValueChange={(value) => setWindow(value as CFMetricWindow)}
@@ -176,7 +176,7 @@ export function ContentFactoryMetricDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Source</Label>
+              <Label>Источник</Label>
               <Select
                 value={source}
                 onValueChange={(value) => setSource(value as CFMetricSource)}
@@ -195,7 +195,7 @@ export function ContentFactoryMetricDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Confidence</Label>
+              <Label>Доверие</Label>
               <Select
                 value={confidence}
                 onValueChange={(value) => setConfidence(value as CFConfidence)}
@@ -217,17 +217,17 @@ export function ContentFactoryMetricDialog({
 
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div className="space-y-2">
-              <Label>Metric name</Label>
+              <Label>Название метрики</Label>
               <Input
                 value={metricName}
                 onChange={(event) => setMetricName(event.target.value)}
-                placeholder="views, clicks, registrations"
+                placeholder="просмотры, клики, регистрации"
                 className="h-9 border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
             <div className="space-y-2">
-              <Label>Value</Label>
+              <Label>Числовое значение</Label>
               <Input
                 value={metricValue}
                 onChange={(event) => setMetricValue(event.target.value)}
@@ -241,21 +241,21 @@ export function ContentFactoryMetricDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Text value</Label>
+              <Label>Текстовое значение</Label>
               <Input
                 value={metricValueText}
                 onChange={(event) => setMetricValueText(event.target.value)}
-                placeholder="optional"
+                placeholder="необязательно"
                 className="h-9 border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
             </div>
             <div className="space-y-2">
-              <Label>Source method</Label>
+              <Label>Как получено</Label>
               <Input
                 value={sourceMethod}
                 onChange={(event) => setSourceMethod(event.target.value)}
-                placeholder="manual export, dashboard screenshot"
+                placeholder="ручной экспорт, скриншот кабинета"
                 className="h-9 border-border/70 bg-muted/20 text-sm"
                 disabled={saving}
               />
@@ -263,7 +263,7 @@ export function ContentFactoryMetricDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Note</Label>
+            <Label>Заметка</Label>
             <Textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -290,7 +290,7 @@ export function ContentFactoryMetricDialog({
             </Button>
             <Button type="submit" size="sm" disabled={saving}>
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Save metric
+              Сохранить метрику
             </Button>
           </DialogFooter>
         </form>

@@ -83,7 +83,7 @@ export function ContentFactorySegmentTargetsPanel({
       ? Number(expectedCount.replace(",", "."))
       : null;
     if (parsedExpected !== null && Number.isNaN(parsedExpected)) {
-      toastError("Expected count должен быть числом");
+      toastError("Ожидаемый охват должен быть числом");
       return;
     }
 
@@ -121,7 +121,7 @@ export function ContentFactorySegmentTargetsPanel({
     <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Users className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold text-foreground">Segments</h2>
+        <h2 className="text-sm font-semibold text-foreground">Аудитории</h2>
       </div>
 
       <div className="mt-3 space-y-3">
@@ -143,8 +143,8 @@ export function ContentFactorySegmentTargetsPanel({
                         getContentFactoryDisplayName(target.external_segment_id, [])}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {SEGMENT_ROLE_LABELS[target.role]} · expected{" "}
-                      {formatCount(target.expected_count)} · actual{" "}
+                      {SEGMENT_ROLE_LABELS[target.role]} · план{" "}
+                      {formatCount(target.expected_count)} · факт{" "}
                       {formatCount(target.actual_count_at_send)}
                     </p>
                   </div>
@@ -161,7 +161,7 @@ export function ContentFactorySegmentTargetsPanel({
                     ) : (
                       <Trash2 className="h-3.5 w-3.5" />
                     )}
-                    <span className="sr-only">Remove segment</span>
+                    <span className="sr-only">Удалить аудиторию</span>
                   </Button>
                 </div>
               </div>
@@ -209,7 +209,7 @@ export function ContentFactorySegmentTargetsPanel({
               onChange={(event) => setExpectedCount(event.target.value)}
               type="number"
               min="0"
-              placeholder="count"
+              placeholder="охват"
               className="h-9 border-border/70 bg-muted/20 text-sm"
               disabled={adding}
             />
@@ -226,7 +226,7 @@ export function ContentFactorySegmentTargetsPanel({
             ) : (
               <Plus className="h-3.5 w-3.5" />
             )}
-            Add segment
+            Добавить аудиторию
           </Button>
         </div>
       </div>

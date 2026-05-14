@@ -38,8 +38,40 @@ function formatDateTime(value: string | null | undefined): string {
   }).format(date);
 }
 
-function jsonText(value: unknown): string {
-  return JSON.stringify(value ?? {}, null, 2);
+function readableValue(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return JSON.stringify(value);
+}
+
+function linesFromValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => readableValue(item).trim())
+      .filter(Boolean);
+  }
+  if (value && typeof value === "object") {
+    const objectValue = value as Record<string, unknown>;
+    const notes = objectValue.notes;
+    if (Array.isArray(notes)) {
+      return notes
+        .map((item) => readableValue(item).trim())
+        .filter(Boolean);
+    }
+    return Object.entries(objectValue)
+      .flatMap(([key, item]) => {
+        if (Array.isArray(item)) {
+          return item.map((entry) => `${key}: ${readableValue(entry)}`);
+        }
+        const text = readableValue(item);
+        return text ? [`${key}: ${text}`] : [];
+      })
+      .map((line) => line.trim())
+      .filter(Boolean);
+  }
+  const text = readableValue(value).trim();
+  return text ? [text] : [];
 }
 
 function RetroDetailLoadingSkeleton() {
@@ -124,7 +156,7 @@ export default function ContentFactoryRetroDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href="/content-factory/retros">
             <ArrowLeft className="h-3.5 w-3.5" />
-            К retros
+            К ретроспективам
           </Link>
         </Button>
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
@@ -139,7 +171,7 @@ export default function ContentFactoryRetroDetailPage() {
 
   const summary = summarizeContentFactoryRetroSections(retro);
   const title = getContentFactoryRetroTitle(retro);
-  const bundleName = bundleNames.get(retro.bundle_id ?? "") ?? "Без bundle";
+  const bundleName = bundleNames.get(retro.bundle_id ?? "") ?? "Без кампании";
   const facilitatorName =
     memberNames.get(retro.facilitator_id) ??
     getContentFactoryDisplayName(retro.facilitator_id, []);
@@ -150,7 +182,7 @@ export default function ContentFactoryRetroDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href="/content-factory/retros">
             <ArrowLeft className="h-3.5 w-3.5" />
-            К retros
+            К ретроспективам
           </Link>
         </Button>
         <Button
@@ -181,7 +213,7 @@ export default function ContentFactoryRetroDetailPage() {
               {title}
             </h1>
             <p className="max-w-4xl whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-              {retro.notes?.trim() || "Notes не заполнены"}
+              {retro.notes?.trim() || "Дополнительные заметки не заполнены"}
             </p>
           </div>
           <Button
@@ -191,60 +223,62 @@ export default function ContentFactoryRetroDetailPage() {
             onClick={() => setEditOpen(true)}
           >
             <Edit3 className="h-3.5 w-3.5" />
-            Edit retro
+            Редактировать
           </Button>
         </div>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
-          <JsonSection
-            title="Best by objective"
+          <RetroSection
+            title="Что сработало"
             count={summary.bestByObjective}
             value={retro.best_by_objective}
           />
-          <JsonSection title="Broken" count={summary.broken} value={retro.broken} />
-          <JsonSection
-            title="Learnings"
+          <RetroSection title="Что сломалось" count={summary.broken} value={retro.broken} />
+          <RetroSection
+            title="Выводы"
             count={summary.learnings}
             value={retro.learnings}
           />
-          <JsonSection
-            title="Decisions"
+          <RetroSection
+            title="Решения"
             count={summary.decisions}
             value={retro.decisions}
           />
-          <JsonSection title="Actions" count={summary.actions} value={retro.actions} />
+          <RetroSection title="Следующие действия" count={summary.actions} value={retro.actions} />
         </div>
 
         <aside className="space-y-4">
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-foreground">Retro details</h2>
+            <h2 className="text-sm font-semibold text-foreground">
+              Детали ретроспективы
+            </h2>
             <dl className="mt-3 space-y-3 text-sm">
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Type</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Формат</dt>
                 <dd className="mt-1 text-foreground">
                   {CF_RETRO_TYPE_LABELS[retro.retro_type]}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Bundle</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Кампания</dt>
                 <dd className="mt-1 text-foreground">{bundleName}</dd>
               </div>
               <div>
                 <dt className="text-xs uppercase text-muted-foreground">
-                  Facilitator
+                  Фасилитатор
                 </dt>
                 <dd className="mt-1 text-foreground">{facilitatorName}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Created</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Создана</dt>
                 <dd className="mt-1 text-foreground">
                   {formatDateTime(retro.created_at)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Retro ID</dt>
+                <dt className="text-xs uppercase text-muted-foreground">ID записи</dt>
                 <dd className="mt-1 font-mono text-xs text-muted-foreground">
                   {getContentFactoryDisplayName(retro.id, [])}
                 </dd>
@@ -253,13 +287,13 @@ export default function ContentFactoryRetroDetailPage() {
           </section>
 
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-foreground">Summary</h2>
+            <h2 className="text-sm font-semibold text-foreground">Итог по разделам</h2>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <RetroStat label="Best" value={summary.bestByObjective} />
-              <RetroStat label="Broken" value={summary.broken} />
-              <RetroStat label="Learnings" value={summary.learnings} />
-              <RetroStat label="Decisions" value={summary.decisions} />
-              <RetroStat label="Actions" value={summary.actions} />
+              <RetroStat label="Сработало" value={summary.bestByObjective} />
+              <RetroStat label="Сломалось" value={summary.broken} />
+              <RetroStat label="Выводы" value={summary.learnings} />
+              <RetroStat label="Решения" value={summary.decisions} />
+              <RetroStat label="Действия" value={summary.actions} />
             </div>
           </section>
         </aside>
@@ -277,7 +311,7 @@ export default function ContentFactoryRetroDetailPage() {
   );
 }
 
-function JsonSection({
+function RetroSection({
   title,
   count,
   value,
@@ -286,15 +320,30 @@ function JsonSection({
   count: number;
   value: unknown;
 }) {
+  const lines = linesFromValue(value);
+
   return (
     <section className="rounded-lg border border-border/70 bg-card shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <h2 className="text-sm font-semibold text-foreground">{title}</h2>
         <span className="text-xs text-muted-foreground">{count}</span>
       </div>
-      <pre className="max-h-[420px] overflow-auto whitespace-pre-wrap break-words px-4 py-4 text-xs leading-6 text-muted-foreground">
-        {jsonText(value)}
-      </pre>
+      {lines.length === 0 ? (
+        <p className="px-4 py-4 text-sm text-muted-foreground">
+          Пока не заполнено.
+        </p>
+      ) : (
+        <ul className="space-y-2 px-4 py-4">
+          {lines.map((line, index) => (
+            <li
+              key={`${title}-${index}`}
+              className="rounded-md bg-muted/30 px-3 py-2 text-sm leading-6 text-muted-foreground"
+            >
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

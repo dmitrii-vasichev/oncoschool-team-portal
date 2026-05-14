@@ -170,7 +170,7 @@ export default function ContentFactorySegmentAnalyticsPage() {
       setMetricsByPublicationId(Object.fromEntries(metricEntries));
       setPartialEvidence(secondaryFailed);
       if (secondaryFailed) {
-        toastError("Часть segment analytics evidence не удалось загрузить");
+        toastError("Часть данных по аудиториям не удалось загрузить");
       }
     } catch (err) {
       if (!isLatestRequest()) return;
@@ -239,7 +239,7 @@ export default function ContentFactorySegmentAnalyticsPage() {
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Segments
+            Аудитории
           </Link>
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -247,10 +247,10 @@ export default function ContentFactorySegmentAnalyticsPage() {
             </span>
             <div className="min-w-0">
               <h1 className="text-xl font-semibold leading-7 text-foreground">
-                Segment usage analytics
+                Аналитика аудиторий
               </h1>
               <p className="text-sm text-muted-foreground">
-                Publication links, bundle context, role mix, and manual metric evidence
+                Связи с публикациями, кампаниями, ролями и ручными замерами метрик
               </p>
             </div>
           </div>
@@ -269,29 +269,29 @@ export default function ContentFactorySegmentAnalyticsPage() {
 
       <div className="grid gap-3 md:grid-cols-5">
         <SummaryCard
-          label="In use"
+          label="Используются"
           value={summary.segmentsInUse}
-          helper={`${summary.totalSegments} total segments`}
+          helper={`${summary.totalSegments} аудиторий всего`}
         />
         <SummaryCard
-          label="Unused active"
+          label="Без связей"
           value={summary.unusedActiveSegments}
-          helper="active with no targets"
+          helper="активные, но не выбраны в публикациях"
         />
         <SummaryCard
-          label="Target links"
+          label="Связи"
           value={summary.totalTargetLinks}
-          helper="publication segment rows"
+          helper="аудитории в публикациях"
         />
         <SummaryCard
-          label="Published"
+          label="Опубликовано"
           value={summary.publishedPublications}
-          helper="unique publications"
+          helper="уникальных публикаций"
         />
         <SummaryCard
-          label="Metric evidence"
+          label="Замеры"
           value={summary.metricEvidenceCount}
-          helper={partialEvidence ? "partial load" : "manual snapshots"}
+          helper={partialEvidence ? "загружено частично" : "ручные замеры"}
         />
       </div>
 
@@ -302,7 +302,7 @@ export default function ContentFactorySegmentAnalyticsPage() {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search segments, source IDs, publications"
+              placeholder="Поиск по аудиториям, внешним ID, публикациям"
               className="h-9 border-border/70 bg-muted/20 pl-8 text-sm"
             />
           </div>
@@ -314,9 +314,9 @@ export default function ContentFactorySegmentAnalyticsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
-              <SelectItem value="all">All usage</SelectItem>
-              <SelectItem value="used">Used</SelectItem>
-              <SelectItem value="unused">Unused</SelectItem>
+              <SelectItem value="all">Все связи</SelectItem>
+              <SelectItem value="used">Используются</SelectItem>
+              <SelectItem value="unused">Без связей</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -327,7 +327,7 @@ export default function ContentFactorySegmentAnalyticsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
-              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="all">Все роли</SelectItem>
               {Object.entries(CF_SEGMENT_ROLE_LABELS).map(([role, label]) => (
                 <SelectItem key={role} value={role}>
                   {label}
@@ -337,7 +337,7 @@ export default function ContentFactorySegmentAnalyticsPage() {
           </Select>
         </div>
         <p className="self-center text-sm text-muted-foreground">
-          {filteredRows.length} rows shown
+          {filteredRows.length} строк показано
         </p>
       </div>
 

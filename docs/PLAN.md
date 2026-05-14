@@ -1,30 +1,31 @@
-# Active Plan: Content Factory Sprint 9 Segment Usage Analytics
+# Active Plan: Content Factory Sprint 9.5 UX Consolidation
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-ux-consolidation.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a Content Factory segment usage analytics workspace across publications, bundles, targeting roles, and manual metric evidence.
+**Goal:** Consolidate Content Factory navigation, Russian naming, and help before building Sprint 10 outcome analytics.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-9-segment-analytics-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-ux-consolidation-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-ux-consolidation.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add pure helpers for segment usage rows, summaries, and filters.
-2. Add a compact segment usage table component.
-3. Add `/content-factory/segments/analytics` with summary cards, filters, segment rows, and publication links.
-4. Link the analytics workspace from the segment registry, sidebar, and header.
-5. Run frontend verification and update durable repo docs.
+1. Keep one global sidebar entry for `Контент-фабрика`.
+2. Add internal Content Factory navigation for all module sections.
+3. Add a dedicated Content Factory help page.
+4. Replace system-oriented English/snake_case UI labels with Russian product wording.
+5. Make the retrospective form readable without raw JSON field names.
+6. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented; automated verification passed; merged to `main` through PR #187.
+- Implemented and verified on branch `codex/content-factory-ux-consolidation`.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.
@@ -35,22 +36,46 @@
 
 **Definition of done:**
 
-- `/content-factory/segments/analytics` loads segments, publications, bundles, target links, and manual metric evidence from existing APIs.
-- Segment usage rows show publication count, bundle count, role mix, bundle status mix, published count, metric evidence count, and latest activity.
-- Search, usage-state, and role filters work without a page reload.
-- The segment registry, sidebar, and header expose the analytics route.
+- Global sidebar shows one Content Factory entry.
+- `/content-factory/*` shows internal Russian navigation.
+- Header and common Content Factory labels use clear Russian wording.
+- `/content-factory/help` explains the module and sections.
+- Retrospective create/edit UI no longer exposes raw snake_case labels or JSON placeholders.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
 
 ```bash
-cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts src/lib/contentFactoryUtils.test.ts
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
 cd frontend && npm run lint
 cd frontend && npm run build
 git diff --check
 ```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts src/lib/contentFactoryUtils.test.ts` passed: 50 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 140 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/help`.
+- `git diff --check` passed.
+- Local dev server smoke on `http://127.0.0.1:3010/content-factory/help` and `/content-factory/dashboard` returned HTTP 200.
+- In-app browser opened `/content-factory/help`; the route compiled and loaded, but the authenticated app shell stayed on its existing loading screen because the local browser session had auth/backend state unavailable for this run. Authenticated visual QA remains a manual follow-up.
+
+---
+
+# Previous Plan: Content Factory Sprint 9 Segment Usage Analytics
+
+> **For agentic workers:** Sprint 9 is complete and merged. The implementation plan is `docs/superpowers/plans/2026-05-14-content-factory-sprint-9-segment-analytics.md`.
+
+**Goal:** Add a Content Factory segment usage analytics workspace across publications, bundles, targeting roles, and manual metric evidence.
+
+**Implementation status:**
+
+- Implemented; automated verification passed; merged to `main` through PR #187.
 
 **Latest verification result:**
 

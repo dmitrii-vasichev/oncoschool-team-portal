@@ -110,7 +110,7 @@ export function ContentFactoryBundleDialog({
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError("Введите название bundle");
+      setError("Введите название кампании");
       return;
     }
     if (!ownerId) {
@@ -137,9 +137,9 @@ export function ContentFactoryBundleDialog({
         : await api.createCFBundle(payload);
       await onSaved(saved);
       onOpenChange(false);
-      toastSuccess(editing ? "Bundle обновлён" : "Bundle создан");
+      toastSuccess(editing ? "Кампания обновлена" : "Кампания создана");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Не удалось сохранить bundle";
+      const message = err instanceof Error ? err.message : "Не удалось сохранить кампанию";
       setError(message);
       toastError(message);
     } finally {
@@ -152,10 +152,10 @@ export function ContentFactoryBundleDialog({
       <DialogContent className="max-h-[calc(100vh-1.5rem)] overflow-y-auto sm:max-w-[640px]">
         <DialogHeader>
           <DialogTitle className="text-lg">
-            {editing ? "Редактировать bundle" : "Новый bundle"}
+            {editing ? "Редактировать кампанию" : "Новая кампания"}
           </DialogTitle>
           <DialogDescription>
-            Соберите кампанию: поток, владелец, дата, brief и исходные материалы.
+            Соберите кампанию: направление, владелец, дата, описание и исходные материалы.
           </DialogDescription>
         </DialogHeader>
 
@@ -264,7 +264,7 @@ export function ContentFactoryBundleDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-bundle-brief">Brief</Label>
+            <Label htmlFor="cf-bundle-brief">Описание кампании</Label>
             <Textarea
               id="cf-bundle-brief"
               value={brief}

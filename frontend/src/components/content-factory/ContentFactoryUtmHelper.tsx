@@ -115,18 +115,18 @@ export function ContentFactoryUtmHelper({
     <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
       <div className="flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold text-foreground">UTM helper</h2>
+        <h2 className="text-sm font-semibold text-foreground">UTM-помощник</h2>
       </div>
 
       <div className="mt-3 space-y-3">
         <div className="space-y-2">
-          <Label className="text-xs">Segment</Label>
+          <Label className="text-xs">Аудитория</Label>
           <Select value={selectedSegmentId} onValueChange={setSelectedSegmentId}>
             <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
-              <SelectItem value="none">Без segment term</SelectItem>
+              <SelectItem value="none">Без аудитории в метке</SelectItem>
               {targetedSegmentIds.map((segmentId) => (
                 <SelectItem key={segmentId} value={segmentId}>
                   {getContentFactoryDisplayName(segmentId, segments)}
@@ -137,7 +137,7 @@ export function ContentFactoryUtmHelper({
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs">CTA marker</Label>
+          <Label className="text-xs">CTA-метка</Label>
           <Input
             value={cta}
             onChange={(event) => setCta(event.target.value)}
@@ -149,14 +149,14 @@ export function ContentFactoryUtmHelper({
 
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase text-muted-foreground">
-            Generated
+            Сгенерировано
           </p>
           <JsonBlock value={generatedUtm} />
         </div>
 
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase text-muted-foreground">
-            Current
+            Сейчас в публикации
           </p>
           <JsonBlock value={publication.utm} />
         </div>
@@ -170,7 +170,7 @@ export function ContentFactoryUtmHelper({
             onClick={() => void handleCopy()}
           >
             <Clipboard className="h-3.5 w-3.5" />
-            <span className="sr-only">Copy UTM</span>
+            <span className="sr-only">Скопировать UTM</span>
           </Button>
           <Button
             type="button"
@@ -180,7 +180,7 @@ export function ContentFactoryUtmHelper({
             onClick={() => void handleApply()}
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Apply to publication
+            Применить к публикации
           </Button>
         </div>
       </div>

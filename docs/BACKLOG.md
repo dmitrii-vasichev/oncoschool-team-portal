@@ -2,13 +2,10 @@
 
 ## Content Factory
 
-### Active
-
-- Run authenticated manual QA across Content Factory segment registry, segment detail, and segment usage analytics with real production data.
-
 ### Next
 
-- Choose the next Content Factory slice from the restored design and current product gaps.
+- Run authenticated manual QA across the consolidated Content Factory workspace.
+- Build Sprint 10 outcome and metrics analytics after UX consolidation is merged.
 
 ### Later
 

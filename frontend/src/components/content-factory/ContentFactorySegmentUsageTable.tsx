@@ -33,9 +33,9 @@ type ContentFactorySegmentUsageTableProps = {
 };
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return "No activity";
+  if (!value) return "Нет активности";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No activity";
+  if (Number.isNaN(date.getTime())) return "Нет активности";
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
@@ -44,7 +44,7 @@ function formatDate(value: string | null | undefined): string {
 }
 
 function publicationTitle(publication: CFPublication): string {
-  return publication.title?.trim() || `Publication ${publication.id.slice(0, 8)}`;
+  return publication.title?.trim() || `Публикация ${publication.id.slice(0, 8)}`;
 }
 
 export function ContentFactorySegmentUsageTable({
@@ -55,10 +55,10 @@ export function ContentFactorySegmentUsageTable({
       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
         <Users className="mx-auto h-8 w-8 text-muted-foreground" />
         <h2 className="mt-3 text-sm font-semibold text-foreground">
-          No segment usage found
+          Связи с аудиториями не найдены
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Adjust filters or add segment targets on publication pages.
+          Измените фильтры или добавьте аудитории на страницах публикаций.
         </p>
       </div>
     );
@@ -94,7 +94,7 @@ export function ContentFactorySegmentUsageTable({
                         : "border-muted-foreground/20 bg-muted text-muted-foreground"
                     }
                   >
-                    {row.segment.is_active ? "Active" : "Inactive"}
+                    {row.segment.is_active ? "Активна" : "Неактивна"}
                   </Badge>
                   <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                     {row.segment.source_segment_id}
@@ -111,7 +111,7 @@ export function ContentFactorySegmentUsageTable({
                 <div className="grid gap-2 sm:grid-cols-4">
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Publications
+                      Публикации
                     </span>
                     <span className="text-sm font-semibold text-foreground">
                       {row.publicationCount}
@@ -119,7 +119,7 @@ export function ContentFactorySegmentUsageTable({
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Bundles
+                      Кампании
                     </span>
                     <span className="text-sm font-semibold text-foreground">
                       {row.bundleCount}
@@ -127,7 +127,7 @@ export function ContentFactorySegmentUsageTable({
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Published
+                      Опубликовано
                     </span>
                     <span className="text-sm font-semibold text-foreground">
                       {row.publishedPublicationCount}
@@ -135,7 +135,7 @@ export function ContentFactorySegmentUsageTable({
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Metrics
+                      Замеры
                     </span>
                     <span className="text-sm font-semibold text-foreground">
                       {row.metricEvidenceCount}
@@ -148,11 +148,11 @@ export function ContentFactorySegmentUsageTable({
                 <div className="grid gap-2 md:grid-cols-2">
                   <div className="min-w-0 rounded-md bg-muted/30 px-3 py-2">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Roles
+                      Роли
                     </span>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {activeRoles.length === 0 ? (
-                        <span className="text-sm text-muted-foreground">No links</span>
+                        <span className="text-sm text-muted-foreground">Связей нет</span>
                       ) : (
                         activeRoles.map((role) => (
                           <Badge key={role} variant="outline" className="max-w-full">
@@ -165,12 +165,12 @@ export function ContentFactorySegmentUsageTable({
 
                   <div className="min-w-0 rounded-md bg-muted/30 px-3 py-2">
                     <span className="block text-2xs uppercase text-muted-foreground">
-                      Bundle states
+                      Статусы кампаний
                     </span>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {activeBundleStatuses.length === 0 ? (
                         <span className="text-sm text-muted-foreground">
-                          No bundles
+                          Кампаний нет
                         </span>
                       ) : (
                         activeBundleStatuses.map((status) => (
@@ -188,7 +188,7 @@ export function ContentFactorySegmentUsageTable({
                 <div className="rounded-md bg-muted/30 px-3 py-2">
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="text-2xs uppercase text-muted-foreground">
-                      Recent publications
+                      Последние публикации
                     </span>
                     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                       <Activity className="h-3.5 w-3.5" />
@@ -198,7 +198,7 @@ export function ContentFactorySegmentUsageTable({
 
                   {recentPublications.length === 0 ? (
                     <span className="text-sm text-muted-foreground">
-                      No publication links yet
+                      Связей с публикациями пока нет
                     </span>
                   ) : (
                     <div className="space-y-1.5">
@@ -217,7 +217,7 @@ export function ContentFactorySegmentUsageTable({
                           <span className="shrink-0 text-xs text-muted-foreground">
                             {CF_BUNDLE_STATUS_LABELS[
                               item.bundle?.status as keyof typeof CF_BUNDLE_STATUS_LABELS
-                            ] ?? "No bundle"}
+                            ] ?? "Без кампании"}
                           </span>
                         </Link>
                       ))}

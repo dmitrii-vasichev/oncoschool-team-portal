@@ -1,5 +1,42 @@
 # Status
 
+## Content Factory Sprint 9.5 UX Consolidation
+
+- Current phase: implemented and verified on branch `codex/content-factory-ux-consolidation`
+- Source: user UX feedback on 2026-05-14, preserved research, restored Content Factory design doc, and Sprint 1-9 implementation
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-ux-consolidation-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-ux-consolidation.md`
+- Scope: global sidebar consolidation, internal Content Factory navigation, Russian user-facing labels, Content Factory help page, and retrospective form cleanup
+- Latest progress:
+  - Confirmed Sprint 9 is merged to `main` and production smoke passed.
+  - Confirmed current `main` is clean and aligned with `origin/main`.
+  - Created branch `codex/content-factory-ux-consolidation`.
+  - Reviewed current Content Factory sidebar/header/layout and raw retro dialog fields from the user screenshots.
+  - Wrote Sprint 9.5 UX consolidation design and implementation plan.
+  - Added one global sidebar entry for `Контент-фабрика`.
+  - Added internal Content Factory workspace navigation with Russian section names.
+  - Added `/content-factory/help` with workflow, glossary, section, manual-data, and integration notes.
+  - Reworked retrospective create/edit and detail UI to use readable Russian fields instead of raw JSON labels.
+  - Replaced the most visible English/system labels across campaigns, publications, review queue, audiences, audience analytics, retrospectives, references, UTM, metrics, and version history.
+- Key decisions:
+  - Do UX consolidation before Sprint 10 outcome analytics.
+  - Keep backend contracts unchanged and translate only user-facing interface language.
+  - Use one global sidebar entry plus internal module navigation.
+  - Add help as a first-class module section.
+- Next actions:
+  - Run authenticated manual QA across the consolidated Content Factory workspace.
+  - Start Sprint 10 outcome and metrics analytics after this UX consolidation is merged.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts src/lib/contentFactoryUtils.test.ts` passed: 50 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 140 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/help`.
+  - `git diff --check` passed.
+  - Local dev server smoke on `http://127.0.0.1:3010/content-factory/help` and `/content-factory/dashboard` returned HTTP 200.
+  - In-app browser opened `/content-factory/help`; the route compiled and loaded, but authenticated visual QA remains manual because the local browser session stayed on the existing auth-loading shell with unavailable local backend/auth state.
+
 ## Content Factory Sprint 9 Segment Usage Analytics
 
 - Current phase: implemented; automated verification passed; merged to `main` through PR #187

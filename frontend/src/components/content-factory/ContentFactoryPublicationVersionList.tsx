@@ -5,12 +5,12 @@ import type { CFApprovalEvent, CFPublicationVersion, TeamMember } from "@/lib/ty
 
 const APPROVAL_EVENT_LABELS: Record<CFApprovalEvent, string> = {
   drafted: "Черновик",
-  reviewed: "Reviewed",
-  factchecked: "Factcheck",
-  doctor_approved: "Doctor approved",
-  scheduled: "Scheduled",
-  published: "Published",
-  rolled_back: "Rolled back",
+  reviewed: "Проверено",
+  factchecked: "Фактчек пройден",
+  doctor_approved: "Одобрено врачом",
+  scheduled: "Запланировано",
+  published: "Опубликовано",
+  rolled_back: "Откат версии",
 };
 
 function formatDateTime(value: string): string {

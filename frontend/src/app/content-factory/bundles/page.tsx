@@ -35,7 +35,7 @@ function formatDate(value: string | null): string {
 
 function briefPreview(value: string | null): string {
   const text = value?.trim();
-  if (!text) return "Brief не заполнен";
+  if (!text) return "Описание кампании не заполнено";
   return text.length > 140 ? `${text.slice(0, 140)}...` : text;
 }
 
@@ -88,7 +88,7 @@ export default function ContentFactoryBundlesPage() {
       setMembers(memberRes);
       setFunnelTemplates(templateRes);
     } catch {
-      if (isLatestRequest()) toastError("Не удалось загрузить bundles");
+      if (isLatestRequest()) toastError("Не удалось загрузить кампании");
     } finally {
       if (isLatestRequest()) setLoading(false);
     }
@@ -124,10 +124,10 @@ export default function ContentFactoryBundlesPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Bundles
+              Кампании
             </h1>
             <p className="text-sm text-muted-foreground">
-              Кампании, события, briefs и производственные пакеты публикаций
+              Смысловые блоки, события, описания и пакеты публикаций
             </p>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function ContentFactoryBundlesPage() {
           >
             <Link href="/content-factory/calendar">
               <CalendarDays className="h-3.5 w-3.5" />
-              Calendar
+              Календарь
             </Link>
           </Button>
           <Button
@@ -149,7 +149,7 @@ export default function ContentFactoryBundlesPage() {
             className="h-8 w-full gap-1.5 rounded-md px-3 text-xs sm:w-auto"
           >
             <Plus className="h-3.5 w-3.5" />
-            New bundle
+            Новая кампания
           </Button>
         </div>
       </div>
@@ -180,10 +180,10 @@ export default function ContentFactoryBundlesPage() {
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
           <Factory className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            Bundles по выбранным фильтрам нет
+            Кампаний по выбранным фильтрам нет
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Создайте bundle или измените фильтры.
+            Создайте кампанию или измените фильтры.
           </p>
         </div>
       ) : (
@@ -214,13 +214,13 @@ export default function ContentFactoryBundlesPage() {
                 </div>
                 <div className="grid shrink-0 grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:w-[320px]">
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                    <span className="block text-2xs uppercase">Event</span>
+                    <span className="block text-2xs uppercase">Дата</span>
                     <span className="font-medium text-foreground">
                       {formatDate(bundle.event_date)}
                     </span>
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                    <span className="block text-2xs uppercase">Sources</span>
+                    <span className="block text-2xs uppercase">Материалы</span>
                     <span className="font-medium text-foreground">
                       {bundle.source_material_refs.length}
                     </span>

@@ -39,25 +39,31 @@ function detailText(
   if (tableKey === "platforms") {
     const platform = record as CFPlatform;
     const capabilityCount = Object.keys(platform.capabilities ?? {}).length;
-    return `${capabilityCount} capability keys · order ${platform.display_order}`;
+    return `${capabilityCount} настроек возможностей · порядок ${platform.display_order}`;
   }
   if (tableKey === "formats") {
     const format = record as CFFormat;
-    const objective = format.default_objective?.trim() || "No objective";
-    return `${objective} · ${format.requires_medical_review ? "medical review" : "no medical review"} · order ${format.display_order}`;
+    const objective = format.default_objective?.trim() || "Цель не указана";
+    return `${objective} · ${
+      format.requires_medical_review
+        ? "нужна врачебная проверка"
+        : "без врачебной проверки"
+    } · порядок ${format.display_order}`;
   }
   if (tableKey === "rubrics") {
     const rubric = record as CFRubric;
-    return rubric.deprecated_at ? `Deprecated ${rubric.deprecated_at}` : "Active taxonomy row";
+    return rubric.deprecated_at
+      ? `Выведена из работы ${rubric.deprecated_at}`
+      : "Активная запись таксономии";
   }
   if (tableKey === "nosologies") {
     const nosology = record as CFNosology;
     return nosology.deprecated_at
-      ? `Deprecated ${nosology.deprecated_at}`
-      : "Active taxonomy row";
+      ? `Выведена из работы ${nosology.deprecated_at}`
+      : "Активная запись таксономии";
   }
   const template = record as CFFunnelTemplate;
-  return `${template.template_publications?.length ?? 0} publication recipe items`;
+  return `${template.template_publications?.length ?? 0} элементов шаблона публикаций`;
 }
 
 export function ContentFactoryReferenceTable({
@@ -72,10 +78,10 @@ export function ContentFactoryReferenceTable({
     return (
       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
         <h2 className="text-sm font-semibold text-foreground">
-          {CF_REFERENCE_TABLE_LABELS[tableKey]} are empty
+          {CF_REFERENCE_TABLE_LABELS[tableKey]} пока пусты
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Admin users can add the first reference row from this workspace.
+          Администратор может добавить первую запись прямо здесь.
         </p>
       </div>
     );
@@ -84,9 +90,9 @@ export function ContentFactoryReferenceTable({
   return (
     <div className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
       <div className="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_auto] gap-3 border-b border-border/70 bg-muted/25 px-4 py-2 text-xs font-medium uppercase text-muted-foreground">
-        <span>Code</span>
-        <span>Details</span>
-        <span className="text-right">Actions</span>
+        <span>Код</span>
+        <span>Детали</span>
+        <span className="text-right">Действия</span>
       </div>
       <div className="divide-y divide-border/60">
         {records.map((record) => (
@@ -107,7 +113,7 @@ export function ContentFactoryReferenceTable({
                       : "border-muted-foreground/20 bg-muted text-muted-foreground"
                   }
                 >
-                  {record.is_active ? "Active" : "Inactive"}
+                  {record.is_active ? "Активна" : "Неактивна"}
                 </Badge>
               </div>
               <p className="truncate text-sm font-semibold text-foreground">
@@ -128,7 +134,7 @@ export function ContentFactoryReferenceTable({
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => onEdit(record)}
-                    aria-label="Edit reference record"
+                    aria-label="Редактировать запись справочника"
                   >
                     <Edit3 className="h-4 w-4" />
                   </Button>
@@ -139,13 +145,13 @@ export function ContentFactoryReferenceTable({
                     className="h-8 w-8 text-destructive hover:text-destructive"
                     onClick={() => onDelete(record)}
                     disabled={deletingId === record.id}
-                    aria-label="Delete reference record"
+                    aria-label="Удалить запись справочника"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </>
               ) : (
-                <span className="text-xs text-muted-foreground">Read-only</span>
+                <span className="text-xs text-muted-foreground">Только просмотр</span>
               )}
             </div>
           </div>

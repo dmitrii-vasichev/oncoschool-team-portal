@@ -95,7 +95,7 @@ export default function ContentFactoryReviewPage() {
       setFormats(formatRes);
       setMembers(memberRes);
     } catch {
-      if (isLatestRequest()) toastError("Не удалось загрузить review queue");
+      if (isLatestRequest()) toastError("Не удалось загрузить очередь проверки");
     } finally {
       if (isLatestRequest()) setLoading(false);
     }
@@ -143,7 +143,7 @@ export default function ContentFactoryReviewPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Review queue
+              Очередь проверки
             </h1>
             <p className="text-sm text-muted-foreground">
               {formatContentFactoryPublicationCount(queueCount)} ждут проверки,
@@ -167,7 +167,7 @@ export default function ContentFactoryReviewPage() {
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
           <ListChecks className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            Review queue пуст
+            Очередь проверки пуста
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Сейчас нет публикаций в статусах проверки или согласования.
@@ -216,21 +216,21 @@ export default function ContentFactoryReviewPage() {
                       </div>
                       <div className="grid shrink-0 gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:w-[360px]">
                         <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                          <span className="block text-2xs uppercase">Channel</span>
+                          <span className="block text-2xs uppercase">Канал</span>
                           <span className="font-medium text-foreground">
                             {platformNames.get(publication.platform_id) ?? "Платформа"} ·{" "}
                             {formatNames.get(publication.format_id) ?? "Формат"}
                           </span>
                         </div>
                         <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                          <span className="block text-2xs uppercase">Owner</span>
+                          <span className="block text-2xs uppercase">Ответственный</span>
                           <span className="font-medium text-foreground">
                             {memberNames.get(publication.responsible_id) ??
                               "Ответственный"}
                           </span>
                         </div>
                         <div className="rounded-md bg-muted/30 px-2 py-1.5 sm:col-span-2">
-                          <span className="block text-2xs uppercase">Schedule</span>
+                          <span className="block text-2xs uppercase">План</span>
                           <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
                             <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
                             {formatDateTime(publication.scheduled_at)}

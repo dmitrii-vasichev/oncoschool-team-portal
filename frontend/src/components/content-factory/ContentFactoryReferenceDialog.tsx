@@ -50,7 +50,7 @@ function isJsonObject(value: unknown): value is CFJsonObject {
 function parseJsonObject(label: string, value: string): CFJsonObject {
   const parsed = JSON.parse(value || "{}") as unknown;
   if (!isJsonObject(parsed)) {
-    throw new Error(`${label} must be a JSON object`);
+    throw new Error(`${label} должен быть объектом`);
   }
   return parsed;
 }
@@ -58,7 +58,7 @@ function parseJsonObject(label: string, value: string): CFJsonObject {
 function parseJsonArray(label: string, value: string): unknown[] {
   const parsed = JSON.parse(value || "[]") as unknown;
   if (!Array.isArray(parsed)) {
-    throw new Error(`${label} must be a JSON array`);
+    throw new Error(`${label} должен быть списком`);
   }
   return parsed;
 }
@@ -131,12 +131,12 @@ export function ContentFactoryReferenceDialog({
 
   function validateBaseFields() {
     if (!editing && !code.trim()) {
-      throw new Error("Code is required");
+      throw new Error("Введите код записи");
     }
     if (tableKey === "funnel_templates") {
-      if (!name.trim()) throw new Error("Name is required");
+      if (!name.trim()) throw new Error("Введите название шаблона");
     } else if (!displayName.trim()) {
-      throw new Error("Display name is required");
+      throw new Error("Введите понятное название");
     }
   }
 
@@ -150,7 +150,7 @@ export function ContentFactoryReferenceDialog({
       setError(null);
 
       if (tableKey === "platforms") {
-        const parsedCapabilities = parseJsonObject("capabilities", capabilities);
+        const parsedCapabilities = parseJsonObject("Возможности площадки", capabilities);
         const payload = {
           display_name: displayName.trim(),
           is_active: isActive,
@@ -189,7 +189,7 @@ export function ContentFactoryReferenceDialog({
           : await api.createCFNosology({ code: code.trim(), ...payload });
       } else {
         const parsedPublications = parseJsonArray(
-          "template_publications",
+          "Шаблон публикаций",
           templatePublications,
         );
         const payload = {
@@ -205,10 +205,10 @@ export function ContentFactoryReferenceDialog({
 
       await onSaved(saved);
       onOpenChange(false);
-      toastSuccess(editing ? "Reference updated" : "Reference created");
+      toastSuccess(editing ? "Запись обновлена" : "Запись создана");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to save reference record";
+        err instanceof Error ? err.message : "Не удалось сохранить запись";
       setError(message);
       toastError(message);
     } finally {
@@ -227,17 +227,17 @@ export function ContentFactoryReferenceDialog({
       <DialogContent className="max-h-[calc(100vh-1.5rem)] overflow-y-auto sm:max-w-[680px]">
         <DialogHeader>
           <DialogTitle className="text-lg">
-            {editing ? `Edit ${tableLabel}` : `New ${tableLabel}`}
+            {editing ? `Редактировать: ${tableLabel}` : `Новая запись: ${tableLabel}`}
           </DialogTitle>
           <DialogDescription>
-            Keep Content Factory dictionaries aligned with the current workflow.
+            Обновите справочник так, чтобы он совпадал с текущим рабочим процессом.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-reference-code">Code</Label>
+              <Label htmlFor="cf-reference-code">Код</Label>
               <Input
                 id="cf-reference-code"
                 value={code}
@@ -248,7 +248,7 @@ export function ContentFactoryReferenceDialog({
             </div>
             {showDisplayName ? (
               <div className="space-y-2">
-                <Label htmlFor="cf-reference-display-name">Display name</Label>
+                <Label htmlFor="cf-reference-display-name">Понятное название</Label>
                 <Input
                   id="cf-reference-display-name"
                   value={displayName}
@@ -259,7 +259,7 @@ export function ContentFactoryReferenceDialog({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="cf-reference-name">Name</Label>
+                <Label htmlFor="cf-reference-name">Название</Label>
                 <Input
                   id="cf-reference-name"
                   value={name}
@@ -274,7 +274,7 @@ export function ContentFactoryReferenceDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             {showDisplayOrder && (
               <div className="space-y-2">
-                <Label htmlFor="cf-reference-display-order">Display order</Label>
+                <Label htmlFor="cf-reference-display-order">Порядок показа</Label>
                 <Input
                   id="cf-reference-display-order"
                   type="number"
@@ -288,7 +288,7 @@ export function ContentFactoryReferenceDialog({
             {showFormatFields && (
               <div className="space-y-2">
                 <Label htmlFor="cf-reference-default-objective">
-                  Default objective
+                  Цель по умолчанию
                 </Label>
                 <Input
                   id="cf-reference-default-objective"
@@ -301,7 +301,7 @@ export function ContentFactoryReferenceDialog({
             )}
             {showTemplatePublications && (
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="cf-reference-description">Description</Label>
+                <Label htmlFor="cf-reference-description">Описание</Label>
                 <Textarea
                   id="cf-reference-description"
                   value={description}
@@ -316,10 +316,10 @@ export function ContentFactoryReferenceDialog({
           <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label htmlFor="cf-reference-active" className="text-sm font-medium">
-                Active
+                Активна
               </Label>
               <p className="text-xs text-muted-foreground">
-                Inactive records stay visible here and disappear from normal pickers.
+                Неактивные записи остаются здесь, но скрываются в обычных списках выбора.
               </p>
             </div>
             <Switch
@@ -337,10 +337,10 @@ export function ContentFactoryReferenceDialog({
                   htmlFor="cf-reference-medical-review"
                   className="text-sm font-medium"
                 >
-                  Requires medical review
+                  Требуется врачебная проверка
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Use for formats that need doctor approval before scheduling.
+                  Включите для форматов, которым нужно одобрение врача перед планированием.
                 </p>
               </div>
               <Switch
@@ -354,7 +354,7 @@ export function ContentFactoryReferenceDialog({
 
           {showCapabilities && (
             <div className="space-y-2">
-              <Label htmlFor="cf-reference-capabilities">capabilities</Label>
+              <Label htmlFor="cf-reference-capabilities">Возможности площадки</Label>
               <Textarea
                 id="cf-reference-capabilities"
                 value={capabilities}
@@ -368,7 +368,7 @@ export function ContentFactoryReferenceDialog({
           {showTemplatePublications && (
             <div className="space-y-2">
               <Label htmlFor="cf-reference-template-publications">
-                template_publications
+                Шаблон публикаций
               </Label>
               <Textarea
                 id="cf-reference-template-publications"
@@ -393,11 +393,11 @@ export function ContentFactoryReferenceDialog({
               onClick={() => onOpenChange(false)}
               disabled={saving}
             >
-              Cancel
+              Отмена
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {editing ? "Save changes" : "Create"}
+              {editing ? "Сохранить" : "Создать"}
             </Button>
           </DialogFooter>
         </form>

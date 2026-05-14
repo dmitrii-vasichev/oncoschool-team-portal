@@ -128,7 +128,7 @@ export default function ContentFactoryBundleDetailPage() {
       setFunnelTemplates(templateRes);
     } catch (err) {
       if (isLatestRequest()) {
-        toastError(err instanceof Error ? err.message : "Не удалось загрузить bundle");
+        toastError(err instanceof Error ? err.message : "Не удалось загрузить кампанию");
       }
     } finally {
       if (isLatestRequest()) setLoading(false);
@@ -179,13 +179,13 @@ export default function ContentFactoryBundleDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href="/content-factory/bundles">
             <ArrowLeft className="h-3.5 w-3.5" />
-            К bundles
+            К кампаниям
           </Link>
         </Button>
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
           <FolderKanban className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            Bundle не найден
+            Кампания не найдена
           </h2>
         </div>
       </div>
@@ -198,7 +198,7 @@ export default function ContentFactoryBundleDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href="/content-factory/bundles">
             <ArrowLeft className="h-3.5 w-3.5" />
-            К bundles
+            К кампаниям
           </Link>
         </Button>
         <Button
@@ -226,7 +226,7 @@ export default function ContentFactoryBundleDetailPage() {
               {bundle.name}
             </h1>
             <p className="max-w-4xl whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-              {bundle.brief?.trim() || "Brief не заполнен"}
+              {bundle.brief?.trim() || "Описание кампании не заполнено"}
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
@@ -238,7 +238,7 @@ export default function ContentFactoryBundleDetailPage() {
               onClick={() => setEditOpen(true)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              Edit bundle
+              Редактировать
             </Button>
             <Button
               type="button"
@@ -247,7 +247,7 @@ export default function ContentFactoryBundleDetailPage() {
               onClick={() => setCreatePublicationOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
-              New publication
+              Новая публикация
             </Button>
           </div>
         </div>
@@ -259,7 +259,7 @@ export default function ContentFactoryBundleDetailPage() {
             <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
               <FileText className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">
-                Publications
+                Публикации
               </h2>
               <span className="text-xs text-muted-foreground">
                 {formatContentFactoryPublicationCount(publications.length)}
@@ -268,7 +268,7 @@ export default function ContentFactoryBundleDetailPage() {
 
             {publications.length === 0 ? (
               <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-                В этом bundle ещё нет публикаций
+                В этой кампании ещё нет публикаций
               </div>
             ) : (
               <div className="divide-y divide-border/60">
@@ -325,26 +325,26 @@ export default function ContentFactoryBundleDetailPage() {
 
         <aside className="space-y-4">
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-foreground">Bundle details</h2>
+            <h2 className="text-sm font-semibold text-foreground">Детали кампании</h2>
             <dl className="mt-3 space-y-3 text-sm">
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Owner</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Владелец</dt>
                 <dd className="mt-1 text-foreground">
                   {memberNames.get(bundle.owner_id) ?? "Не указан"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Event date</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Дата события</dt>
                 <dd className="mt-1 text-foreground">{formatDateTime(bundle.event_date)}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Funnel</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Шаблон</dt>
                 <dd className="mt-1 text-foreground">
                   {templateNames.get(bundle.funnel_template_id ?? "") ?? "Без шаблона"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Bundle ID</dt>
+                <dt className="text-xs uppercase text-muted-foreground">ID кампании</dt>
                 <dd className="mt-1 font-mono text-xs text-muted-foreground">
                   {getContentFactoryDisplayName(bundle.id, [])}
                 </dd>
@@ -356,7 +356,7 @@ export default function ContentFactoryBundleDetailPage() {
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-muted-foreground" />
               <h2 className="text-sm font-semibold text-foreground">
-                Source materials
+                Исходные материалы
               </h2>
             </div>
             {bundle.source_material_refs.length === 0 ? (

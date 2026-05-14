@@ -156,12 +156,12 @@ export function ContentFactoryPublicationDialog({
       return;
     }
     if (!editing && !bundleId) {
-      setError("Bundle не найден");
+      setError("Кампания не найдена");
       return;
     }
     const targetBundleId = bundleId ?? publication?.bundle_id;
     if (!targetBundleId) {
-      setError("Bundle не найден");
+      setError("Кампания не найдена");
       return;
     }
 
@@ -227,7 +227,7 @@ export function ContentFactoryPublicationDialog({
             {publication ? "Редактировать публикацию" : "Новая публикация"}
           </DialogTitle>
           <DialogDescription>
-            Производственные поля, расписание, текст, UTM и platform refs.
+            Производственные поля, расписание, текст, UTM-метки и ссылки на опубликованный пост.
           </DialogDescription>
         </DialogHeader>
 
@@ -388,19 +388,19 @@ export function ContentFactoryPublicationDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-publication-media">Media refs</Label>
+              <Label htmlFor="cf-publication-media">Медиа и материалы</Label>
               <Textarea
                 id="cf-publication-media"
                 value={mediaRefsText}
                 onChange={(event) => setMediaRefsText(event.target.value)}
-                placeholder="Одна ссылка или asset id на строку"
+                placeholder="Одна ссылка или ID материала на строку"
                 rows={4}
                 className="min-h-[108px] resize-y border-border/70 bg-muted/20"
                 disabled={saving}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cf-publication-utm">UTM JSON</Label>
+              <Label htmlFor="cf-publication-utm">UTM-метки</Label>
               <Textarea
                 id="cf-publication-utm"
                 value={utmText}
@@ -414,7 +414,7 @@ export function ContentFactoryPublicationDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-publication-url">Post URL</Label>
+              <Label htmlFor="cf-publication-url">Ссылка на опубликованный пост</Label>
               <Input
                 id="cf-publication-url"
                 value={platformPostUrl}
@@ -424,7 +424,7 @@ export function ContentFactoryPublicationDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cf-publication-post-id">Platform post ID</Label>
+              <Label htmlFor="cf-publication-post-id">ID поста на площадке</Label>
               <Input
                 id="cf-publication-post-id"
                 value={platformPostId}

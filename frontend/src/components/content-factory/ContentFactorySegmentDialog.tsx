@@ -37,7 +37,7 @@ function nullableText(value: string): string | null {
 function parsePopulation(value: string): number {
   const parsed = Number(value.trim());
   if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error("Population count must be a non-negative integer");
+    throw new Error("Размер базы должен быть целым числом не меньше нуля");
   }
   return parsed;
 }
@@ -92,11 +92,11 @@ export function ContentFactorySegmentDialog({
     const cleanName = name.trim();
     const cleanSourceSegmentId = sourceSegmentId.trim();
     if (!cleanName) {
-      setError("Name is required");
+      setError("Введите название аудитории");
       return;
     }
     if (!cleanSourceSegmentId) {
-      setError("Source segment ID is required");
+      setError("Введите внешний ID аудитории");
       return;
     }
 
@@ -105,7 +105,7 @@ export function ContentFactorySegmentDialog({
       parsedPopulation = parsePopulation(populationCount);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Invalid population count";
+        err instanceof Error ? err.message : "Некорректный размер базы";
       setError(message);
       return;
     }
@@ -125,10 +125,10 @@ export function ContentFactorySegmentDialog({
       });
       await onCreated(created);
       onOpenChange(false);
-      toastSuccess("Segment created");
+      toastSuccess("Аудитория создана");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to create segment";
+        err instanceof Error ? err.message : "Не удалось создать аудиторию";
       setError(message);
       toastError(message);
     } finally {
@@ -140,16 +140,16 @@ export function ContentFactorySegmentDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[calc(100vh-1.5rem)] overflow-y-auto sm:max-w-[680px]">
         <DialogHeader>
-          <DialogTitle className="text-lg">New segment mirror</DialogTitle>
+          <DialogTitle className="text-lg">Новая аудитория</DialogTitle>
           <DialogDescription>
-            Add an external audience segment so publications can target it.
+            Добавьте внешнюю аудиторию, чтобы выбирать её в публикациях.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="grid gap-3 sm:grid-cols-[180px_minmax(0,1fr)]">
             <div className="space-y-2">
-              <Label>Source</Label>
+              <Label>Источник</Label>
               <Select
                 value={source}
                 onValueChange={(value) => setSource(value as CFSegmentSource)}
@@ -168,7 +168,7 @@ export function ContentFactorySegmentDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cf-segment-source-id">source_segment_id</Label>
+              <Label htmlFor="cf-segment-source-id">Внешний ID аудитории</Label>
               <Input
                 id="cf-segment-source-id"
                 value={sourceSegmentId}
@@ -180,7 +180,7 @@ export function ContentFactorySegmentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-segment-name">Name</Label>
+            <Label htmlFor="cf-segment-name">Название</Label>
             <Input
               id="cf-segment-name"
               value={name}
@@ -192,7 +192,7 @@ export function ContentFactorySegmentDialog({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="cf-segment-population">population_count</Label>
+              <Label htmlFor="cf-segment-population">Размер базы</Label>
               <Input
                 id="cf-segment-population"
                 type="number"
@@ -205,13 +205,13 @@ export function ContentFactorySegmentDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Owner</Label>
+              <Label>Владелец</Label>
               <Select value={ownerId} onValueChange={setOwnerId} disabled={saving}>
                 <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
-                  <SelectItem value="none">No owner</SelectItem>
+                  <SelectItem value="none">Без владельца</SelectItem>
                   {activeMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
                       {member.full_name}
@@ -223,7 +223,7 @@ export function ContentFactorySegmentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-segment-source-url">Source URL</Label>
+            <Label htmlFor="cf-segment-source-url">Ссылка на источник</Label>
             <Input
               id="cf-segment-source-url"
               value={sourceUrl}
@@ -234,7 +234,7 @@ export function ContentFactorySegmentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cf-segment-description">Description</Label>
+            <Label htmlFor="cf-segment-description">Описание</Label>
             <Textarea
               id="cf-segment-description"
               value={description}
@@ -247,10 +247,10 @@ export function ContentFactorySegmentDialog({
           <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Label htmlFor="cf-segment-active" className="text-sm font-medium">
-                Active
+                Активна
               </Label>
               <p className="text-xs text-muted-foreground">
-                Inactive segments stay visible in the registry but are hidden from normal pickers.
+                Неактивные аудитории остаются в списке, но скрываются в обычном выборе.
               </p>
             </div>
             <Switch
@@ -274,11 +274,11 @@ export function ContentFactorySegmentDialog({
               onClick={() => onOpenChange(false)}
               disabled={saving}
             >
-              Cancel
+              Отмена
             </Button>
             <Button type="submit" disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create segment
+              Создать аудиторию
             </Button>
           </DialogFooter>
         </form>

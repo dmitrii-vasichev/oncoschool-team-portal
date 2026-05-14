@@ -53,21 +53,21 @@ export const CF_PUBLICATION_STATUS_LABELS: Record<CFPublicationStatus, string> =
 };
 
 export const CF_RETRO_TYPE_LABELS: Record<CFRetroType, string> = {
-  weekly: "Weekly",
-  monthly: "Monthly",
-  bundle: "Bundle",
-  adhoc: "Ad-hoc",
+  weekly: "Еженедельная",
+  monthly: "Ежемесячная",
+  bundle: "По кампании",
+  adhoc: "Разовая",
 };
 
 export const CF_REFERENCE_TABLE_LABELS: Record<
   ContentFactoryReferenceTableKey,
   string
 > = {
-  platforms: "Platforms",
-  formats: "Formats",
-  rubrics: "Rubrics",
-  nosologies: "Nosologies",
-  funnel_templates: "Funnel templates",
+  platforms: "Площадки",
+  formats: "Форматы",
+  rubrics: "Рубрики",
+  nosologies: "Нозологии",
+  funnel_templates: "Шаблоны кампаний",
 };
 
 export const CF_SEGMENT_SOURCE_LABELS: Record<CFSegmentSource, string> = {
@@ -103,10 +103,10 @@ export const CF_SEGMENT_ROLES: CFSegmentRole[] = [
 ];
 
 export const CF_SEGMENT_ROLE_LABELS: Record<CFSegmentRole, string> = {
-  target: "Target",
-  exclusion: "Exclusion",
-  control: "Control",
-  retargeting: "Retargeting",
+  target: "Целевая",
+  exclusion: "Исключение",
+  control: "Контрольная",
+  retargeting: "Ретаргетинг",
 };
 
 type ContentFactoryAccessMember = {
@@ -480,7 +480,21 @@ export function buildContentFactoryBundleParams(
 }
 
 export function formatContentFactoryBundleCount(count: number): string {
-  return `${count} ${count === 1 ? "bundle" : "bundles"}`;
+  return `${count} ${russianBundleNoun(count)}`;
+}
+
+function russianBundleNoun(count: number): string {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  if (lastDigit === 1 && lastTwoDigits !== 11) return "кампания";
+  if (
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14)
+  ) {
+    return "кампании";
+  }
+  return "кампаний";
 }
 
 function russianPublicationNoun(count: number): string {

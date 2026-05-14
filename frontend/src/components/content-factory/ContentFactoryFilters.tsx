@@ -178,13 +178,13 @@ export function ContentFactoryFilters({
           ]}
         />
         <FilterSelect
-          label="Bundle"
+          label="Кампания"
           value={filters.bundle_id || "all"}
           onChange={(value) =>
             onChange({ ...filters, bundle_id: value === "all" ? "" : value })
           }
           options={[
-            { value: "all", label: "Все bundles" },
+            { value: "all", label: "Все кампании" },
             ...bundles.map((bundle) => ({
               value: bundle.id,
               label: bundle.name,

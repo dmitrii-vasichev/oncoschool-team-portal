@@ -55,19 +55,20 @@ const PAGE_META: Record<string, PageMeta> = {
   "/analytics": { title: "Статистика задач", icon: BarChart3 },
   "/reports": { title: "Отчёты", icon: FileBarChart },
   "/content/telegram-analysis": { title: "Telegram-анализ", icon: Search },
-  "/content-factory/dashboard": { title: "Content Factory", icon: Factory },
-  "/content-factory/calendar": { title: "Календарь контента", icon: CalendarDays },
-  "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
-  "/content-factory/segments": { title: "CF Segments", icon: Users },
+  "/content-factory/dashboard": { title: "Контент-фабрика", icon: Factory },
+  "/content-factory/calendar": { title: "Календарь", icon: CalendarDays },
+  "/content-factory/bundles": { title: "Кампании", icon: FolderKanban },
+  "/content-factory/segments": { title: "Аудитории", icon: Users },
   "/content-factory/segments/analytics": {
-    title: "CF Segment Analytics",
+    title: "Аналитика аудиторий",
     icon: BarChart3,
   },
-  "/content-factory/review": { title: "CF Review", icon: ListChecks },
-  "/content-factory/retros": { title: "CF Retros", icon: History },
-  "/content-factory/references": { title: "CF References", icon: Settings2 },
+  "/content-factory/review": { title: "Очередь проверки", icon: ListChecks },
+  "/content-factory/retros": { title: "Ретроспективы", icon: History },
+  "/content-factory/references": { title: "Справочники", icon: Settings2 },
+  "/content-factory/help": { title: "Справка", icon: FileText },
   "/content-factory/publications": {
-    title: "CF Publication",
+    title: "Публикация",
     icon: FileText,
     parent: "/content-factory/bundles",
   },
@@ -93,11 +94,11 @@ function getPageMeta(
     const parentMeta = PAGE_META["/content-factory/bundles"];
     return {
       ...parentMeta,
-      title: pageTitle || "Bundle",
+      title: pageTitle || "Кампания",
       parent: "/content-factory/bundles",
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/bundles" },
-        { label: pageTitle || "Bundle" },
+        { label: pageTitle || "Кампания" },
       ],
     };
   }
@@ -106,11 +107,11 @@ function getPageMeta(
     const parentMeta = PAGE_META["/content-factory/bundles"];
     return {
       ...PAGE_META["/content-factory/publications"],
-      title: pageTitle || "Publication",
+      title: pageTitle || "Публикация",
       parent: "/content-factory/bundles",
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/bundles" },
-        { label: pageTitle || "Publication" },
+        { label: pageTitle || "Публикация" },
       ],
     };
   }
@@ -119,11 +120,11 @@ function getPageMeta(
     const parentMeta = PAGE_META["/content-factory/retros"];
     return {
       ...parentMeta,
-      title: pageTitle || "Retro",
+      title: pageTitle || "Ретроспектива",
       parent: "/content-factory/retros",
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/retros" },
-        { label: pageTitle || "Retro" },
+        { label: pageTitle || "Ретроспектива" },
       ],
     };
   }
@@ -132,11 +133,11 @@ function getPageMeta(
     const parentMeta = PAGE_META["/content-factory/segments"];
     return {
       ...parentMeta,
-      title: pageTitle || "Segment",
+      title: pageTitle || "Аудитория",
       parent: "/content-factory/segments",
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/segments" },
-        { label: pageTitle || "Segment" },
+        { label: pageTitle || "Аудитория" },
       ],
     };
   }

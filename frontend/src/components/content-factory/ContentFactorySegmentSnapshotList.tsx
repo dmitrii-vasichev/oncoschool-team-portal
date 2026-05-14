@@ -8,9 +8,9 @@ import {
 import type { CFSegmentSnapshot } from "@/lib/types";
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "No date";
+  if (!value) return "Без даты";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No date";
+  if (Number.isNaN(date.getTime())) return "Без даты";
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
@@ -21,7 +21,7 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 function formatDelta(value: number | null): string {
-  if (value === null) return "No comparison";
+  if (value === null) return "Нет сравнения";
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${formatContentFactorySegmentCount(value)}`;
 }
@@ -53,7 +53,7 @@ export function ContentFactorySegmentSnapshotList({
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold text-foreground">
-            Snapshot history
+            История замеров
           </h2>
         </div>
       </div>
@@ -61,14 +61,14 @@ export function ContentFactorySegmentSnapshotList({
       <div className="grid gap-3 border-b border-border/60 px-4 py-3 md:grid-cols-3">
         <div className="rounded-md bg-muted/30 px-3 py-2">
           <span className="block text-2xs uppercase text-muted-foreground">
-            Latest
+            Последний замер
           </span>
           <span className="text-sm font-semibold text-foreground">
             {comparison.latest
               ? formatContentFactorySegmentCount(
                   comparison.latest.population_count,
                 )
-              : "No snapshots"}
+                : "Замеров нет"}
           </span>
           {comparison.latest && (
             <span className="mt-1 block text-xs text-muted-foreground">
@@ -78,14 +78,14 @@ export function ContentFactorySegmentSnapshotList({
         </div>
         <div className="rounded-md bg-muted/30 px-3 py-2">
           <span className="block text-2xs uppercase text-muted-foreground">
-            Previous
+            Предыдущий замер
           </span>
           <span className="text-sm font-semibold text-foreground">
             {comparison.previous
               ? formatContentFactorySegmentCount(
                   comparison.previous.population_count,
                 )
-              : "No comparison"}
+                : "Нет сравнения"}
           </span>
           {comparison.previous && (
             <span className="mt-1 block text-xs text-muted-foreground">
@@ -95,7 +95,7 @@ export function ContentFactorySegmentSnapshotList({
         </div>
         <div className="rounded-md bg-muted/30 px-3 py-2">
           <span className="block text-2xs uppercase text-muted-foreground">
-            Delta
+            Изменение
           </span>
           <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
             <DeltaIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -111,7 +111,7 @@ export function ContentFactorySegmentSnapshotList({
 
       {sortedSnapshots.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          No population snapshots yet.
+          Замеров размера аудитории пока нет.
         </div>
       ) : (
         <div className="divide-y divide-border/60">

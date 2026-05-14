@@ -31,9 +31,9 @@ type ActiveFilter = "all" | "active" | "inactive";
 type SourceFilter = "all" | CFSegmentSource;
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "No refresh";
+  if (!value) return "Нет обновления";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No refresh";
+  if (Number.isNaN(date.getTime())) return "Нет обновления";
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
@@ -132,10 +132,10 @@ export default function ContentFactorySegmentsPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Segments
+              Аудитории
             </h1>
             <p className="text-sm text-muted-foreground">
-              Audience mirrors, population refreshes, and snapshot history
+              Внешние аудитории, обновления размера базы и история замеров
             </p>
           </div>
         </div>
@@ -149,7 +149,7 @@ export default function ContentFactorySegmentsPage() {
           >
             <Link href="/content-factory/segments/analytics">
               <BarChart3 className="h-3.5 w-3.5" />
-              Analytics
+              Аналитика
             </Link>
           </Button>
           <Button
@@ -169,7 +169,7 @@ export default function ContentFactorySegmentsPage() {
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-3.5 w-3.5" />
-            New segment
+            Новая аудитория
           </Button>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function ContentFactorySegmentsPage() {
             <Input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or source ID"
+              placeholder="Поиск по названию или внешнему ID"
               className="h-9 border-border/70 bg-muted/20 pl-8 text-sm"
             />
           </div>
@@ -193,9 +193,9 @@ export default function ContentFactorySegmentsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
-              <SelectItem value="all">All states</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">Все статусы</SelectItem>
+              <SelectItem value="active">Активные</SelectItem>
+              <SelectItem value="inactive">Неактивные</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -206,14 +206,14 @@ export default function ContentFactorySegmentsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
-              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="all">Все источники</SelectItem>
               <SelectItem value="getcourse">GetCourse</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <p className="self-center text-sm text-muted-foreground">
-          {summary.total} total · {summary.active} active · {summary.inactive} inactive ·{" "}
-          {formatContentFactorySegmentCount(summary.population)} people
+          {summary.total} всего · {summary.active} активных ·{" "}
+          {summary.inactive} неактивных · {formatContentFactorySegmentCount(summary.population)}
         </p>
       </div>
 
@@ -221,10 +221,10 @@ export default function ContentFactorySegmentsPage() {
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
           <Users className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            No segments found
+            Аудитории не найдены
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Add a known external segment ID or adjust the filters.
+            Добавьте известный внешний ID аудитории или измените фильтры.
           </p>
         </div>
       ) : (
@@ -251,7 +251,7 @@ export default function ContentFactorySegmentsPage() {
                           : "border-muted-foreground/20 bg-muted text-muted-foreground"
                       }
                     >
-                      {segment.is_active ? "Active" : "Inactive"}
+                      {segment.is_active ? "Активна" : "Неактивна"}
                     </Badge>
                     <code className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                       {segment.source_segment_id}
@@ -261,26 +261,26 @@ export default function ContentFactorySegmentsPage() {
                     {segment.name}
                   </h2>
                   <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                    {segment.description?.trim() || "Description is empty"}
+                    {segment.description?.trim() || "Описание не заполнено"}
                   </p>
                 </Link>
 
                 <div className="grid shrink-0 gap-2 text-xs text-muted-foreground sm:grid-cols-3 lg:w-[500px]">
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                    <span className="block text-2xs uppercase">Population</span>
+                    <span className="block text-2xs uppercase">Размер</span>
                     <span className="font-medium text-foreground">
                       {formatContentFactorySegmentCount(segment.population_count)}
                     </span>
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                    <span className="block text-2xs uppercase">Owner</span>
+                    <span className="block text-2xs uppercase">Владелец</span>
                     <span className="font-medium text-foreground">
                       {memberNames.get(segment.owner_id ?? "") ??
                         getContentFactoryDisplayName(segment.owner_id, [])}
                     </span>
                   </div>
                   <div className="rounded-md bg-muted/30 px-2 py-1.5">
-                    <span className="block text-2xs uppercase">Updated</span>
+                    <span className="block text-2xs uppercase">Обновлено</span>
                     <span className="font-medium text-foreground">
                       {formatDateTime(segment.last_fetched_at ?? segment.updated_at)}
                     </span>
@@ -295,7 +295,7 @@ export default function ContentFactorySegmentsPage() {
                   onClick={() => setRefreshSegment(segment)}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
+                  Обновить
                 </Button>
               </div>
             </div>

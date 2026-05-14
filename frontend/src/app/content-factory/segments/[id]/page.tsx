@@ -20,9 +20,9 @@ import {
 import type { CFExternalSegment, CFSegmentSnapshot, TeamMember } from "@/lib/types";
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "No date";
+  if (!value) return "Без даты";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No date";
+  if (Number.isNaN(date.getTime())) return "Без даты";
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "short",
@@ -109,13 +109,13 @@ export default function ContentFactorySegmentDetailPage() {
       <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
         <Users className="mx-auto h-8 w-8 text-muted-foreground" />
         <h1 className="mt-3 text-sm font-semibold text-foreground">
-          Segment not found
+          Аудитория не найдена
         </h1>
         <Link
           href="/content-factory/segments"
           className="mt-2 inline-flex text-sm text-primary hover:underline"
         >
-          Back to segments
+          К аудиториям
         </Link>
       </div>
     );
@@ -130,7 +130,7 @@ export default function ContentFactorySegmentDetailPage() {
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Segments
+            Аудитории
           </Link>
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -152,11 +152,11 @@ export default function ContentFactorySegmentDetailPage() {
                       : "border-muted-foreground/20 bg-muted text-muted-foreground"
                   }
                 >
-                  {segment.is_active ? "Active" : "Inactive"}
+                  {segment.is_active ? "Активна" : "Неактивна"}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                {segment.description?.trim() || "Description is empty"}
+                {segment.description?.trim() || "Описание не заполнено"}
               </p>
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function ContentFactorySegmentDetailPage() {
           onClick={() => setRefreshOpen(true)}
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          Refresh population
+          Обновить размер
         </Button>
       </div>
 
@@ -176,7 +176,7 @@ export default function ContentFactorySegmentDetailPage() {
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <span className="block text-2xs uppercase text-muted-foreground">
-              Population
+              Размер базы
             </span>
             <span className="text-sm font-semibold text-foreground">
               {formatContentFactorySegmentCount(segment.population_count)}
@@ -184,7 +184,7 @@ export default function ContentFactorySegmentDetailPage() {
           </div>
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <span className="block text-2xs uppercase text-muted-foreground">
-              Source ID
+              Внешний ID
             </span>
             <span className="text-sm font-semibold text-foreground">
               {segment.source_segment_id}
@@ -192,7 +192,7 @@ export default function ContentFactorySegmentDetailPage() {
           </div>
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <span className="block text-2xs uppercase text-muted-foreground">
-              Owner
+              Владелец
             </span>
             <span className="text-sm font-semibold text-foreground">
               {memberNames.get(segment.owner_id ?? "") ??
@@ -201,7 +201,7 @@ export default function ContentFactorySegmentDetailPage() {
           </div>
           <div className="rounded-md bg-muted/30 px-3 py-2">
             <span className="block text-2xs uppercase text-muted-foreground">
-              Last refresh
+              Последнее обновление
             </span>
             <span className="text-sm font-semibold text-foreground">
               {formatDateTime(segment.last_fetched_at ?? segment.updated_at)}
@@ -216,7 +216,7 @@ export default function ContentFactorySegmentDetailPage() {
             rel="noreferrer"
             className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
           >
-            Open source segment
+            Открыть источник
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         )}

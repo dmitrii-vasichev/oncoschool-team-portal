@@ -102,7 +102,7 @@ export default function ContentFactoryCalendarPage() {
       setMembers(memberRes);
     } catch {
       if (isLatestRequest()) {
-        toastError("Не удалось загрузить календарь Content Factory");
+        toastError("Не удалось загрузить календарь Контент-фабрики");
       }
     } finally {
       if (isLatestRequest()) {
@@ -176,7 +176,7 @@ export default function ContentFactoryCalendarPage() {
         >
           <Link href="/content-factory/dashboard">
             <Factory className="h-3.5 w-3.5" />
-            Dashboard
+            Обзор
           </Link>
         </Button>
       </div>
@@ -252,7 +252,7 @@ export default function ContentFactoryCalendarPage() {
                         />
                       </div>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {bundleNames.get(publication.bundle_id) ?? "Bundle"} ·{" "}
+                        {bundleNames.get(publication.bundle_id) ?? "Кампания"} ·{" "}
                         {platformNames.get(publication.platform_id) ?? "Платформа"} ·{" "}
                         {formatNames.get(publication.format_id) ?? "Формат"}
                       </p>

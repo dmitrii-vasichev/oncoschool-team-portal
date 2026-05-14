@@ -21,7 +21,7 @@ import type { CFExternalSegment } from "@/lib/types";
 function parsePopulation(value: string): number {
   const parsed = Number(value.trim());
   if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error("Population count must be a non-negative integer");
+    throw new Error("Размер базы должен быть целым числом не меньше нуля");
   }
   return parsed;
 }
@@ -62,7 +62,7 @@ export function ContentFactorySegmentRefreshDialog({
       parsedPopulation = parsePopulation(populationCount);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Invalid population count";
+        err instanceof Error ? err.message : "Некорректный размер базы";
       setError(message);
       return;
     }
@@ -75,10 +75,10 @@ export function ContentFactorySegmentRefreshDialog({
       });
       await onRefreshed(refreshed);
       onOpenChange(false);
-      toastSuccess("Segment population refreshed");
+      toastSuccess("Размер аудитории обновлён");
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to refresh segment";
+        err instanceof Error ? err.message : "Не удалось обновить аудиторию";
       setError(message);
       toastError(message);
     } finally {
@@ -90,17 +90,17 @@ export function ContentFactorySegmentRefreshDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-lg">Refresh population</DialogTitle>
+          <DialogTitle className="text-lg">Обновить размер аудитории</DialogTitle>
           <DialogDescription>
             {segment
-              ? `${segment.name}: current ${formatContentFactorySegmentCount(segment.population_count)}`
-              : "Record a new segment population snapshot."}
+              ? `${segment.name}: сейчас ${formatContentFactorySegmentCount(segment.population_count)}`
+              : "Зафиксируйте новый замер размера аудитории."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div className="space-y-2">
-            <Label htmlFor="cf-segment-refresh-population">population_count</Label>
+            <Label htmlFor="cf-segment-refresh-population">Размер базы</Label>
             <Input
               id="cf-segment-refresh-population"
               type="number"
@@ -126,11 +126,11 @@ export function ContentFactorySegmentRefreshDialog({
               onClick={() => onOpenChange(false)}
               disabled={saving}
             >
-              Cancel
+              Отмена
             </Button>
             <Button type="submit" disabled={saving || !segment}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Record snapshot
+              Записать замер
             </Button>
           </DialogFooter>
         </form>

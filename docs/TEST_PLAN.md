@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 9.5 UX Consolidation
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts src/lib/contentFactoryUtils.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Confirm the global sidebar shows a single `Контент-фабрика` entry.
+2. Open `/content-factory/dashboard` and confirm internal Content Factory navigation appears.
+3. Confirm internal navigation reaches overview, calendar, campaigns, review queue, audiences, audience analytics, retrospectives, dictionaries, and help.
+4. Confirm headers and visible labels use Russian product wording instead of `CF`, `Bundle`, `Segment`, or other system terms.
+5. Open the retrospective dialog and confirm it uses readable fields: `Что сработало`, `Что сломалось`, `Выводы`, `Решения`, `Следующие действия`.
+6. Create or edit a retrospective using plain text lines rather than JSON.
+7. Open a retrospective detail page and confirm sections render as readable Russian content.
+8. Open `/content-factory/help` and confirm it explains the module, workflow, sections, manual data, and deferred integrations.
+9. Confirm unauthenticated access still reaches the existing protected-route behavior.
+10. Confirm desktop and mobile layouts do not overlap and the internal navigation scrolls horizontally when needed.
+
 ## Content Factory Sprint 9 Segment Usage Analytics
 
 ### Automated

@@ -159,7 +159,7 @@ export default function ContentFactoryReferencesPage() {
       } else {
         await api.deleteCFFunnelTemplate(deleteTarget.record.id);
       }
-      toastSuccess("Reference deleted");
+      toastSuccess("Запись удалена");
       setDeleteTarget(null);
       await fetchData();
     } catch (err) {
@@ -184,10 +184,10 @@ export default function ContentFactoryReferencesPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              References
+              Справочники
             </h1>
             <p className="text-sm text-muted-foreground">
-              Platforms, formats, taxonomies, and reusable funnel templates
+              Площадки, форматы, рубрики, нозологии и шаблоны кампаний
             </p>
           </div>
         </div>
@@ -210,7 +210,7 @@ export default function ContentFactoryReferencesPage() {
               onClick={openCreateDialog}
             >
               <Plus className="h-3.5 w-3.5" />
-              New record
+              Новая запись
             </Button>
           )}
         </div>
@@ -218,8 +218,8 @@ export default function ContentFactoryReferencesPage() {
 
       {!isAdmin && (
         <div className="rounded-lg border border-border/70 bg-muted/25 px-4 py-3 text-sm text-muted-foreground">
-          You can inspect Content Factory dictionaries here. Admin access is
-          required for create, edit, and delete actions.
+          Здесь можно смотреть справочники Контент-фабрики. Создавать,
+          редактировать и удалять записи могут только администраторы.
         </div>
       )}
 
@@ -246,8 +246,8 @@ export default function ContentFactoryReferencesPage() {
               {CF_REFERENCE_TABLE_LABELS[activeTable]}
             </p>
             <p className="text-sm text-muted-foreground">
-              {activeSummary.total} total · {activeSummary.active} active ·{" "}
-              {activeSummary.inactive} inactive
+              {activeSummary.total} всего · {activeSummary.active} активных ·{" "}
+              {activeSummary.inactive} неактивных
             </p>
           </div>
           {isAdmin && (
@@ -259,7 +259,7 @@ export default function ContentFactoryReferencesPage() {
               onClick={openCreateDialog}
             >
               <Plus className="h-3.5 w-3.5" />
-              Add {CF_REFERENCE_TABLE_LABELS[activeTable]}
+              Добавить запись
             </Button>
           )}
         </div>
@@ -294,23 +294,23 @@ export default function ContentFactoryReferencesPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete reference record?</AlertDialogTitle>
+            <AlertDialogTitle>Удалить запись справочника?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget
-                ? `${getContentFactoryReferenceLabel(deleteTarget.record)} will be deleted if it is not used by Content Factory records.`
-                : "This reference record will be deleted if it is not in use."}
+                ? `${getContentFactoryReferenceLabel(deleteTarget.record)} будет удалена, если она не используется в Контент-фабрике.`
+                : "Запись будет удалена, если она нигде не используется."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={Boolean(deletingId)}>
-              Cancel
+              Отмена
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               disabled={Boolean(deletingId)}
               onClick={() => void handleDeleteConfirmed()}
             >
-              Delete
+              Удалить
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

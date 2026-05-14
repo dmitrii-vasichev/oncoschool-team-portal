@@ -170,7 +170,7 @@ export default function ContentFactoryPublicationDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href="/content-factory/bundles">
             <ArrowLeft className="h-3.5 w-3.5" />
-            К bundles
+            К кампаниям
           </Link>
         </Button>
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
@@ -200,7 +200,7 @@ export default function ContentFactoryPublicationDetailPage() {
         <Button asChild variant="ghost" size="sm" className="h-8 rounded-md px-2 text-xs">
           <Link href={bundleHref}>
             <ArrowLeft className="h-3.5 w-3.5" />
-            К bundle
+            К кампании
           </Link>
         </Button>
         <Button
@@ -249,7 +249,7 @@ export default function ContentFactoryPublicationDetailPage() {
             onClick={() => setEditOpen(true)}
           >
             <Edit3 className="h-3.5 w-3.5" />
-            Edit publication
+            Редактировать
           </Button>
         </div>
       </section>
@@ -271,11 +271,13 @@ export default function ContentFactoryPublicationDetailPage() {
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold text-foreground">Media refs</h2>
+              <h2 className="text-sm font-semibold text-foreground">
+                Медиа и материалы
+              </h2>
             </div>
             {publication.media_refs.length === 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">
-                Media refs не указаны
+                Медиа и материалы не указаны
               </p>
             ) : (
               <ul className="mt-3 space-y-2">
@@ -304,38 +306,38 @@ export default function ContentFactoryPublicationDetailPage() {
         <aside className="space-y-4">
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
             <h2 className="text-sm font-semibold text-foreground">
-              Production details
+              Детали публикации
             </h2>
             <dl className="mt-3 space-y-3 text-sm">
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Schedule</dt>
+                <dt className="text-xs uppercase text-muted-foreground">План</dt>
                 <dd className="mt-1 flex items-center gap-1.5 text-foreground">
                   <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
                   {formatDateTime(publication.scheduled_at)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Published</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Опубликовано</dt>
                 <dd className="mt-1 text-foreground">
                   {formatDateTime(publication.actual_published_at)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Rubric</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Рубрика</dt>
                 <dd className="mt-1 text-foreground">{rubricName}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Nosology</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Нозология</dt>
                 <dd className="mt-1 text-foreground">{nosologyName}</dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Post ID</dt>
+                <dt className="text-xs uppercase text-muted-foreground">ID поста</dt>
                 <dd className="mt-1 text-foreground">
                   {publication.platform_post_id || "Не указан"}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs uppercase text-muted-foreground">Post URL</dt>
+                <dt className="text-xs uppercase text-muted-foreground">Ссылка на пост</dt>
                 <dd className="mt-1">
                   {publication.platform_post_url ? (
                     <a
@@ -355,7 +357,7 @@ export default function ContentFactoryPublicationDetailPage() {
               {publication.cancelled_reason && (
                 <div>
                   <dt className="text-xs uppercase text-muted-foreground">
-                    Cancelled reason
+                    Причина отмены
                   </dt>
                   <dd className="mt-1 whitespace-pre-wrap text-foreground">
                     {publication.cancelled_reason}

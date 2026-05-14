@@ -119,10 +119,10 @@ export default function ContentFactoryRetrosPage() {
           </span>
           <div className="min-w-0">
             <h1 className="text-xl font-semibold leading-7 text-foreground">
-              Retrospectives
+              Ретроспективы
             </h1>
             <p className="text-sm text-muted-foreground">
-              Evidence log для результатов, решений и следующих действий
+              Журнал результатов, решений и следующих действий команды
             </p>
           </div>
         </div>
@@ -144,14 +144,14 @@ export default function ContentFactoryRetrosPage() {
             onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-3.5 w-3.5" />
-            New retro
+            Новая ретроспектива
           </Button>
         </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          {retros.length} {retros.length === 1 ? "retro" : "retros"}
+          {retros.length} ретроспектив
         </p>
         <div className="w-full sm:w-56">
           <Select
@@ -162,7 +162,7 @@ export default function ContentFactoryRetrosPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
-              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="all">Все форматы</SelectItem>
               {RETRO_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {CF_RETRO_TYPE_LABELS[type]}
@@ -207,20 +207,20 @@ export default function ContentFactoryRetrosPage() {
                       {getContentFactoryRetroTitle(retro)}
                     </h2>
                     <p className="line-clamp-2 text-sm leading-6 text-muted-foreground">
-                      {retro.notes?.trim() || "Notes не заполнены"}
+                      {retro.notes?.trim() || "Дополнительные заметки не заполнены"}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {bundleNames.get(retro.bundle_id ?? "") ?? "Без bundle"} ·{" "}
+                      {bundleNames.get(retro.bundle_id ?? "") ?? "Без кампании"} ·{" "}
                       {memberNames.get(retro.facilitator_id) ??
                         getContentFactoryDisplayName(retro.facilitator_id, [])}
                     </p>
                   </div>
                   <div className="grid shrink-0 grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-5 lg:w-[420px]">
-                    <RetroStat label="Best" value={summary.bestByObjective} />
-                    <RetroStat label="Broken" value={summary.broken} />
-                    <RetroStat label="Learnings" value={summary.learnings} />
-                    <RetroStat label="Decisions" value={summary.decisions} />
-                    <RetroStat label="Actions" value={summary.actions} />
+                    <RetroStat label="Сработало" value={summary.bestByObjective} />
+                    <RetroStat label="Сломалось" value={summary.broken} />
+                    <RetroStat label="Выводы" value={summary.learnings} />
+                    <RetroStat label="Решения" value={summary.decisions} />
+                    <RetroStat label="Действия" value={summary.actions} />
                   </div>
                 </div>
               </Link>
