@@ -19,6 +19,7 @@ test("sidebar exposes content factory navigation", () => {
 
   assert.match(source, /href:\s*"\/content-factory\/dashboard"/);
   assert.match(source, /href:\s*"\/content-factory\/bundles"/);
+  assert.match(source, /href:\s*"\/content-factory\/segments"/);
   assert.match(source, /href:\s*"\/content-factory\/references"/);
   assert.match(source, /label:\s*"Content Factory"/);
 });
@@ -31,6 +32,7 @@ test("header knows content factory workspace routes", () => {
   assert.match(source, /\/content-factory\/bundles/);
   assert.match(source, /\/content-factory\/publications/);
   assert.match(source, /\/content-factory\/review/);
+  assert.match(source, /\/content-factory\/segments/);
   assert.match(source, /\/content-factory\/retros/);
   assert.match(source, /\/content-factory\/references/);
 });
@@ -211,4 +213,57 @@ test("reference admin route loads inactive dictionaries and gates mutations", ()
   assert.match(source, /PermissionService\.isAdmin/);
   assert.match(source, /ContentFactoryReferenceDialog/);
   assert.match(source, /ContentFactoryReferenceTable/);
+});
+
+test("segment workspace components expose create refresh and snapshots", () => {
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactorySegmentDialog.tsx"),
+    true,
+  );
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactorySegmentRefreshDialog.tsx"),
+    true,
+  );
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactorySegmentSnapshotList.tsx"),
+    true,
+  );
+
+  const createDialogSource = readSource(
+    "components/content-factory/ContentFactorySegmentDialog.tsx",
+  );
+  const refreshDialogSource = readSource(
+    "components/content-factory/ContentFactorySegmentRefreshDialog.tsx",
+  );
+  const snapshotSource = readSource(
+    "components/content-factory/ContentFactorySegmentSnapshotList.tsx",
+  );
+
+  assert.match(createDialogSource, /api\.createCFSegment/);
+  assert.match(createDialogSource, /source_segment_id/);
+  assert.match(createDialogSource, /population_count/);
+  assert.match(refreshDialogSource, /api\.refreshCFSegment/);
+  assert.match(refreshDialogSource, /population_count/);
+  assert.match(snapshotSource, /compareContentFactorySegmentSnapshots/);
+  assert.match(snapshotSource, /formatContentFactorySegmentCount/);
+});
+
+test("segment workspace routes load registry detail and snapshot history", () => {
+  assert.equal(sourceExists("app/content-factory/segments/page.tsx"), true);
+  assert.equal(sourceExists("app/content-factory/segments/[id]/page.tsx"), true);
+
+  const listSource = readSource("app/content-factory/segments/page.tsx");
+  const detailSource = readSource("app/content-factory/segments/[id]/page.tsx");
+
+  assert.match(listSource, /ContentFactorySegmentsPage/);
+  assert.match(listSource, /api\.getCFSegments\(\{ only_active: false \}\)/);
+  assert.match(listSource, /ContentFactorySegmentDialog/);
+  assert.match(listSource, /ContentFactorySegmentRefreshDialog/);
+  assert.match(listSource, /filterContentFactorySegments/);
+  assert.match(listSource, /\/content-factory\/segments\/\$\{segment\.id\}/);
+  assert.match(detailSource, /ContentFactorySegmentDetailPage/);
+  assert.match(detailSource, /api\.getCFSegment/);
+  assert.match(detailSource, /api\.getCFSegmentSnapshots/);
+  assert.match(detailSource, /ContentFactorySegmentRefreshDialog/);
+  assert.match(detailSource, /ContentFactorySegmentSnapshotList/);
 });

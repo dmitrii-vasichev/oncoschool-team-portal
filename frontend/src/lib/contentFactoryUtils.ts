@@ -6,6 +6,8 @@ import type {
   CFPublicationUpdateRequest,
   CFPublicationStatus,
   CFRetroType,
+  CFSegmentSnapshot,
+  CFSegmentSource,
   MemberRole,
 } from "./types";
 
@@ -63,6 +65,10 @@ export const CF_REFERENCE_TABLE_LABELS: Record<
   rubrics: "Rubrics",
   nosologies: "Nosologies",
   funnel_templates: "Funnel templates",
+};
+
+export const CF_SEGMENT_SOURCE_LABELS: Record<CFSegmentSource, string> = {
+  getcourse: "GetCourse",
 };
 
 export const CF_BUNDLE_STATUSES: CFBundleStatus[] = [
@@ -203,6 +209,42 @@ type ReferenceLabelRecord = {
 
 type ReferenceActivityRecord = {
   is_active?: boolean | null;
+};
+
+export type ContentFactorySegmentFilters = {
+  search?: string | null;
+  active?: "all" | "active" | "inactive";
+  source?: "all" | string | null;
+};
+
+type SegmentLike = {
+  id?: string;
+  name?: string;
+  source_segment_id?: string;
+  source?: string;
+  is_active: boolean;
+  population_count?: number;
+};
+
+type SegmentSnapshotLike = Pick<
+  CFSegmentSnapshot,
+  "fetched_at" | "population_count"
+> & {
+  id?: string;
+};
+
+export type ContentFactorySegmentSummary = {
+  total: number;
+  active: number;
+  inactive: number;
+  population: number;
+};
+
+export type ContentFactorySegmentSnapshotComparison<TSnapshot> = {
+  latest: TSnapshot | null;
+  previous: TSnapshot | null;
+  delta: number | null;
+  deltaPercent: number | null;
 };
 
 export function canAccessContentFactory(
@@ -472,6 +514,86 @@ export function getAvailableContentFactorySegments<
   return segments.filter(
     (segment) => segment.is_active && !selectedSegmentIds.has(segment.id),
   );
+}
+
+export function formatContentFactorySegmentCount(count: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits: 0,
+  })
+    .format(count)
+    .replace(/\u00a0/g, " ");
+}
+
+export function filterContentFactorySegments<TSegment extends SegmentLike>(
+  segments: TSegment[],
+  filters: ContentFactorySegmentFilters,
+): TSegment[] {
+  const search = filters.search?.trim().toLowerCase();
+  return segments.filter((segment) => {
+    if (filters.active === "active" && !segment.is_active) return false;
+    if (filters.active === "inactive" && segment.is_active) return false;
+    if (filters.source && filters.source !== "all" && segment.source !== filters.source) {
+      return false;
+    }
+    if (search) {
+      const haystack = [
+        segment.name ?? "",
+        segment.source_segment_id ?? "",
+        segment.source ?? "",
+        segment.id ?? "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+export function summarizeContentFactorySegments<TSegment extends SegmentLike>(
+  segments: TSegment[],
+): ContentFactorySegmentSummary {
+  const active = segments.filter((segment) => segment.is_active).length;
+  return {
+    total: segments.length,
+    active,
+    inactive: segments.length - active,
+    population: segments.reduce(
+      (total, segment) => total + (segment.population_count ?? 0),
+      0,
+    ),
+  };
+}
+
+export function compareContentFactorySegmentSnapshots<
+  TSnapshot extends SegmentSnapshotLike,
+>(
+  snapshots: TSnapshot[],
+): ContentFactorySegmentSnapshotComparison<TSnapshot> {
+  const sorted = [...snapshots].sort(
+    (left, right) =>
+      (dateTime(right.fetched_at) ?? 0) - (dateTime(left.fetched_at) ?? 0),
+  );
+  const latest = sorted[0] ?? null;
+  const previous = sorted[1] ?? null;
+  if (!latest || !previous) {
+    return {
+      latest,
+      previous,
+      delta: null,
+      deltaPercent: null,
+    };
+  }
+  const delta = latest.population_count - previous.population_count;
+  return {
+    latest,
+    previous,
+    delta,
+    deltaPercent:
+      previous.population_count === 0
+        ? null
+        : (delta / previous.population_count) * 100,
+  };
 }
 
 const REVIEW_QUEUE_META: Array<{

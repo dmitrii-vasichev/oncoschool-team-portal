@@ -8,21 +8,26 @@ const {
   CF_PUBLICATION_STATUS_LABELS,
   CF_REFERENCE_TABLE_LABELS,
   CF_RETRO_TYPE_LABELS,
+  CF_SEGMENT_SOURCE_LABELS,
   buildContentFactoryBundleParams,
   buildContentFactoryUtm,
   canAccessContentFactory,
   cleanContentFactoryPublicationUpdate,
+  compareContentFactorySegmentSnapshots,
   filterContentFactoryPublications,
+  filterContentFactorySegments,
   formatContentFactoryBundleCount,
   formatContentFactoryMetricValue,
   formatContentFactoryPublicationCount,
   formatContentFactoryRetroPeriod,
+  formatContentFactorySegmentCount,
   getAvailableContentFactorySegments,
   getContentFactoryDisplayName,
   getContentFactoryReferenceLabel,
   getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
+  summarizeContentFactorySegments,
   summarizeContentFactoryReferenceRecords,
   summarizeContentFactoryRetroSections,
   summarizeContentFactoryDashboard,
@@ -39,6 +44,10 @@ test("reference table labels expose Sprint 7 dictionaries", () => {
   assert.equal(CF_REFERENCE_TABLE_LABELS?.rubrics, "Rubrics");
   assert.equal(CF_REFERENCE_TABLE_LABELS?.nosologies, "Nosologies");
   assert.equal(CF_REFERENCE_TABLE_LABELS?.funnel_templates, "Funnel templates");
+});
+
+test("segment source labels expose Sprint 8 segment sources", () => {
+  assert.equal(CF_SEGMENT_SOURCE_LABELS?.getcourse, "GetCourse");
 });
 
 test("content factory access allows admins and flagged active members", () => {
@@ -326,6 +335,111 @@ test("getAvailableContentFactorySegments excludes selected segment targets", () 
     ]).map((segment) => segment.id),
     ["keep"],
   );
+});
+
+test("formatContentFactorySegmentCount renders grouped population counts", () => {
+  assert.equal(typeof formatContentFactorySegmentCount, "function");
+  assert.equal(formatContentFactorySegmentCount(0), "0");
+  assert.equal(formatContentFactorySegmentCount(1234567), "1 234 567");
+});
+
+test("filterContentFactorySegments applies search, active, and source filters", () => {
+  assert.equal(typeof filterContentFactorySegments, "function");
+  const segments = [
+    {
+      id: "keep",
+      name: "Breast cancer survivors",
+      source_segment_id: "gc-001",
+      source: "getcourse",
+      is_active: true,
+    },
+    {
+      id: "inactive",
+      name: "Archived webinars",
+      source_segment_id: "gc-002",
+      source: "getcourse",
+      is_active: false,
+    },
+    {
+      id: "other-source",
+      name: "Clinic leads",
+      source_segment_id: "crm-001",
+      source: "crm",
+      is_active: true,
+    },
+  ];
+
+  assert.deepEqual(
+    filterContentFactorySegments(segments, {
+      search: "survivors",
+      active: "active",
+      source: "getcourse",
+    }).map((segment) => segment.id),
+    ["keep"],
+  );
+  assert.deepEqual(
+    filterContentFactorySegments(segments, {
+      search: "gc-002",
+      active: "inactive",
+      source: "all",
+    }).map((segment) => segment.id),
+    ["inactive"],
+  );
+});
+
+test("summarizeContentFactorySegments counts rows and total population", () => {
+  assert.equal(typeof summarizeContentFactorySegments, "function");
+  assert.deepEqual(
+    summarizeContentFactorySegments([
+      { id: "1", is_active: true, population_count: 10 },
+      { id: "2", is_active: false, population_count: 5 },
+      { id: "3", is_active: true, population_count: 7 },
+    ]),
+    {
+      total: 3,
+      active: 2,
+      inactive: 1,
+      population: 22,
+    },
+  );
+});
+
+test("compareContentFactorySegmentSnapshots returns latest previous and delta", () => {
+  assert.equal(typeof compareContentFactorySegmentSnapshots, "function");
+  assert.deepEqual(
+    compareContentFactorySegmentSnapshots([
+      {
+        id: "latest",
+        fetched_at: "2026-05-14T12:00:00Z",
+        population_count: 150,
+      },
+      {
+        id: "previous",
+        fetched_at: "2026-05-13T12:00:00Z",
+        population_count: 100,
+      },
+    ]),
+    {
+      latest: {
+        id: "latest",
+        fetched_at: "2026-05-14T12:00:00Z",
+        population_count: 150,
+      },
+      previous: {
+        id: "previous",
+        fetched_at: "2026-05-13T12:00:00Z",
+        population_count: 100,
+      },
+      delta: 50,
+      deltaPercent: 50,
+    },
+  );
+  assert.deepEqual(compareContentFactorySegmentSnapshots([]), {
+    latest: null,
+    previous: null,
+    delta: null,
+    deltaPercent: null,
+  });
 });
 
 test("retro labels expose retrospective types", () => {

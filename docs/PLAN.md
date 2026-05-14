@@ -1,45 +1,47 @@
-# Active Plan: Content Factory Sprint 7 Reference Admin
+# Active Plan: Content Factory Sprint 8 Segment Workspace
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a Content Factory reference-table admin workspace for platforms, formats, rubrics, nosologies, and funnel templates.
+**Goal:** Add a Content Factory segment registry and detail workspace for segment mirrors, population refreshes, and snapshot comparisons.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-7-reference-admin-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-8-segments-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add frontend request types and API methods for reference create, update, delete, and inactive reads.
-2. Add pure helpers for reference-table labels, display names, and active/inactive summaries.
-3. Add a reusable reference dialog with JSON validation for `capabilities` and `template_publications`.
-4. Add a reusable reference table with admin-only edit/delete actions.
-5. Add `/content-factory/references` with five tabs, admin create/edit/delete, and read-only access for non-admin Content Factory users.
-6. Add sidebar/header navigation, run verification, and update durable repo docs.
+1. Add frontend API detail method and pure helpers for segment filtering, summaries, and snapshot comparison.
+2. Add a segment create dialog for manual external segment mirrors.
+3. Add a segment refresh dialog for population-count snapshots.
+4. Add a snapshot list/comparison component.
+5. Add `/content-factory/segments` registry with search, active/source filters, create, refresh, and detail links.
+6. Add `/content-factory/segments/[id]` detail with metadata and snapshot history.
+7. Add sidebar/header navigation, run verification, and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-7-reference-admin`.
+- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-8-segments`.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.
 - Sprint 5 segments, UTM, manual metrics, and review queues are merged to `main`.
 - Sprint 6 retrospective workspace is merged to `main`.
+- Sprint 7 reference admin workspace is merged to `main`.
 
 **Definition of done:**
 
-- `/content-factory/references` lists platforms, formats, rubrics, nosologies, and funnel templates, including inactive records.
-- Users with Content Factory access can view reference records.
-- Admin users can create, edit, and delete reference records through the UI.
-- Non-admin Content Factory users see a read-only state and no mutation controls.
-- JSON fields are validated client-side before requests are sent.
-- Backend 409 delete failures are shown as clear user-facing errors.
+- `/content-factory/segments` lists active and inactive segment mirrors.
+- Users with Content Factory access can create manual segment mirrors.
+- Users with Content Factory access can refresh segment population counts and create snapshots.
+- `/content-factory/segments/[id]` shows segment metadata, latest/previous snapshot comparison, and snapshot history.
+- Search, source, and active filters work without a page reload.
+- Snapshot comparison handles zero, one, and many snapshots safely.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
@@ -52,6 +54,28 @@ cd frontend && npm run lint
 cd frontend && npm run build
 git diff --check
 ```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 50 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 134 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/segments` and `/content-factory/segments/[id]`.
+- Local dev server smoke on `http://127.0.0.1:3007/content-factory/segments` returned HTTP 200 and compiled the route.
+- `git diff --check` passed.
+
+---
+
+# Previous Plan: Content Factory Sprint 7 Reference Admin
+
+> **For agentic workers:** Sprint 7 is complete and merged. The implementation plan is `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`.
+
+**Goal:** Add a Content Factory reference-table admin workspace for platforms, formats, rubrics, nosologies, and funnel templates.
+
+**Implementation status:**
+
+- Implemented; automated verification passed; merged to `main` through PR #185.
 
 **Latest verification result:**
 

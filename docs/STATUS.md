@@ -1,8 +1,52 @@
 # Status
 
+## Content Factory Sprint 8 Segment Workspace
+
+- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-8-segments`
+- Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-7 frontend workspace
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-8-segments-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-8-segments.md`
+- Scope: segment registry, segment detail, create dialog, refresh dialog, snapshot comparison helpers, snapshot list, and navigation
+- Latest progress:
+  - Merged Sprint 7 through PR #185.
+  - Confirmed local `main` is clean and aligned with `origin/main`.
+  - Created branch `codex/content-factory-sprint-8-segments`.
+  - Confirmed backend segment list/create/detail/refresh/snapshot endpoints already exist.
+  - Wrote the Sprint 8 segment workspace design and implementation plan.
+  - Made Sprint 8 the active repository plan in `docs/PLAN.md`.
+  - Added failing Sprint 8 source/helper tests and verified the red state.
+  - Added `api.getCFSegment` for segment detail loading.
+  - Added segment helpers for source labels, population formatting, registry filtering, summary counts, and latest-vs-previous snapshot comparison.
+  - Added `ContentFactorySegmentDialog` for manual segment mirror creation.
+  - Added `ContentFactorySegmentRefreshDialog` for population-count refresh snapshots.
+  - Added `ContentFactorySegmentSnapshotList` for snapshot comparison and history.
+  - Added `/content-factory/segments` registry with search, active/source filters, create, refresh, owner labels, and detail links.
+  - Added `/content-factory/segments/{id}` detail view with metadata, source link, refresh action, and snapshot history.
+  - Added Content Factory segment navigation in the sidebar and header breadcrumbs.
+  - Ran Sprint 8 frontend verification successfully.
+  - Ran a local dev server smoke for `/content-factory/segments`.
+- Key decisions:
+  - Keep Sprint 8 frontend-heavy and reuse existing backend segment endpoints.
+  - Follow the backend permission contract: Content Factory access users can create segment mirrors and refresh population counts.
+  - Avoid snapshot notes in the first UI because the current backend service does not persist them.
+  - Defer automatic GetCourse synchronization and segment update/deactivate/delete endpoints.
+- Next actions:
+  - Commit and push Sprint 8.
+  - Open a PR for review and merge when checks pass.
+  - Run authenticated manual QA against real segment data when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 50 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 134 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/segments` and `/content-factory/segments/[id]`.
+  - Local dev server smoke on `http://127.0.0.1:3007/content-factory/segments` returned HTTP 200 and compiled the route.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 7 Reference Admin
 
-- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-7-reference-admin`
+- Current phase: implemented; automated verification passed; merged to `main` through PR #185
 - Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-6 frontend workspace
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-7-reference-admin-design.md`
@@ -24,15 +68,16 @@
   - Added Content Factory reference navigation in the sidebar and header breadcrumbs.
   - Ran Sprint 7 frontend verification successfully.
   - Ran a local dev server smoke for `/content-factory/references`.
+  - Committed and pushed Sprint 7 to `origin/codex/content-factory-sprint-7-reference-admin`.
+  - Opened PR #185 and merged it into `main`.
 - Key decisions:
   - Keep Sprint 7 frontend-heavy and reuse existing backend reference endpoints.
   - Allow all Content Factory users to view reference records, with admin-only create/edit/delete controls.
   - Load inactive records with `only_active=false` so admins can reactivate or inspect deprecated values.
   - Keep JSON fields as text areas with client-side validation in the first UI.
 - Next actions:
-  - Commit and push Sprint 7.
-  - Open a PR for review and merge when checks pass.
   - Run authenticated manual QA against real reference data when useful.
+  - Continue Sprint 8 segment workspace implementation.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 43 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 127 tests, with existing Node module-type warnings.

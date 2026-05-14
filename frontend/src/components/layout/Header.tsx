@@ -58,6 +58,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/dashboard": { title: "Content Factory", icon: Factory },
   "/content-factory/calendar": { title: "Календарь контента", icon: CalendarDays },
   "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
+  "/content-factory/segments": { title: "CF Segments", icon: Users },
   "/content-factory/review": { title: "CF Review", icon: ListChecks },
   "/content-factory/retros": { title: "CF Retros", icon: History },
   "/content-factory/references": { title: "CF References", icon: Settings2 },
@@ -119,6 +120,19 @@ function getPageMeta(
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/retros" },
         { label: pageTitle || "Retro" },
+      ],
+    };
+  }
+
+  if (pathname.startsWith("/content-factory/segments/")) {
+    const parentMeta = PAGE_META["/content-factory/segments"];
+    return {
+      ...parentMeta,
+      title: pageTitle || "Segment",
+      parent: "/content-factory/segments",
+      crumbs: [
+        { label: parentMeta.title, href: "/content-factory/segments" },
+        { label: pageTitle || "Segment" },
       ],
     };
   }

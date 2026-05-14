@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 8 Segment Workspace
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/segments` and confirm active and inactive segments load.
+2. Search by segment name and external segment ID.
+3. Filter by active state and source.
+4. Create a manual GetCourse segment mirror with name, source ID, population count, owner, and optional URL.
+5. Refresh a segment population count and confirm the registry updates.
+6. Open `/content-factory/segments/{id}` and confirm metadata, latest count, previous count, delta, and snapshot history render.
+7. Refresh the segment from the detail page and confirm a new snapshot appears.
+8. Confirm segments with no snapshots and one snapshot do not show misleading percentage deltas.
+9. Confirm unauthenticated access reaches the existing login flow instead of a blank page or runtime crash.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 7 Reference Admin
 
 ### Automated

@@ -121,6 +121,13 @@ const NAV_ITEMS: NavItem[] = [
     section: "content",
   },
   {
+    href: "/content-factory/segments",
+    label: "CF Segments",
+    icon: Users,
+    contentFactoryAccess: true,
+    section: "content",
+  },
+  {
     href: "/content-factory/review",
     label: "CF Review",
     icon: ListChecks,

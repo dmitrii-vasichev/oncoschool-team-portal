@@ -857,6 +857,10 @@ class ApiClient {
     });
   }
 
+  async getCFSegment(id: string): Promise<CFExternalSegment> {
+    return this.request<CFExternalSegment>(`/api/content-factory/segments/${id}`);
+  }
+
   async refreshCFSegment(
     segmentId: string,
     data: CFSegmentRefreshRequest
