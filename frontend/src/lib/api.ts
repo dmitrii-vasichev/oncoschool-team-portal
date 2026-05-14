@@ -84,6 +84,22 @@ import type {
   TelegramConnectionStatus,
   TelegramConnectRequest,
   TelegramVerifyRequest,
+  CFPlatform,
+  CFFormat,
+  CFRubric,
+  CFNosology,
+  CFFunnelTemplate,
+  CFBundle,
+  CFBundleCreateRequest,
+  CFBundleUpdateRequest,
+  CFBundleListParams,
+  CFPublication,
+  CFPublicationUpdateRequest,
+  CFPublicationListParams,
+  CFExternalSegment,
+  CFMetricSnapshot,
+  CFRetroNote,
+  CFRetroListParams,
   // Reports
   DailyMetric,
   DailyMetricWithDelta,
@@ -231,6 +247,18 @@ class ApiClient {
 
     if (res.status === 204) return undefined as T;
     return res.json();
+  }
+
+  private buildQuery(params?: object): string {
+    if (!params) return "";
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") {
+        searchParams.set(key, String(value));
+      }
+    }
+    const query = searchParams.toString();
+    return query ? `?${query}` : "";
   }
 
   // ==================== Auth ====================
@@ -562,6 +590,99 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(data),
     });
+  }
+
+  // ==================== Content Factory ====================
+
+  async getCFPlatforms(): Promise<CFPlatform[]> {
+    return this.request<CFPlatform[]>("/api/content-factory/platforms");
+  }
+
+  async getCFFormats(): Promise<CFFormat[]> {
+    return this.request<CFFormat[]>("/api/content-factory/formats");
+  }
+
+  async getCFRubrics(): Promise<CFRubric[]> {
+    return this.request<CFRubric[]>("/api/content-factory/rubrics");
+  }
+
+  async getCFNosologies(): Promise<CFNosology[]> {
+    return this.request<CFNosology[]>("/api/content-factory/nosologies");
+  }
+
+  async getCFFunnelTemplates(): Promise<CFFunnelTemplate[]> {
+    return this.request<CFFunnelTemplate[]>(
+      "/api/content-factory/funnel-templates"
+    );
+  }
+
+  async getCFBundles(params?: CFBundleListParams): Promise<CFBundle[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFBundle[]>(`/api/content-factory/bundles${query}`);
+  }
+
+  async createCFBundle(data: CFBundleCreateRequest): Promise<CFBundle> {
+    return this.request<CFBundle>("/api/content-factory/bundles", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFBundle(
+    id: string,
+    data: CFBundleUpdateRequest
+  ): Promise<CFBundle> {
+    return this.request<CFBundle>(`/api/content-factory/bundles/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCFPublications(
+    params?: CFPublicationListParams
+  ): Promise<CFPublication[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFPublication[]>(
+      `/api/content-factory/publications${query}`
+    );
+  }
+
+  async getCFPublicationsForBundle(bundleId: string): Promise<CFPublication[]> {
+    return this.request<CFPublication[]>(
+      `/api/content-factory/bundles/${bundleId}/publications`
+    );
+  }
+
+  async getCFPublication(id: string): Promise<CFPublication> {
+    return this.request<CFPublication>(`/api/content-factory/publications/${id}`);
+  }
+
+  async updateCFPublication(
+    id: string,
+    data: CFPublicationUpdateRequest
+  ): Promise<CFPublication> {
+    return this.request<CFPublication>(`/api/content-factory/publications/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCFSegments(options?: { only_active?: boolean }): Promise<CFExternalSegment[]> {
+    const query = this.buildQuery(options);
+    return this.request<CFExternalSegment[]>(
+      `/api/content-factory/segments${query}`
+    );
+  }
+
+  async getCFMetrics(publicationId: string): Promise<CFMetricSnapshot[]> {
+    return this.request<CFMetricSnapshot[]>(
+      `/api/content-factory/publications/${publicationId}/metrics`
+    );
+  }
+
+  async getCFRetros(params?: CFRetroListParams): Promise<CFRetroNote[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFRetroNote[]>(`/api/content-factory/retros${query}`);
   }
 
   // ==================== Task Updates ====================

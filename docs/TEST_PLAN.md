@@ -1,5 +1,40 @@
 # Test Plan
 
+## Content Factory Sprint 3 Frontend
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_auth_me_content_factory.py tests/test_content_factory_publications_api.py -q`
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Log in as an admin user and confirm `/content-factory/dashboard` and `/content-factory/calendar` are reachable from navigation.
+2. Log in as a non-admin member with `has_content_factory_access=true` and confirm the same Content Factory routes are reachable.
+3. Log in as a non-admin member without Content Factory access and confirm the Content Factory routes are blocked or redirected consistently with the portal's existing protected-route behavior.
+4. Confirm the dashboard shows bundle status, publication status, upcoming scheduled publications, overdue production work, and recent published work.
+5. Confirm the calendar groups publications by scheduled date, keeps unscheduled publications visible, and applies platform/status/responsible filters without a page reload.
+6. Confirm dashboard and calendar copy stays operational and compact, with no marketing-style hero page.
+7. In a local unauthenticated browser session, open `/content-factory/dashboard` and `/content-factory/calendar` and confirm both routes reach the existing login flow instead of a blank page or runtime crash.
+
+## Content Factory Recovery Sprint 2.5
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_bundle_service.py tests/test_cf_publication_service.py tests/test_cf_seed.py tests/test_cf_segment_metric_retro_services.py tests/test_content_factory_models.py tests/test_content_factory_permissions.py tests/test_content_factory_schemas.py tests/test_content_factory_bundles_api.py tests/test_content_factory_formats_api.py tests/test_content_factory_funnel_templates_api.py tests/test_content_factory_glossary_api.py tests/test_content_factory_glossary_service.py tests/test_content_factory_metrics_api.py tests/test_content_factory_nosologies_api.py tests/test_content_factory_platforms_api.py tests/test_content_factory_publication_service_extras.py tests/test_content_factory_publications_api.py tests/test_content_factory_retro_update.py tests/test_content_factory_retros_api.py tests/test_content_factory_rubrics_api.py tests/test_content_factory_segments_api.py tests/test_team_cf_access_api.py -q`
+- `git diff --check`
+
+### Manual
+
+1. Confirm `backend/.env` exists locally and uses `DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf` for the Docker development Content Factory database.
+2. Confirm durable Content Factory planning context is tracked in `docs/content-factory-design.md`, not in gitignored `docs/plans/`.
+3. Before Sprint 3 starts, confirm the frontend access plan accounts for `team_members.has_content_factory_access` and does not reuse legacy Telegram analysis content grants.
+
 ## Meeting Board Focus
 
 ### Automated

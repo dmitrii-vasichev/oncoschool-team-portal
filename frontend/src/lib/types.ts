@@ -68,6 +68,61 @@ export type ProjectDepartmentStatus =
   | "ready"
   | "not_required";
 export type ProjectMilestoneStatus = "planned" | "in_progress" | "done";
+export type CFProductStream =
+  | "onco_school"
+  | "nko"
+  | "medtourism"
+  | "alternative"
+  | "patient_live"
+  | "expert_live"
+  | "seasonal";
+export type CFBundleStatus =
+  | "planning"
+  | "production"
+  | "live"
+  | "retrospective"
+  | "archived";
+export type CFPublicationStatus =
+  | "draft"
+  | "needs_copy"
+  | "needs_design"
+  | "factcheck"
+  | "doctor_review"
+  | "approved"
+  | "scheduled"
+  | "published"
+  | "failed"
+  | "cancelled";
+export type CFApprovalEvent =
+  | "drafted"
+  | "reviewed"
+  | "factchecked"
+  | "doctor_approved"
+  | "scheduled"
+  | "published"
+  | "rolled_back";
+export type CFPublicationRelationType =
+  | "adapted_from"
+  | "follow_up_to"
+  | "reminder_for"
+  | "digest_includes"
+  | "replaces"
+  | "crosspost_of";
+export type CFSegmentRole = "target" | "exclusion" | "control" | "retargeting";
+export type CFMetricWindow = "3h" | "24h" | "72h" | "7d" | "final" | "custom";
+export type CFMetricSource =
+  | "manual"
+  | "api"
+  | "tgstat"
+  | "telemetr"
+  | "vk_api"
+  | "email_provider"
+  | "getcourse"
+  | "parser"
+  | "import";
+export type CFConfidence = "high" | "medium" | "low";
+export type CFRetroType = "weekly" | "monthly" | "bundle" | "adhoc";
+export type CFSegmentSource = "getcourse";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   new: "Новые",
@@ -125,6 +180,7 @@ export interface TeamMember {
   role: MemberRole;
   is_test: boolean;
   is_active: boolean;
+  has_content_factory_access: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -1014,6 +1070,285 @@ export interface ProjectLinkedTaskCreateRequest {
   assignee_id?: string | null;
   deadline?: string | null;
   label_ids?: string[];
+}
+
+export type CFJsonObject = Record<string, unknown>;
+
+export interface CFPlatform {
+  id: string;
+  code: string;
+  display_name: string;
+  is_active: boolean;
+  capabilities: CFJsonObject;
+  display_order: number;
+}
+
+export interface CFFormat {
+  id: string;
+  code: string;
+  display_name: string;
+  default_objective: string | null;
+  requires_medical_review: boolean;
+  is_active: boolean;
+  display_order: number;
+}
+
+export interface CFRubric {
+  id: string;
+  code: string;
+  display_name: string;
+  is_active: boolean;
+  deprecated_at: string | null;
+}
+
+export interface CFNosology {
+  id: string;
+  code: string;
+  display_name: string;
+  is_active: boolean;
+  deprecated_at: string | null;
+}
+
+export interface CFFunnelTemplate {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  template_publications: unknown[];
+  is_active: boolean;
+}
+
+export interface CFBundle {
+  id: string;
+  name: string;
+  product_stream: CFProductStream;
+  status: CFBundleStatus;
+  event_date: string | null;
+  brief: string | null;
+  funnel_template_id: string | null;
+  source_material_refs: unknown[];
+  owner_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFBundleCreateRequest {
+  name: string;
+  product_stream: CFProductStream;
+  owner_id: string;
+  status?: CFBundleStatus;
+  event_date?: string | null;
+  brief?: string | null;
+  funnel_template_id?: string | null;
+  source_material_refs?: unknown[];
+}
+
+export interface CFBundleUpdateRequest {
+  name?: string | null;
+  status?: CFBundleStatus | null;
+  event_date?: string | null;
+  brief?: string | null;
+  funnel_template_id?: string | null;
+  source_material_refs?: unknown[] | null;
+}
+
+export interface CFPublication {
+  id: string;
+  bundle_id: string;
+  platform_id: string;
+  format_id: string;
+  rubric_id: string | null;
+  nosology_id: string | null;
+  title: string | null;
+  body_text: string | null;
+  media_refs: unknown[];
+  scheduled_at: string | null;
+  status: CFPublicationStatus;
+  utm: CFJsonObject;
+  responsible_id: string;
+  actual_published_at: string | null;
+  platform_post_url: string | null;
+  platform_post_id: string | null;
+  version_number: number;
+  cancelled_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFPublicationCreateRequest {
+  bundle_id: string;
+  platform_id: string;
+  format_id: string;
+  responsible_id: string;
+  rubric_id?: string | null;
+  nosology_id?: string | null;
+  title?: string | null;
+  body_text?: string | null;
+  media_refs?: unknown[];
+  scheduled_at?: string | null;
+  status?: CFPublicationStatus;
+  utm?: CFJsonObject;
+}
+
+export interface CFPublicationUpdateRequest {
+  title?: string | null;
+  body_text?: string | null;
+  media_refs?: unknown[] | null;
+  scheduled_at?: string | null;
+  status?: CFPublicationStatus | null;
+  utm?: CFJsonObject | null;
+  actual_published_at?: string | null;
+  platform_post_url?: string | null;
+  platform_post_id?: string | null;
+  cancelled_reason?: string | null;
+}
+
+export interface CFPublicationVersion {
+  id: string;
+  publication_id: string;
+  version_number: number;
+  body_text: string | null;
+  edited_by_id: string;
+  edited_at: string;
+  approval_event: CFApprovalEvent;
+  source_materials_refs: unknown[];
+  notes: string | null;
+}
+
+export interface CFPublicationSegmentTarget {
+  publication_id: string;
+  external_segment_id: string;
+  role: CFSegmentRole;
+  expected_count: number | null;
+  actual_count_at_send: number | null;
+}
+
+export interface CFPublicationSegmentTargetCreateRequest {
+  external_segment_id: string;
+  role?: CFSegmentRole;
+  expected_count?: number | null;
+}
+
+export interface CFExternalSegment {
+  id: string;
+  source: CFSegmentSource;
+  source_segment_id: string;
+  source_url: string | null;
+  name: string;
+  description: string | null;
+  population_count: number;
+  is_active: boolean;
+  last_fetched_at: string | null;
+  owner_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFSegmentSnapshot {
+  id: string;
+  external_segment_id: string;
+  fetched_at: string;
+  population_count: number;
+  notes: string | null;
+}
+
+export interface CFSegmentRefreshRequest {
+  population_count: number;
+  note?: string | null;
+}
+
+export interface CFMetricSnapshot {
+  id: string;
+  publication_id: string;
+  window: CFMetricWindow;
+  metric_name: string;
+  metric_value: string | number | null;
+  metric_value_text: string | null;
+  source: CFMetricSource;
+  source_method: string | null;
+  confidence: CFConfidence;
+  raw_payload: CFJsonObject | null;
+  note: string | null;
+  captured_by_id: string | null;
+  captured_at: string;
+}
+
+export interface CFMetricSnapshotCreateRequest {
+  publication_id: string;
+  window: CFMetricWindow;
+  metric_name: string;
+  metric_value?: string | number | null;
+  metric_value_text?: string | null;
+  source?: CFMetricSource;
+  source_method?: string | null;
+  confidence?: CFConfidence;
+  raw_payload?: CFJsonObject | null;
+  note?: string | null;
+  captured_by_id?: string | null;
+}
+
+export interface CFRetroNote {
+  id: string;
+  period_start: string;
+  period_end: string;
+  retro_type: CFRetroType;
+  bundle_id: string | null;
+  best_by_objective: CFJsonObject;
+  broken: unknown[];
+  learnings: CFJsonObject;
+  decisions: CFJsonObject;
+  actions: unknown[];
+  notes: string | null;
+  facilitator_id: string;
+  created_at: string;
+}
+
+export interface CFRetroNoteCreateRequest {
+  period_start: string;
+  period_end: string;
+  retro_type?: CFRetroType;
+  bundle_id?: string | null;
+  best_by_objective?: CFJsonObject;
+  broken?: unknown[];
+  learnings?: CFJsonObject;
+  decisions?: CFJsonObject;
+  actions?: unknown[];
+  notes?: string | null;
+  facilitator_id: string;
+}
+
+export interface CFRetroNoteUpdateRequest {
+  best_by_objective?: CFJsonObject | null;
+  broken?: unknown[] | null;
+  learnings?: CFJsonObject | null;
+  decisions?: CFJsonObject | null;
+  actions?: unknown[] | null;
+  notes?: string | null;
+}
+
+export interface CFBundleListParams {
+  product_stream?: CFProductStream;
+  status?: CFBundleStatus;
+  owner_id?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CFPublicationListParams {
+  bundle_id?: string;
+  status?: CFPublicationStatus;
+  platform_id?: string;
+  format_id?: string;
+  responsible_id?: string;
+  scheduled_from?: string;
+  scheduled_to?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CFRetroListParams {
+  retro_type?: CFRetroType;
+  limit?: number;
 }
 
 export interface TeamMemberUpdateRequest {

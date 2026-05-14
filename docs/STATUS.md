@@ -1,5 +1,94 @@
 # Status
 
+## Content Factory Sprint 3 Frontend
+
+- Current phase: implemented; automated verification passed
+- Source: preserved deep research, restored Content Factory design doc, and Sprint 1/2 backend implementation artifacts
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/content-factory-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-3-frontend.md`
+- Scope: first usable `/content-factory` frontend slice with access guard, navigation, dashboard, calendar, typed API methods, pure derivation helpers, and one backend publication-list bridge endpoint
+- Latest progress:
+  - Confirmed the deep research file survived at `/Users/dmitry.vasichev/Downloads/content_factory_market_context_report.md`.
+  - Copied the deep research into tracked docs at `docs/content-factory-market-context-report.md`.
+  - Linked the preserved research from `docs/content-factory-design.md`.
+  - Added a product roadmap to `docs/content-factory-design.md` so Sprint 3 stays connected to later bundle workspace, segment, metrics, retro, CRM, AI, and integration work.
+  - Wrote the detailed Sprint 3 implementation plan at `docs/superpowers/plans/2026-05-14-content-factory-sprint-3-frontend.md`.
+  - Made Sprint 3 the active repository plan in `docs/PLAN.md`.
+  - Added `/api/auth/me` response support for `has_content_factory_access`.
+  - Added `PublicationService.list(...)` and `GET /api/content-factory/publications` for cross-bundle dashboard/calendar queries.
+  - Added backend tests for the current-user access flag and publication list filter forwarding.
+  - Added frontend Content Factory types, API client methods, permission helper, dashboard/calendar derivation helpers, and focused helper/source-guard tests.
+  - Added the new Content Factory frontend tests to `npm test`.
+  - Added `/content-factory` route guard and layout using the dedicated Content Factory access flag.
+  - Added sidebar navigation and header metadata for Content Factory dashboard and calendar routes.
+  - Added placeholder dashboard/calendar routes so Task 4 and Task 5 can replace them with full operational pages.
+  - Replaced the dashboard placeholder with a data-backed Content Factory dashboard.
+  - Added compact status badges, bundle/publication status counts, upcoming publications, overdue production items, and recently published lists.
+  - Added helper coverage for dashboard list sorting.
+  - Replaced the calendar placeholder with a data-backed Content Factory calendar page.
+  - Added shared Content Factory filters for status, platform, format, responsible member, and bundle.
+  - Added helper coverage for date grouping, unscheduled ordering, and combined calendar filters.
+  - Ran the Sprint 3 backend/frontend verification set.
+  - Ran a browser smoke with the frontend dev server on `http://127.0.0.1:3005`; both Content Factory routes returned HTTP 200 and redirected/rendered the existing unauthenticated login flow in system Chrome.
+- Key decisions:
+  - Sprint 3 should deliver operational visibility first: dashboard and calendar, not a full editor suite.
+  - The frontend must use `team_members.has_content_factory_access` plus admin access, not legacy Telegram analysis content grants.
+  - Add `GET /api/content-factory/publications` as a narrow bridge endpoint for cross-bundle dashboard/calendar queries.
+  - Defer bundle editing, publication editing, segment management, metric entry, retrospectives, AI drafting, CRM, and publisher integrations to later sprints.
+  - Keep the preserved deep research as a durable tracked planning input, not an external-only file.
+- Next actions:
+  - Run authenticated manual QA for admin, flagged member, and unflagged member access.
+  - Commit Sprint 2.5 recovery and Sprint 3 frontend work when ready.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_auth_me_content_factory.py tests/test_content_factory_publications_api.py -q` passed: 10 tests, with existing pytest-asyncio warning.
+  - Full focused Content Factory backend suite passed: 133 tests, with existing AsyncMock/runtime warnings.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts` passed: 7 tests, with existing Node module-type warnings.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 4 tests, with existing Node module-type warnings.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 10 tests, with existing Node module-type warnings.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed after calendar implementation: 13 tests, with existing Node module-type warnings.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 16 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 100 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/dashboard` and `/content-factory/calendar`.
+  - `git diff --check` passed.
+  - Browser smoke: `curl -I` returned HTTP 200 for `/content-factory/dashboard` and `/content-factory/calendar`; Playwright screenshots through system Chrome reached the login flow for both unauthenticated routes. The default Playwright browser binary was not installed, so the smoke used `/Applications/Google Chrome.app`.
+  - Recovery Sprint 2.5 focused backend suite passed before Sprint 3 planning began: 131 tests, with existing AsyncMock/pytest-asyncio warnings.
+  - `git diff --check` passed before Sprint 3 planning updates.
+
+## Content Factory Recovery Sprint 2.5
+
+- Current phase: implemented; focused verification passed
+- Source: user recovery request on 2026-05-14 after three removed worktrees deleted gitignored Content Factory planning files
+- Scope: restore a tracked Content Factory execution pack, recreate local backend environment settings, clean up new CF test datetime helpers, and prepare for Sprint 3 frontend work
+- Latest progress:
+  - Confirmed `main` is aligned with `origin/main` at `6ff0967`.
+  - Confirmed unrelated working-tree deletions exist under `release-posts/may-2026/*`; they are not part of this recovery work and should not be reverted here.
+  - Confirmed `backend/.env` was missing.
+  - Recreated `backend/.env` locally with `DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf`.
+  - Confirmed `memory/MEMORY.md` and `memory/project_content_factory_sprint_2.md` are not present in the current checkout.
+  - Confirmed the lost design doc path was still referenced from backend models.
+  - Added tracked replacement design documentation at `docs/content-factory-design.md`.
+  - Preserved the surviving deep research report in tracked docs at `docs/content-factory-market-context-report.md`.
+  - Added tracked project backlog at `docs/BACKLOG.md`.
+  - Updated the backend model comment to point at the tracked design doc.
+  - Updated Content Factory tests to use `datetime.now(UTC)` instead of `datetime.utcnow()`.
+  - Updated recovery validation commands to use the active Docker development Content Factory database on `localhost:5434`.
+- Key decisions:
+  - Do not restore critical Content Factory docs under `docs/plans/` while that directory is gitignored.
+  - Treat Sprint 1/2 backend code, migrations, schemas, services, seed data, and tests as the implementation source of truth.
+  - Keep the original Excel workbook as external context; keep the surviving deep research report tracked in the repo as a Sprint 3 planning source.
+  - Run a short recovery sprint before starting Sprint 3 frontend implementation.
+- Next actions:
+  - Start Sprint 3 planning from `docs/content-factory-design.md`.
+  - Add frontend Content Factory types, API client methods, access guard, sidebar/header route, dashboard page, and calendar page.
+- Latest verification:
+  - First focused test run against `postgresql+asyncpg://test:test@localhost:5432/test` reached execution but failed only on real-DB tests because the local `localhost:5432` Postgres rejected `test:test`.
+  - Focused Content Factory suite passed against `postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf`: 131 tests, with existing AsyncMock/pytest-asyncio warnings.
+  - `git diff --check` passed.
+  - `rg -n "datetime\.utcnow\(" backend/tests/test_content_factory_* backend/tests/test_cf_*` returned no matches.
+
 ## Supabase RLS Security Advisory
 
 - Current phase: implemented; production migration applied and verified

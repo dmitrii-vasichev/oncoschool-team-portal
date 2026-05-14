@@ -84,4 +84,9 @@ export class PermissionService {
     // Admins always have implicit access
     return PermissionService.isAdmin(member);
   }
+
+  static canAccessContentFactory(member: TeamMember): boolean {
+    if (!member.is_active) return false;
+    return PermissionService.isAdmin(member) || member.has_content_factory_access;
+  }
 }
