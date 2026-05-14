@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,11 +10,16 @@ function readSource(path: string): string {
   return readFileSync(join(srcDir, path), "utf8");
 }
 
+function sourceExists(path: string): boolean {
+  return existsSync(join(srcDir, path));
+}
+
 test("sidebar exposes content factory navigation", () => {
   const source = readSource("components/layout/Sidebar.tsx");
 
   assert.match(source, /href:\s*"\/content-factory\/dashboard"/);
   assert.match(source, /href:\s*"\/content-factory\/bundles"/);
+  assert.match(source, /href:\s*"\/content-factory\/references"/);
   assert.match(source, /label:\s*"Content Factory"/);
 });
 
@@ -26,6 +32,7 @@ test("header knows content factory workspace routes", () => {
   assert.match(source, /\/content-factory\/publications/);
   assert.match(source, /\/content-factory\/review/);
   assert.match(source, /\/content-factory\/retros/);
+  assert.match(source, /\/content-factory\/references/);
 });
 
 test("content factory layout uses dedicated access guard", () => {
@@ -158,4 +165,50 @@ test("retro detail route loads and edits retrospective notes", () => {
   assert.match(source, /api\.getCFRetro/);
   assert.match(source, /ContentFactoryRetroDialog/);
   assert.match(source, /summarizeContentFactoryRetroSections/);
+});
+
+test("reference admin components expose table and dialog behavior", () => {
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryReferenceDialog.tsx"),
+    true,
+  );
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryReferenceTable.tsx"),
+    true,
+  );
+
+  const dialogSource = readSource(
+    "components/content-factory/ContentFactoryReferenceDialog.tsx",
+  );
+  const tableSource = readSource(
+    "components/content-factory/ContentFactoryReferenceTable.tsx",
+  );
+
+  assert.match(dialogSource, /api\.createCFPlatform/);
+  assert.match(dialogSource, /api\.updateCFPlatform/);
+  assert.match(dialogSource, /api\.createCFFunnelTemplate/);
+  assert.match(dialogSource, /api\.updateCFFunnelTemplate/);
+  assert.match(dialogSource, /capabilities/);
+  assert.match(dialogSource, /template_publications/);
+  assert.match(dialogSource, /requires_medical_review/);
+  assert.match(dialogSource, /is_active/);
+  assert.match(tableSource, /onEdit/);
+  assert.match(tableSource, /onDelete/);
+  assert.match(tableSource, /isAdmin/);
+});
+
+test("reference admin route loads inactive dictionaries and gates mutations", () => {
+  assert.equal(sourceExists("app/content-factory/references/page.tsx"), true);
+
+  const source = readSource("app/content-factory/references/page.tsx");
+
+  assert.match(source, /ContentFactoryReferencesPage/);
+  assert.match(source, /api\.getCFPlatforms\(\{ only_active: false \}\)/);
+  assert.match(source, /api\.getCFFormats\(\{ only_active: false \}\)/);
+  assert.match(source, /api\.getCFRubrics\(\{ only_active: false \}\)/);
+  assert.match(source, /api\.getCFNosologies\(\{ only_active: false \}\)/);
+  assert.match(source, /api\.getCFFunnelTemplates\(\{ only_active: false \}\)/);
+  assert.match(source, /PermissionService\.isAdmin/);
+  assert.match(source, /ContentFactoryReferenceDialog/);
+  assert.match(source, /ContentFactoryReferenceTable/);
 });

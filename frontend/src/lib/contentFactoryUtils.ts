@@ -9,6 +9,13 @@ import type {
   MemberRole,
 } from "./types";
 
+export type ContentFactoryReferenceTableKey =
+  | "platforms"
+  | "formats"
+  | "rubrics"
+  | "nosologies"
+  | "funnel_templates";
+
 export const CF_PRODUCT_STREAM_LABELS: Record<CFProductStream, string> = {
   onco_school: "ОнкоШкола",
   nko: "НКО",
@@ -45,6 +52,17 @@ export const CF_RETRO_TYPE_LABELS: Record<CFRetroType, string> = {
   monthly: "Monthly",
   bundle: "Bundle",
   adhoc: "Ad-hoc",
+};
+
+export const CF_REFERENCE_TABLE_LABELS: Record<
+  ContentFactoryReferenceTableKey,
+  string
+> = {
+  platforms: "Platforms",
+  formats: "Formats",
+  rubrics: "Rubrics",
+  nosologies: "Nosologies",
+  funnel_templates: "Funnel templates",
 };
 
 export const CF_BUNDLE_STATUSES: CFBundleStatus[] = [
@@ -175,6 +193,16 @@ type DisplayNameRecord = {
   display_name?: string | null;
   full_name?: string | null;
   name?: string | null;
+};
+
+type ReferenceLabelRecord = {
+  code?: string | null;
+  display_name?: string | null;
+  name?: string | null;
+};
+
+type ReferenceActivityRecord = {
+  is_active?: boolean | null;
 };
 
 export function canAccessContentFactory(
@@ -352,6 +380,28 @@ export function getContentFactoryDisplayName(
     record?.name ||
     id.slice(0, 9)
   );
+}
+
+export function getContentFactoryReferenceLabel(
+  record: ReferenceLabelRecord,
+): string {
+  return (
+    record.display_name?.trim() ||
+    record.name?.trim() ||
+    record.code?.trim() ||
+    "Untitled"
+  );
+}
+
+export function summarizeContentFactoryReferenceRecords<
+  T extends ReferenceActivityRecord,
+>(records: T[]): { total: number; active: number; inactive: number } {
+  const active = records.filter((record) => record.is_active !== false).length;
+  return {
+    total: records.length,
+    active,
+    inactive: records.length - active,
+  };
 }
 
 function cleanNullableText(value: string | null | undefined): string | null | undefined {

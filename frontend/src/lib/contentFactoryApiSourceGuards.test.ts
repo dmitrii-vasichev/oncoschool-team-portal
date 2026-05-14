@@ -59,6 +59,29 @@ test("content factory API client exposes Sprint 6 retro endpoints", () => {
   assert.match(source, /\/api\/content-factory\/retros",/);
 });
 
+test("content factory API client exposes Sprint 7 reference admin endpoints", () => {
+  const source = readSource("lib/api.ts");
+
+  assert.match(source, /only_active/);
+  assert.match(source, /async createCFPlatform/);
+  assert.match(source, /async updateCFPlatform/);
+  assert.match(source, /async deleteCFPlatform/);
+  assert.match(source, /async createCFFormat/);
+  assert.match(source, /async updateCFFormat/);
+  assert.match(source, /async deleteCFFormat/);
+  assert.match(source, /async createCFRubric/);
+  assert.match(source, /async updateCFRubric/);
+  assert.match(source, /async deleteCFRubric/);
+  assert.match(source, /async createCFNosology/);
+  assert.match(source, /async updateCFNosology/);
+  assert.match(source, /async deleteCFNosology/);
+  assert.match(source, /async createCFFunnelTemplate/);
+  assert.match(source, /async updateCFFunnelTemplate/);
+  assert.match(source, /async deleteCFFunnelTemplate/);
+  assert.match(source, /\/api\/content-factory\/platforms\/\$\{id\}/);
+  assert.match(source, /\/api\/content-factory\/funnel-templates\/\$\{id\}/);
+});
+
 test("permission service exposes content factory access helper", () => {
   const source = readSource("lib/permissions.ts");
 

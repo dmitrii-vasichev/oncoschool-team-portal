@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Search,
   Settings,
+  Settings2,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -59,6 +60,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
   "/content-factory/review": { title: "CF Review", icon: ListChecks },
   "/content-factory/retros": { title: "CF Retros", icon: History },
+  "/content-factory/references": { title: "CF References", icon: Settings2 },
   "/content-factory/publications": {
     title: "CF Publication",
     icon: FileText,

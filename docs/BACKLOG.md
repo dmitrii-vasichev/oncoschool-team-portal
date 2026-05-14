@@ -4,15 +4,14 @@
 
 ### Active
 
-- Review and merge Sprint 6 retrospective workspace for weekly, monthly, bundle, and ad-hoc learning loops.
+- Build Sprint 7 reference-table admin CRUD for platforms, formats, rubrics, nosologies, and funnel templates.
 
 ### Next
 
-- Add reference-table admin CRUD for platforms, formats, rubrics, nosologies, and funnel templates.
+- Add richer segmentation management and snapshot comparison beyond publication-level target assignment.
 
 ### Later
 
-- Add richer segmentation management and snapshot comparison beyond publication-level target assignment.
 - Explore publishing and metric API integrations after the manual workflow is usable.
 - Keep the preserved deep research at `docs/content-factory-market-context-report.md` and restored design at `docs/content-factory-design.md` as planning inputs for later slices.
 

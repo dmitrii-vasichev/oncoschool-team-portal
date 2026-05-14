@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
+import * as contentFactoryUtils from "./contentFactoryUtils.ts";
+
+const {
   CF_BUNDLE_STATUS_LABELS,
   CF_PUBLICATION_STATUS_LABELS,
+  CF_REFERENCE_TABLE_LABELS,
   CF_RETRO_TYPE_LABELS,
   buildContentFactoryBundleParams,
   buildContentFactoryUtm,
@@ -16,16 +19,26 @@ import {
   formatContentFactoryRetroPeriod,
   getAvailableContentFactorySegments,
   getContentFactoryDisplayName,
+  getContentFactoryReferenceLabel,
   getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
+  summarizeContentFactoryReferenceRecords,
   summarizeContentFactoryRetroSections,
   summarizeContentFactoryDashboard,
-} from "./contentFactoryUtils.ts";
+} = contentFactoryUtils;
 
 test("content factory labels expose production wording", () => {
   assert.equal(CF_BUNDLE_STATUS_LABELS.production, "В производстве");
   assert.equal(CF_PUBLICATION_STATUS_LABELS.doctor_review, "Проверка врача");
+});
+
+test("reference table labels expose Sprint 7 dictionaries", () => {
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.platforms, "Platforms");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.formats, "Formats");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.rubrics, "Rubrics");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.nosologies, "Nosologies");
+  assert.equal(CF_REFERENCE_TABLE_LABELS?.funnel_templates, "Funnel templates");
 });
 
 test("content factory access allows admins and flagged active members", () => {
@@ -201,6 +214,41 @@ test("getContentFactoryDisplayName falls back to an id fragment", () => {
       { id: "member-1", full_name: "Мария Смирнова" },
     ]),
     "Мария Смирнова",
+  );
+});
+
+test("getContentFactoryReferenceLabel supports display names and template names", () => {
+  assert.equal(typeof getContentFactoryReferenceLabel, "function");
+  assert.equal(
+    getContentFactoryReferenceLabel({
+      code: "telegram",
+      display_name: "Telegram",
+    }),
+    "Telegram",
+  );
+  assert.equal(
+    getContentFactoryReferenceLabel({
+      code: "launch",
+      name: "Launch funnel",
+    }),
+    "Launch funnel",
+  );
+  assert.equal(getContentFactoryReferenceLabel({ code: "raw-code" }), "raw-code");
+});
+
+test("summarizeContentFactoryReferenceRecords counts active and inactive rows", () => {
+  assert.equal(typeof summarizeContentFactoryReferenceRecords, "function");
+  assert.deepEqual(
+    summarizeContentFactoryReferenceRecords([
+      { id: "1", is_active: true },
+      { id: "2", is_active: false },
+      { id: "3", is_active: true },
+    ]),
+    {
+      total: 3,
+      active: 2,
+      inactive: 1,
+    },
   );
 });
 

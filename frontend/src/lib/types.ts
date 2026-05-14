@@ -1083,6 +1083,21 @@ export interface CFPlatform {
   display_order: number;
 }
 
+export interface CFPlatformCreateRequest {
+  code: string;
+  display_name: string;
+  is_active?: boolean;
+  capabilities?: CFJsonObject;
+  display_order?: number;
+}
+
+export interface CFPlatformUpdateRequest {
+  display_name?: string;
+  is_active?: boolean;
+  capabilities?: CFJsonObject;
+  display_order?: number;
+}
+
 export interface CFFormat {
   id: string;
   code: string;
@@ -1093,12 +1108,41 @@ export interface CFFormat {
   display_order: number;
 }
 
+export interface CFFormatCreateRequest {
+  code: string;
+  display_name: string;
+  default_objective?: string | null;
+  requires_medical_review?: boolean;
+  is_active?: boolean;
+  display_order?: number;
+}
+
+export interface CFFormatUpdateRequest {
+  display_name?: string;
+  default_objective?: string | null;
+  requires_medical_review?: boolean;
+  is_active?: boolean;
+  display_order?: number;
+}
+
 export interface CFRubric {
   id: string;
   code: string;
   display_name: string;
   is_active: boolean;
   deprecated_at: string | null;
+}
+
+export interface CFRubricCreateRequest {
+  code: string;
+  display_name: string;
+  is_active?: boolean;
+}
+
+export interface CFRubricUpdateRequest {
+  display_name?: string;
+  is_active?: boolean;
+  deprecated_at?: string | null;
 }
 
 export interface CFNosology {
@@ -1109,6 +1153,18 @@ export interface CFNosology {
   deprecated_at: string | null;
 }
 
+export interface CFNosologyCreateRequest {
+  code: string;
+  display_name: string;
+  is_active?: boolean;
+}
+
+export interface CFNosologyUpdateRequest {
+  display_name?: string;
+  is_active?: boolean;
+  deprecated_at?: string | null;
+}
+
 export interface CFFunnelTemplate {
   id: string;
   code: string;
@@ -1116,6 +1172,21 @@ export interface CFFunnelTemplate {
   description: string | null;
   template_publications: unknown[];
   is_active: boolean;
+}
+
+export interface CFFunnelTemplateCreateRequest {
+  code: string;
+  name: string;
+  description?: string | null;
+  template_publications?: unknown[];
+  is_active?: boolean;
+}
+
+export interface CFFunnelTemplateUpdateRequest {
+  name?: string;
+  description?: string | null;
+  template_publications?: unknown[];
+  is_active?: boolean;
 }
 
 export interface CFBundle {
@@ -1350,6 +1421,10 @@ export interface CFBundleListParams {
   owner_id?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface CFReferenceListOptions {
+  only_active?: boolean;
 }
 
 export interface CFPublicationListParams {

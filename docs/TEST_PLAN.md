@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 7 Reference Admin
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/references` as an admin and confirm platforms, formats, rubrics, nosologies, and funnel templates load with inactive records included.
+2. Create one test record in each reference table where test data is available.
+3. Edit each record and confirm changes refresh in the active tab.
+4. Toggle `is_active` and confirm inactive records remain visible on the reference admin page.
+5. Enter invalid JSON for platform capabilities and funnel-template publications and confirm the dialog shows a clear inline error without sending the request.
+6. Delete an unused test record and confirm it disappears after refresh.
+7. Attempt to delete an in-use record and confirm the backend 409 message is shown clearly.
+8. Log in as a non-admin user with `has_content_factory_access=true` and confirm the page is read-only.
+9. Confirm unauthenticated access reaches the existing login flow instead of a blank page or runtime crash.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 6 Retrospective Workspace
 
 ### Automated

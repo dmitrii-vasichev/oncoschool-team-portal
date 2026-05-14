@@ -1,8 +1,50 @@
 # Status
 
+## Content Factory Sprint 7 Reference Admin
+
+- Current phase: implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-7-reference-admin`
+- Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-6 frontend workspace
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-7-reference-admin-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`
+- Scope: reference API client mutations, helper summaries, reusable reference dialog/table, `/content-factory/references`, and navigation
+- Latest progress:
+  - Merged Sprint 6 through PR #184.
+  - Confirmed local `main` was clean and aligned with `origin/main` before starting Sprint 7.
+  - Created branch `codex/content-factory-sprint-7-reference-admin`.
+  - Confirmed backend reference CRUD endpoints already exist and write operations are admin-only.
+  - Wrote the Sprint 7 reference-admin design and implementation plan.
+  - Made Sprint 7 the active repository plan in `docs/PLAN.md`.
+  - Added failing Sprint 7 source/helper tests and verified the red state.
+  - Added reference create/update request types and frontend API client create/update/delete methods.
+  - Added reference helpers for table labels, row labels, and active/inactive summaries.
+  - Added `ContentFactoryReferenceDialog` with JSON validation for `capabilities` and `template_publications`.
+  - Added `ContentFactoryReferenceTable` with compact rows, active state, table-specific detail text, and admin-only edit/delete actions.
+  - Added `/content-factory/references` with five tabs, inactive reads, read-only non-admin state, admin create/edit/delete, and delete confirmation.
+  - Added Content Factory reference navigation in the sidebar and header breadcrumbs.
+  - Ran Sprint 7 frontend verification successfully.
+  - Ran a local dev server smoke for `/content-factory/references`.
+- Key decisions:
+  - Keep Sprint 7 frontend-heavy and reuse existing backend reference endpoints.
+  - Allow all Content Factory users to view reference records, with admin-only create/edit/delete controls.
+  - Load inactive records with `only_active=false` so admins can reactivate or inspect deprecated values.
+  - Keep JSON fields as text areas with client-side validation in the first UI.
+- Next actions:
+  - Commit and push Sprint 7.
+  - Open a PR for review and merge when checks pass.
+  - Run authenticated manual QA against real reference data when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 43 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 127 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/references`.
+  - Local dev server smoke on `http://127.0.0.1:3006/content-factory/references` returned HTTP 200 and compiled the route.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 6 Retrospective Workspace
 
-- Current phase: implemented; automated verification passed; browser smoke passed with a temporary mock API; preparing PR
+- Current phase: implemented; automated verification passed; browser smoke passed with a temporary mock API; merged to `main` through PR #184
 - Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-5 frontend workspace
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-6-retros-design.md`
@@ -23,14 +65,15 @@
   - Added Content Factory retros navigation in the sidebar and header breadcrumbs.
   - Ran Sprint 6 frontend verification successfully.
   - Ran an authenticated browser smoke with a temporary local mock API for list, detail, and edit dialog rendering.
+  - Committed and pushed Sprint 6 to `origin/codex/content-factory-sprint-6-retros`.
+  - Opened PR #184 and merged it into `main`.
 - Key decisions:
   - Keep Sprint 6 frontend-heavy and reuse existing `cf_retro_note` backend endpoints.
   - Use JSON text areas for structured retro sections in the first UI instead of inventing a rigid taxonomy.
   - Keep AI summaries, automatic metric aggregation, and publishing integrations out of this sprint.
 - Next actions:
-  - Commit and push Sprint 6.
-  - Open a PR for review and merge when checks pass.
   - Run manual QA against real data when useful.
+  - Continue Sprint 7 reference-admin implementation.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 37 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 121 tests, with existing Node module-type warnings.

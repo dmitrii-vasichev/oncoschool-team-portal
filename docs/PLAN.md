@@ -1,4 +1,71 @@
-# Active Plan: Content Factory Sprint 6 Retrospective Workspace
+# Active Plan: Content Factory Sprint 7 Reference Admin
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a Content Factory reference-table admin workspace for platforms, formats, rubrics, nosologies, and funnel templates.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-7-reference-admin-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-7-reference-admin.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add frontend request types and API methods for reference create, update, delete, and inactive reads.
+2. Add pure helpers for reference-table labels, display names, and active/inactive summaries.
+3. Add a reusable reference dialog with JSON validation for `capabilities` and `template_publications`.
+4. Add a reusable reference table with admin-only edit/delete actions.
+5. Add `/content-factory/references` with five tabs, admin create/edit/delete, and read-only access for non-admin Content Factory users.
+6. Add sidebar/header navigation, run verification, and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-7-reference-admin`.
+- Sprint 1 and Sprint 2 backend work are merged to `main`.
+- Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
+- Sprint 4 bundle/publication workspace is merged to `main`.
+- Sprint 5 segments, UTM, manual metrics, and review queues are merged to `main`.
+- Sprint 6 retrospective workspace is merged to `main`.
+
+**Definition of done:**
+
+- `/content-factory/references` lists platforms, formats, rubrics, nosologies, and funnel templates, including inactive records.
+- Users with Content Factory access can view reference records.
+- Admin users can create, edit, and delete reference records through the UI.
+- Non-admin Content Factory users see a read-only state and no mutation controls.
+- JSON fields are validated client-side before requests are sent.
+- Backend 409 delete failures are shown as clear user-facing errors.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 43 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 127 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/references`.
+- Local dev server smoke on `http://127.0.0.1:3006/content-factory/references` returned HTTP 200 and compiled the route.
+- `git diff --check` passed.
+
+---
+
+# Previous Plan: Content Factory Sprint 6 Retrospective Workspace
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-6-retros.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
@@ -24,7 +91,7 @@
 
 **Implementation status:**
 
-- Implemented; automated verification passed; preparing PR from branch `codex/content-factory-sprint-6-retros`.
+- Implemented; automated verification passed; merged to `main` through PR #184.
 - Sprint 1 and Sprint 2 backend work are merged to `main`.
 - Sprint 2.5 recovery and Sprint 3 frontend foundation are merged to `main`.
 - Sprint 4 bundle/publication workspace is merged to `main`.

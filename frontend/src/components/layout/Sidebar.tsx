@@ -23,6 +23,7 @@ import {
   GraduationCap,
   History,
   Search,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -130,6 +131,13 @@ const NAV_ITEMS: NavItem[] = [
     href: "/content-factory/retros",
     label: "CF Retros",
     icon: History,
+    contentFactoryAccess: true,
+    section: "content",
+  },
+  {
+    href: "/content-factory/references",
+    label: "CF References",
+    icon: Settings2,
     contentFactoryAccess: true,
     section: "content",
   },

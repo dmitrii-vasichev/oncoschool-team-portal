@@ -85,14 +85,25 @@ import type {
   TelegramConnectRequest,
   TelegramVerifyRequest,
   CFPlatform,
+  CFPlatformCreateRequest,
+  CFPlatformUpdateRequest,
   CFFormat,
+  CFFormatCreateRequest,
+  CFFormatUpdateRequest,
   CFRubric,
+  CFRubricCreateRequest,
+  CFRubricUpdateRequest,
   CFNosology,
+  CFNosologyCreateRequest,
+  CFNosologyUpdateRequest,
   CFFunnelTemplate,
+  CFFunnelTemplateCreateRequest,
+  CFFunnelTemplateUpdateRequest,
   CFBundle,
   CFBundleCreateRequest,
   CFBundleUpdateRequest,
   CFBundleListParams,
+  CFReferenceListOptions,
   CFPublication,
   CFPublicationCreateRequest,
   CFPublicationUpdateRequest,
@@ -604,26 +615,156 @@ class ApiClient {
 
   // ==================== Content Factory ====================
 
-  async getCFPlatforms(): Promise<CFPlatform[]> {
-    return this.request<CFPlatform[]>("/api/content-factory/platforms");
+  async getCFPlatforms(options?: CFReferenceListOptions): Promise<CFPlatform[]> {
+    const query = this.buildQuery(options);
+    return this.request<CFPlatform[]>(`/api/content-factory/platforms${query}`);
   }
 
-  async getCFFormats(): Promise<CFFormat[]> {
-    return this.request<CFFormat[]>("/api/content-factory/formats");
+  async createCFPlatform(data: CFPlatformCreateRequest): Promise<CFPlatform> {
+    return this.request<CFPlatform>("/api/content-factory/platforms", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
 
-  async getCFRubrics(): Promise<CFRubric[]> {
-    return this.request<CFRubric[]>("/api/content-factory/rubrics");
+  async updateCFPlatform(
+    id: string,
+    data: CFPlatformUpdateRequest
+  ): Promise<CFPlatform> {
+    return this.request<CFPlatform>(`/api/content-factory/platforms/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
 
-  async getCFNosologies(): Promise<CFNosology[]> {
-    return this.request<CFNosology[]>("/api/content-factory/nosologies");
+  async deleteCFPlatform(id: string): Promise<void> {
+    return this.request<void>(`/api/content-factory/platforms/${id}`, {
+      method: "DELETE",
+    });
   }
 
-  async getCFFunnelTemplates(): Promise<CFFunnelTemplate[]> {
+  async getCFFormats(options?: CFReferenceListOptions): Promise<CFFormat[]> {
+    const query = this.buildQuery(options);
+    return this.request<CFFormat[]>(`/api/content-factory/formats${query}`);
+  }
+
+  async createCFFormat(data: CFFormatCreateRequest): Promise<CFFormat> {
+    return this.request<CFFormat>("/api/content-factory/formats", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFFormat(
+    id: string,
+    data: CFFormatUpdateRequest
+  ): Promise<CFFormat> {
+    return this.request<CFFormat>(`/api/content-factory/formats/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCFFormat(id: string): Promise<void> {
+    return this.request<void>(`/api/content-factory/formats/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCFRubrics(options?: CFReferenceListOptions): Promise<CFRubric[]> {
+    const query = this.buildQuery(options);
+    return this.request<CFRubric[]>(`/api/content-factory/rubrics${query}`);
+  }
+
+  async createCFRubric(data: CFRubricCreateRequest): Promise<CFRubric> {
+    return this.request<CFRubric>("/api/content-factory/rubrics", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFRubric(
+    id: string,
+    data: CFRubricUpdateRequest
+  ): Promise<CFRubric> {
+    return this.request<CFRubric>(`/api/content-factory/rubrics/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCFRubric(id: string): Promise<void> {
+    return this.request<void>(`/api/content-factory/rubrics/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCFNosologies(options?: CFReferenceListOptions): Promise<CFNosology[]> {
+    const query = this.buildQuery(options);
+    return this.request<CFNosology[]>(`/api/content-factory/nosologies${query}`);
+  }
+
+  async createCFNosology(data: CFNosologyCreateRequest): Promise<CFNosology> {
+    return this.request<CFNosology>("/api/content-factory/nosologies", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFNosology(
+    id: string,
+    data: CFNosologyUpdateRequest
+  ): Promise<CFNosology> {
+    return this.request<CFNosology>(`/api/content-factory/nosologies/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCFNosology(id: string): Promise<void> {
+    return this.request<void>(`/api/content-factory/nosologies/${id}`, {
+      method: "DELETE",
+    });
+  }
+
+  async getCFFunnelTemplates(
+    options?: CFReferenceListOptions
+  ): Promise<CFFunnelTemplate[]> {
+    const query = this.buildQuery(options);
     return this.request<CFFunnelTemplate[]>(
-      "/api/content-factory/funnel-templates"
+      `/api/content-factory/funnel-templates${query}`
     );
+  }
+
+  async createCFFunnelTemplate(
+    data: CFFunnelTemplateCreateRequest
+  ): Promise<CFFunnelTemplate> {
+    return this.request<CFFunnelTemplate>(
+      "/api/content-factory/funnel-templates",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async updateCFFunnelTemplate(
+    id: string,
+    data: CFFunnelTemplateUpdateRequest
+  ): Promise<CFFunnelTemplate> {
+    return this.request<CFFunnelTemplate>(
+      `/api/content-factory/funnel-templates/${id}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async deleteCFFunnelTemplate(id: string): Promise<void> {
+    return this.request<void>(`/api/content-factory/funnel-templates/${id}`, {
+      method: "DELETE",
+    });
   }
 
   async getCFBundles(params?: CFBundleListParams): Promise<CFBundle[]> {
