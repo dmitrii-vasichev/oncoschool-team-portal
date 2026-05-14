@@ -93,6 +93,15 @@ test("content factory chrome avoids repeated module titles", () => {
   );
 });
 
+test("content factory workspace navigation keeps every section discoverable", () => {
+  const navSource = readSource(
+    "components/content-factory/ContentFactoryWorkspaceNav.tsx",
+  );
+
+  assert.match(navSource, /flex-wrap/);
+  assert.doesNotMatch(navSource, /overflow-x-auto/);
+});
+
 test("content factory help route explains the workspace", () => {
   assert.equal(sourceExists("app/content-factory/help/page.tsx"), true);
 
