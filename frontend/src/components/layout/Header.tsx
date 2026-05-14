@@ -15,6 +15,7 @@ import {
   FileBarChart,
   FileText,
   FolderKanban,
+  History,
   LayoutDashboard,
   ListChecks,
   Loader2,
@@ -57,6 +58,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/calendar": { title: "Календарь контента", icon: CalendarDays },
   "/content-factory/bundles": { title: "CF Bundles", icon: FolderKanban },
   "/content-factory/review": { title: "CF Review", icon: ListChecks },
+  "/content-factory/retros": { title: "CF Retros", icon: History },
   "/content-factory/publications": {
     title: "CF Publication",
     icon: FileText,
@@ -102,6 +104,19 @@ function getPageMeta(
       crumbs: [
         { label: parentMeta.title, href: "/content-factory/bundles" },
         { label: pageTitle || "Publication" },
+      ],
+    };
+  }
+
+  if (pathname.startsWith("/content-factory/retros/")) {
+    const parentMeta = PAGE_META["/content-factory/retros"];
+    return {
+      ...parentMeta,
+      title: pageTitle || "Retro",
+      parent: "/content-factory/retros",
+      crumbs: [
+        { label: parentMeta.title, href: "/content-factory/retros" },
+        { label: pageTitle || "Retro" },
       ],
     };
   }

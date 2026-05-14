@@ -1,8 +1,48 @@
 # Status
 
+## Content Factory Sprint 6 Retrospective Workspace
+
+- Current phase: implemented; automated verification passed; browser smoke passed with a temporary mock API; preparing PR
+- Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, and Sprint 3-5 frontend workspace
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-6-retros-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-6-retros.md`
+- Scope: retro list, retro detail, create/edit dialog, retro helpers/API methods, and navigation
+- Latest progress:
+  - Merged Sprint 5 through PR #183.
+  - Confirmed local `main` is clean and aligned with `origin/main`.
+  - Created branch `codex/content-factory-sprint-6-retros`.
+  - Confirmed backend retro persistence and REST endpoints already exist.
+  - Wrote the Sprint 6 retrospective workspace design and implementation plan.
+  - Made Sprint 6 the active repository plan in `docs/PLAN.md`.
+  - Added frontend API client methods for listing, reading, creating, and updating retro notes.
+  - Added pure retrospective helpers for type labels, period/title formatting, and structured section counts.
+  - Added the JSON-backed `ContentFactoryRetroDialog` for create/update flows.
+  - Added `/content-factory/retros` list route with type filtering, retro cards, detail links, and create action.
+  - Added `/content-factory/retros/{id}` detail route with structured JSON evidence sections, summary counts, metadata, and edit action.
+  - Added Content Factory retros navigation in the sidebar and header breadcrumbs.
+  - Ran Sprint 6 frontend verification successfully.
+  - Ran an authenticated browser smoke with a temporary local mock API for list, detail, and edit dialog rendering.
+- Key decisions:
+  - Keep Sprint 6 frontend-heavy and reuse existing `cf_retro_note` backend endpoints.
+  - Use JSON text areas for structured retro sections in the first UI instead of inventing a rigid taxonomy.
+  - Keep AI summaries, automatic metric aggregation, and publishing integrations out of this sprint.
+- Next actions:
+  - Commit and push Sprint 6.
+  - Open a PR for review and merge when checks pass.
+  - Run manual QA against real data when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 37 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 121 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/retros` and `/content-factory/retros/[id]`.
+  - Browser smoke passed on `http://localhost:3003` with a temporary local mock API: authenticated login, `/content-factory/retros` list, `/content-factory/retros/retro-1` detail, and edit dialog rendered.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 5 Outcomes
 
-- Current phase: implemented; automated verification passed on branch `codex/content-factory-sprint-5`
+- Current phase: implemented; automated verification passed; merged to `main` through PR #183
 - Source: preserved deep research, restored Content Factory design doc, Sprint 1/2 backend API, Sprint 3 visibility frontend, and Sprint 4 workspace frontend
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/content-factory-design.md`
@@ -22,14 +62,14 @@
   - Ran Sprint 5 frontend verification successfully.
   - Committed and pushed Sprint 5 to `origin/codex/content-factory-sprint-5`.
   - Opened draft PR #183: `https://github.com/dmitrii-vasichev/oncoschool-team-portal/pull/183`.
+  - Merged PR #183 into `main`.
 - Key decisions:
   - Treat `docs/content-factory-design.md` as the approved Sprint 5 design source; no new product discovery is needed before implementation.
   - Keep Sprint 5 frontend-heavy because backend segment targets and metric snapshots already exist.
   - Defer API publishing integrations, AI drafting, patient CRM, and retrospectives to later sprints.
 - Next actions:
-  - Run authenticated manual QA for segment targets, UTM helper, manual metrics, and review queues.
-  - Review and merge PR #183 when ready.
-  - After merge, start Sprint 6 planning from `docs/content-factory-design.md` and `docs/BACKLOG.md`.
+  - Run authenticated manual QA for segment targets, UTM helper, manual metrics, and review queues when useful.
+  - Continue Sprint 6 retrospective workspace implementation.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 29 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 113 tests, with existing Node module-type warnings.

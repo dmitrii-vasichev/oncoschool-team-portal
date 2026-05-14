@@ -49,6 +49,16 @@ test("content factory API client exposes Sprint 5 outcomes endpoints", () => {
   assert.match(source, /\/api\/content-factory\/publications\/\$\{publicationId\}\/metrics/);
 });
 
+test("content factory API client exposes Sprint 6 retro endpoints", () => {
+  const source = readSource("lib/api.ts");
+
+  assert.match(source, /async getCFRetro/);
+  assert.match(source, /async createCFRetro/);
+  assert.match(source, /async updateCFRetro/);
+  assert.match(source, /\/api\/content-factory\/retros\/\$\{id\}/);
+  assert.match(source, /\/api\/content-factory\/retros",/);
+});
+
 test("permission service exposes content factory access helper", () => {
   const source = readSource("lib/permissions.ts");
 

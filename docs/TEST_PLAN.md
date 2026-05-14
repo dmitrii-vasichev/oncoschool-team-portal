@@ -1,5 +1,27 @@
 # Test Plan
 
+## Content Factory Sprint 6 Retrospective Workspace
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/retros` and confirm retro cards load with period, type, facilitator, bundle, and structured section counts.
+2. Filter retros by weekly, monthly, bundle, and ad-hoc types.
+3. Create a weekly retro with structured JSON sections and notes.
+4. Create a bundle retro linked to an existing bundle.
+5. Open a retro detail page and confirm structured sections and notes render clearly.
+6. Edit structured sections and notes from the detail page.
+7. Enter invalid JSON in the dialog and confirm the UI shows a clear inline error without sending the request.
+8. Confirm unauthenticated access reaches the existing login flow instead of a blank page or runtime crash.
+
 ## Content Factory Sprint 5 Outcomes
 
 ### Automated
