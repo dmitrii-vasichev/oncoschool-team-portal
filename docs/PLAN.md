@@ -1,4 +1,121 @@
-# Active Plan: Projects Phase 2
+# Active Plan: Content Factory Sprint 3 Frontend
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-3-frontend.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Build the first usable Content Factory frontend slice: access guard, navigation, dashboard, and calendar backed by the existing Sprint 1/2 API plus one publication-list bridge endpoint.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-3-frontend.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add the backend bridge endpoint and `/api/auth/me` Content Factory access flag.
+2. Add frontend Content Factory types, API methods, permissions, and pure dashboard/calendar helpers.
+3. Add `/content-factory` route protection, sidebar/header navigation, and source guards.
+4. Build the Content Factory dashboard page.
+5. Build the Content Factory calendar page.
+6. Run backend/frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented; automated verification passed.
+- Sprint 1 and Sprint 2 backend work are already merged to `main`.
+- Sprint 2.5 recovery restored the durable docs and local environment needed before frontend work.
+
+**Definition of done:**
+
+- `/api/auth/me` returns `has_content_factory_access`.
+- `GET /api/content-factory/publications` supports dashboard/calendar filters across bundles.
+- Frontend has typed Content Factory API client methods and pure helper coverage.
+- Admin users and members with `has_content_factory_access` can access `/content-factory`.
+- Sidebar/header expose Content Factory dashboard and calendar navigation.
+- Dashboard shows bundle status, publication status, upcoming scheduled work, overdue production work, and recent published work.
+- Calendar groups publications by date, supports core filters, and keeps unscheduled work visible.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_auth_me_content_factory.py tests/test_content_factory_publications_api.py -q
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_auth_me_content_factory.py tests/test_content_factory_publications_api.py -q` passed: 10 tests, with existing pytest-asyncio warning.
+- Full focused Content Factory backend suite passed: 133 tests, with existing AsyncMock/runtime warnings.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 16 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 100 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/dashboard` and `/content-factory/calendar`.
+- `git diff --check` passed.
+- Browser smoke on `http://127.0.0.1:3005/content-factory/dashboard` and `/content-factory/calendar` returned HTTP 200 and rendered the existing unauthenticated login flow through system Chrome screenshots.
+
+---
+
+# Previous Plan: Content Factory Recovery Sprint 2.5
+
+> **For agentic workers:** This recovery sprint is complete. The original Content Factory docs under `docs/plans/` were lost with removed worktrees, and `docs/plans/` is gitignored. Use tracked docs for all durable Content Factory decisions.
+
+**Goal:** Restore the durable Content Factory execution pack before Sprint 3 frontend work begins.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Recreate local backend development environment variables.
+2. Clean up new Content Factory tests to use timezone-aware UTC helpers.
+3. Restore a tracked Content Factory design document from Sprint 1/2 code artifacts.
+4. Update repo-owned plan, status, test plan, and backlog for Content Factory.
+5. Run focused backend verification and repository hygiene checks.
+
+**Implementation status:**
+
+- Implemented; focused verification passed.
+- Sprint 1 and Sprint 2 backend work are already merged to `main`.
+- Sprint 3 frontend work should start only after the recovery documents and focused checks are in place.
+
+**Definition of done:**
+
+- `backend/.env` exists locally with the Docker development Content Factory database URL.
+- Critical Content Factory design context is available in a tracked path.
+- `docs/PLAN.md`, `docs/STATUS.md`, `docs/TEST_PLAN.md`, and `docs/BACKLOG.md` identify Content Factory as the active workstream.
+- New Content Factory tests no longer use `datetime.utcnow()`.
+- Focused Content Factory backend tests pass.
+- `git diff --check` passes.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_bundle_service.py tests/test_cf_publication_service.py tests/test_cf_seed.py tests/test_cf_segment_metric_retro_services.py tests/test_content_factory_models.py tests/test_content_factory_permissions.py tests/test_content_factory_schemas.py tests/test_content_factory_bundles_api.py tests/test_content_factory_formats_api.py tests/test_content_factory_funnel_templates_api.py tests/test_content_factory_glossary_api.py tests/test_content_factory_glossary_service.py tests/test_content_factory_metrics_api.py tests/test_content_factory_nosologies_api.py tests/test_content_factory_platforms_api.py tests/test_content_factory_publication_service_extras.py tests/test_content_factory_publications_api.py tests/test_content_factory_retro_update.py tests/test_content_factory_retros_api.py tests/test_content_factory_rubrics_api.py tests/test_content_factory_segments_api.py tests/test_team_cf_access_api.py -q
+git diff --check
+```
+
+**Next plan after recovery:**
+
+- Sprint 3: Content Factory frontend foundation, dashboard, and calendar.
+
+**Latest verification result:**
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_bundle_service.py tests/test_cf_publication_service.py tests/test_cf_seed.py tests/test_cf_segment_metric_retro_services.py tests/test_content_factory_models.py tests/test_content_factory_permissions.py tests/test_content_factory_schemas.py tests/test_content_factory_bundles_api.py tests/test_content_factory_formats_api.py tests/test_content_factory_funnel_templates_api.py tests/test_content_factory_glossary_api.py tests/test_content_factory_glossary_service.py tests/test_content_factory_metrics_api.py tests/test_content_factory_nosologies_api.py tests/test_content_factory_platforms_api.py tests/test_content_factory_publication_service_extras.py tests/test_content_factory_publications_api.py tests/test_content_factory_retro_update.py tests/test_content_factory_retros_api.py tests/test_content_factory_rubrics_api.py tests/test_content_factory_segments_api.py tests/test_team_cf_access_api.py -q` passed: 131 tests, with existing AsyncMock/pytest-asyncio warnings.
+- `git diff --check` passed.
+
+---
+
+# Previous Plan: Projects Phase 2
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-13-projects-phase-2.md`. Keep this section as the current source-of-truth index for milestone order, definition of done, and validation commands.
 

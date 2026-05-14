@@ -1,8 +1,9 @@
 """Publications endpoints — bundle-scoped and direct."""
 
 import uuid
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.content_factory.deps import require_cf_access
@@ -57,6 +58,34 @@ async def create_publication_for_bundle(
     pub = await publication_service.create(session, data, editor_id=member.id)
     await session.commit()
     return pub
+
+
+@pubs_router.get("", response_model=list[CFPublicationResponse])
+async def list_publications(
+    member: TeamMember = Depends(require_cf_access),
+    session: AsyncSession = Depends(get_session),
+    bundle_id: uuid.UUID | None = None,
+    status: str | None = None,
+    platform_id: uuid.UUID | None = None,
+    format_id: uuid.UUID | None = None,
+    responsible_id: uuid.UUID | None = None,
+    scheduled_from: datetime | None = None,
+    scheduled_to: datetime | None = None,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    return await publication_service.list(
+        session,
+        bundle_id=bundle_id,
+        status=status,
+        platform_id=platform_id,
+        format_id=format_id,
+        responsible_id=responsible_id,
+        scheduled_from=scheduled_from,
+        scheduled_to=scheduled_to,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @pubs_router.get("/{publication_id}", response_model=CFPublicationResponse)

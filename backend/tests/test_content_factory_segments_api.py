@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -24,10 +24,10 @@ def make_seg(**ov):
         "name": "Сегмент", "description": None,
         "population_count": 100, "is_active": True,
         "owner_id": uuid.uuid4(),
-        "last_fetched_at": datetime.utcnow(),
+        "last_fetched_at": datetime.now(UTC),
         "filter_hash": None,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
     base.update(ov)
     return SimpleNamespace(**base)
@@ -124,7 +124,7 @@ async def test_list_snapshots(monkeypatch):
         id=uuid.uuid4(),
         external_segment_id=uuid.uuid4(),
         population_count=100,
-        fetched_at=datetime.utcnow(),
+        fetched_at=datetime.now(UTC),
         raw_payload=None,
         notes=None,
     )

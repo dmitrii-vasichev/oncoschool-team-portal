@@ -47,6 +47,7 @@ function teamMember(overrides: Partial<TeamMember> = {}): TeamMember {
     role: "member",
     is_test: false,
     is_active: true,
+    has_content_factory_access: false,
     created_at: "2026-05-08T00:00:00Z",
     updated_at: "2026-05-08T00:00:00Z",
     ...overrides,

@@ -565,6 +565,7 @@ async def get_me(member: TeamMember = Depends(get_current_user)):
         "role": member.role,
         "is_test": member.is_test,
         "is_active": member.is_active,
+        "has_content_factory_access": member.has_content_factory_access,
         "position": member.position,
         "department_id": str(member.department_id) if member.department_id else None,
         "extra_department_ids": [str(dept_id) for dept_id in member.extra_department_ids],

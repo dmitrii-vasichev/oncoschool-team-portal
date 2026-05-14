@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -34,7 +34,7 @@ def make_snap(**ov):
     base = {
         "id": uuid.uuid4(),
         "publication_id": uuid.uuid4(),
-        "captured_at": datetime.utcnow(),
+        "captured_at": datetime.now(UTC),
         "window": "24h", "metric_name": "views",
         "metric_value": 1000.0, "metric_value_text": None,
         "source": "manual", "source_method": "manual_entry",

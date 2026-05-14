@@ -1504,7 +1504,7 @@ class AIFeatureConfig(Base):
 
 # ─────────────────────────────────────────────────────────────────────
 # Content Factory (cf_*) — internal content production module
-# Design doc: docs/plans/2026-05-13-content-factory-design.md
+# Design doc: docs/content-factory-design.md
 # ─────────────────────────────────────────────────────────────────────
 
 

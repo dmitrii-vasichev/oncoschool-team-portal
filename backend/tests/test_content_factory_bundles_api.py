@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -24,8 +24,8 @@ def make_bundle(**ov):
         "name": "Эфир по РМЖ", "product_stream": "onco_school",
         "status": "planning", "event_date": None, "owner_id": uuid.uuid4(),
         "brief": "Описание", "funnel_template_id": None,
-        "source_material_refs": [], "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow(),
+        "source_material_refs": [], "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
     }
     base.update(ov)
     return SimpleNamespace(**base)

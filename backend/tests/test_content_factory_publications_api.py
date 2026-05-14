@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -34,7 +34,7 @@ def make_pub(**ov):
         "status": "draft", "platform_post_url": None,
         "platform_post_id": None, "utm": {},
         "version_number": 1, "cancelled_reason": None,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     }
     base.update(ov)
     return SimpleNamespace(**base)
@@ -67,6 +67,55 @@ async def test_list_publications_by_bundle(monkeypatch):
         bundle_id=uuid.uuid4(), member=cf_member(), session=session,
     )
     assert len(result) == 2
+
+
+@pytest.mark.asyncio
+async def test_list_publications_passes_filters(monkeypatch):
+    bundle_id = uuid.uuid4()
+    platform_id = uuid.uuid4()
+    responsible_id = uuid.uuid4()
+    pubs = [
+        make_pub(
+            bundle_id=bundle_id,
+            platform_id=platform_id,
+            responsible_id=responsible_id,
+            status="scheduled",
+        )
+    ]
+    monkeypatch.setattr(
+        pubs_api.publication_service,
+        "list",
+        AsyncMock(return_value=pubs),
+    )
+    session = AsyncMock()
+
+    result = await pubs_api.list_publications(
+        member=cf_member(),
+        session=session,
+        bundle_id=bundle_id,
+        status="scheduled",
+        platform_id=platform_id,
+        format_id=None,
+        responsible_id=responsible_id,
+        scheduled_from=None,
+        scheduled_to=None,
+        limit=100,
+        offset=0,
+    )
+
+    assert result == pubs
+    pubs_api.publication_service.list.assert_awaited_once_with(
+        session,
+        bundle_id=bundle_id,
+        status="scheduled",
+        platform_id=platform_id,
+        format_id=None,
+        responsible_id=responsible_id,
+        scheduled_from=None,
+        scheduled_to=None,
+        limit=100,
+        offset=0,
+    )
 
 
 @pytest.mark.asyncio
@@ -134,7 +183,7 @@ async def test_list_versions(monkeypatch):
     versions = [SimpleNamespace(
         id=uuid.uuid4(), publication_id=uuid.uuid4(),
         version_number=1, body_text="b", edited_by_id=uuid.uuid4(),
-        edited_at=datetime.utcnow(), approval_event="drafted",
+        edited_at=datetime.now(UTC), approval_event="drafted",
         source_materials_refs=[], notes=None,
     )]
     monkeypatch.setattr(

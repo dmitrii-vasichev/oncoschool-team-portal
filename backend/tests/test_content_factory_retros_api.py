@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -29,7 +29,7 @@ def make_retro(**ov):
         "broken": [], "learnings": {},
         "decisions": {}, "actions": [],
         "notes": "",
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC),
     }
     base.update(ov)
     return SimpleNamespace(**base)

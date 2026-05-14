@@ -9,6 +9,7 @@ import {
   CalendarDays,
   BarChart3,
   FileBarChart,
+  Factory,
   Users,
   Settings,
   Megaphone,
@@ -74,6 +75,7 @@ interface NavItem {
   icon: React.ElementType;
   moderatorOnly?: boolean;
   contentAccess?: boolean;
+  contentFactoryAccess?: boolean;
   contentSubSection?: ContentSubSection;
   section: SidebarSection;
 }
@@ -99,6 +101,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Search,
     contentAccess: true,
     contentSubSection: "telegram_analysis",
+    section: "content",
+  },
+  {
+    href: "/content-factory/dashboard",
+    label: "Content Factory",
+    icon: Factory,
+    contentFactoryAccess: true,
     section: "content",
   },
   { href: "/team", label: "Команда", icon: Users, moderatorOnly: true, section: "manage" },
@@ -160,6 +169,7 @@ function SidebarInner({ collapsed }: { collapsed: boolean }) {
   const visibleItems = NAV_ITEMS.filter((i) => {
     if (i.moderatorOnly && !isModerator) return false;
     if (i.contentAccess && !hasContentAccess(i.contentSubSection ?? "telegram_analysis")) return false;
+    if (i.contentFactoryAccess && !PermissionService.canAccessContentFactory(user)) return false;
     return true;
   });
 

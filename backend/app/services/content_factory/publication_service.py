@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
@@ -61,6 +63,43 @@ class PublicationService:
         result = await session.execute(
             select(CFPublication).where(CFPublication.bundle_id == bundle_id).order_by(CFPublication.scheduled_at)
         )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def list(
+        session: AsyncSession,
+        *,
+        bundle_id: uuid.UUID | None = None,
+        status: str | None = None,
+        platform_id: uuid.UUID | None = None,
+        format_id: uuid.UUID | None = None,
+        responsible_id: uuid.UUID | None = None,
+        scheduled_from: datetime | None = None,
+        scheduled_to: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[CFPublication]:
+        stmt = select(CFPublication)
+        if bundle_id:
+            stmt = stmt.where(CFPublication.bundle_id == bundle_id)
+        if status:
+            stmt = stmt.where(CFPublication.status == status)
+        if platform_id:
+            stmt = stmt.where(CFPublication.platform_id == platform_id)
+        if format_id:
+            stmt = stmt.where(CFPublication.format_id == format_id)
+        if responsible_id:
+            stmt = stmt.where(CFPublication.responsible_id == responsible_id)
+        if scheduled_from:
+            stmt = stmt.where(CFPublication.scheduled_at >= scheduled_from)
+        if scheduled_to:
+            stmt = stmt.where(CFPublication.scheduled_at <= scheduled_to)
+        stmt = stmt.order_by(
+            CFPublication.scheduled_at.asc().nullslast(),
+            CFPublication.created_at.desc(),
+        )
+        stmt = stmt.limit(limit).offset(offset)
+        result = await session.execute(stmt)
         return list(result.scalars().all())
 
     @staticmethod
