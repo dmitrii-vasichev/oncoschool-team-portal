@@ -1,5 +1,24 @@
 # Status
 
+## Telegram Overdue Task Report Readability
+
+- Current phase: implemented, focused backend verification passed
+- Source: user feedback that the current Telegram overdue-task report is difficult to read, task numbers add no value in the report body, project grouping is not useful yet, and assignee-count sorting would be helpful.
+- Scope: backend-only formatting change for the `task_overdue` subscription report.
+- Latest progress:
+  - Added focused tests for the new overdue report text and action keyboard.
+  - Replaced the flat `#id · title · assignee · date` overdue report with structured sections.
+  - Added overdue-age buckets, assignee counts sorted by descending count, and a short oldest-overdue sample.
+  - Removed task short IDs from the report body.
+  - Added a single `Показать все просроченные` button that reuses the existing team overdue task list callback.
+- Key decisions:
+  - Use neutral wording: `Давно просрочены`, not `critical`.
+  - Do not add project grouping or project buttons until projects are meaningful in this workflow.
+  - Keep the report compact by showing top assignees and the five oldest overdue tasks.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_reminder_digest_section_order.py -q` passed: 12 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 17 Guest Stage Timeline
 
 - Current phase: implemented, verified, merged to `main`, and pushed

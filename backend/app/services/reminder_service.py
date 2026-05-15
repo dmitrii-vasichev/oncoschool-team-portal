@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import Counter
 from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
@@ -48,6 +49,8 @@ DIGEST_SECTION_ORDER_DEFAULT = ("overdue", "upcoming", "in_progress", "new")
 ALLOWED_DIGEST_SECTION_KEYS = set(DIGEST_SECTION_ORDER_DEFAULT)
 TASK_LINE_FIELD_ORDER_DEFAULT = ("number", "title", "deadline", "priority")
 ALLOWED_TASK_LINE_FIELD_KEYS = set(TASK_LINE_FIELD_ORDER_DEFAULT)
+OVERDUE_REPORT_TOP_ASSIGNEES = 5
+OVERDUE_REPORT_TOP_TASKS = 5
 
 
 def normalize_digest_sections_order(value: object | None) -> list[str]:
@@ -103,6 +106,139 @@ def normalize_upcoming_days(value: object | None) -> int:
     except (TypeError, ValueError):
         return 3
     return max(0, min(days, 7))
+
+
+def _task_deadline(task: Task) -> date | None:
+    value = getattr(task, "deadline", None)
+    return value if isinstance(value, date) else None
+
+
+def _task_title(task: Task) -> str:
+    title = str(getattr(task, "title", "") or "").strip()
+    return title or "Без названия"
+
+
+def _task_assignee_name(task: Task) -> str:
+    assignee = getattr(task, "assignee", None)
+    full_name = str(getattr(assignee, "full_name", "") or "").strip()
+    return full_name or "Не назначен"
+
+
+def _days_overdue(task: Task, today: date) -> int:
+    deadline = _task_deadline(task)
+    if deadline is None:
+        return 0
+    return max(0, (today - deadline).days)
+
+
+def _format_ru_count(value: int, forms: tuple[str, str, str]) -> str:
+    last_two = value % 100
+    last_one = value % 10
+    if 11 <= last_two <= 14:
+        form = forms[2]
+    elif last_one == 1:
+        form = forms[0]
+    elif 2 <= last_one <= 4:
+        form = forms[1]
+    else:
+        form = forms[2]
+    return f"{value} {form}"
+
+
+def _overdue_task_sort_key(task: Task, today: date) -> tuple[int, date, str]:
+    deadline = _task_deadline(task)
+    return (
+        -_days_overdue(task, today),
+        deadline or date.max,
+        _task_title(task).casefold(),
+    )
+
+
+def build_overdue_tasks_report_text(
+    overdue_tasks: list[Task],
+    *,
+    today: date | None = None,
+) -> str:
+    """Build a readable Telegram report for overdue task subscriptions."""
+    report_date = today or date.today()
+    tasks = [task for task in overdue_tasks if _days_overdue(task, report_date) > 0]
+
+    lines = [f"⏰ Просроченные задачи: {len(tasks)}"]
+    if not tasks:
+        return "\n".join(lines)
+
+    more_than_week = sum(1 for task in tasks if _days_overdue(task, report_date) > 7)
+    three_to_seven = sum(
+        1 for task in tasks if 3 <= _days_overdue(task, report_date) <= 7
+    )
+    one_to_two = sum(1 for task in tasks if 1 <= _days_overdue(task, report_date) <= 2)
+
+    lines.extend([
+        "",
+        "По давности:",
+        f"🔴 Больше 7 дней: {more_than_week}",
+        f"🟠 3-7 дней: {three_to_seven}",
+        f"🟡 1-2 дня: {one_to_two}",
+        "",
+        "По ответственным:",
+    ])
+
+    assignee_counts = Counter(_task_assignee_name(task) for task in tasks)
+    assignee_rows = sorted(
+        assignee_counts.items(),
+        key=lambda item: (-item[1], item[0] == "Не назначен", item[0].casefold()),
+    )
+    for assignee_name, count in assignee_rows[:OVERDUE_REPORT_TOP_ASSIGNEES]:
+        lines.append(f"👤 {assignee_name} — {count}")
+    if len(assignee_rows) > OVERDUE_REPORT_TOP_ASSIGNEES:
+        hidden = len(assignee_rows) - OVERDUE_REPORT_TOP_ASSIGNEES
+        hidden_text = _format_ru_count(
+            hidden,
+            ("исполнитель", "исполнителя", "исполнителей"),
+        )
+        lines.append(f"... и ещё {hidden_text}")
+
+    lines.extend(["", "Давно просрочены:"])
+    sorted_tasks = sorted(
+        tasks,
+        key=lambda task: _overdue_task_sort_key(task, report_date),
+    )
+    for index, task in enumerate(sorted_tasks[:OVERDUE_REPORT_TOP_TASKS], start=1):
+        deadline = _task_deadline(task)
+        days = _days_overdue(task, report_date)
+        overdue_age = _format_ru_count(days, ("день", "дня", "дней"))
+        deadline_text = deadline.strftime("%d.%m") if deadline else "—"
+        lines.extend([
+            "",
+            f"{index}. {_task_title(task)}",
+            f"👤 {_task_assignee_name(task)}",
+            f"📅 {deadline_text} · просрочено на {overdue_age}",
+        ])
+
+    if len(sorted_tasks) > OVERDUE_REPORT_TOP_TASKS:
+        shown_count = OVERDUE_REPORT_TOP_TASKS
+        total_count = len(sorted_tasks)
+        lines.extend([
+            "",
+            f"Показаны {shown_count} самых давних из {total_count}.",
+        ])
+
+    return "\n".join(lines)
+
+
+def build_overdue_tasks_report_keyboard() -> InlineKeyboardMarkup:
+    """Build the action keyboard for the overdue task subscription report."""
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="📋 Показать все просроченные",
+            callback_data=TaskListCallback(
+                scope=TaskListScope.TEAM,
+                task_filter=TaskListFilter.OVERDUE,
+                page=1,
+                department_token=ALL_DEPARTMENTS_TOKEN,
+            ).pack(),
+        )
+    ]])
 
 
 class ReminderService:
@@ -695,23 +831,17 @@ class ReminderService:
                 if not subs:
                     return
 
-                # Build summary
-                lines = [f"⏰ Просроченные задачи ({len(overdue_tasks)}):"]
-                for t in overdue_tasks[:15]:  # Limit to 15
-                    assignee_name = t.assignee.full_name if t.assignee else "—"
-                    dl = t.deadline.strftime("%d.%m") if t.deadline else ""
-                    lines.append(
-                        f"  #{t.short_id} · {t.title} · 👤 {assignee_name} · 📅 {dl}"
-                    )
-                if len(overdue_tasks) > 15:
-                    lines.append(f"  ... и ещё {len(overdue_tasks) - 15}")
-
-                text = "\n".join(lines)
+                text = build_overdue_tasks_report_text(overdue_tasks, today=today)
+                reply_markup = build_overdue_tasks_report_keyboard()
 
                 for sub in subs:
                     member = sub.member
                     if member and member.telegram_id:
-                        await self._send_safe(member.telegram_id, text)
+                        await self._send_safe(
+                            member.telegram_id,
+                            text,
+                            reply_markup=reply_markup,
+                        )
 
         except Exception as e:
             logger.error(f"Error in _check_overdue_tasks: {e}")

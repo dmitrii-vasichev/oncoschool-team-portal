@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock
 
 from app.services.reminder_service import (
     ReminderService,
+    build_overdue_tasks_report_keyboard,
+    build_overdue_tasks_report_text,
     normalize_digest_sections_order,
     normalize_upcoming_days,
 )
@@ -375,6 +377,108 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent_text.count("#502"), 1)
         self.assertEqual(sent_text.count("#503"), 1)
         self.assertEqual(sent_text.count("#504"), 1)
+
+
+class OverdueTasksReportFormatTests(unittest.TestCase):
+    def test_build_overdue_tasks_report_text_groups_by_age_and_assignee(self) -> None:
+        today = date(2026, 5, 15)
+        push_title = "Сделать пуш для возврата участников эфира"
+        summary_title = (
+            "Собрать сводную таблицу по теплому трафику"
+        )
+        tasks = [
+            SimpleNamespace(
+                short_id=234,
+                title=push_title,
+                deadline=today - timedelta(days=6),
+                assignee=SimpleNamespace(full_name="Елена Полищук"),
+            ),
+            SimpleNamespace(
+                short_id=219,
+                title="Провести созвон с переводчиком на БНЗТ",
+                deadline=today - timedelta(days=3),
+                assignee=SimpleNamespace(full_name="Оксана Гончарук"),
+            ),
+            SimpleNamespace(
+                short_id=220,
+                title="Прохождение воронок с учетом обновлений",
+                deadline=today - timedelta(days=2),
+                assignee=SimpleNamespace(full_name="Андрей Поспелов"),
+            ),
+            SimpleNamespace(
+                short_id=43,
+                title=summary_title,
+                deadline=today - timedelta(days=79),
+                assignee=SimpleNamespace(full_name="Дарья Плешкова"),
+            ),
+            SimpleNamespace(
+                short_id=232,
+                title="Сделать новый тренинг для НКО на ГК по ТЗ",
+                deadline=today - timedelta(days=1),
+                assignee=SimpleNamespace(full_name="Елена Полищук"),
+            ),
+            SimpleNamespace(
+                short_id=207,
+                title="Записи вебинара на 24 часа",
+                deadline=today - timedelta(days=10),
+                assignee=SimpleNamespace(full_name="Елена Полищук"),
+            ),
+        ]
+
+        report = build_overdue_tasks_report_text(tasks, today=today)
+
+        self.assertIn("⏰ Просроченные задачи: 6", report)
+        self.assertIn("По давности:", report)
+        self.assertIn("🔴 Больше 7 дней: 2", report)
+        self.assertIn("🟠 3-7 дней: 2", report)
+        self.assertIn("🟡 1-2 дня: 2", report)
+        self.assertIn("По ответственным:", report)
+        self.assertLess(
+            report.find("👤 Елена Полищук — 3"),
+            report.find("👤 Андрей Поспелов — 1"),
+        )
+        self.assertIn("Давно просрочены:", report)
+        self.assertLess(
+            report.find(
+                "1. Собрать сводную таблицу по теплому трафику"
+            ),
+            report.find("2. Записи вебинара на 24 часа"),
+        )
+        self.assertIn("📅 25.02 · просрочено на 79 дней", report)
+        self.assertIn("📅 05.05 · просрочено на 10 дней", report)
+        self.assertNotIn("#43", report)
+        self.assertNotIn("#207", report)
+        self.assertNotIn("#234", report)
+
+    def test_build_overdue_tasks_report_text_limits_long_sections(self) -> None:
+        today = date(2026, 5, 15)
+        tasks = [
+            SimpleNamespace(
+                short_id=index,
+                title=f"Задача {index}",
+                deadline=today - timedelta(days=index),
+                assignee=SimpleNamespace(full_name=f"Участник {index}"),
+            )
+            for index in range(1, 9)
+        ]
+
+        report = build_overdue_tasks_report_text(tasks, today=today)
+
+        self.assertIn("... и ещё 3 исполнителя", report)
+        self.assertIn("Показаны 5 самых давних из 8.", report)
+        self.assertIn("1. Задача 8", report)
+        self.assertIn("5. Задача 4", report)
+        self.assertNotIn("6. Задача 3", report)
+
+    def test_build_overdue_tasks_report_keyboard_opens_team_overdue_list(self) -> None:
+        keyboard = build_overdue_tasks_report_keyboard()
+
+        self.assertEqual(
+            keyboard.inline_keyboard[0][0].text,
+            "📋 Показать все просроченные",
+        )
+        self.assertIn("team", keyboard.inline_keyboard[0][0].callback_data)
+        self.assertIn("overdue", keyboard.inline_keyboard[0][0].callback_data)
 
 
 if __name__ == "__main__":

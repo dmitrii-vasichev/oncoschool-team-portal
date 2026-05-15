@@ -1,5 +1,23 @@
 # Test Plan
 
+## Telegram Overdue Task Report Readability
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_reminder_digest_section_order.py -q`
+- `git diff --check`
+
+### Manual
+
+1. Trigger or wait for a `task_overdue` subscription report in Telegram.
+2. Confirm the report body starts with the total overdue task count.
+3. Confirm the report shows overdue-age buckets for more than 7 days, 3-7 days, and 1-2 days.
+4. Confirm the `По ответственным` section is sorted by descending overdue task count.
+5. Confirm the report uses `Давно просрочены` and does not call old tasks critical.
+6. Confirm task numbers are not visible in the report body.
+7. Confirm no project grouping or project button appears.
+8. Tap `Показать все просроченные` and confirm the existing overdue task list opens.
+
 ## Content Factory Sprint 17 Guest Stage Timeline
 
 ### Automated

@@ -1,3 +1,33 @@
+# Active Plan: Telegram Overdue Task Report Readability
+
+**Goal:** Make the Telegram overdue-task subscription report scannable without exposing task numbers in the report body.
+
+**Milestones:**
+
+1. Add focused backend tests for the overdue report text and action keyboard.
+2. Replace the flat overdue task list with summary blocks by overdue age and assignee count.
+3. Show only a short "long overdue" task sample with title, assignee, deadline, and overdue age.
+4. Keep a single action button that opens the existing team overdue task list.
+5. Run focused backend verification and whitespace checks.
+
+**Definition of done:**
+
+- The report body does not show task short IDs.
+- The report includes overdue-age buckets: more than 7 days, 3-7 days, and 1-2 days.
+- The report includes assignee counts sorted by descending overdue task count.
+- The report labels the oldest task sample as "Давно просрочены" rather than "critical".
+- The report does not include project grouping or project buttons.
+- The existing task list callback is reused for the full overdue list.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_reminder_digest_section_order.py -q
+git diff --check
+```
+
+---
+
 # Active Plan: Content Factory Sprint 17 Guest Stage Timeline
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-17-stage-timeline.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
