@@ -17,8 +17,8 @@
 
 **Implementation status:**
 
-- Implemented, verified, and merged to `main`.
-- Sprint 1 through Sprint 35 work is merged to `main`.
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 35 work is merged to `main` and pushed.
 
 **Definition of done:**
 

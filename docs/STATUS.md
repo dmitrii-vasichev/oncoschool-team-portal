@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 35 Variant Handoff
 
-- Current phase: implemented, verified, and merged to `main`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: Sprint 34 shows adaptation readiness, but editors still need to copy each ready channel one by one for manual publication handoff.
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-35-variant-handoff-design.md`
 - Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-35-variant-handoff.md`
@@ -16,12 +16,13 @@
   - Added the `Скопировать готовые` action inside the adaptations coverage block.
   - Focused and full frontend verification passed after implementation.
   - Merged Sprint 35 into local `main`.
+  - Pushed Sprint 35 to `origin/main`.
 - Key decisions:
   - Keep Sprint 35 frontend-only and reuse saved variants plus coverage rules.
   - Copy only current saved variants so stale text is not published accidentally.
   - Include skipped channels in the copied package to make partial readiness explicit.
 - Next actions:
-  - Push Sprint 35 to `origin/main`.
+  - Continue product development from Sprint 36.
 - Latest verification:
   - RED confirmed: `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the handoff helper and UI action did not exist.
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 98 tests, with existing Node module-type warnings.
