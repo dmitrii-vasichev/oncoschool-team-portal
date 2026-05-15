@@ -45,6 +45,65 @@ class TestPublicationService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.body_text, "new text")
         self.assertEqual(result.version_number, 2)
 
+    async def test_update_publication_creates_history_on_status_change(self):
+        session = AsyncMock()
+        publication = SimpleNamespace(
+            id=uuid.uuid4(),
+            bundle_id=uuid.uuid4(),
+            body_text="ready text",
+            version_number=1,
+            status="needs_copy",
+            title="t",
+        )
+        PublicationService.get = AsyncMock(return_value=publication)
+
+        editor_id = uuid.uuid4()
+        result = await PublicationService.update(
+            session,
+            publication.id,
+            CFPublicationUpdate(status="factcheck"),
+            editor_id=editor_id,
+        )
+
+        self.assertEqual(result.status, "factcheck")
+        self.assertEqual(result.version_number, 2)
+        version = session.add.call_args.args[0]
+        self.assertEqual(version.version_number, 2)
+        self.assertEqual(version.body_text, "ready text")
+        self.assertEqual(version.edited_by_id, editor_id)
+        self.assertEqual(version.approval_event, "reviewed")
+        self.assertEqual(version.notes, "Статус: Нужен текст -> Фактчек")
+
+    async def test_update_publication_body_and_status_creates_one_history_row(self):
+        session = AsyncMock()
+        publication = SimpleNamespace(
+            id=uuid.uuid4(),
+            bundle_id=uuid.uuid4(),
+            body_text="old",
+            version_number=1,
+            status="doctor_review",
+            title="t",
+        )
+        PublicationService.get = AsyncMock(return_value=publication)
+
+        editor_id = uuid.uuid4()
+        result = await PublicationService.update(
+            session,
+            publication.id,
+            CFPublicationUpdate(body_text="new", status="approved"),
+            editor_id=editor_id,
+            approval_event="doctor_approved",
+        )
+
+        self.assertEqual(result.body_text, "new")
+        self.assertEqual(result.status, "approved")
+        self.assertEqual(result.version_number, 2)
+        self.assertEqual(session.add.call_count, 1)
+        version = session.add.call_args.args[0]
+        self.assertEqual(version.body_text, "new")
+        self.assertEqual(version.approval_event, "doctor_approved")
+        self.assertEqual(version.notes, "Статус: Проверка врача -> Одобрено")
+
     async def test_update_publication_metadata_without_body_version(self):
         session = AsyncMock()
         platform_id = uuid.uuid4()

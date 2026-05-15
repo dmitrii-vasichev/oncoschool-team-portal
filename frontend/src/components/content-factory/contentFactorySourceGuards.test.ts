@@ -246,6 +246,9 @@ test("workspace routes use bundle and publication APIs", () => {
   const publicationSource = readSource(
     "app/content-factory/publications/[id]/page.tsx",
   );
+  const versionListSource = readSource(
+    "components/content-factory/ContentFactoryPublicationVersionList.tsx",
+  );
 
   assert.match(bundlesSource, /api\.getCFBundles/);
   assert.match(bundlesSource, /ContentFactoryBundleDialog/);
@@ -255,6 +258,9 @@ test("workspace routes use bundle and publication APIs", () => {
   assert.match(publicationSource, /api\.getCFPublication/);
   assert.match(publicationSource, /api\.getCFPublicationVersions/);
   assert.match(publicationSource, /ContentFactoryPublicationVersionList/);
+  assert.match(versionListSource, /История публикации/);
+  assert.match(versionListSource, /workflow/);
+  assert.match(versionListSource, /version\.notes/);
 });
 
 test("publication detail route exposes Sprint 5 outcomes panels", () => {

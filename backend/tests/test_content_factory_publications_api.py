@@ -176,6 +176,8 @@ async def test_update_publication_404(monkeypatch):
             member=cf_member(), session=AsyncMock(),
         )
     assert exc.value.status_code == 404
+    _, kwargs = pubs_api.publication_service.update.await_args
+    assert "approval_event" not in kwargs
 
 
 @pytest.mark.asyncio

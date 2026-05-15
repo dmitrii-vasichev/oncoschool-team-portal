@@ -41,14 +41,21 @@ export function ContentFactoryPublicationVersionList({
 
   return (
     <section className="rounded-lg border border-border/70 bg-card shadow-sm">
-      <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-        <History className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold text-foreground">История версий</h2>
+      <div className="flex items-start gap-2 border-b border-border/60 px-4 py-3">
+        <History className="mt-0.5 h-4 w-4 text-muted-foreground" />
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">
+            История публикации
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Версии текста и переходы по workflow.
+          </p>
+        </div>
       </div>
 
       {versions.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          Версий текста пока нет
+          Истории публикации пока нет
         </div>
       ) : (
         <div className="divide-y divide-border/60">

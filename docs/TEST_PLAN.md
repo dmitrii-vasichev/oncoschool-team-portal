@@ -1,5 +1,30 @@
 # Test Plan
 
+## Content Factory Sprint 27 Publication Workflow History
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q`
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page with existing body text.
+2. Use `Быстрые действия` to move it from `Нужен текст` to a later review status.
+3. Confirm the detail page refreshes and the status badge changes.
+4. Confirm `История публикации` shows a new row for the status transition.
+5. Confirm the row note uses readable Russian labels such as `Статус: Нужен текст -> Фактчек`.
+6. Edit body text and status in one save and confirm only one new history row appears.
+7. Confirm the saved body snapshot in history matches the latest body text.
+8. Confirm metadata-only edits do not create noisy history rows.
+9. Confirm published, failed, and cancelled transitions receive readable history events.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 26 Publication Workflow Actions
 
 ### Automated

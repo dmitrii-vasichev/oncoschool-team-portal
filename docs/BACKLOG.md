@@ -4,6 +4,7 @@
 
 ### Next
 
+- Run authenticated manual QA for the Sprint 27 publication workflow history against real publication records.
 - Run authenticated manual QA for the Sprint 26 publication workflow actions against real publication records.
 - Run authenticated manual QA for the Sprint 25 review queue triage view against real publication records.
 - Run authenticated manual QA for the Sprint 24 calendar operations view against real publication records.

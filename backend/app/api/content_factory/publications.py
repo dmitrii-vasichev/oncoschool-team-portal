@@ -110,7 +110,6 @@ async def update_publication(
     pub = await publication_service.update(
         session, publication_id, data,
         editor_id=member.id,
-        approval_event="reviewed",
     )
     if pub is None:
         raise HTTPException(status_code=404, detail="Публикация не найдена")

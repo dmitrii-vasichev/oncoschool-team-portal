@@ -1,3 +1,71 @@
+# Active Plan: Content Factory Sprint 27 Publication Workflow History
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-27-publication-workflow-history.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Record publication workflow status changes in the existing publication history and make the history panel read as a workflow audit trail.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-27-publication-workflow-history-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-27-publication-workflow-history.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add backend tests proving status-only publication updates create history.
+2. Add backend tests proving body+status updates create one history row.
+3. Stop forcing the publication PATCH route to pass a generic approval event.
+4. Extend `PublicationService.update` to record status notes in `CFPublicationVersion`.
+5. Rename the frontend version panel to a publication history panel and explain workflow events.
+6. Run focused backend, frontend, build, and docs verification.
+
+**Implementation status:**
+
+- Implemented and verified on branch `codex/content-factory-sprint-27-publication-workflow-history`.
+- Pending commit, merge to `main`, and push.
+- Sprint 1 through Sprint 26 work is merged to `main`.
+- Sprint 27 builds on Sprint 26 quick workflow actions by making those status moves visible in the publication history trail.
+
+**Definition of done:**
+
+- Publication status-only PATCH updates create a `CFPublicationVersion` row.
+- Body+status PATCH updates create exactly one history row.
+- History rows keep the current body text snapshot.
+- Status history notes use readable Russian labels, for example `Статус: Нужен текст -> Фактчек`.
+- Derived approval events match the target status when the caller does not provide an explicit approval event.
+- The publication PATCH route lets the service derive the event instead of hard-coding `reviewed`.
+- The detail history panel is titled `История публикации` and explains that it includes text versions and workflow moves.
+- No new database migration, table, endpoint, notification, or external platform integration is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q` passed: 14 tests, with existing AsyncMock/pytest-asyncio warnings.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 30 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 175 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 26 Publication Workflow Actions
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-26-publication-workflow-actions.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

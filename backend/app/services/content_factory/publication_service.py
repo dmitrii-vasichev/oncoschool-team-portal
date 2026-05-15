@@ -14,6 +14,45 @@ if TYPE_CHECKING:
     from app.db.models import CFPublicationSegmentTarget
 
 
+CF_PUBLICATION_STATUS_LABELS = {
+    "draft": "Черновик",
+    "needs_copy": "Нужен текст",
+    "needs_design": "Нужен дизайн",
+    "factcheck": "Фактчек",
+    "doctor_review": "Проверка врача",
+    "approved": "Одобрено",
+    "scheduled": "Запланировано",
+    "published": "Опубликовано",
+    "failed": "Ошибка",
+    "cancelled": "Отменено",
+}
+
+CF_PUBLICATION_STATUS_APPROVAL_EVENTS = {
+    "draft": "drafted",
+    "needs_copy": "reviewed",
+    "needs_design": "reviewed",
+    "factcheck": "reviewed",
+    "doctor_review": "reviewed",
+    "approved": "doctor_approved",
+    "scheduled": "scheduled",
+    "published": "published",
+    "failed": "rolled_back",
+    "cancelled": "rolled_back",
+}
+
+
+def _status_label(status: str | None) -> str:
+    if not status:
+        return "Статус не задан"
+    return CF_PUBLICATION_STATUS_LABELS.get(status, status)
+
+
+def _approval_event_for_status(status: str | None) -> str:
+    if not status:
+        return "reviewed"
+    return CF_PUBLICATION_STATUS_APPROVAL_EVENTS.get(status, "reviewed")
+
+
 class PublicationService:
     @staticmethod
     async def create(
@@ -109,27 +148,35 @@ class PublicationService:
         payload: CFPublicationUpdate,
         *,
         editor_id: uuid.UUID,
-        approval_event: str = "reviewed",
+        approval_event: str | None = None,
     ) -> CFPublication | None:
         pub = await PublicationService.get(session, pub_id)
         if pub is None:
             return None
 
         changes = payload.model_dump(exclude_unset=True)
+        old_status = pub.status
         body_changed = "body_text" in changes and changes["body_text"] != pub.body_text
+        status_changed = "status" in changes and changes["status"] != old_status
 
         for field, value in changes.items():
             setattr(pub, field, value)
 
-        if body_changed:
+        if body_changed or status_changed:
             pub.version_number = (pub.version_number or 1) + 1
+            status_note = (
+                f"Статус: {_status_label(old_status)} -> {_status_label(pub.status)}"
+                if status_changed
+                else None
+            )
             version = CFPublicationVersion(
                 publication_id=pub.id,
                 version_number=pub.version_number,
                 body_text=pub.body_text,
                 edited_by_id=editor_id,
-                approval_event=approval_event,
+                approval_event=approval_event or _approval_event_for_status(pub.status),
                 source_materials_refs=[],
+                notes=status_note,
             )
             session.add(version)
 

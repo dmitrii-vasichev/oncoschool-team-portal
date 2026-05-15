@@ -1,5 +1,40 @@
 # Status
 
+## Content Factory Sprint 27 Publication Workflow History
+
+- Current phase: implemented and full verification passed on branch; pending commit, merge to `main`, and push
+- Source: Sprint 26 added quick workflow status actions, but backend status-only updates did not create publication history because `CFPublicationVersion` rows were only created for body text changes.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-27-publication-workflow-history-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-27-publication-workflow-history.md`
+- Scope: backend publication update history behavior, PATCH delegation cleanup, frontend history panel copy, source guards, focused backend tests, and frontend verification
+- Latest progress:
+  - Confirmed branch `codex/content-factory-sprint-27-publication-workflow-history` is active.
+  - Wrote Sprint 27 design and implementation plan.
+  - Added failing backend tests for status-only history and body+status single-row history.
+  - Added a failing API delegation guard so PATCH no longer hard-codes `approval_event`.
+  - Added a failing frontend source guard for `История публикации`, workflow explanatory copy, and `version.notes`.
+  - Extended `PublicationService.update` to create one version row for body or status changes.
+  - Added Russian status transition notes such as `Статус: Нужен текст -> Фактчек`.
+  - Updated the publication version panel copy so workflow moves read as part of the publication history.
+  - Focused backend and frontend verification passed after implementation.
+  - Full frontend verification passed after implementation.
+- Key decisions:
+  - Reuse the existing `cf_publication_version` table instead of adding a new workflow audit table.
+  - Derive approval events from the target status when no explicit event is provided.
+  - Keep backend transition validation, approval comments, notifications, and platform integrations out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+  - Run authenticated manual QA against real publication workflow records when useful.
+- Latest verification:
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q` passed: 14 tests, with existing AsyncMock/pytest-asyncio warnings.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 30 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 175 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 26 Publication Workflow Actions
 
 - Current phase: implemented, verified, merged to `main`, and pushed
