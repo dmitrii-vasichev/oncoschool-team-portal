@@ -39,7 +39,7 @@
 **Files:**
 - Modify backend model, schema, service, API, and migration tests listed above.
 
-- [ ] Add tests that expect `CFGuestStoryEvent` model, event schemas, service comment creation, service auto-events, event endpoints, and migration `043_content_factory_guest_story_events`.
+- [ ] Add tests that expect `CFGuestStoryEvent` model, event schemas, service comment creation, service auto-events, event endpoints, and migration revision `043_cf_guest_story_events`.
 - [ ] Run:
 
 ```bash

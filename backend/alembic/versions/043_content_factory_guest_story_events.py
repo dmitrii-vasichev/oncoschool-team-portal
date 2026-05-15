@@ -1,6 +1,6 @@
 """Add Content Factory guest story activity events.
 
-Revision ID: 043_content_factory_guest_story_events
+Revision ID: 043_cf_guest_story_events
 Revises: 042_content_factory_guest_story
 Create Date: 2026-05-14
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "043_content_factory_guest_story_events"
+revision: str = "043_cf_guest_story_events"
 down_revision: Union[str, None] = "042_content_factory_guest_story"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

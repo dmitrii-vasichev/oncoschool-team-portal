@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 
@@ -13,6 +14,35 @@ EVENT_MIGRATION = (
     / "versions"
     / "043_content_factory_guest_story_events.py"
 )
+ALEMBIC_VERSIONS = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+ALEMBIC_VERSION_NUM_MAX_LENGTH = 32
+
+
+def _extract_literal_assignment(source: str, name: str) -> str | None:
+    module = ast.parse(source)
+    for node in module.body:
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if not isinstance(node.target, ast.Name):
+            continue
+        if node.target.id != name or not isinstance(node.value, ast.Constant):
+            continue
+        if isinstance(node.value.value, str):
+            return node.value.value
+    return None
+
+
+def test_alembic_revision_ids_fit_version_table_limit():
+    oversized_revisions = []
+
+    for migration in sorted(ALEMBIC_VERSIONS.glob("*.py")):
+        if migration.name == "__init__.py":
+            continue
+        revision = _extract_literal_assignment(migration.read_text(), "revision")
+        if revision is not None and len(revision) > ALEMBIC_VERSION_NUM_MAX_LENGTH:
+            oversized_revisions.append((migration.name, revision, len(revision)))
+
+    assert oversized_revisions == []
 
 
 def test_guest_story_migration_creates_table_and_consent_columns():
@@ -49,7 +79,7 @@ def test_guest_story_migration_indexes_and_downgrade():
 def test_guest_story_event_migration_creates_table_and_indexes():
     source = EVENT_MIGRATION.read_text()
 
-    assert 'revision: str = "043_content_factory_guest_story_events"' in source
+    assert 'revision: str = "043_cf_guest_story_events"' in source
     assert 'down_revision: Union[str, None] = "042_content_factory_guest_story"' in source
     assert '"cf_guest_story_event"' in source
     assert '"guest_story_id"' in source

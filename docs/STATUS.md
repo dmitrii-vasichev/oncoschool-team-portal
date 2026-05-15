@@ -14,7 +14,7 @@
   - Reviewed existing guest story backend service/router/schemas/models, task/idea/project event patterns, and guest detail frontend.
   - Wrote Sprint 14 design and implementation plan.
   - Made Sprint 14 the active repository plan.
-  - Added `cf_guest_story_event` model and Alembic revision `043_content_factory_guest_story_events`.
+  - Added `cf_guest_story_event` model and Alembic revision `043_cf_guest_story_events`.
   - Added guest story event create/response schemas with blank-comment validation.
   - Added guest story event service methods for list, generic event creation, and manual comments.
   - Updated guest story create/update to record created and watched-field change events.
@@ -24,6 +24,7 @@
   - Added backend and frontend tests/source guards.
   - Ran Sprint 14 backend and frontend verification successfully.
   - Merged Sprint 14 to `main` with a fast-forward merge and pushed `main` to GitHub.
+  - Hotfixed the Sprint 14 Alembic revision id after Railway exposed the production `alembic_version.version_num` 32-character limit.
 - Key decisions:
   - Use a dedicated `cf_guest_story_event` table instead of overloading the guest story JSON fields.
   - Allow manual comment creation from the frontend; reserve system event types for backend-generated events.
@@ -33,8 +34,9 @@
   - Run authenticated manual QA against real guest story activity after deployment.
   - Continue the next Content Factory slice from the preserved design and backlog.
 - Latest verification:
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 51 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
-  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `043_content_factory_guest_story_events`.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 52 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `043_cf_guest_story_events`.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic upgrade head` passed locally through `041 -> 042_content_factory_guest_story -> 043_cf_guest_story_events`.
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 32 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 153 tests, with existing Node module-type warnings.
   - `cd frontend && npx tsc --noEmit` passed.
