@@ -854,6 +854,7 @@ export type ContentFactoryPublicationReadinessKey =
   | "body"
   | "schedule"
   | "utm"
+  | "adaptations"
   | "audience"
   | "publish_fact"
   | "metrics";
@@ -880,6 +881,16 @@ type PublicationWorkflowPublicationLike = {
 type PublicationReadinessSegmentTargetLike = {
   external_segment_id?: string | null;
 };
+
+type PublicationReadinessVariantCoverageLike = Pick<
+  ContentFactoryPublicationVariantCoverage,
+  | "totalChannels"
+  | "readyCount"
+  | "missingCount"
+  | "staleCount"
+  | "missingChannels"
+  | "staleChannels"
+>;
 
 type PublishPackagePublicationLike = {
   id: string;
@@ -2045,10 +2056,54 @@ function hasUtmValue(value: Record<string, unknown> | null | undefined): boolean
   });
 }
 
+function formatReadinessChannelLabels(
+  channels: Array<{ label: string }>,
+): string {
+  return channels.map((channel) => channel.label).join(", ");
+}
+
+function adaptationReadinessItem(
+  coverage: PublicationReadinessVariantCoverageLike,
+): ContentFactoryPublicationReadinessItem {
+  const allReady =
+    coverage.readyCount === coverage.totalChannels &&
+    coverage.missingCount === 0 &&
+    coverage.staleCount === 0;
+
+  if (allReady) {
+    return readinessItem(
+      "adaptations",
+      "Адаптации",
+      "ready",
+      `Все ${coverage.totalChannels} каналов сохранены и актуальны.`,
+    );
+  }
+
+  const descriptions: string[] = [];
+  if (coverage.missingCount > 0) {
+    descriptions.push(
+      `Не хватает: ${formatReadinessChannelLabels(coverage.missingChannels)}.`,
+    );
+  }
+  if (coverage.staleCount > 0) {
+    descriptions.push(
+      `Устарели: ${formatReadinessChannelLabels(coverage.staleChannels)}.`,
+    );
+  }
+
+  return readinessItem(
+    "adaptations",
+    "Адаптации",
+    "missing",
+    descriptions.join(" ") || "Сохраните актуальные адаптации.",
+  );
+}
+
 export function getContentFactoryPublicationReadiness(
   publication: PublicationReadinessPublicationLike,
   segmentTargets: PublicationReadinessSegmentTargetLike[],
   metrics: PublicationOperationsMetricLike[],
+  variantCoverage?: PublicationReadinessVariantCoverageLike | null,
 ): ContentFactoryPublicationReadinessItem[] {
   const isPublished = publication.status === "published";
   const hasPostReference = Boolean(
@@ -2058,7 +2113,7 @@ export function getContentFactoryPublicationReadiness(
     publication.actual_published_at && hasPostReference,
   );
 
-  return [
+  const items: ContentFactoryPublicationReadinessItem[] = [
     readinessItem(
       "body",
       "Текст публикации",
@@ -2083,6 +2138,13 @@ export function getContentFactoryPublicationReadiness(
         ? "UTM-метки сохранены в публикации."
         : "Сгенерируйте и примените UTM-метки.",
     ),
+  ];
+
+  if (variantCoverage) {
+    items.push(adaptationReadinessItem(variantCoverage));
+  }
+
+  items.push(
     readinessItem(
       "audience",
       "Аудитория",
@@ -2111,7 +2173,9 @@ export function getContentFactoryPublicationReadiness(
           ? "Есть хотя бы один замер результата."
           : "Добавьте первый ручной замер результата.",
     ),
-  ];
+  );
+
+  return items;
 }
 
 function publishPackageReferenceLabel(

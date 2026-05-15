@@ -1,3 +1,57 @@
+# Active Plan: Content Factory Sprint 36 Readiness Adaptations
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-36-readiness-adaptations.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Include saved channel adaptations in the publication readiness checklist.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-36-readiness-adaptations-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-36-readiness-adaptations.md`
+
+**Milestones:**
+
+1. Add failing helper and source guard tests for adaptation readiness.
+2. Add optional variant coverage support to `getContentFactoryPublicationReadiness`.
+3. Wire saved variants into the operations panel checklist.
+4. Run focused and full frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented and verified on branch `codex/content-factory-sprint-36-readiness-adaptations`.
+- Sprint 1 through Sprint 35 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- Publication operations checklist shows `Адаптации` when saved variant coverage is available.
+- The item is ready only when all expected channels are saved and current.
+- Missing or stale adaptations are called out in readable Russian wording.
+- Existing adaptation edit/copy/handoff behavior remains unchanged.
+- No backend schema or API changes are added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: focused frontend tests failed before implementation because the readiness checklist did not include `Адаптации` and the operations panel did not consume variant coverage.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 99 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 191 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 35 Variant Handoff
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-35-variant-handoff.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

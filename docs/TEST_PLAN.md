@@ -1,5 +1,26 @@
 # Test Plan
 
+## Content Factory Sprint 36 Readiness Adaptations
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page with no saved variants.
+2. Confirm `Чек-лист готовности` includes `Адаптации` as needing work.
+3. Save current adaptations for all expected channels.
+4. Confirm `Адаптации` becomes ready in the checklist.
+5. Edit the source publication so saved variants become stale.
+6. Confirm the checklist calls out stale adaptations.
+7. Confirm the dedicated `Адаптации` panel still edits, saves, copies one channel, and copies ready handoff packages.
+
 ## Content Factory Sprint 35 Variant Handoff
 
 ### Automated

@@ -314,6 +314,7 @@ test("publication detail route exposes publication operations panel", () => {
   assert.match(source, /ContentFactoryPublicationWorkflowActionsPanel/);
   assert.match(source, /platform={platform}/);
   assert.match(source, /segmentTargets={segmentTargets}/);
+  assert.match(source, /savedVariants={variants}/);
   assert.match(workflowPanelSource, /Быстрые действия/);
   assert.match(workflowPanelSource, /getContentFactoryPublicationWorkflowActions/);
   assert.match(workflowPanelSource, /api\.updateCFPublication/);
@@ -322,9 +323,12 @@ test("publication detail route exposes publication operations panel", () => {
   assert.match(panelSource, /Публикация и статистика/);
   assert.match(panelSource, /Чек-лист готовности/);
   assert.match(panelSource, /getContentFactoryPublicationReadiness/);
+  assert.match(panelSource, /getContentFactoryPublicationVariantCoverage/);
+  assert.match(panelSource, /savedVariants/);
   assert.match(utilsSource, /Текст публикации/);
   assert.match(utilsSource, /Дата в плане/);
   assert.match(utilsSource, /UTM-метки/);
+  assert.match(utilsSource, /Адаптации/);
   assert.match(utilsSource, /Аудитория/);
   assert.match(utilsSource, /Факт выхода/);
   assert.match(utilsSource, /Первые метрики/);

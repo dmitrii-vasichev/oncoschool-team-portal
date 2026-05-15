@@ -346,6 +346,7 @@ export default function ContentFactoryPublicationDetailPage() {
             platform={platform}
             metrics={metrics}
             segmentTargets={segmentTargets}
+            savedVariants={variants}
             onSaved={handleSaved}
           />
 

@@ -4,6 +4,7 @@
 
 ### Next
 
+- Run authenticated manual QA for the Sprint 36 adaptation readiness checklist against saved publication variants.
 - Run authenticated manual QA for the Sprint 35 variant handoff package against saved publication variants.
 - Run authenticated manual QA for the Sprint 34 variant coverage summary against saved publication variants.
 - Run authenticated manual QA for the Sprint 32 saved publication variants against real publication texts.

@@ -27,12 +27,14 @@ import {
   cleanContentFactoryPublicationUpdate,
   getContentFactoryPublicationOperations,
   getContentFactoryPublicationReadiness,
+  getContentFactoryPublicationVariantCoverage,
   type ContentFactoryPublicationReadinessStatus,
 } from "@/lib/contentFactoryUtils";
 import type {
   CFMetricSnapshot,
   CFPlatform,
   CFPublication,
+  CFPublicationVariant,
   CFPublicationSegmentTarget,
 } from "@/lib/types";
 
@@ -105,12 +107,14 @@ export function ContentFactoryPublicationOperationsPanel({
   platform,
   metrics,
   segmentTargets,
+  savedVariants,
   onSaved,
 }: {
   publication: CFPublication;
   platform: CFPlatform | null;
   metrics: CFMetricSnapshot[];
   segmentTargets: CFPublicationSegmentTarget[];
+  savedVariants: CFPublicationVariant[];
   onSaved: () => void | Promise<void>;
 }) {
   const { toastSuccess, toastError } = useToast();
@@ -123,9 +127,23 @@ export function ContentFactoryPublicationOperationsPanel({
     () => getContentFactoryPublicationOperations(publication, platform, metrics),
     [metrics, platform, publication],
   );
+  const variantCoverage = useMemo(
+    () =>
+      getContentFactoryPublicationVariantCoverage({
+        publication,
+        savedVariants,
+      }),
+    [publication, savedVariants],
+  );
   const readiness = useMemo(
-    () => getContentFactoryPublicationReadiness(publication, segmentTargets, metrics),
-    [metrics, publication, segmentTargets],
+    () =>
+      getContentFactoryPublicationReadiness(
+        publication,
+        segmentTargets,
+        metrics,
+        variantCoverage,
+      ),
+    [metrics, publication, segmentTargets, variantCoverage],
   );
   const actionLabel =
     publication.status === "published"

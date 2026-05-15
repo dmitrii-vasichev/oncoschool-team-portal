@@ -1,5 +1,35 @@
 # Status
 
+## Content Factory Sprint 36 Readiness Adaptations
+
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-36-readiness-adaptations`
+- Source: Sprint 34 and Sprint 35 made adaptation coverage and handoff explicit, but the main publication readiness checklist still ignores channel adaptation readiness.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-36-readiness-adaptations-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-36-readiness-adaptations.md`
+- Scope: frontend-only readiness helper extension, operations panel wiring, source guards, helper tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-36-readiness-adaptations`.
+  - Wrote Sprint 36 design and implementation plan.
+  - Added failing helper tests for unchanged default readiness, all-ready adaptation coverage, and missing/stale adaptation coverage.
+  - Added source guards for saved variant wiring into the operations panel.
+  - Added optional adaptation coverage support to `getContentFactoryPublicationReadiness`.
+  - Wired saved variants into `ContentFactoryPublicationOperationsPanel`.
+  - Focused and full frontend verification passed after implementation.
+- Key decisions:
+  - Keep adaptation editing and copying in the dedicated `Адаптации` panel.
+  - Add only a compact readiness row to the main operations checklist.
+  - Require every expected channel to be saved and current before the checklist item becomes ready.
+- Next actions:
+  - Merge Sprint 36 into `main` and push when ready.
+- Latest verification:
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because adaptation readiness was not part of the operations checklist.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 99 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 191 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 35 Variant Handoff
 
 - Current phase: implemented, verified, merged to `main`, and pushed

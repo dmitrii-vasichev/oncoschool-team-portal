@@ -1280,6 +1280,78 @@ test("publication readiness checklist explains missing and after-publish steps",
   );
 });
 
+test("publication readiness checklist includes adaptation coverage when provided", () => {
+  const readyCoverage = getContentFactoryPublicationVariantCoverage({
+    publication: { version_number: 2 },
+    savedVariants: [
+      { channel: "telegram", body_text: "Telegram", source_version_number: 2 },
+      { channel: "vk", body_text: "VK", source_version_number: 2 },
+      { channel: "email", body_text: "Email", source_version_number: 2 },
+      { channel: "push", body_text: "Push", source_version_number: 2 },
+      { channel: "max", body_text: "Max", source_version_number: 2 },
+      { channel: "dzen", body_text: "Dzen", source_version_number: 2 },
+    ],
+  });
+  const readyItems = getContentFactoryPublicationReadiness(
+    {
+      status: "scheduled",
+      body_text: "Готовый текст",
+      scheduled_at: "2026-05-20T10:00:00Z",
+      actual_published_at: null,
+      platform_post_url: null,
+      platform_post_id: null,
+      utm: { utm_source: "telegram" },
+    },
+    [{ external_segment_id: "segment-1" }],
+    [],
+    readyCoverage,
+  );
+
+  assert.deepEqual(
+    readyItems.map((item) => [item.key, item.statusLabel]),
+    [
+      ["body", "Готово"],
+      ["schedule", "Готово"],
+      ["utm", "Готово"],
+      ["adaptations", "Готово"],
+      ["audience", "Готово"],
+      ["publish_fact", "После публикации"],
+      ["metrics", "После публикации"],
+    ],
+  );
+  assert.match(
+    readyItems.find((item) => item.key === "adaptations")?.description ?? "",
+    /Все 6 каналов сохранены и актуальны/,
+  );
+
+  const partialCoverage = getContentFactoryPublicationVariantCoverage({
+    publication: { version_number: 4 },
+    savedVariants: [
+      { channel: "telegram", body_text: "Telegram", source_version_number: 4 },
+      { channel: "email", body_text: "Email", source_version_number: 3 },
+    ],
+  });
+  const partialItems = getContentFactoryPublicationReadiness(
+    {
+      status: "scheduled",
+      body_text: "Готовый текст",
+      scheduled_at: "2026-05-20T10:00:00Z",
+      actual_published_at: null,
+      platform_post_url: null,
+      platform_post_id: null,
+      utm: { utm_source: "telegram" },
+    },
+    [{ external_segment_id: "segment-1" }],
+    [],
+    partialCoverage,
+  );
+  const adaptationItem = partialItems.find((item) => item.key === "adaptations");
+
+  assert.equal(adaptationItem?.statusLabel, "Нужно заполнить");
+  assert.match(adaptationItem?.description ?? "", /Не хватает: VK, Push, Max, Дзен/);
+  assert.match(adaptationItem?.description ?? "", /Устарели: Email/);
+});
+
 test("publication workflow actions expose readable next status steps", () => {
   assert.deepEqual(
     getContentFactoryPublicationWorkflowActions({
