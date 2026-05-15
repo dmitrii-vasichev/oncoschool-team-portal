@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 34 Variant Coverage
 
-- Current phase: implemented, verified, and merged to `main`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: Sprint 32 made channel adaptations durable, but editors still need an at-a-glance view of which channel variants are saved, missing, or stale after source publication changes.
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-34-variant-coverage-design.md`
 - Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-34-variant-coverage.md`
@@ -16,12 +16,13 @@
   - Added a compact coverage summary inside `ContentFactoryPublicationVariants`.
   - Focused and full frontend verification passed after implementation.
   - Merged Sprint 34 into local `main`.
+  - Pushed Sprint 34 to `origin/main`.
 - Key decisions:
   - Keep Sprint 34 frontend-only and reuse existing saved variants.
   - Treat blank saved variant bodies as missing.
   - Use `source_version_number` versus `publication.version_number` to flag stale adaptations.
 - Next actions:
-  - Push Sprint 34 to `origin/main`.
+  - Continue product development from Sprint 35.
 - Latest verification:
   - RED confirmed: `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the coverage helper and UI block did not exist.
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 96 tests, with existing Node module-type warnings.
