@@ -484,6 +484,8 @@ test("guest story workspace exposes list create edit and navigation", () => {
   assert.match(routeSource, /sortContentFactoryGuestStoriesByAttention/);
   assert.match(routeSource, /attentionFilter/);
   assert.match(routeSource, /Требуют внимания/);
+  assert.doesNotMatch(routeSource, /xl:grid-cols-\[minmax\(0,1fr\)_auto\]/);
+  assert.match(routeSource, /sm:text-right/);
   assert.match(routeSource, /ContentFactoryGuestStoryDialog/);
   assert.match(routeSource, /ContentFactoryGuestStoryTable/);
   assert.match(dialogSource, /api\.createCFGuestStory/);

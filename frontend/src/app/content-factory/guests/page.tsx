@@ -263,8 +263,8 @@ export default function ContentFactoryGuestsPage() {
         />
       </div>
 
-      <div className="grid gap-3 rounded-lg border border-border/70 bg-card px-4 py-3 shadow-sm xl:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="grid gap-2 md:grid-cols-[minmax(180px,1.4fr)_160px_160px_170px_170px_170px]">
+      <div className="space-y-3 rounded-lg border border-border/70 bg-card px-4 py-3 shadow-sm">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-[minmax(220px,1.6fr)_repeat(5,minmax(0,1fr))]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -278,7 +278,7 @@ export default function ContentFactoryGuestsPage() {
             value={statusFilter}
             onValueChange={(value) => setStatusFilter(value as GuestStatusFilter)}
           >
-            <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+            <SelectTrigger className="h-9 min-w-0 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
@@ -294,7 +294,7 @@ export default function ContentFactoryGuestsPage() {
             value={consentFilter}
             onValueChange={(value) => setConsentFilter(value as ConsentFilter)}
           >
-            <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+            <SelectTrigger className="h-9 min-w-0 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
@@ -314,7 +314,7 @@ export default function ContentFactoryGuestsPage() {
               setAttentionFilter(value as AttentionFilter)
             }
           >
-            <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+            <SelectTrigger className="h-9 min-w-0 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] border-border/70 shadow-xl">
@@ -323,7 +323,7 @@ export default function ContentFactoryGuestsPage() {
             </SelectContent>
           </Select>
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+            <SelectTrigger className="h-9 min-w-0 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
@@ -336,7 +336,7 @@ export default function ContentFactoryGuestsPage() {
             </SelectContent>
           </Select>
           <Select value={bundleFilter} onValueChange={setBundleFilter}>
-            <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+            <SelectTrigger className="h-9 min-w-0 border-border/70 bg-muted/20 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
@@ -349,7 +349,7 @@ export default function ContentFactoryGuestsPage() {
             </SelectContent>
           </Select>
         </div>
-        <p className="self-center text-sm text-muted-foreground">
+        <p className="border-t border-border/60 pt-2 text-sm text-muted-foreground sm:text-right">
           Показано {filteredStories.length} из {stories.length}
         </p>
       </div>
