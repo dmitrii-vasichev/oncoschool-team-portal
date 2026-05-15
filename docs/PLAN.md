@@ -24,8 +24,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-30-metric-insights`.
-- Pending commit, merge to `main`, and push.
+- Implemented, verified, and merged to `main`.
+- Pending push to `origin/main`.
 - Sprint 1 through Sprint 29 work is merged to `main`.
 - Sprint 30 turns manual/imported metric snapshots into a readable publication-level summary before any external platform integration work.
 

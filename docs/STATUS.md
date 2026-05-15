@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 30 Metric Insights
 
-- Current phase: implemented and full frontend verification passed on branch; pending commit, merge to `main`, and push
+- Current phase: implemented, verified, and merged to `main`; pending push to `origin/main`
 - Source: Sprint 29 made metric import fast, but publication detail pages still show metrics mostly as a chronological log instead of an operational summary.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-30-metric-insights-design.md`
@@ -18,12 +18,13 @@
   - Wired metric insights above the metric history on publication detail pages.
   - Focused frontend verification passed after implementation.
   - Full frontend verification passed after implementation.
+  - Merged Sprint 30 into local `main`.
 - Key decisions:
   - Keep Sprint 30 frontend-only and summarize existing metric snapshots.
   - Put insights above the metric history so the log remains available as the audit trail.
   - Defer charts, backend aggregates, deduplication, metric editing, and external platform integrations.
 - Next actions:
-  - Commit, merge to `main`, and push.
+  - Push `main` to `origin/main`.
   - Run authenticated manual QA against real publication metric rows when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 90 tests, with existing Node module-type warnings.
