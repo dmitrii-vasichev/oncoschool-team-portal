@@ -208,6 +208,29 @@ test("publications route lists all publications with search filters and detail l
   assert.match(source, /Поиск/);
 });
 
+test("publications route can create a publication and redirect to detail", () => {
+  const source = readSource("app/content-factory/publications/page.tsx");
+  const dialogSource = readSource(
+    "components/content-factory/ContentFactoryPublicationDialog.tsx",
+  );
+
+  assert.match(source, /useRouter/);
+  assert.match(source, /ContentFactoryPublicationDialog/);
+  assert.match(source, /setCreateOpen/);
+  assert.match(source, /api\.getCFRubrics/);
+  assert.match(source, /api\.getCFNosologies/);
+  assert.match(source, /Новая публикация/);
+  assert.match(
+    source,
+    /router\.push\(`\/content-factory\/publications\/\$\{saved\.id\}`\)/,
+  );
+  assert.match(source, /bundles=\{bundles\}/);
+  assert.match(dialogSource, /bundles\?: CFBundle\[\]/);
+  assert.match(dialogSource, /selectedBundleId/);
+  assert.match(dialogSource, /Выберите кампанию/);
+  assert.match(dialogSource, /Кампания/);
+});
+
 test("workspace routes use bundle and publication APIs", () => {
   const bundlesSource = readSource("app/content-factory/bundles/page.tsx");
   const bundleDetailSource = readSource("app/content-factory/bundles/[id]/page.tsx");

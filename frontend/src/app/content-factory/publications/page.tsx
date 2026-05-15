@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CalendarDays,
@@ -9,6 +10,7 @@ import {
   Clock3,
   ExternalLink,
   FileText,
+  Plus,
   RefreshCw,
   Search,
   type LucideIcon,
@@ -22,6 +24,7 @@ import {
   EMPTY_CONTENT_FACTORY_FILTERS,
   type ContentFactoryFilterValues,
 } from "@/components/content-factory/ContentFactoryFilters";
+import { ContentFactoryPublicationDialog } from "@/components/content-factory/ContentFactoryPublicationDialog";
 import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentFactoryStatusBadge";
 import { api } from "@/lib/api";
 import {
@@ -33,8 +36,10 @@ import {
 import type {
   CFBundle,
   CFFormat,
+  CFNosology,
   CFPlatform,
   CFPublication,
+  CFRubric,
   TeamMember,
 } from "@/lib/types";
 
@@ -125,16 +130,20 @@ function SummaryTile({
 }
 
 export default function ContentFactoryPublicationsPage() {
+  const router = useRouter();
   const { toastError } = useToast();
   const [publications, setPublications] = useState<CFPublication[]>([]);
   const [bundles, setBundles] = useState<CFBundle[]>([]);
   const [platforms, setPlatforms] = useState<CFPlatform[]>([]);
   const [formats, setFormats] = useState<CFFormat[]>([]);
+  const [rubrics, setRubrics] = useState<CFRubric[]>([]);
+  const [nosologies, setNosologies] = useState<CFNosology[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [filters, setFilters] = useState<ContentFactoryFilterValues>(
     EMPTY_CONTENT_FACTORY_FILTERS,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const latestRequestSeqRef = useRef(0);
 
@@ -145,12 +154,21 @@ export default function ContentFactoryPublicationsPage() {
 
     setLoading(true);
     try {
-      const [publicationRes, bundleRes, platformRes, formatRes, memberRes] =
-        await Promise.all([
+      const [
+        publicationRes,
+        bundleRes,
+        platformRes,
+        formatRes,
+        rubricRes,
+        nosologyRes,
+        memberRes,
+      ] = await Promise.all([
           api.getCFPublications({ limit: 500 }),
           api.getCFBundles({ limit: 500 }),
           api.getCFPlatforms().catch(() => [] as CFPlatform[]),
           api.getCFFormats().catch(() => [] as CFFormat[]),
+          api.getCFRubrics().catch(() => [] as CFRubric[]),
+          api.getCFNosologies().catch(() => [] as CFNosology[]),
           api.getTeam().catch(() => [] as TeamMember[]),
         ]);
       if (!isLatestRequest()) return;
@@ -158,6 +176,8 @@ export default function ContentFactoryPublicationsPage() {
       setBundles(bundleRes);
       setPlatforms(platformRes);
       setFormats(formatRes);
+      setRubrics(rubricRes);
+      setNosologies(nosologyRes);
       setMembers(memberRes);
     } catch {
       if (isLatestRequest()) {
@@ -171,6 +191,14 @@ export default function ContentFactoryPublicationsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handlePublicationCreated = useCallback(
+    async (saved: CFPublication) => {
+      await fetchData();
+      router.push(`/content-factory/publications/${saved.id}`);
+    },
+    [fetchData, router],
+  );
 
   const bundleNames = useMemo(
     () => buildNameMap(bundles, (bundle) => bundle.name),
@@ -244,17 +272,28 @@ export default function ContentFactoryPublicationsPage() {
             </p>
           </div>
         </div>
-        <Button
-          asChild
-          size="sm"
-          variant="outline"
-          className="h-8 w-full gap-1.5 rounded-md px-3 text-xs sm:w-auto"
-        >
-          <Link href="/content-factory/calendar">
-            <CalendarDays className="h-3.5 w-3.5" />
-            К календарю
-          </Link>
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 w-full gap-1.5 rounded-md px-3 text-xs sm:w-auto"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Новая публикация
+          </Button>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="h-8 w-full gap-1.5 rounded-md px-3 text-xs sm:w-auto"
+          >
+            <Link href="/content-factory/calendar">
+              <CalendarDays className="h-3.5 w-3.5" />
+              К календарю
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
@@ -414,6 +453,17 @@ export default function ContentFactoryPublicationsPage() {
           </div>
         </section>
       )}
+      <ContentFactoryPublicationDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        bundles={bundles}
+        platforms={platforms}
+        formats={formats}
+        rubrics={rubrics}
+        nosologies={nosologies}
+        members={members}
+        onSaved={handlePublicationCreated}
+      />
     </div>
   );
 }

@@ -1,47 +1,48 @@
-# Active Plan: Content Factory Sprint 19 Publications Index
+# Active Plan: Content Factory Sprint 20 Publication Creation
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-19-publications-index.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-20-publication-create.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a first-class `Публикации` section that lists all Content Factory publications with search, filters, summary counts, and links to detail pages.
+**Goal:** Add a direct `Новая публикация` flow to `/content-factory/publications`, with campaign selection and redirect to the created publication detail page.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-19-publications-index-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-20-publication-create-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-19-publications-index.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-20-publication-create.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add publication index helper tests and source guards.
-2. Add `/content-factory/publications` to Content Factory navigation and header metadata.
-3. Build frontend helper functions for publication index summary, search, and sorting.
-4. Create the publications index route using existing REST endpoints.
-5. Run frontend verification and update durable repo docs.
+1. Add source guards for publication creation from the publications index.
+2. Extend `ContentFactoryPublicationDialog` with optional campaign selection.
+3. Load rubrics and nosologies on `/content-factory/publications`.
+4. Add the `Новая публикация` action and render the shared dialog.
+5. Refresh data and redirect to `/content-factory/publications/[id]` after creation.
+6. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-19-publications-index`.
-- Sprint 1 through Sprint 18 work is merged to `main`.
-- Sprint 19 builds on Sprint 18 publication operations and the user request for an obvious `Публикации` page.
+- Implemented and verified on branch `codex/content-factory-sprint-20-publication-create`.
+- Sprint 1 through Sprint 19 work is merged to `main`.
+- Sprint 20 builds on the Sprint 19 publications index and closes the gap where users could list publications but had to return to a campaign to create one.
 
 **Definition of done:**
 
-- `Публикации` appears in the Content Factory horizontal navigation.
-- `/content-factory/publications` loads all publications with campaign, platform, format, and responsible names.
-- Users can search by publication text/title and related display names.
-- Users can filter by status, platform, format, responsible person, and campaign.
-- Rows show planned date, actual date, post-link state, and link to detail pages.
-- No backend endpoint, bulk edit, drag-and-drop scheduling, or social integration is added.
+- `/content-factory/publications` shows a primary `Новая публикация` action.
+- Opening the dialog from the publications index requires choosing `Кампания`.
+- Opening the same dialog from a campaign detail page does not show a redundant campaign selector.
+- Created publications use the existing bundle publication API endpoint.
+- After save, the page refreshes and routes to the new publication detail page.
+- No backend endpoint, bulk creation, drag-and-drop scheduling, template generation, or social integration is added.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
 
 ```bash
-cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
 cd frontend && npm run lint
@@ -51,8 +52,8 @@ git diff --check
 
 **Latest verification result:**
 
-- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 72 tests, with existing Node module-type warnings.
-- `cd frontend && npm test` passed: 163 tests, with existing Node module-type warnings.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 28 tests, with the existing Node module-type warning.
+- `cd frontend && npm test` passed: 164 tests, with existing Node module-type warnings.
 - `cd frontend && npx tsc --noEmit` passed.
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
 - `cd frontend && npm run build` passed, including `/content-factory/publications`.

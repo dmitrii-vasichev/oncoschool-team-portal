@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 20 Publication Creation
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/publications`.
+2. Confirm the page header shows the primary `Новая публикация` action and the secondary `К календарю` action.
+3. Click `Новая публикация` and confirm the publication dialog opens.
+4. Confirm the dialog shows a required `Кампания` selector before the production fields.
+5. Fill campaign, platform, format, responsible person, title, body text, scheduled date, and optional rubric/nosology.
+6. Save and confirm the app routes to `/content-factory/publications/{id}` for the created publication.
+7. Return to `/content-factory/publications` and confirm the new publication appears in the list.
+8. Open a campaign detail page and confirm creating a publication there does not show a duplicate campaign selector.
+9. Confirm saving without a campaign from the publications index shows `Выберите кампанию`.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 19 Publications Index
 
 ### Automated

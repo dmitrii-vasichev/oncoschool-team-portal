@@ -29,6 +29,7 @@ import {
   cleanContentFactoryPublicationUpdate,
 } from "@/lib/contentFactoryUtils";
 import type {
+  CFBundle,
   CFFormat,
   CFJsonObject,
   CFNosology,
@@ -77,6 +78,7 @@ export function ContentFactoryPublicationDialog({
   onOpenChange,
   publication,
   bundleId,
+  bundles = [],
   platforms,
   formats,
   rubrics,
@@ -88,6 +90,7 @@ export function ContentFactoryPublicationDialog({
   onOpenChange: (open: boolean) => void;
   publication?: CFPublication | null;
   bundleId?: string;
+  bundles?: CFBundle[];
   platforms: CFPlatform[];
   formats: CFFormat[];
   rubrics: CFRubric[];
@@ -96,6 +99,7 @@ export function ContentFactoryPublicationDialog({
   onSaved: (publication: CFPublication) => void | Promise<void>;
 }) {
   const { toastSuccess, toastError } = useToast();
+  const [selectedBundleId, setSelectedBundleId] = useState("");
   const [platformId, setPlatformId] = useState("");
   const [formatId, setFormatId] = useState("");
   const [rubricId, setRubricId] = useState("none");
@@ -115,9 +119,11 @@ export function ContentFactoryPublicationDialog({
   const [error, setError] = useState<string | null>(null);
   const activeMembers = members.filter((member) => member.is_active);
   const editing = Boolean(publication);
+  const showBundleSelect = !editing && !bundleId;
 
   useEffect(() => {
     if (!open) return;
+    setSelectedBundleId(publication?.bundle_id ?? bundleId ?? bundles[0]?.id ?? "");
     setPlatformId(publication?.platform_id ?? platforms[0]?.id ?? "");
     setFormatId(publication?.format_id ?? formats[0]?.id ?? "");
     setRubricId(publication?.rubric_id ?? "none");
@@ -134,7 +140,7 @@ export function ContentFactoryPublicationDialog({
     setPlatformPostId(publication?.platform_post_id ?? "");
     setCancelledReason(publication?.cancelled_reason ?? "");
     setError(null);
-  }, [activeMembers, formats, open, platforms, publication]);
+  }, [activeMembers, bundleId, bundles, formats, open, platforms, publication]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen && saving) return;
@@ -155,13 +161,13 @@ export function ContentFactoryPublicationDialog({
       setError("Выберите ответственного");
       return;
     }
-    if (!editing && !bundleId) {
-      setError("Кампания не найдена");
+    if (showBundleSelect && !selectedBundleId) {
+      setError("Выберите кампанию");
       return;
     }
-    const targetBundleId = bundleId ?? publication?.bundle_id;
+    const targetBundleId = bundleId ?? publication?.bundle_id ?? selectedBundleId;
     if (!targetBundleId) {
-      setError("Кампания не найдена");
+      setError("Выберите кампанию");
       return;
     }
 
@@ -232,6 +238,28 @@ export function ContentFactoryPublicationDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
+          {showBundleSelect && (
+            <div className="space-y-2">
+              <Label>Кампания</Label>
+              <Select
+                value={selectedBundleId || undefined}
+                onValueChange={setSelectedBundleId}
+                disabled={saving}
+              >
+                <SelectTrigger className="h-9 border-border/70 bg-muted/20 text-sm">
+                  <SelectValue placeholder="Выберите кампанию" />
+                </SelectTrigger>
+                <SelectContent className="z-[70] max-h-72 border-border/70 shadow-xl">
+                  {bundles.map((bundle) => (
+                    <SelectItem key={bundle.id} value={bundle.id}>
+                      {bundle.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">
               <Label>Платформа</Label>

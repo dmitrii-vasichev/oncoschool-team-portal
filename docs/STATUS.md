@@ -1,5 +1,36 @@
 # Status
 
+## Content Factory Sprint 20 Publication Creation
+
+- Current phase: implemented and full frontend verification passed
+- Source: Sprint 19 added a first-class `Публикации` section, and the next UX gap is that users can browse all publications there but still need to return to a campaign detail page to create a new one.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-20-publication-create-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-20-publication-create.md`
+- Scope: frontend-only publication creation from `/content-factory/publications`, optional campaign selector in the shared publication dialog, rubric/nosology loading, redirect to created detail page, source guards, and frontend verification
+- Latest progress:
+  - Confirmed Sprint 19 is merged to `main` and created branch `codex/content-factory-sprint-20-publication-create`.
+  - Wrote Sprint 20 design and implementation plan.
+  - Added a failing source guard for creating a publication from the publications index and redirecting to detail.
+  - Extended `ContentFactoryPublicationDialog` with optional campaign selection for create flows without a fixed `bundleId`.
+  - Added the primary `Новая публикация` action to `/content-factory/publications`.
+  - Loaded rubrics and nosologies on the publications index so the shared dialog has the same reference data as campaign detail creation.
+  - Wired creation to refresh data and redirect to `/content-factory/publications/{id}` after save.
+- Key decisions:
+  - Keep Sprint 20 frontend-only and reuse `api.createCFPublicationForBundle`.
+  - Require a campaign when creating from the publications index because the backend model keeps publications owned by bundles.
+  - Keep the campaign selector hidden when the dialog is opened from a campaign detail page.
+  - Keep bulk creation, template generation, drag-and-drop scheduling, backend endpoint changes, and social integrations out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 28 tests, with the existing Node module-type warning.
+  - `cd frontend && npm test` passed: 164 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 19 Publications Index
 
 - Current phase: implemented, full frontend verification passed
