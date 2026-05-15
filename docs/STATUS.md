@@ -1,5 +1,35 @@
 # Status
 
+## Content Factory Sprint 22 Publication Readiness
+
+- Current phase: implemented and full frontend verification passed
+- Source: the publication detail page now has creation, UTM, audience targeting, publication fact capture, and manual metrics, but users still had to scan several panels to understand readiness for manual publishing.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-22-publication-readiness-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-22-publication-readiness.md`
+- Scope: frontend-only readiness helper, checklist rendering in the publication operations panel, segment-target wiring, source guards, tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-22-publication-readiness`.
+  - Wrote Sprint 22 design and implementation plan.
+  - Added failing helper tests for publication readiness states.
+  - Added source guards for publication detail wiring and operations-panel checklist rendering.
+  - Added `getContentFactoryPublicationReadiness` for text, schedule, UTM, audience, publication fact, and metric evidence states.
+  - Passed `segmentTargets` into `ContentFactoryPublicationOperationsPanel`.
+  - Rendered `Чек-лист готовности` in the publication operations panel with `Готово`, `Нужно заполнить`, and `После публикации` states.
+- Key decisions:
+  - Keep Sprint 22 frontend-only and derive readiness from existing data.
+  - Make the checklist informational rather than blocking status transitions.
+  - Keep automatic publishing, automatic metric collection, and backend validation out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 76 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 167 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 21 Metric Capture UX
 
 - Current phase: implemented and full frontend verification passed

@@ -268,12 +268,22 @@ test("publication detail route exposes publication operations panel", () => {
 
   assert.match(source, /ContentFactoryPublicationOperationsPanel/);
   assert.match(source, /platform={platform}/);
+  assert.match(source, /segmentTargets={segmentTargets}/);
   assert.match(panelSource, /Публикация и статистика/);
+  assert.match(panelSource, /Чек-лист готовности/);
+  assert.match(panelSource, /getContentFactoryPublicationReadiness/);
+  assert.match(utilsSource, /Текст публикации/);
+  assert.match(utilsSource, /Дата в плане/);
+  assert.match(utilsSource, /UTM-метки/);
+  assert.match(utilsSource, /Аудитория/);
+  assert.match(utilsSource, /Факт выхода/);
+  assert.match(utilsSource, /Первые метрики/);
   assert.match(panelSource, /Отметить как опубликовано/);
   assert.match(panelSource, /api\.updateCFPublication/);
   assert.match(panelSource, /platform_post_url/);
   assert.match(utilsSource, /getContentFactoryPlatformCapabilities/);
   assert.match(utilsSource, /getContentFactoryPublicationOperations/);
+  assert.match(utilsSource, /getContentFactoryPublicationReadiness/);
 });
 
 test("metric capture surfaces use readable labels and presets", () => {

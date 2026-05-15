@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   Loader2,
   RadioTower,
@@ -25,8 +26,15 @@ import { api } from "@/lib/api";
 import {
   cleanContentFactoryPublicationUpdate,
   getContentFactoryPublicationOperations,
+  getContentFactoryPublicationReadiness,
+  type ContentFactoryPublicationReadinessStatus,
 } from "@/lib/contentFactoryUtils";
-import type { CFMetricSnapshot, CFPlatform, CFPublication } from "@/lib/types";
+import type {
+  CFMetricSnapshot,
+  CFPlatform,
+  CFPublication,
+  CFPublicationSegmentTarget,
+} from "@/lib/types";
 
 function formatDateTime(value: string | null): string {
   if (!value) return "Не заполнено";
@@ -69,15 +77,40 @@ function OperationRow({
   );
 }
 
+const READINESS_STATUS_CLASSES: Record<
+  ContentFactoryPublicationReadinessStatus,
+  string
+> = {
+  ready: "border-primary/20 bg-primary/10 text-primary",
+  missing: "border-amber-300 bg-amber-50 text-amber-800",
+  after_publish: "border-muted-foreground/20 bg-muted text-muted-foreground",
+};
+
+function ReadinessIcon({
+  status,
+}: {
+  status: ContentFactoryPublicationReadinessStatus;
+}) {
+  if (status === "ready") {
+    return <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 text-primary" />;
+  }
+  if (status === "after_publish") {
+    return <Clock3 className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />;
+  }
+  return <AlertTriangle className="mt-0.5 h-3.5 w-3.5 text-amber-700" />;
+}
+
 export function ContentFactoryPublicationOperationsPanel({
   publication,
   platform,
   metrics,
+  segmentTargets,
   onSaved,
 }: {
   publication: CFPublication;
   platform: CFPlatform | null;
   metrics: CFMetricSnapshot[];
+  segmentTargets: CFPublicationSegmentTarget[];
   onSaved: () => void | Promise<void>;
 }) {
   const { toastSuccess, toastError } = useToast();
@@ -89,6 +122,10 @@ export function ContentFactoryPublicationOperationsPanel({
   const operations = useMemo(
     () => getContentFactoryPublicationOperations(publication, platform, metrics),
     [metrics, platform, publication],
+  );
+  const readiness = useMemo(
+    () => getContentFactoryPublicationReadiness(publication, segmentTargets, metrics),
+    [metrics, publication, segmentTargets],
   );
   const actionLabel =
     publication.status === "published"
@@ -181,6 +218,37 @@ export function ContentFactoryPublicationOperationsPanel({
           label="Метрики"
           value={operations.metricEvidenceLabel}
         />
+      </div>
+
+      <div className="mt-3 rounded-md border border-border/70 bg-muted/10 px-3 py-3">
+        <p className="text-xs font-medium uppercase text-muted-foreground">
+          Чек-лист готовности
+        </p>
+        <div className="mt-2 space-y-2">
+          {readiness.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-start justify-between gap-3 rounded-md bg-background px-2 py-2"
+            >
+              <div className="flex min-w-0 items-start gap-2">
+                <ReadinessIcon status={item.status} />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium leading-5 text-foreground">
+                    {item.label}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {item.description}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-2xs font-medium ${READINESS_STATUS_CLASSES[item.status]}`}
+              >
+                {item.statusLabel}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {(operations.missingPublishedAt ||

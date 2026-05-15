@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 22 Publication Readiness
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page.
+2. Confirm the `Публикация и статистика` panel shows `Чек-лист готовности`.
+3. Confirm text, scheduled date, UTM, audience, publication fact, and first metrics are listed.
+4. Open a prepared unpublished publication and confirm text, schedule, UTM, and audience can show `Готово`.
+5. Confirm publication fact and first metrics show `После публикации` before the publication is marked published.
+6. Open a published publication without post URL/ID and confirm `Факт выхода` shows `Нужно заполнить`.
+7. Open a published publication without metrics and confirm `Первые метрики` shows `Нужно заполнить`.
+8. Add publication fact and confirm the checklist refreshes after save.
+9. Add a metric and confirm the checklist refreshes after save.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 21 Metric Capture UX
 
 ### Automated

@@ -664,6 +664,37 @@ export type ContentFactoryPublicationOperationsSummary = {
   metricEvidenceLabel: string;
 };
 
+export type ContentFactoryPublicationReadinessStatus =
+  | "ready"
+  | "missing"
+  | "after_publish";
+
+export type ContentFactoryPublicationReadinessKey =
+  | "body"
+  | "schedule"
+  | "utm"
+  | "audience"
+  | "publish_fact"
+  | "metrics";
+
+export type ContentFactoryPublicationReadinessItem = {
+  key: ContentFactoryPublicationReadinessKey;
+  label: string;
+  status: ContentFactoryPublicationReadinessStatus;
+  statusLabel: string;
+  description: string;
+};
+
+type PublicationReadinessPublicationLike =
+  PublicationOperationsPublicationLike & {
+    body_text?: string | null;
+    utm?: Record<string, unknown> | null;
+  };
+
+type PublicationReadinessSegmentTargetLike = {
+  external_segment_id?: string | null;
+};
+
 export type ContentFactorySegmentSummary = {
   total: number;
   active: number;
@@ -1395,6 +1426,111 @@ export function getContentFactoryPublicationOperations(
     metricEvidenceCount,
     metricEvidenceLabel: formatMetricEvidenceLabel(metricEvidenceCount),
   };
+}
+
+const READINESS_STATUS_LABELS: Record<
+  ContentFactoryPublicationReadinessStatus,
+  string
+> = {
+  ready: "Готово",
+  missing: "Нужно заполнить",
+  after_publish: "После публикации",
+};
+
+function readinessItem(
+  key: ContentFactoryPublicationReadinessKey,
+  label: string,
+  status: ContentFactoryPublicationReadinessStatus,
+  description: string,
+): ContentFactoryPublicationReadinessItem {
+  return {
+    key,
+    label,
+    status,
+    statusLabel: READINESS_STATUS_LABELS[status],
+    description,
+  };
+}
+
+function hasTextValue(value: string | null | undefined): boolean {
+  return Boolean(value?.trim());
+}
+
+function hasUtmValue(value: Record<string, unknown> | null | undefined): boolean {
+  if (!value) return false;
+  return Object.values(value).some((item) => {
+    if (item === null || item === undefined) return false;
+    return String(item).trim().length > 0;
+  });
+}
+
+export function getContentFactoryPublicationReadiness(
+  publication: PublicationReadinessPublicationLike,
+  segmentTargets: PublicationReadinessSegmentTargetLike[],
+  metrics: PublicationOperationsMetricLike[],
+): ContentFactoryPublicationReadinessItem[] {
+  const isPublished = publication.status === "published";
+  const hasPostReference = Boolean(
+    publication.platform_post_url?.trim() || publication.platform_post_id?.trim(),
+  );
+  const publishFactReady = Boolean(
+    publication.actual_published_at && hasPostReference,
+  );
+
+  return [
+    readinessItem(
+      "body",
+      "Текст публикации",
+      hasTextValue(publication.body_text) ? "ready" : "missing",
+      hasTextValue(publication.body_text)
+        ? "Текст готов для ручной публикации."
+        : "Заполните текст публикации.",
+    ),
+    readinessItem(
+      "schedule",
+      "Дата в плане",
+      hasTextValue(publication.scheduled_at) ? "ready" : "missing",
+      hasTextValue(publication.scheduled_at)
+        ? "Плановая дата задана."
+        : "Добавьте плановую дату выхода.",
+    ),
+    readinessItem(
+      "utm",
+      "UTM-метки",
+      hasUtmValue(publication.utm) ? "ready" : "missing",
+      hasUtmValue(publication.utm)
+        ? "UTM-метки сохранены в публикации."
+        : "Сгенерируйте и примените UTM-метки.",
+    ),
+    readinessItem(
+      "audience",
+      "Аудитория",
+      segmentTargets.length > 0 ? "ready" : "missing",
+      segmentTargets.length > 0
+        ? "К публикации привязана аудитория."
+        : "Добавьте целевую или исключающую аудиторию.",
+    ),
+    readinessItem(
+      "publish_fact",
+      "Факт выхода",
+      !isPublished ? "after_publish" : publishFactReady ? "ready" : "missing",
+      !isPublished
+        ? "Заполняется после выхода публикации."
+        : publishFactReady
+          ? "Дата выхода и ссылка или ID поста заполнены."
+          : "Добавьте дату выхода и ссылку или ID поста.",
+    ),
+    readinessItem(
+      "metrics",
+      "Первые метрики",
+      !isPublished ? "after_publish" : metrics.length > 0 ? "ready" : "missing",
+      !isPublished
+        ? "Первые замеры нужны после публикации."
+        : metrics.length > 0
+          ? "Есть хотя бы один замер результата."
+          : "Добавьте первый ручной замер результата.",
+    ),
+  ];
 }
 
 export function buildContentFactoryEffectivenessRows<

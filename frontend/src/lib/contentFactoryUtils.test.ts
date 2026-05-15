@@ -41,6 +41,7 @@ const {
   getContentFactoryDisplayName,
   getContentFactoryPlatformCapabilities,
   getContentFactoryPublicationOperations,
+  getContentFactoryPublicationReadiness,
   getContentFactoryReferenceLabel,
   getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
@@ -803,6 +804,60 @@ test("publication operations summarize publish fact and metric evidence", () => 
   assert.equal(complete.missingPostUrl, false);
   assert.equal(complete.needsMetricEvidence, false);
   assert.equal(complete.metricEvidenceLabel, "1 метрика");
+});
+
+test("publication readiness checklist explains missing and after-publish steps", () => {
+  const draftItems = getContentFactoryPublicationReadiness(
+    {
+      status: "scheduled",
+      body_text: "Готовый текст",
+      scheduled_at: "2026-05-20T10:00:00Z",
+      actual_published_at: null,
+      platform_post_url: null,
+      platform_post_id: null,
+      utm: { utm_source: "telegram" },
+    },
+    [{ external_segment_id: "segment-1" }],
+    [],
+  );
+
+  assert.deepEqual(
+    draftItems.map((item) => [item.key, item.statusLabel]),
+    [
+      ["body", "Готово"],
+      ["schedule", "Готово"],
+      ["utm", "Готово"],
+      ["audience", "Готово"],
+      ["publish_fact", "После публикации"],
+      ["metrics", "После публикации"],
+    ],
+  );
+
+  const publishedItems = getContentFactoryPublicationReadiness(
+    {
+      status: "published",
+      body_text: "",
+      scheduled_at: null,
+      actual_published_at: "2026-05-20T12:00:00Z",
+      platform_post_url: "",
+      platform_post_id: "",
+      utm: {},
+    },
+    [],
+    [],
+  );
+
+  assert.deepEqual(
+    publishedItems.map((item) => [item.key, item.statusLabel]),
+    [
+      ["body", "Нужно заполнить"],
+      ["schedule", "Нужно заполнить"],
+      ["utm", "Нужно заполнить"],
+      ["audience", "Нужно заполнить"],
+      ["publish_fact", "Нужно заполнить"],
+      ["metrics", "Нужно заполнить"],
+    ],
+  );
 });
 
 test("formatContentFactoryMetricValue renders numeric and text metrics", () => {

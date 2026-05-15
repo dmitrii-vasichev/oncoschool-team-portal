@@ -1,42 +1,42 @@
-# Active Plan: Content Factory Sprint 21 Metric Capture UX
+# Active Plan: Content Factory Sprint 22 Publication Readiness
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-21-metric-capture-ux.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-22-publication-readiness.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Make manual metric capture readable and faster by replacing raw enum values with shared user-facing labels and metric-name presets.
+**Goal:** Add a publication readiness checklist to the publication operations panel so users can see what is ready, what is missing, and what is due after publication.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-21-metric-capture-ux-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-22-publication-readiness-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-21-metric-capture-ux.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-22-publication-readiness.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add helper tests and source guards for readable metric capture labels.
-2. Add shared frontend labels for metric windows, metric sources, and confidence values.
-3. Add shared metric-name presets.
-4. Use labels and presets in the manual metric dialog.
-5. Use labels in metric history and effectiveness evidence.
+1. Add helper tests and source guards for publication readiness.
+2. Add `getContentFactoryPublicationReadiness`.
+3. Derive text, schedule, UTM, audience, publication fact, and metric evidence states.
+4. Pass segment targets into the operations panel.
+5. Render `Чек-лист готовности` in the publication operations panel.
 6. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-21-metric-capture-ux`.
-- Sprint 1 through Sprint 20 work is merged to `main`.
-- Sprint 21 builds on the existing manual metric snapshots and prepares the UI foundation for later API/import integrations.
+- Implemented and verified on branch `codex/content-factory-sprint-22-publication-readiness`.
+- Sprint 1 through Sprint 21 work is merged to `main`.
+- Sprint 22 builds on publication creation, UTM, audience targeting, fact capture, and manual metrics by making readiness visible in one place.
 
 **Definition of done:**
 
-- Metric window labels are readable Russian phrases.
-- Metric source labels use familiar product/channel names.
-- Confidence labels are human-readable.
-- The manual metric dialog includes quick metric-name presets.
-- Metric history and effectiveness rows do not expose raw `24h`, `tgstat`, `vk_api`, or `medium` values.
-- No backend schema, metric edit/delete flow, bulk import, or automatic social/API integration is added.
+- Publication detail operations panel shows `Чек-лист готовности`.
+- Checklist includes text, scheduled date, UTM, audience, publication fact, and first metrics.
+- Each item has a readable status: `Готово`, `Нужно заполнить`, or `После публикации`.
+- Checklist derives from existing publication, segment target, and metric data.
+- Existing publication fact and metric actions continue to work.
+- No backend schema, blocking validation, automatic publishing, or automatic metric collection is added.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
@@ -52,11 +52,11 @@ git diff --check
 
 **Latest verification result:**
 
-- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 75 tests, with existing Node module-type warnings.
-- `cd frontend && npm test` passed: 166 tests, with existing Node module-type warnings.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 76 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 167 tests, with existing Node module-type warnings.
 - `cd frontend && npx tsc --noEmit` passed.
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
-- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]` and `/content-factory/effectiveness`.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
 - `git diff --check` passed.
 
 ---

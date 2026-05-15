@@ -4,6 +4,7 @@
 
 ### Next
 
+- Run authenticated manual QA for the Sprint 22 publication readiness checklist against real publication records.
 - Run authenticated manual QA for the Sprint 21 metric capture UX against real publication metric rows.
 - Run authenticated manual QA for the Sprint 20 publication creation flow against real campaigns and publications.
 - Run authenticated manual QA for the Sprint 19 publications index against real publication records.
