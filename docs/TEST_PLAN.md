@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 24 Calendar Operations
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/calendar`.
+2. Confirm the summary strip shows `Сегодня`, `Просрочено`, `Готовы к выходу`, `Нужно действие`, and `Без даты`.
+3. Apply status, platform, format, responsible, and campaign filters and confirm the summary counts update with the filtered list.
+4. Confirm overdue active publications show `Просрочен план`.
+5. Confirm today's ready publications show `Сегодня`.
+6. Confirm future approved or scheduled publications with text and UTM show `Готово к выходу`.
+7. Confirm publications without body text show `Нужен текст`.
+8. Confirm publications without UTM show `Нужны UTM`.
+9. Confirm published publications without fact or post reference show `Заполнить факт`.
+10. Click `Открыть` on a row and confirm the publication detail page opens.
+
 ## Content Factory Sprint 23 Publish Package
 
 ### Automated

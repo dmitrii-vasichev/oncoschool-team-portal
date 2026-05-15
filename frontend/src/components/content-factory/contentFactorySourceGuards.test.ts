@@ -179,13 +179,22 @@ test("dashboard route uses content factory API data and summaries", () => {
 
 test("calendar route uses content factory filters and date grouping", () => {
   const source = readSource("app/content-factory/calendar/page.tsx");
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
 
   assert.match(source, /api\.getCFPublications/);
   assert.match(source, /groupPublicationsByDate/);
   assert.match(source, /filterContentFactoryPublications/);
+  assert.match(source, /summarizeContentFactoryCalendar/);
+  assert.match(source, /getContentFactoryCalendarPublicationState/);
   assert.match(source, /ContentFactoryFilters/);
   assert.match(source, /ContentFactoryStatusBadge/);
+  assert.match(source, /Нужно действие/);
+  assert.match(source, /Готовы к выходу/);
+  assert.match(source, /Открыть/);
+  assert.match(source, /\/content-factory\/publications\/\$\{publication\.id\}/);
   assert.match(source, /href="\/content-factory\/dashboard"/);
+  assert.match(utilsSource, /ContentFactoryCalendarPublicationState/);
+  assert.match(utilsSource, /summarizeContentFactoryCalendar/);
 });
 
 test("publications route lists all publications with search filters and detail links", () => {

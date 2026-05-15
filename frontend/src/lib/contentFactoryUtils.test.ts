@@ -38,6 +38,7 @@ const {
   formatContentFactoryRetroPeriod,
   formatContentFactorySegmentCount,
   getAvailableContentFactorySegments,
+  getContentFactoryCalendarPublicationState,
   getContentFactoryGuestAttention,
   getContentFactoryDisplayName,
   getContentFactoryPlatformCapabilities,
@@ -51,6 +52,7 @@ const {
   isContentFactoryGuestStoryActive,
   summarizeContentFactoryEffectiveness,
   summarizeContentFactoryGuestStories,
+  summarizeContentFactoryCalendar,
   summarizeContentFactoryPublicationIndex,
   summarizeContentFactorySegments,
   summarizeContentFactorySegmentUsage,
@@ -520,6 +522,144 @@ test("filterContentFactoryPublications applies calendar filters together", () =>
     result.map((publication) => publication.id),
     ["keep"],
   );
+});
+
+test("calendar operations classify publication planning states", () => {
+  const now = new Date("2026-05-15T12:00:00Z");
+
+  assert.deepEqual(
+    [
+      {
+        id: "overdue",
+        status: "scheduled",
+        scheduled_at: "2026-05-14T10:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "today",
+        status: "scheduled",
+        scheduled_at: "2026-05-15T18:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "ready",
+        status: "approved",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "needs-text",
+        status: "approved",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        body_text: "",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "needs-utm",
+        status: "scheduled",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        body_text: "Готовый текст",
+        utm: {},
+      },
+      {
+        id: "published-missing-fact",
+        status: "published",
+        scheduled_at: "2026-05-15T10:00:00Z",
+        actual_published_at: null,
+        platform_post_url: null,
+        platform_post_id: null,
+      },
+      {
+        id: "published",
+        status: "published",
+        scheduled_at: "2026-05-15T10:00:00Z",
+        actual_published_at: "2026-05-15T10:10:00Z",
+        platform_post_url: "https://t.me/oncoschool/123",
+        platform_post_id: null,
+      },
+      {
+        id: "cancelled",
+        status: "cancelled",
+        scheduled_at: "2026-05-16T10:00:00Z",
+      },
+      {
+        id: "unscheduled",
+        status: "draft",
+        scheduled_at: null,
+        body_text: "Черновик",
+        utm: {},
+      },
+    ].map((publication) => {
+      const state = getContentFactoryCalendarPublicationState(publication, now);
+      return [publication.id, state.key, state.label, state.actionLabel];
+    }),
+    [
+      ["overdue", "overdue", "Просрочен план", "Проверить выпуск"],
+      ["today", "today", "Сегодня", "Открыть пакет"],
+      ["ready", "ready", "Готово к выходу", "Открыть пакет"],
+      ["needs-text", "needs_text", "Нужен текст", "Заполнить текст"],
+      ["needs-utm", "needs_utm", "Нужны UTM", "Добавить UTM"],
+      ["published-missing-fact", "published_needs_fact", "Заполнить факт", "Добавить факт"],
+      ["published", "published", "Опубликовано", "Проверить метрики"],
+      ["cancelled", "inactive", "Не выходит", "Открыть карточку"],
+      ["unscheduled", "unscheduled", "Без даты", "Назначить дату"],
+    ],
+  );
+});
+
+test("calendar summary counts filtered operational signals", () => {
+  const summary = summarizeContentFactoryCalendar(
+    [
+      {
+        id: "overdue",
+        status: "scheduled",
+        scheduled_at: "2026-05-14T10:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "today",
+        status: "scheduled",
+        scheduled_at: "2026-05-15T18:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "ready",
+        status: "approved",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        body_text: "Готовый текст",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "needs-text",
+        status: "approved",
+        scheduled_at: "2026-05-16T10:00:00Z",
+        body_text: "",
+        utm: { utm_source: "telegram" },
+      },
+      {
+        id: "unscheduled",
+        status: "draft",
+        scheduled_at: null,
+        body_text: "Черновик",
+        utm: {},
+      },
+    ],
+    new Date("2026-05-15T12:00:00Z"),
+  );
+
+  assert.deepEqual(summary, {
+    total: 5,
+    today: 1,
+    overdue: 1,
+    readyToPublish: 2,
+    needsAction: 3,
+    unscheduled: 1,
+  });
 });
 
 test("publication index helpers summarize search and sort rows", () => {

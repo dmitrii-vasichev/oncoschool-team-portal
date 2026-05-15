@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Clock3, Factory, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Factory,
+  ListChecks,
+  RefreshCw,
+  TimerReset,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/Toast";
@@ -15,7 +25,11 @@ import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentF
 import { api } from "@/lib/api";
 import {
   filterContentFactoryPublications,
+  getContentFactoryCalendarPublicationState,
   groupPublicationsByDate,
+  summarizeContentFactoryCalendar,
+  type ContentFactoryCalendarPublicationState,
+  type ContentFactoryCalendarPublicationStateTone,
 } from "@/lib/contentFactoryUtils";
 import type {
   CFBundle,
@@ -44,6 +58,66 @@ function formatTime(value: string | null): string {
 
 function publicationTitle(publication: CFPublication): string {
   return publication.title?.trim() || "Без названия";
+}
+
+const CALENDAR_STATE_CLASSES: Record<
+  ContentFactoryCalendarPublicationStateTone,
+  string
+> = {
+  critical: "border-red-200 bg-red-50 text-red-700",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  success: "border-primary/20 bg-primary/10 text-primary",
+  info: "border-sky-200 bg-sky-50 text-sky-800",
+  muted: "border-border bg-muted/40 text-muted-foreground",
+};
+
+function CalendarStatePill({
+  state,
+}: {
+  state: ContentFactoryCalendarPublicationState;
+}) {
+  return (
+    <span
+      className={`inline-flex h-6 shrink-0 items-center rounded-full border px-2 text-xs font-medium ${CALENDAR_STATE_CLASSES[state.tone]}`}
+    >
+      {state.label}
+    </span>
+  );
+}
+
+function CalendarSummaryCard({
+  label,
+  value,
+  description,
+  tone,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  description: string;
+  tone: ContentFactoryCalendarPublicationStateTone;
+  icon: typeof CalendarDays;
+}) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-card px-3 py-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-medium uppercase text-muted-foreground">
+          {label}
+        </p>
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md border ${CALENDAR_STATE_CLASSES[tone]}`}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+      </div>
+      <p className="mt-2 text-2xl font-semibold leading-none text-foreground">
+        {value}
+      </p>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {description}
+      </p>
+    </div>
+  );
 }
 
 function CalendarLoadingSkeleton() {
@@ -147,6 +221,10 @@ export default function ContentFactoryCalendarPage() {
     () => groupPublicationsByDate(filteredPublications),
     [filteredPublications],
   );
+  const calendarSummary = useMemo(
+    () => summarizeContentFactoryCalendar(filteredPublications),
+    [filteredPublications],
+  );
 
   if (loading) {
     return <CalendarLoadingSkeleton />;
@@ -190,6 +268,44 @@ export default function ContentFactoryCalendarPage() {
         onChange={setFilters}
       />
 
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <CalendarSummaryCard
+          label="Сегодня"
+          value={calendarSummary.today}
+          description="Публикации к выпуску сегодня"
+          tone="info"
+          icon={CalendarDays}
+        />
+        <CalendarSummaryCard
+          label="Просрочено"
+          value={calendarSummary.overdue}
+          description="Плановое время уже прошло"
+          tone="critical"
+          icon={AlertTriangle}
+        />
+        <CalendarSummaryCard
+          label="Готовы к выходу"
+          value={calendarSummary.readyToPublish}
+          description="Есть текст, дата и UTM"
+          tone="success"
+          icon={CheckCircle2}
+        />
+        <CalendarSummaryCard
+          label="Нужно действие"
+          value={calendarSummary.needsAction}
+          description="Требуют заполнения или проверки"
+          tone="warning"
+          icon={ListChecks}
+        />
+        <CalendarSummaryCard
+          label="Без даты"
+          value={calendarSummary.unscheduled}
+          description="Нужно назначить план"
+          tone="muted"
+          icon={TimerReset}
+        />
+      </div>
+
       <div className="flex items-center justify-between gap-3 border-y border-border/60 py-2">
         <p className="text-sm text-muted-foreground">
           {filteredPublications.length} из {publications.length} публикаций
@@ -232,37 +348,65 @@ export default function ContentFactoryCalendarPage() {
                 </span>
               </div>
               <div className="divide-y divide-border/60">
-                {group.publications.map((publication) => (
-                  <div
-                    key={publication.id}
-                    className="grid gap-3 px-4 py-3 lg:grid-cols-[96px_minmax(0,1fr)_180px]"
-                  >
-                    <div className="flex h-8 items-center gap-1.5 text-xs text-muted-foreground">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {formatTime(publication.scheduled_at)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                          {publicationTitle(publication)}
-                        </p>
-                        <ContentFactoryStatusBadge
-                          kind="publication"
-                          status={publication.status}
-                        />
+                {group.publications.map((publication) => {
+                  const calendarState =
+                    getContentFactoryCalendarPublicationState(publication);
+
+                  return (
+                    <div
+                      key={publication.id}
+                      className="grid gap-3 px-4 py-3 lg:grid-cols-[96px_minmax(0,1fr)_220px]"
+                    >
+                      <div className="flex h-8 items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {formatTime(publication.scheduled_at)}
                       </div>
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {bundleNames.get(publication.bundle_id) ?? "Кампания"} ·{" "}
-                        {platformNames.get(publication.platform_id) ?? "Платформа"} ·{" "}
-                        {formatNames.get(publication.format_id) ?? "Формат"}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                            {publicationTitle(publication)}
+                          </p>
+                          <CalendarStatePill state={calendarState} />
+                          <ContentFactoryStatusBadge
+                            kind="publication"
+                            status={publication.status}
+                          />
+                        </div>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {bundleNames.get(publication.bundle_id) ?? "Кампания"} ·{" "}
+                          {platformNames.get(publication.platform_id) ??
+                            "Платформа"} ·{" "}
+                          {formatNames.get(publication.format_id) ?? "Формат"}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                          {calendarState.description}
+                        </p>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground lg:justify-end">
+                        <span className="min-w-0 truncate">
+                          {memberNames.get(publication.responsible_id) ??
+                            "Ответственный"}
+                        </span>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-xs"
+                        >
+                          <Link
+                            href={`/content-factory/publications/${publication.id}`}
+                          >
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                            Открыть
+                          </Link>
+                        </Button>
+                        <span className="w-full text-right text-2xs font-medium uppercase text-muted-foreground">
+                          {calendarState.actionLabel}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex h-8 items-center truncate text-xs text-muted-foreground lg:justify-end">
-                      {memberNames.get(publication.responsible_id) ??
-                        "Ответственный"}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}

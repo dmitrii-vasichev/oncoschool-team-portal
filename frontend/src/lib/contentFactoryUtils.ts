@@ -287,6 +287,51 @@ export type ContentFactoryPublicationFilters = {
   responsible_id?: string | null;
 };
 
+type CalendarPublicationLike = PublicationStatusLike & {
+  body_text?: string | null;
+  utm?: Record<string, unknown> | null;
+  platform_post_url?: string | null;
+  platform_post_id?: string | null;
+};
+
+export type ContentFactoryCalendarPublicationStateKey =
+  | "published_needs_fact"
+  | "published"
+  | "inactive"
+  | "unscheduled"
+  | "overdue"
+  | "today"
+  | "needs_text"
+  | "needs_utm"
+  | "ready"
+  | "preparing";
+
+export type ContentFactoryCalendarPublicationStateTone =
+  | "critical"
+  | "warning"
+  | "success"
+  | "info"
+  | "muted";
+
+export type ContentFactoryCalendarPublicationState = {
+  key: ContentFactoryCalendarPublicationStateKey;
+  label: string;
+  description: string;
+  actionLabel: string;
+  tone: ContentFactoryCalendarPublicationStateTone;
+  needsAction: boolean;
+  readyToPublish: boolean;
+};
+
+export type ContentFactoryCalendarSummary = {
+  total: number;
+  today: number;
+  overdue: number;
+  readyToPublish: number;
+  needsAction: number;
+  unscheduled: number;
+};
+
 type PublicationIndexLike = ContentFactoryPublicationFilters & {
   id: string;
   title?: string | null;
@@ -2001,6 +2046,180 @@ export function matchesContentFactoryPublicationFilters<
     return false;
   }
   return true;
+}
+
+function calendarState(
+  key: ContentFactoryCalendarPublicationStateKey,
+  label: string,
+  description: string,
+  actionLabel: string,
+  tone: ContentFactoryCalendarPublicationStateTone,
+  needsAction: boolean,
+  readyToPublish = false,
+): ContentFactoryCalendarPublicationState {
+  return {
+    key,
+    label,
+    description,
+    actionLabel,
+    tone,
+    needsAction,
+    readyToPublish,
+  };
+}
+
+function isTerminalPublicationStatus(status: string): boolean {
+  return status === "cancelled" || status === "failed";
+}
+
+function hasPublicationPostReference(publication: CalendarPublicationLike): boolean {
+  return Boolean(
+    publication.platform_post_url?.trim() || publication.platform_post_id?.trim(),
+  );
+}
+
+export function getContentFactoryCalendarPublicationState(
+  publication: CalendarPublicationLike,
+  now: Date | string = new Date(),
+): ContentFactoryCalendarPublicationState {
+  const status = String(publication.status);
+  const scheduledTime = dateTime(publication.scheduled_at);
+  const nowTime = dateInputTime(now);
+  const scheduledDateKey = dateKey(publication.scheduled_at);
+  const nowDateKey = dateKey(new Date(nowTime).toISOString());
+  const hasBody = hasTextValue(publication.body_text);
+  const hasUtm = hasUtmValue(publication.utm);
+
+  if (status === "published") {
+    const factReady = Boolean(
+      publication.actual_published_at && hasPublicationPostReference(publication),
+    );
+    return factReady
+      ? calendarState(
+          "published",
+          "Опубликовано",
+          "Публикация вышла, можно контролировать первые метрики.",
+          "Проверить метрики",
+          "success",
+          false,
+        )
+      : calendarState(
+          "published_needs_fact",
+          "Заполнить факт",
+          "Добавьте дату выхода и ссылку или ID опубликованного поста.",
+          "Добавить факт",
+          "warning",
+          true,
+        );
+  }
+
+  if (isTerminalPublicationStatus(status)) {
+    return calendarState(
+      "inactive",
+      "Не выходит",
+      status === "failed"
+        ? "Публикация отмечена как ошибка, нужна ручная проверка."
+        : "Публикация отменена и не участвует в ближайшем выпуске.",
+      "Открыть карточку",
+      "muted",
+      false,
+    );
+  }
+
+  if (scheduledTime === null) {
+    return calendarState(
+      "unscheduled",
+      "Без даты",
+      "Назначьте плановую дату выхода.",
+      "Назначить дату",
+      "warning",
+      true,
+    );
+  }
+
+  if (scheduledTime < nowTime) {
+    return calendarState(
+      "overdue",
+      "Просрочен план",
+      "Плановое время прошло, проверьте выпуск или перенесите дату.",
+      "Проверить выпуск",
+      "critical",
+      true,
+    );
+  }
+
+  if (!hasBody) {
+    return calendarState(
+      "needs_text",
+      "Нужен текст",
+      "Заполните текст публикации до передачи на площадку.",
+      "Заполнить текст",
+      "warning",
+      true,
+    );
+  }
+
+  if (!hasUtm) {
+    return calendarState(
+      "needs_utm",
+      "Нужны UTM",
+      "Добавьте UTM-метки для ручной публикации и дальнейшей аналитики.",
+      "Добавить UTM",
+      "warning",
+      true,
+    );
+  }
+
+  if (scheduledDateKey && scheduledDateKey === nowDateKey) {
+    return calendarState(
+      "today",
+      "Сегодня",
+      "Публикация готова к ручному выпуску сегодня.",
+      "Открыть пакет",
+      "info",
+      false,
+      true,
+    );
+  }
+
+  if (status === "approved" || status === "scheduled") {
+    return calendarState(
+      "ready",
+      "Готово к выходу",
+      "Текст, дата и UTM заполнены для ручного выпуска.",
+      "Открыть пакет",
+      "success",
+      false,
+      true,
+    );
+  }
+
+  return calendarState(
+    "preparing",
+    "В подготовке",
+    "Публикация ещё проходит производственный процесс.",
+    "Открыть карточку",
+    "muted",
+    false,
+  );
+}
+
+export function summarizeContentFactoryCalendar<T extends CalendarPublicationLike>(
+  publications: T[],
+  now: Date | string = new Date(),
+): ContentFactoryCalendarSummary {
+  const states = publications.map((publication) =>
+    getContentFactoryCalendarPublicationState(publication, now),
+  );
+
+  return {
+    total: publications.length,
+    today: states.filter((state) => state.key === "today").length,
+    overdue: states.filter((state) => state.key === "overdue").length,
+    readyToPublish: states.filter((state) => state.readyToPublish).length,
+    needsAction: states.filter((state) => state.needsAction).length,
+    unscheduled: states.filter((state) => state.key === "unscheduled").length,
+  };
 }
 
 function publicationIndexSearchText(

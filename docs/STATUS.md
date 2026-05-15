@@ -1,5 +1,36 @@
 # Status
 
+## Content Factory Sprint 24 Calendar Operations
+
+- Current phase: implemented and full frontend verification passed
+- Source: the calendar grouped publications by date and filters, but users still had to open each publication to know whether it was overdue, ready, missing text or UTM, or needed publication fact cleanup.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-24-calendar-ops-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-24-calendar-ops.md`
+- Scope: frontend-only calendar state helper, filtered calendar summary, row-level operational badges, next-action copy, detail links, source guards, tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-24-calendar-ops`.
+  - Wrote Sprint 24 design and implementation plan.
+  - Added failing helper tests for calendar operational states and summary counts.
+  - Added failing source guards for calendar helper wiring, summary labels, row actions, and publication detail links.
+  - Added `getContentFactoryCalendarPublicationState` and `summarizeContentFactoryCalendar`.
+  - Updated `/content-factory/calendar` with summary cards, row-level state badges, next-action copy, and `Открыть` links.
+  - Focused frontend test command passed after implementation: 80 tests, with existing Node module-type warnings.
+  - Full frontend verification passed after implementation.
+- Key decisions:
+  - Keep Sprint 24 frontend-only and derive operational state from existing publication fields.
+  - Keep full readiness checks that require segment target and metric fan-out on the publication detail page.
+  - Keep drag-and-drop rescheduling, backend endpoints, automatic publishing, and platform integrations out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 80 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 171 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/calendar`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 23 Publish Package
 
 - Current phase: implemented, verified, merged to `main`, and pushed
