@@ -23,6 +23,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
+import {
+  CF_CONFIDENCE_LABELS,
+  CF_METRIC_SOURCE_LABELS,
+  CF_METRIC_WINDOW_LABELS,
+  CONTENT_FACTORY_METRIC_PRESETS,
+} from "@/lib/contentFactoryUtils";
 import type { CFConfidence, CFMetricSource, CFMetricWindow } from "@/lib/types";
 
 const METRIC_WINDOWS: CFMetricWindow[] = ["3h", "24h", "72h", "7d", "final", "custom"];
@@ -38,12 +44,6 @@ const METRIC_SOURCES: CFMetricSource[] = [
   "import",
 ];
 const CONFIDENCES: CFConfidence[] = ["high", "medium", "low"];
-
-const CONFIDENCE_LABELS: Record<CFConfidence, string> = {
-  high: "Высокое",
-  medium: "Среднее",
-  low: "Низкое",
-};
 
 function nullableText(value: string): string | null {
   const trimmed = value.trim();
@@ -169,7 +169,7 @@ export function ContentFactoryMetricDialog({
                 <SelectContent className="z-[70] border-border/70 shadow-xl">
                   {METRIC_WINDOWS.map((item) => (
                     <SelectItem key={item} value={item}>
-                      {item}
+                      {CF_METRIC_WINDOW_LABELS[item]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -188,7 +188,7 @@ export function ContentFactoryMetricDialog({
                 <SelectContent className="z-[70] border-border/70 shadow-xl">
                   {METRIC_SOURCES.map((item) => (
                     <SelectItem key={item} value={item}>
-                      {item}
+                      {CF_METRIC_SOURCE_LABELS[item]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -207,11 +207,30 @@ export function ContentFactoryMetricDialog({
                 <SelectContent className="z-[70] border-border/70 shadow-xl">
                   {CONFIDENCES.map((item) => (
                     <SelectItem key={item} value={item}>
-                      {CONFIDENCE_LABELS[item]}
+                      {CF_CONFIDENCE_LABELS[item]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Быстрый выбор</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {CONTENT_FACTORY_METRIC_PRESETS.map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant={metricName === preset ? "default" : "outline"}
+                  className="h-7 rounded-md px-2.5 text-xs"
+                  disabled={saving}
+                  onClick={() => setMetricName(preset)}
+                >
+                  {preset}
+                </Button>
+              ))}
             </div>
           </div>
 

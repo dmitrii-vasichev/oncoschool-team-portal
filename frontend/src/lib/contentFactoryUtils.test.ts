@@ -12,7 +12,11 @@ const {
   CF_GUEST_GIFT_STATUS_LABELS,
   CF_GUEST_ROLE_LABELS,
   CF_GUEST_STATUS_LABELS,
+  CF_CONFIDENCE_LABELS,
+  CF_METRIC_SOURCE_LABELS,
+  CF_METRIC_WINDOW_LABELS,
   CF_SEGMENT_SOURCE_LABELS,
+  CONTENT_FACTORY_METRIC_PRESETS,
   buildContentFactoryBundleParams,
   buildContentFactoryEffectivenessRows,
   buildContentFactoryGuestStageTimeline,
@@ -70,6 +74,16 @@ test("reference table labels expose Sprint 7 dictionaries", () => {
 
 test("segment source labels expose Sprint 8 segment sources", () => {
   assert.equal(CF_SEGMENT_SOURCE_LABELS?.getcourse, "GetCourse");
+});
+
+test("metric capture labels expose readable production wording", () => {
+  assert.equal(CF_METRIC_WINDOW_LABELS?.["24h"], "Через 24 часа");
+  assert.equal(CF_METRIC_WINDOW_LABELS?.final, "Финальный срез");
+  assert.equal(CF_METRIC_SOURCE_LABELS?.tgstat, "TGStat");
+  assert.equal(CF_METRIC_SOURCE_LABELS?.vk_api, "VK API");
+  assert.equal(CF_CONFIDENCE_LABELS?.medium, "Среднее");
+  assert.ok(CONTENT_FACTORY_METRIC_PRESETS.includes("Просмотры"));
+  assert.ok(CONTENT_FACTORY_METRIC_PRESETS.includes("Регистрации"));
 });
 
 test("guest story labels expose Russian workflow wording", () => {

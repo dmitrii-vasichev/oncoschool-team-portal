@@ -1,48 +1,48 @@
-# Active Plan: Content Factory Sprint 20 Publication Creation
+# Active Plan: Content Factory Sprint 21 Metric Capture UX
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-20-publication-create.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-21-metric-capture-ux.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a direct `Новая публикация` flow to `/content-factory/publications`, with campaign selection and redirect to the created publication detail page.
+**Goal:** Make manual metric capture readable and faster by replacing raw enum values with shared user-facing labels and metric-name presets.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-20-publication-create-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-21-metric-capture-ux-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-20-publication-create.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-21-metric-capture-ux.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add source guards for publication creation from the publications index.
-2. Extend `ContentFactoryPublicationDialog` with optional campaign selection.
-3. Load rubrics and nosologies on `/content-factory/publications`.
-4. Add the `Новая публикация` action and render the shared dialog.
-5. Refresh data and redirect to `/content-factory/publications/[id]` after creation.
+1. Add helper tests and source guards for readable metric capture labels.
+2. Add shared frontend labels for metric windows, metric sources, and confidence values.
+3. Add shared metric-name presets.
+4. Use labels and presets in the manual metric dialog.
+5. Use labels in metric history and effectiveness evidence.
 6. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-20-publication-create`.
-- Sprint 1 through Sprint 19 work is merged to `main`.
-- Sprint 20 builds on the Sprint 19 publications index and closes the gap where users could list publications but had to return to a campaign to create one.
+- Implemented and verified on branch `codex/content-factory-sprint-21-metric-capture-ux`.
+- Sprint 1 through Sprint 20 work is merged to `main`.
+- Sprint 21 builds on the existing manual metric snapshots and prepares the UI foundation for later API/import integrations.
 
 **Definition of done:**
 
-- `/content-factory/publications` shows a primary `Новая публикация` action.
-- Opening the dialog from the publications index requires choosing `Кампания`.
-- Opening the same dialog from a campaign detail page does not show a redundant campaign selector.
-- Created publications use the existing bundle publication API endpoint.
-- After save, the page refreshes and routes to the new publication detail page.
-- No backend endpoint, bulk creation, drag-and-drop scheduling, template generation, or social integration is added.
+- Metric window labels are readable Russian phrases.
+- Metric source labels use familiar product/channel names.
+- Confidence labels are human-readable.
+- The manual metric dialog includes quick metric-name presets.
+- Metric history and effectiveness rows do not expose raw `24h`, `tgstat`, `vk_api`, or `medium` values.
+- No backend schema, metric edit/delete flow, bulk import, or automatic social/API integration is added.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
 
 ```bash
-cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
 cd frontend && npm run lint
@@ -52,11 +52,11 @@ git diff --check
 
 **Latest verification result:**
 
-- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 28 tests, with the existing Node module-type warning.
-- `cd frontend && npm test` passed: 164 tests, with existing Node module-type warnings.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 75 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 166 tests, with existing Node module-type warnings.
 - `cd frontend && npx tsc --noEmit` passed.
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
-- `cd frontend && npm run build` passed, including `/content-factory/publications`.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]` and `/content-factory/effectiveness`.
 - `git diff --check` passed.
 
 ---

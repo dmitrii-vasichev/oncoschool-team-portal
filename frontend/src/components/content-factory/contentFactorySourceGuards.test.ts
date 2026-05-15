@@ -276,6 +276,38 @@ test("publication detail route exposes publication operations panel", () => {
   assert.match(utilsSource, /getContentFactoryPublicationOperations/);
 });
 
+test("metric capture surfaces use readable labels and presets", () => {
+  const dialogSource = readSource(
+    "components/content-factory/ContentFactoryMetricDialog.tsx",
+  );
+  const historySource = readSource(
+    "components/content-factory/ContentFactoryMetricHistory.tsx",
+  );
+  const effectivenessSource = readSource(
+    "components/content-factory/ContentFactoryEffectivenessTable.tsx",
+  );
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
+
+  assert.match(utilsSource, /CF_METRIC_WINDOW_LABELS/);
+  assert.match(utilsSource, /CF_METRIC_SOURCE_LABELS/);
+  assert.match(utilsSource, /CF_CONFIDENCE_LABELS/);
+  assert.match(utilsSource, /CONTENT_FACTORY_METRIC_PRESETS/);
+  assert.match(dialogSource, /CONTENT_FACTORY_METRIC_PRESETS/);
+  assert.match(dialogSource, /Быстрый выбор/);
+  assert.match(dialogSource, /CF_METRIC_WINDOW_LABELS/);
+  assert.match(dialogSource, /CF_METRIC_SOURCE_LABELS/);
+  assert.match(dialogSource, /CF_CONFIDENCE_LABELS/);
+  assert.match(historySource, /CF_METRIC_WINDOW_LABELS/);
+  assert.match(historySource, /CF_METRIC_SOURCE_LABELS/);
+  assert.match(historySource, /CF_CONFIDENCE_LABELS/);
+  assert.doesNotMatch(historySource, /доверие \{metric\.confidence\}/);
+  assert.match(effectivenessSource, /CF_METRIC_WINDOW_LABELS/);
+  assert.match(effectivenessSource, /CF_METRIC_SOURCE_LABELS/);
+  assert.match(effectivenessSource, /CF_CONFIDENCE_LABELS/);
+  assert.doesNotMatch(effectivenessSource, /\{latestMetric\.window\}/);
+  assert.doesNotMatch(effectivenessSource, /\{latestMetric\.confidence\}/);
+});
+
 test("review queue route groups publications by workflow status", () => {
   const source = readSource("app/content-factory/review/page.tsx");
 

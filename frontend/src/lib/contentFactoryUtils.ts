@@ -11,7 +11,10 @@ import type {
   CFGuestStoryRole,
   CFGuestStorySource,
   CFGuestStoryStatus,
+  CFConfidence,
+  CFMetricSource,
   CFMetricSnapshot,
+  CFMetricWindow,
   CFPlatform,
   CFProductStream,
   CFPublicationSegmentTarget,
@@ -83,6 +86,45 @@ export const CF_REFERENCE_TABLE_LABELS: Record<
 export const CF_SEGMENT_SOURCE_LABELS: Record<CFSegmentSource, string> = {
   getcourse: "GetCourse",
 };
+
+export const CF_METRIC_WINDOW_LABELS: Record<CFMetricWindow, string> = {
+  "3h": "Через 3 часа",
+  "24h": "Через 24 часа",
+  "72h": "Через 72 часа",
+  "7d": "Через 7 дней",
+  final: "Финальный срез",
+  custom: "Другое окно",
+};
+
+export const CF_METRIC_SOURCE_LABELS: Record<CFMetricSource, string> = {
+  manual: "Вручную",
+  api: "API",
+  tgstat: "TGStat",
+  telemetr: "Telemetr",
+  vk_api: "VK API",
+  email_provider: "Email-платформа",
+  getcourse: "GetCourse",
+  parser: "Парсер",
+  import: "Импорт",
+};
+
+export const CF_CONFIDENCE_LABELS: Record<CFConfidence, string> = {
+  high: "Высокое",
+  medium: "Среднее",
+  low: "Низкое",
+};
+
+export const CONTENT_FACTORY_METRIC_PRESETS = [
+  "Просмотры",
+  "Охват",
+  "Клики",
+  "Регистрации",
+  "Заявки",
+  "Переходы",
+  "Реакции",
+  "Комментарии",
+  "Репосты",
+];
 
 export const CF_GUEST_ROLE_LABELS: Record<CFGuestStoryRole, string> = {
   patient: "Пациент",

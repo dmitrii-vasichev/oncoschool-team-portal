@@ -1,5 +1,35 @@
 # Status
 
+## Content Factory Sprint 21 Metric Capture UX
+
+- Current phase: implemented and full frontend verification passed
+- Source: the preserved market research recommends a manual or semi-automated publishing and metrics ledger before fragile platform API integrations; the current metric UI worked but still exposed raw enum values.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-21-metric-capture-ux-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-21-metric-capture-ux.md`
+- Scope: frontend-only metric window/source/confidence labels, metric-name presets, manual metric dialog polish, metric history polish, effectiveness evidence polish, tests, and source guards
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-21-metric-capture-ux`.
+  - Wrote Sprint 21 design and implementation plan.
+  - Added failing helper tests for metric labels and presets.
+  - Added failing source guards for the metric dialog, metric history, and effectiveness table.
+  - Added `CF_METRIC_WINDOW_LABELS`, `CF_METRIC_SOURCE_LABELS`, `CF_CONFIDENCE_LABELS`, and `CONTENT_FACTORY_METRIC_PRESETS`.
+  - Updated the manual metric dialog to show readable select labels and quick metric-name presets.
+  - Updated metric history and effectiveness latest-metric evidence to show readable labels instead of raw enum values.
+- Key decisions:
+  - Keep Sprint 21 frontend-only and preserve existing API payload values.
+  - Treat manual metrics as the source-of-truth foundation before automatic social/API collection.
+  - Keep metric editing/deleting, bulk imports, platform-specific validation, and integrations out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 75 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 166 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]` and `/content-factory/effectiveness`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 20 Publication Creation
 
 - Current phase: implemented and full frontend verification passed

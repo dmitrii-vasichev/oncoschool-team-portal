@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import { Activity, Clock3, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ContentFactoryMetricDialog } from "@/components/content-factory/ContentFactoryMetricDialog";
-import { formatContentFactoryMetricValue } from "@/lib/contentFactoryUtils";
+import {
+  CF_CONFIDENCE_LABELS,
+  CF_METRIC_SOURCE_LABELS,
+  CF_METRIC_WINDOW_LABELS,
+  formatContentFactoryMetricValue,
+} from "@/lib/contentFactoryUtils";
 import type { CFMetricSnapshot, TeamMember } from "@/lib/types";
 
 function formatDateTime(value: string): string {
@@ -77,7 +82,9 @@ export function ContentFactoryMetricHistory({
                     {metric.metric_name}
                   </p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {metric.window} · {metric.source} · доверие {metric.confidence}
+                    {CF_METRIC_WINDOW_LABELS[metric.window]} ·{" "}
+                    {CF_METRIC_SOURCE_LABELS[metric.source]} · Доверие:{" "}
+                    {CF_CONFIDENCE_LABELS[metric.confidence].toLowerCase()}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-foreground">

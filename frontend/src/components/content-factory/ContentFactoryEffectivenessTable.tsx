@@ -5,6 +5,9 @@ import { Activity, BarChart3, FileText, FolderKanban } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentFactoryStatusBadge";
 import {
+  CF_CONFIDENCE_LABELS,
+  CF_METRIC_SOURCE_LABELS,
+  CF_METRIC_WINDOW_LABELS,
   formatContentFactoryMetricValue,
   formatContentFactorySegmentCount,
   type ContentFactoryEffectivenessMetricHealth,
@@ -187,8 +190,15 @@ export function ContentFactoryEffectivenessTable({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">{latestMetric.metric_name}</Badge>
-                      <Badge variant="outline">{latestMetric.window}</Badge>
-                      <Badge variant="outline">{latestMetric.confidence}</Badge>
+                      <Badge variant="outline">
+                        {CF_METRIC_WINDOW_LABELS[latestMetric.window]}
+                      </Badge>
+                      <Badge variant="outline">
+                        {CF_METRIC_SOURCE_LABELS[latestMetric.source]}
+                      </Badge>
+                      <Badge variant="outline">
+                        {CF_CONFIDENCE_LABELS[latestMetric.confidence]}
+                      </Badge>
                     </div>
                     <div className="text-2xl font-semibold text-foreground">
                       {formatContentFactoryMetricValue(latestMetric)}

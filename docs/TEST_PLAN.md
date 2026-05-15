@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 21 Metric Capture UX
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page.
+2. Click `Добавить метрику`.
+3. Confirm the measurement window options are readable Russian labels.
+4. Confirm the source options are readable labels such as `TGStat`, `VK API`, and `Email-платформа`.
+5. Confirm confidence options are readable Russian labels.
+6. Click a quick metric preset such as `Просмотры` or `Регистрации` and confirm it fills the metric-name field.
+7. Save a metric and confirm the metric history row shows readable window, source, and confidence labels.
+8. Open `/content-factory/effectiveness` and confirm the latest metric badges are readable labels, not raw enum values.
+9. Confirm existing numeric and text metric value rendering still works.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 20 Publication Creation
 
 ### Automated
