@@ -1503,6 +1503,7 @@ export interface CFGuestStory {
 export interface CFGuestStoryEvent {
   id: string;
   guest_story_id: string;
+  parent_event_id: string | null;
   actor_id: string | null;
   event_type: CFGuestStoryEventType;
   body: string | null;
@@ -1514,6 +1515,7 @@ export interface CFGuestStoryEvent {
 
 export interface CFGuestStoryEventCreateRequest {
   body: string;
+  parent_event_id?: string | null;
 }
 
 export interface CFGuestStoryCreateRequest {

@@ -32,37 +32,37 @@
 
 ## Phase 1: Plan And Test Shape
 
-- [ ] Make Sprint 16 the active repository plan.
-- [ ] Add backend tests expecting `parent_event_id` in model, schema, migration, service, and API behavior.
-- [ ] Add frontend source guards expecting `parent_event_id`, reply state, reply action, and nested reply rendering.
-- [ ] Run focused tests once to confirm the new expectations fail for the right reasons.
+- [x] Make Sprint 16 the active repository plan.
+- [x] Add backend tests expecting `parent_event_id` in model, schema, migration, service, and API behavior.
+- [x] Add frontend source guards expecting `parent_event_id`, reply state, reply action, and nested reply rendering.
+- [x] Run focused tests once to confirm the new expectations fail for the right reasons.
 
 ## Phase 2: Backend Thread Contract
 
-- [ ] Add `parent_event_id` to `CFGuestStoryEvent`.
-- [ ] Add self-referential relationship metadata and index.
-- [ ] Add Alembic revision `044_cf_guest_event_threads`.
-- [ ] Add `parent_event_id` to create and response schemas.
-- [ ] Validate reply parent ownership in `GuestStoryService`.
-- [ ] Pass `parent_event_id` through the create endpoint and return 404 for invalid parents.
+- [x] Add `parent_event_id` to `CFGuestStoryEvent`.
+- [x] Add self-referential relationship metadata and index.
+- [x] Add Alembic revision `044_cf_guest_event_threads`.
+- [x] Add `parent_event_id` to create and response schemas.
+- [x] Validate reply parent ownership in `GuestStoryService`.
+- [x] Pass `parent_event_id` through the create endpoint and return 404 for invalid parents.
 
 ## Phase 3: Frontend Thread UI
 
-- [ ] Add `parent_event_id` to event types and create request.
-- [ ] Build a parent/reply tree from the flat event response.
-- [ ] Render replies nested under their parent.
-- [ ] Add `Ответить` and `Отменить ответ` interactions.
-- [ ] Submit replies with `parent_event_id`.
-- [ ] Keep the panel compact and readable on desktop and mobile.
+- [x] Add `parent_event_id` to event types and create request.
+- [x] Build a parent/reply tree from the flat event response.
+- [x] Render replies nested under their parent.
+- [x] Add `Ответить` and `Отменить ответ` interactions.
+- [x] Submit replies with `parent_event_id`.
+- [x] Keep the panel compact and readable on desktop and mobile.
 
 ## Phase 4: Verification And Integration
 
-- [ ] Run backend focused tests.
-- [ ] Run `alembic heads`.
-- [ ] Run frontend source guards.
-- [ ] Run frontend full test, typecheck, lint, and build.
-- [ ] Run `git diff --check`.
-- [ ] Update status docs with final verification.
+- [x] Run backend focused tests.
+- [x] Run `alembic heads`.
+- [x] Run frontend source guards.
+- [x] Run frontend full test, typecheck, lint, and build.
+- [x] Run `git diff --check`.
+- [x] Update status docs with final verification.
 - [ ] Commit, merge to `main`, and push.
 
 ## Validation Commands

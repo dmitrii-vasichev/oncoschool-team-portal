@@ -113,11 +113,15 @@ async def create_guest_story_event(
     guest_story = await guest_story_service.get(session, guest_story_id)
     if guest_story is None:
         raise HTTPException(status_code=404, detail="История гостя не найдена")
-    event = await guest_story_service.create_comment(
-        session,
-        guest_story_id=guest_story_id,
-        actor_id=member.id,
-        body=data.body,
-    )
+    try:
+        event = await guest_story_service.create_comment(
+            session,
+            guest_story_id=guest_story_id,
+            actor_id=member.id,
+            body=data.body,
+            parent_event_id=data.parent_event_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Событие для ответа не найдено") from exc
     await session.commit()
     return event

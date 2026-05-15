@@ -25,7 +25,7 @@
 
 **Implementation status:**
 
-- Planned on branch `codex/content-factory-sprint-16-threaded-activity`.
+- Implemented and verified on branch `codex/content-factory-sprint-16-threaded-activity`.
 - Sprint 1 through Sprint 15 work is merged to `main`.
 - Sprint 16 builds on the Sprint 14 activity journal and Sprint 15 attention queue.
 
@@ -54,7 +54,15 @@ git diff --check
 
 **Latest verification result:**
 
-- Not run yet for Sprint 16.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 56 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `044_cf_guest_event_threads`.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic upgrade head` passed locally through `043_cf_guest_story_events -> 044_cf_guest_event_threads`.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 32 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 156 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+- `git diff --check` passed.
 
 ---
 

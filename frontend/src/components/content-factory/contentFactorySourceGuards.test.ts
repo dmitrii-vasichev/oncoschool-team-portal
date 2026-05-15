@@ -556,6 +556,11 @@ test("guest story detail route exposes readable story context", () => {
   );
   assert.match(activitySource, /Журнал истории/);
   assert.match(activitySource, /api\.createCFGuestStoryEvent/);
+  assert.match(activitySource, /parent_event_id/);
+  assert.match(activitySource, /replyingToEvent/);
+  assert.match(activitySource, /Ответить/);
+  assert.match(activitySource, /Отменить ответ/);
+  assert.match(activitySource, /renderEventThread/);
   assert.match(activitySource, /Комментарий/);
   assert.match(activitySource, /Статус изменён/);
   assert.match(attentionSource, /getContentFactoryGuestAttention/);

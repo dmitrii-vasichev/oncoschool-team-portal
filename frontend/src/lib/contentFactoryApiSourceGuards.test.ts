@@ -95,6 +95,8 @@ test("content factory API client exposes guest story endpoints", () => {
   assert.match(typesSource, /export type CFGuestStoryEventType/);
   assert.match(typesSource, /export interface CFGuestStoryEvent/);
   assert.match(typesSource, /export interface CFGuestStoryEventCreateRequest/);
+  assert.match(typesSource, /parent_event_id:\s*string\s*\|\s*null/);
+  assert.match(typesSource, /parent_event_id\?:\s*string\s*\|\s*null/);
   assert.match(apiSource, /async getCFGuestStories/);
   assert.match(apiSource, /async getCFGuestStory/);
   assert.match(apiSource, /async createCFGuestStory/);

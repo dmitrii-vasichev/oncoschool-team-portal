@@ -1684,6 +1684,7 @@ class CFGuestStoryResponse(CFGuestStoryBase):
 
 class CFGuestStoryEventCreate(BaseModel):
     body: str = Field(..., min_length=1, max_length=4000)
+    parent_event_id: uuid.UUID | None = None
 
     @field_validator("body")
     @classmethod
@@ -1697,6 +1698,7 @@ class CFGuestStoryEventCreate(BaseModel):
 class CFGuestStoryEventResponse(BaseModel):
     id: uuid.UUID
     guest_story_id: uuid.UUID
+    parent_event_id: uuid.UUID | None
     actor_id: uuid.UUID | None
     event_type: CFGuestStoryEventType
     body: str | None

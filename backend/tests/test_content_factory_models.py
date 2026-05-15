@@ -65,6 +65,7 @@ class TestContentFactoryCoreModels(unittest.TestCase):
     def test_cf_guest_story_event_exists(self):
         self.assertEqual(models.CFGuestStoryEvent.__tablename__, "cf_guest_story_event")
         self.assertTrue(hasattr(models.CFGuestStoryEvent, "guest_story_id"))
+        self.assertTrue(hasattr(models.CFGuestStoryEvent, "parent_event_id"))
         self.assertTrue(hasattr(models.CFGuestStoryEvent, "event_type"))
         self.assertTrue(hasattr(models.CFGuestStoryEvent, "body"))
         self.assertTrue(hasattr(models.CFGuestStoryEvent, "payload"))
@@ -79,6 +80,8 @@ class TestContentFactoryCoreModels(unittest.TestCase):
         self.assertIn("snapshots", models.CFExternalSegment.__mapper__.relationships)
         # Guest story ↔ activity events
         self.assertIn("events", models.CFGuestStory.__mapper__.relationships)
+        self.assertIn("parent_event", models.CFGuestStoryEvent.__mapper__.relationships)
+        self.assertIn("replies", models.CFGuestStoryEvent.__mapper__.relationships)
 
 
 if __name__ == "__main__":

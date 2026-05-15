@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 16 Threaded Activity
 
-- Current phase: planned on branch `codex/content-factory-sprint-16-threaded-activity`
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-16-threaded-activity`
 - Source: user approval to continue with Sprint 16, preserved Content Factory research, restored Content Factory design doc, Sprint 14 guest story activity journal, Sprint 15 attention queue, and backlog item for threaded comment workflows
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-16-threaded-activity-design.md`
@@ -14,16 +14,31 @@
   - Reviewed the existing guest story event model, schemas, service, API endpoints, frontend activity panel, and source guards.
   - Wrote Sprint 16 design and implementation plan.
   - Made Sprint 16 the active repository plan.
+  - Added failing backend and frontend tests/source guards for threaded activity.
+  - Added Alembic revision `044_cf_guest_event_threads` for optional activity `parent_event_id`.
+  - Added self-referential guest story event model relationships and schema fields.
+  - Added same-story parent validation in `GuestStoryService`.
+  - Passed `parent_event_id` through the guest activity create endpoint and return 404 for invalid reply parents.
+  - Added frontend event typing, reply state, nested thread rendering, and reply/cancel-reply UI in the guest activity panel.
+  - Ran Sprint 16 backend and frontend verification successfully.
 - Key decisions:
   - Keep the event API response flat and build nesting in the existing activity panel.
   - Add only reply threading in this sprint; keep notifications, mentions, files, editing/deleting events, and separate discussion pages out of scope.
   - Validate `parent_event_id` on the backend so replies cannot cross guest story boundaries.
 - Next actions:
-  - Add failing backend and frontend tests/source guards for threaded activity.
-  - Implement the backend migration, model, schemas, service, and router changes.
-  - Implement the nested reply UI and run verification.
+  - Commit Sprint 16 implementation.
+  - Merge and push after final whitespace/status checks.
+  - Run authenticated manual QA against real guest story threads when useful.
 - Latest verification:
-  - Not run yet for Sprint 16.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 56 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `044_cf_guest_event_threads`.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic upgrade head` passed locally through `043_cf_guest_story_events -> 044_cf_guest_event_threads`.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 32 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 156 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+  - `git diff --check` passed.
 
 ## Content Factory Sprint 15 Guest Attention Queue
 

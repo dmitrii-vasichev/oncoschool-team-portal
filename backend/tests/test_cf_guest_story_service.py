@@ -23,6 +23,9 @@ class _FakeResult:
     def scalars(self):
         return _FakeScalars(self._rows)
 
+    def scalar_one_or_none(self):
+        return self._rows[0] if self._rows else None
+
 
 class TestGuestStoryService(unittest.IsolatedAsyncioTestCase):
     async def test_create_guest_story(self):
@@ -126,6 +129,46 @@ class TestGuestStoryService(unittest.IsolatedAsyncioTestCase):
         session.add.assert_called_once()
         session.flush.assert_awaited()
         session.refresh.assert_awaited_with(result)
+
+    async def test_create_comment_event_reply_validates_parent_story(self):
+        session = AsyncMock()
+        session.add = Mock()
+        session.execute = AsyncMock()
+        session.flush = AsyncMock()
+        session.refresh = AsyncMock()
+        guest_story_id = uuid.uuid4()
+        parent_event_id = uuid.uuid4()
+        parent = SimpleNamespace(id=parent_event_id, guest_story_id=guest_story_id)
+        session.execute.return_value = _FakeResult([parent])
+
+        result = await GuestStoryService.create_comment(
+            session,
+            guest_story_id=guest_story_id,
+            actor_id=uuid.uuid4(),
+            body="Согласовали формулировку в ответ на прошлый комментарий.",
+            parent_event_id=parent_event_id,
+        )
+
+        self.assertEqual(result.parent_event_id, parent_event_id)
+        session.execute.assert_awaited_once()
+        session.add.assert_called_once()
+
+    async def test_create_comment_event_rejects_parent_from_another_story(self):
+        session = AsyncMock()
+        session.execute = AsyncMock()
+        parent_event_id = uuid.uuid4()
+        session.execute.return_value = _FakeResult(
+            [SimpleNamespace(id=parent_event_id, guest_story_id=uuid.uuid4())]
+        )
+
+        with self.assertRaises(ValueError):
+            await GuestStoryService.create_comment(
+                session,
+                guest_story_id=uuid.uuid4(),
+                actor_id=uuid.uuid4(),
+                body="Ответ не должен перескочить в другую историю.",
+                parent_event_id=parent_event_id,
+            )
 
     async def test_update_guest_story_logs_watched_changes(self):
         actor_id = uuid.uuid4()

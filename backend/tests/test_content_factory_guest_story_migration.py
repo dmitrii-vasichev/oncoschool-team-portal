@@ -14,6 +14,12 @@ EVENT_MIGRATION = (
     / "versions"
     / "043_content_factory_guest_story_events.py"
 )
+THREAD_MIGRATION = (
+    Path(__file__).resolve().parents[1]
+    / "alembic"
+    / "versions"
+    / "044_cf_guest_story_event_threads.py"
+)
 ALEMBIC_VERSIONS = Path(__file__).resolve().parents[1] / "alembic" / "versions"
 ALEMBIC_VERSION_NUM_MAX_LENGTH = 32
 
@@ -92,3 +98,15 @@ def test_guest_story_event_migration_creates_table_and_indexes():
     assert '"ix_cf_guest_story_event_story_created"' in source
     assert '"ix_cf_guest_story_event_type"' in source
     assert 'op.drop_table("cf_guest_story_event")' in source
+
+
+def test_guest_story_event_thread_migration_adds_parent_reference():
+    source = THREAD_MIGRATION.read_text()
+
+    assert 'revision: str = "044_cf_guest_event_threads"' in source
+    assert 'down_revision: Union[str, None] = "043_cf_guest_story_events"' in source
+    assert '"cf_guest_story_event"' in source
+    assert '"parent_event_id"' in source
+    assert '"fk_cf_guest_story_event_parent"' in source
+    assert '"ix_cf_guest_story_event_parent"' in source
+    assert 'op.drop_column("cf_guest_story_event", "parent_event_id")' in source

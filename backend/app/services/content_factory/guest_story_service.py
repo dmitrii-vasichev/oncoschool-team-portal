@@ -30,6 +30,7 @@ class GuestStoryService:
         session: AsyncSession,
         *,
         guest_story_id: uuid.UUID,
+        parent_event_id: uuid.UUID | None = None,
         event_type: str,
         actor_id: uuid.UUID | None = None,
         body: str | None = None,
@@ -39,6 +40,7 @@ class GuestStoryService:
     ) -> CFGuestStoryEvent:
         event = CFGuestStoryEvent(
             guest_story_id=guest_story_id,
+            parent_event_id=parent_event_id,
             actor_id=actor_id,
             event_type=event_type,
             body=body,
@@ -48,6 +50,22 @@ class GuestStoryService:
         )
         session.add(event)
         return event
+
+    @staticmethod
+    async def _validate_parent_event(
+        session: AsyncSession,
+        *,
+        guest_story_id: uuid.UUID,
+        parent_event_id: uuid.UUID | None,
+    ) -> None:
+        if parent_event_id is None:
+            return
+        result = await session.execute(
+            select(CFGuestStoryEvent).where(CFGuestStoryEvent.id == parent_event_id)
+        )
+        parent_event = result.scalar_one_or_none()
+        if parent_event is None or parent_event.guest_story_id != guest_story_id:
+            raise ValueError("Parent event not found for guest story")
 
     @staticmethod
     async def create(
@@ -98,14 +116,21 @@ class GuestStoryService:
         guest_story_id: uuid.UUID,
         event_type: str,
         actor_id: uuid.UUID | None = None,
+        parent_event_id: uuid.UUID | None = None,
         body: str | None = None,
         old_value: Any = None,
         new_value: Any = None,
         payload: dict[str, Any] | None = None,
     ) -> CFGuestStoryEvent:
+        await GuestStoryService._validate_parent_event(
+            session,
+            guest_story_id=guest_story_id,
+            parent_event_id=parent_event_id,
+        )
         event = GuestStoryService._append_event(
             session,
             guest_story_id=guest_story_id,
+            parent_event_id=parent_event_id,
             event_type=event_type,
             actor_id=actor_id,
             body=body,
@@ -124,11 +149,13 @@ class GuestStoryService:
         guest_story_id: uuid.UUID,
         actor_id: uuid.UUID,
         body: str,
+        parent_event_id: uuid.UUID | None = None,
     ) -> CFGuestStoryEvent:
         return await GuestStoryService.create_event(
             session,
             guest_story_id=guest_story_id,
             actor_id=actor_id,
+            parent_event_id=parent_event_id,
             event_type="comment",
             body=body.strip(),
         )

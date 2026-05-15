@@ -57,6 +57,7 @@ def make_guest_story_event(**overrides):
     base = {
         "id": uuid.uuid4(),
         "guest_story_id": uuid.uuid4(),
+        "parent_event_id": None,
         "actor_id": uuid.uuid4(),
         "event_type": "comment",
         "body": "Попросили согласовать город.",
@@ -251,9 +252,14 @@ async def test_create_guest_story_event_persists(monkeypatch):
     )
     session = AsyncMock()
 
+    parent_event_id = uuid.uuid4()
+
     result = await guests_api.create_guest_story_event(
         guest_story_id=guest_story.id,
-        data=CFGuestStoryEventCreate(body="Гость просит не называть город."),
+        data=CFGuestStoryEventCreate(
+            body="Гость просит не называть город.",
+            parent_event_id=parent_event_id,
+        ),
         member=member,
         session=session,
     )
@@ -264,5 +270,35 @@ async def test_create_guest_story_event_persists(monkeypatch):
         guest_story_id=guest_story.id,
         actor_id=member.id,
         body="Гость просит не называть город.",
+        parent_event_id=parent_event_id,
     )
     session.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_create_guest_story_event_invalid_parent_returns_404(monkeypatch):
+    member = cf_member()
+    guest_story = make_guest_story()
+    monkeypatch.setattr(
+        guests_api.guest_story_service,
+        "get",
+        AsyncMock(return_value=guest_story),
+    )
+    monkeypatch.setattr(
+        guests_api.guest_story_service,
+        "create_comment",
+        AsyncMock(side_effect=ValueError("Parent event not found for guest story")),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await guests_api.create_guest_story_event(
+            guest_story_id=guest_story.id,
+            data=CFGuestStoryEventCreate(
+                body="Ответ к чужой истории.",
+                parent_event_id=uuid.uuid4(),
+            ),
+            member=member,
+            session=AsyncMock(),
+        )
+
+    assert exc.value.status_code == 404

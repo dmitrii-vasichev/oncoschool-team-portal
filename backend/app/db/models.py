@@ -1820,12 +1820,18 @@ class CFGuestStoryEvent(Base):
     __tablename__ = "cf_guest_story_event"
     __table_args__ = (
         Index("ix_cf_guest_story_event_story_created", "guest_story_id", "created_at"),
+        Index("ix_cf_guest_story_event_parent", "parent_event_id"),
         Index("ix_cf_guest_story_event_type", "event_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     guest_story_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("cf_guest_story.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("cf_guest_story_event.id", ondelete="CASCADE"),
+        nullable=True,
     )
     actor_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True
@@ -1840,4 +1846,14 @@ class CFGuestStoryEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     guest_story: Mapped["CFGuestStory"] = relationship(back_populates="events")
+    parent_event: Mapped["CFGuestStoryEvent | None"] = relationship(
+        "CFGuestStoryEvent",
+        remote_side="CFGuestStoryEvent.id",
+        back_populates="replies",
+    )
+    replies: Mapped[list["CFGuestStoryEvent"]] = relationship(
+        "CFGuestStoryEvent",
+        back_populates="parent_event",
+        cascade="all, delete-orphan",
+    )
     actor: Mapped["TeamMember | None"] = relationship()

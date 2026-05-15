@@ -122,13 +122,20 @@ class TestCFCoreSchemas(unittest.TestCase):
             schemas.CFGuestStoryEventCreate(body="   ")
 
     def test_cf_guest_story_event_create_trims_body(self):
-        event = schemas.CFGuestStoryEventCreate(body="  Комментарий  ")
+        parent_event_id = uuid.uuid4()
+        event = schemas.CFGuestStoryEventCreate(
+            body="  Комментарий  ",
+            parent_event_id=parent_event_id,
+        )
         self.assertEqual(event.body, "Комментарий")
+        self.assertEqual(event.parent_event_id, parent_event_id)
 
     def test_cf_guest_story_event_response(self):
+        parent_event_id = uuid.uuid4()
         event = schemas.CFGuestStoryEventResponse(
             id=uuid.uuid4(),
             guest_story_id=uuid.uuid4(),
+            parent_event_id=parent_event_id,
             actor_id=uuid.uuid4(),
             event_type="comment",
             body="Попросили согласовать город.",
@@ -138,6 +145,7 @@ class TestCFCoreSchemas(unittest.TestCase):
             created_at=datetime(2026, 5, 14, tzinfo=UTC),
         )
         self.assertEqual(event.event_type, "comment")
+        self.assertEqual(event.parent_event_id, parent_event_id)
 
 
 if __name__ == "__main__":
