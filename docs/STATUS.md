@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 12 Guest Workspace
 
-- Current phase: planning started on branch `codex/content-factory-sprint-12-guest-workspace`
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-12-guest-workspace`
 - Source: user approval to continue development on 2026-05-14, preserved Content Factory research, restored Content Factory design doc, and Sprint 11 guest story backend foundation
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-12-guest-workspace-design.md`
@@ -14,17 +14,29 @@
   - Reviewed existing Content Factory frontend page, dialog, helper, navigation, and source-guard patterns.
   - Wrote Sprint 12 design and implementation plan.
   - Made Sprint 12 the active repository plan.
+  - Added guest story frontend types and API client methods for `/api/content-factory/guests`.
+  - Added Russian labels, active/follow-up helpers, summary counters, and combined guest story filters.
+  - Added `/content-factory/guests` with summary cards, search, status, consent, owner, and campaign filters.
+  - Added a create/edit dialog with Russian field groups, readable select options, and newline inputs for array fields.
+  - Added a compact guest story table with pipeline status, role, consent, follow-up, owner, campaign, publication, gift, and source context.
+  - Added `Гости и истории` to Content Factory internal navigation, header metadata, and help.
+  - Added helper, API source-guard, and route/source-guard tests for Sprint 12.
 - Key decisions:
   - Build list/create/edit first; defer a dedicated guest detail page to a later sprint.
   - Use the section name `Гости и истории`.
   - Keep array fields as newline-separated text in the first UI instead of exposing JSON.
   - Use existing Content Factory compact operational UI patterns.
 - Next actions:
-  - Write failing helper and source-guard tests.
-  - Add guest story types, API client methods, helper labels, summary, and filters.
-  - Build dialog, table, route, navigation, help, verification, and docs updates.
+  - Commit Sprint 12 implementation.
+  - Merge and push after final whitespace/status checks.
+  - Run authenticated manual QA against real guest story records when useful.
+  - Consider a dedicated guest story detail page as the next guest workflow slice.
 - Latest verification:
-  - Not yet run for Sprint 12 implementation.
+  - `cd frontend && npm test` passed: 152 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/guests`.
+  - Local dev server smoke on `http://127.0.0.1:3013/content-factory/guests` returned HTTP 200 and compiled the route.
 
 ## Content Factory Sprint 11 Guest CRM Foundation
 

@@ -8,6 +8,10 @@ const {
   CF_PUBLICATION_STATUS_LABELS,
   CF_REFERENCE_TABLE_LABELS,
   CF_RETRO_TYPE_LABELS,
+  CF_GUEST_CONSENT_STATUS_LABELS,
+  CF_GUEST_GIFT_STATUS_LABELS,
+  CF_GUEST_ROLE_LABELS,
+  CF_GUEST_STATUS_LABELS,
   CF_SEGMENT_SOURCE_LABELS,
   buildContentFactoryBundleParams,
   buildContentFactoryEffectivenessRows,
@@ -17,6 +21,7 @@ const {
   cleanContentFactoryPublicationUpdate,
   compareContentFactorySegmentSnapshots,
   filterContentFactoryEffectivenessRows,
+  filterContentFactoryGuestStories,
   filterContentFactorySegmentUsageRows,
   filterContentFactoryPublications,
   filterContentFactorySegments,
@@ -31,7 +36,10 @@ const {
   getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
   groupPublicationsByDate,
+  isContentFactoryGuestFollowUpDue,
+  isContentFactoryGuestStoryActive,
   summarizeContentFactoryEffectiveness,
+  summarizeContentFactoryGuestStories,
   summarizeContentFactorySegments,
   summarizeContentFactorySegmentUsage,
   summarizeContentFactoryReferenceRecords,
@@ -56,6 +64,13 @@ test("segment source labels expose Sprint 8 segment sources", () => {
   assert.equal(CF_SEGMENT_SOURCE_LABELS?.getcourse, "GetCourse");
 });
 
+test("guest story labels expose Russian workflow wording", () => {
+  assert.equal(CF_GUEST_ROLE_LABELS.patient, "Пациент");
+  assert.equal(CF_GUEST_STATUS_LABELS.editorial_screening, "Редакционный отбор");
+  assert.equal(CF_GUEST_CONSENT_STATUS_LABELS.signed, "Подписано");
+  assert.equal(CF_GUEST_GIFT_STATUS_LABELS.pending, "Нужно отправить");
+});
+
 test("content factory access allows admins and flagged active members", () => {
   assert.equal(canAccessContentFactory({ role: "admin", is_active: true }), true);
   assert.equal(
@@ -73,6 +88,130 @@ test("content factory access allows admins and flagged active members", () => {
       has_content_factory_access: false,
     }),
     false,
+  );
+});
+
+test("guest story helpers detect active pipeline and due follow-up", () => {
+  assert.equal(isContentFactoryGuestStoryActive({ status: "sourced" }), true);
+  assert.equal(isContentFactoryGuestStoryActive({ status: "published" }), true);
+  assert.equal(isContentFactoryGuestStoryActive({ status: "follow_up_done" }), false);
+  assert.equal(isContentFactoryGuestStoryActive({ status: "rejected" }), false);
+  assert.equal(
+    isContentFactoryGuestFollowUpDue(
+      {
+        status: "published",
+        follow_up_due_at: "2026-05-13T12:00:00Z",
+      },
+      new Date("2026-05-14T12:00:00Z"),
+    ),
+    true,
+  );
+  assert.equal(
+    isContentFactoryGuestFollowUpDue(
+      {
+        status: "follow_up_done",
+        follow_up_due_at: "2026-05-13T12:00:00Z",
+      },
+      new Date("2026-05-14T12:00:00Z"),
+    ),
+    false,
+  );
+});
+
+test("guest story summary counts operational states", () => {
+  const summary = summarizeContentFactoryGuestStories(
+    [
+      {
+        id: "g1",
+        status: "sourced",
+        consent_status: "not_started",
+        gift_status: "not_required",
+        follow_up_due_at: null,
+      },
+      {
+        id: "g2",
+        status: "published",
+        consent_status: "signed",
+        gift_status: "pending",
+        follow_up_due_at: "2026-05-13T12:00:00Z",
+      },
+      {
+        id: "g3",
+        status: "follow_up_done",
+        consent_status: "signed",
+        gift_status: "received",
+        follow_up_due_at: "2026-05-10T12:00:00Z",
+      },
+    ],
+    new Date("2026-05-14T12:00:00Z"),
+  );
+
+  assert.equal(summary.total, 3);
+  assert.equal(summary.active, 2);
+  assert.equal(summary.consentSigned, 2);
+  assert.equal(summary.followUpsDue, 1);
+  assert.equal(summary.giftPending, 1);
+});
+
+test("guest story filters combine search status consent owner and campaign", () => {
+  const stories = [
+    {
+      id: "g1",
+      display_name: "Анна Иванова",
+      contact_ref: "@anna",
+      role: "patient",
+      source: "open_call",
+      source_notes: "Telegram form",
+      story_brief: "История про реабилитацию",
+      status: "consent_sent",
+      owner_id: "member-1",
+      bundle_id: "bundle-1",
+      publication_id: null,
+      screening_notes: "Спокойно говорит",
+      medical_factcheck_notes: null,
+      rejection_reason: null,
+      consent_status: "sent",
+      allowed_channels: ["telegram"],
+      anonymity_level: "first_name",
+      sensitive_topics: ["clinic"],
+      legal_notes: "Не называем клинику",
+      gift_status: "pending",
+    },
+    {
+      id: "g2",
+      display_name: "Пётр",
+      contact_ref: null,
+      role: "doctor",
+      source: "referral",
+      source_notes: null,
+      story_brief: "Экспертный комментарий",
+      status: "rejected",
+      owner_id: "member-2",
+      bundle_id: "bundle-2",
+      publication_id: null,
+      screening_notes: null,
+      medical_factcheck_notes: null,
+      rejection_reason: "Не подходит под тему",
+      consent_status: "not_started",
+      allowed_channels: [],
+      anonymity_level: "full_name",
+      sensitive_topics: [],
+      legal_notes: null,
+      gift_status: "not_required",
+    },
+  ];
+
+  const result = filterContentFactoryGuestStories(stories, {
+    search: "клинику",
+    status: "consent_sent",
+    consentStatus: "sent",
+    ownerId: "member-1",
+    bundleId: "bundle-1",
+  });
+
+  assert.deepEqual(
+    result.map((story) => story.id),
+    ["g1"],
   );
 });
 

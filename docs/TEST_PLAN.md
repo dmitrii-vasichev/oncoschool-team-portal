@@ -4,7 +4,7 @@
 
 ### Automated
 
-- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
 - `cd frontend && npm test`
 - `cd frontend && npx tsc --noEmit`
 - `cd frontend && npm run lint`

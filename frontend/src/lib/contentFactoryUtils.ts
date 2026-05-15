@@ -3,6 +3,12 @@ import type {
   CFBundleStatus,
   CFExternalSegment,
   CFFormat,
+  CFGuestAnonymityLevel,
+  CFGuestConsentStatus,
+  CFGuestGiftStatus,
+  CFGuestStoryRole,
+  CFGuestStorySource,
+  CFGuestStoryStatus,
   CFMetricSnapshot,
   CFPlatform,
   CFProductStream,
@@ -74,6 +80,73 @@ export const CF_REFERENCE_TABLE_LABELS: Record<
 
 export const CF_SEGMENT_SOURCE_LABELS: Record<CFSegmentSource, string> = {
   getcourse: "GetCourse",
+};
+
+export const CF_GUEST_ROLE_LABELS: Record<CFGuestStoryRole, string> = {
+  patient: "Пациент",
+  relative: "Родственник",
+  doctor: "Врач",
+  volunteer: "Волонтёр",
+  partner: "Партнёр",
+  other: "Другое",
+};
+
+export const CF_GUEST_SOURCE_LABELS: Record<CFGuestStorySource, string> = {
+  manual: "Вручную",
+  open_call: "Открытый набор",
+  referral: "Рекомендация",
+  screening_form: "Анкета отбора",
+  partner: "Партнёр",
+  other: "Другое",
+};
+
+export const CF_GUEST_STATUS_LABELS: Record<CFGuestStoryStatus, string> = {
+  sourced: "Найден кандидат",
+  applied: "Заполнил заявку",
+  editorial_screening: "Редакционный отбор",
+  shortlisted: "В коротком списке",
+  producer_call_scheduled: "Созвон назначен",
+  producer_call_done: "Созвон проведён",
+  medical_factcheck_needed: "Нужен фактчек",
+  doctor_approved: "Врач одобрил",
+  consent_sent: "Согласие отправлено",
+  consent_signed: "Согласие подписано",
+  scheduled: "Запланировано",
+  prep_materials_sent: "Материалы отправлены",
+  live_or_recorded: "Эфир или запись",
+  post_production: "Постпродакшн",
+  published: "Опубликовано",
+  gift_sent: "Подарок отправлен",
+  follow_up_done: "Follow-up завершён",
+  maybe_later: "Возможно позже",
+  rejected: "Не подходит",
+  archived: "Архив",
+};
+
+export const CF_GUEST_CONSENT_STATUS_LABELS: Record<
+  CFGuestConsentStatus,
+  string
+> = {
+  not_started: "Не начинали",
+  sent: "Отправлено",
+  signed: "Подписано",
+  declined: "Отказ",
+  revoked: "Отозвано",
+  expired: "Истекло",
+};
+
+export const CF_GUEST_ANONYMITY_LABELS: Record<CFGuestAnonymityLevel, string> = {
+  full_name: "Полное имя",
+  first_name: "Только имя",
+  anonymous: "Анонимно",
+  pseudonym: "Псевдоним",
+};
+
+export const CF_GUEST_GIFT_STATUS_LABELS: Record<CFGuestGiftStatus, string> = {
+  not_required: "Не нужен",
+  pending: "Нужно отправить",
+  sent: "Отправлен",
+  received: "Получен",
 };
 
 export const CF_BUNDLE_STATUSES: CFBundleStatus[] = [
@@ -234,6 +307,49 @@ export type ContentFactorySegmentFilters = {
   search?: string | null;
   active?: "all" | "active" | "inactive";
   source?: "all" | string | null;
+};
+
+export type ContentFactoryGuestStorySummary = {
+  total: number;
+  active: number;
+  consentSigned: number;
+  followUpsDue: number;
+  giftPending: number;
+};
+
+export type ContentFactoryGuestStoryFilters = {
+  search?: string | null;
+  status?: "all" | string | null;
+  consentStatus?: "all" | string | null;
+  ownerId?: "all" | string | null;
+  bundleId?: "all" | string | null;
+};
+
+type GuestStoryStatusLike = {
+  status: string;
+  follow_up_due_at?: string | null;
+};
+
+type GuestStoryLike = GuestStoryStatusLike & {
+  id?: string;
+  display_name?: string | null;
+  contact_ref?: string | null;
+  role?: string | null;
+  source?: string | null;
+  source_notes?: string | null;
+  story_brief?: string | null;
+  owner_id?: string | null;
+  bundle_id?: string | null;
+  publication_id?: string | null;
+  screening_notes?: string | null;
+  medical_factcheck_notes?: string | null;
+  rejection_reason?: string | null;
+  consent_status?: string | null;
+  allowed_channels?: string[] | null;
+  anonymity_level?: string | null;
+  sensitive_topics?: string[] | null;
+  legal_notes?: string | null;
+  gift_status?: string | null;
 };
 
 type SegmentLike = {
@@ -478,6 +594,99 @@ export function canAccessContentFactory(
 ): boolean {
   if (!member || member.is_active === false) return false;
   return member.role === "admin" || member.has_content_factory_access === true;
+}
+
+export function isContentFactoryGuestStoryActive(
+  story: GuestStoryStatusLike,
+): boolean {
+  return !["follow_up_done", "maybe_later", "rejected", "archived"].includes(
+    story.status,
+  );
+}
+
+export function isContentFactoryGuestFollowUpDue(
+  story: GuestStoryStatusLike,
+  now: Date | string = new Date(),
+): boolean {
+  if (!isContentFactoryGuestStoryActive(story)) return false;
+  const dueTime = dateTime(story.follow_up_due_at);
+  if (dueTime === null) return false;
+  return dueTime <= dateInputTime(now);
+}
+
+export function summarizeContentFactoryGuestStories<TStory extends GuestStoryLike>(
+  stories: TStory[],
+  now: Date | string = new Date(),
+): ContentFactoryGuestStorySummary {
+  return {
+    total: stories.length,
+    active: stories.filter(isContentFactoryGuestStoryActive).length,
+    consentSigned: stories.filter((story) => story.consent_status === "signed")
+      .length,
+    followUpsDue: stories.filter((story) =>
+      isContentFactoryGuestFollowUpDue(story, now),
+    ).length,
+    giftPending: stories.filter((story) => story.gift_status === "pending")
+      .length,
+  };
+}
+
+export function filterContentFactoryGuestStories<TStory extends GuestStoryLike>(
+  stories: TStory[],
+  filters: ContentFactoryGuestStoryFilters,
+): TStory[] {
+  const search = filters.search?.trim().toLowerCase();
+  return stories.filter((story) => {
+    if (filters.status && filters.status !== "all" && story.status !== filters.status) {
+      return false;
+    }
+    if (
+      filters.consentStatus &&
+      filters.consentStatus !== "all" &&
+      story.consent_status !== filters.consentStatus
+    ) {
+      return false;
+    }
+    if (
+      filters.ownerId &&
+      filters.ownerId !== "all" &&
+      story.owner_id !== filters.ownerId
+    ) {
+      return false;
+    }
+    if (
+      filters.bundleId &&
+      filters.bundleId !== "all" &&
+      story.bundle_id !== filters.bundleId
+    ) {
+      return false;
+    }
+    if (!search) return true;
+
+    const haystack = [
+      story.id,
+      story.display_name,
+      story.contact_ref,
+      story.role,
+      story.source,
+      story.source_notes,
+      story.story_brief,
+      story.status,
+      story.screening_notes,
+      story.medical_factcheck_notes,
+      story.rejection_reason,
+      story.consent_status,
+      story.anonymity_level,
+      story.legal_notes,
+      ...(story.allowed_channels ?? []),
+      ...(story.sensitive_topics ?? []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(search);
+  });
 }
 
 function dateTime(value: string | null | undefined): number | null {

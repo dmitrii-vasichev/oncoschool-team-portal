@@ -24,7 +24,7 @@
 
 **Implementation status:**
 
-- In progress on branch `codex/content-factory-sprint-12-guest-workspace`.
+- Implemented and verified on branch `codex/content-factory-sprint-12-guest-workspace`.
 - Sprint 1 through Sprint 11 work is merged to `main`.
 - Sprint 12 builds on the Sprint 11 `/api/content-factory/guests` backend foundation.
 
@@ -41,7 +41,7 @@
 **Validation commands:**
 
 ```bash
-cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
 cd frontend && npm test
 cd frontend && npx tsc --noEmit
 cd frontend && npm run lint
@@ -51,7 +51,11 @@ git diff --check
 
 **Latest verification result:**
 
-- Not yet run for Sprint 12 implementation.
+- `cd frontend && npm test` passed: 152 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/guests`.
+- Local dev server smoke on `http://127.0.0.1:3013/content-factory/guests` returned HTTP 200 and compiled the route.
 
 ---
 

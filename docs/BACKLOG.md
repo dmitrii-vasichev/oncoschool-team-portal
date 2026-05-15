@@ -5,6 +5,7 @@
 ### Next
 
 - Build a dedicated guest-story detail page after the Sprint 12 list/create/edit workspace is validated.
+- Run authenticated manual QA for the Sprint 12 guest story workspace against real guest and patient story records.
 - Run authenticated manual QA across the consolidated Content Factory workspace.
 - Run authenticated manual QA for Sprint 10 effectiveness analytics against real metric rows.
 

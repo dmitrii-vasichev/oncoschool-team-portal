@@ -84,6 +84,22 @@ test("content factory API client exposes Sprint 7 reference admin endpoints", ()
   assert.match(source, /\/api\/content-factory\/funnel-templates\/\$\{id\}/);
 });
 
+test("content factory API client exposes Sprint 12 guest story endpoints", () => {
+  const typesSource = readSource("lib/types.ts");
+  const apiSource = readSource("lib/api.ts");
+
+  assert.match(typesSource, /export interface CFGuestStory/);
+  assert.match(typesSource, /export interface CFGuestStoryCreateRequest/);
+  assert.match(typesSource, /export interface CFGuestStoryUpdateRequest/);
+  assert.match(typesSource, /export interface CFGuestStoryListParams/);
+  assert.match(apiSource, /async getCFGuestStories/);
+  assert.match(apiSource, /async createCFGuestStory/);
+  assert.match(apiSource, /async updateCFGuestStory/);
+  assert.match(apiSource, /\/api\/content-factory\/guests\$\{query\}/);
+  assert.match(apiSource, /\/api\/content-factory\/guests",/);
+  assert.match(apiSource, /\/api\/content-factory\/guests\/\$\{id\}/);
+});
+
 test("permission service exposes content factory access helper", () => {
   const source = readSource("lib/permissions.ts");
 

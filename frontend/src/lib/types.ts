@@ -123,6 +123,54 @@ export type CFMetricSource =
 export type CFConfidence = "high" | "medium" | "low";
 export type CFRetroType = "weekly" | "monthly" | "bundle" | "adhoc";
 export type CFSegmentSource = "getcourse";
+export type CFGuestStoryRole =
+  | "patient"
+  | "relative"
+  | "doctor"
+  | "volunteer"
+  | "partner"
+  | "other";
+export type CFGuestStorySource =
+  | "manual"
+  | "open_call"
+  | "referral"
+  | "screening_form"
+  | "partner"
+  | "other";
+export type CFGuestStoryStatus =
+  | "sourced"
+  | "applied"
+  | "editorial_screening"
+  | "shortlisted"
+  | "producer_call_scheduled"
+  | "producer_call_done"
+  | "medical_factcheck_needed"
+  | "doctor_approved"
+  | "consent_sent"
+  | "consent_signed"
+  | "scheduled"
+  | "prep_materials_sent"
+  | "live_or_recorded"
+  | "post_production"
+  | "published"
+  | "gift_sent"
+  | "follow_up_done"
+  | "maybe_later"
+  | "rejected"
+  | "archived";
+export type CFGuestConsentStatus =
+  | "not_started"
+  | "sent"
+  | "signed"
+  | "declined"
+  | "revoked"
+  | "expired";
+export type CFGuestAnonymityLevel =
+  | "full_name"
+  | "first_name"
+  | "anonymous"
+  | "pseudonym";
+export type CFGuestGiftStatus = "not_required" | "pending" | "sent" | "received";
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   new: "Новые",
@@ -1415,6 +1463,90 @@ export interface CFRetroNoteUpdateRequest {
   notes?: string | null;
 }
 
+export interface CFGuestStory {
+  id: string;
+  display_name: string;
+  contact_ref: string | null;
+  role: CFGuestStoryRole;
+  source: CFGuestStorySource;
+  source_notes: string | null;
+  story_brief: string | null;
+  status: CFGuestStoryStatus;
+  owner_id: string;
+  stage_due_at: string | null;
+  nosology_id: string | null;
+  bundle_id: string | null;
+  publication_id: string | null;
+  screening_notes: string | null;
+  medical_factcheck_notes: string | null;
+  rejection_reason: string | null;
+  consent_status: CFGuestConsentStatus;
+  consent_version: string | null;
+  consent_signed_at: string | null;
+  allowed_channels: string[];
+  anonymity_level: CFGuestAnonymityLevel;
+  sensitive_topics: string[];
+  legal_notes: string | null;
+  gift_status: CFGuestGiftStatus;
+  follow_up_due_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFGuestStoryCreateRequest {
+  display_name: string;
+  contact_ref?: string | null;
+  role: CFGuestStoryRole;
+  source?: CFGuestStorySource;
+  source_notes?: string | null;
+  story_brief?: string | null;
+  status?: CFGuestStoryStatus;
+  owner_id: string;
+  stage_due_at?: string | null;
+  nosology_id?: string | null;
+  bundle_id?: string | null;
+  publication_id?: string | null;
+  screening_notes?: string | null;
+  medical_factcheck_notes?: string | null;
+  rejection_reason?: string | null;
+  consent_status?: CFGuestConsentStatus;
+  consent_version?: string | null;
+  consent_signed_at?: string | null;
+  allowed_channels?: string[];
+  anonymity_level?: CFGuestAnonymityLevel;
+  sensitive_topics?: string[];
+  legal_notes?: string | null;
+  gift_status?: CFGuestGiftStatus;
+  follow_up_due_at?: string | null;
+}
+
+export interface CFGuestStoryUpdateRequest {
+  display_name?: string | null;
+  contact_ref?: string | null;
+  role?: CFGuestStoryRole | null;
+  source?: CFGuestStorySource | null;
+  source_notes?: string | null;
+  story_brief?: string | null;
+  status?: CFGuestStoryStatus | null;
+  owner_id?: string | null;
+  stage_due_at?: string | null;
+  nosology_id?: string | null;
+  bundle_id?: string | null;
+  publication_id?: string | null;
+  screening_notes?: string | null;
+  medical_factcheck_notes?: string | null;
+  rejection_reason?: string | null;
+  consent_status?: CFGuestConsentStatus | null;
+  consent_version?: string | null;
+  consent_signed_at?: string | null;
+  allowed_channels?: string[] | null;
+  anonymity_level?: CFGuestAnonymityLevel | null;
+  sensitive_topics?: string[] | null;
+  legal_notes?: string | null;
+  gift_status?: CFGuestGiftStatus | null;
+  follow_up_due_at?: string | null;
+}
+
 export interface CFBundleListParams {
   product_stream?: CFProductStream;
   status?: CFBundleStatus;
@@ -1442,6 +1574,16 @@ export interface CFPublicationListParams {
 export interface CFRetroListParams {
   retro_type?: CFRetroType;
   limit?: number;
+}
+
+export interface CFGuestStoryListParams {
+  status?: CFGuestStoryStatus;
+  owner_id?: string;
+  consent_status?: CFGuestConsentStatus;
+  bundle_id?: string;
+  publication_id?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface TeamMemberUpdateRequest {

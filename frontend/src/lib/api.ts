@@ -121,6 +121,10 @@ import type {
   CFRetroNoteCreateRequest,
   CFRetroNoteUpdateRequest,
   CFRetroListParams,
+  CFGuestStory,
+  CFGuestStoryCreateRequest,
+  CFGuestStoryUpdateRequest,
+  CFGuestStoryListParams,
   // Reports
   DailyMetric,
   DailyMetricWithDelta,
@@ -951,6 +955,32 @@ class ApiClient {
     data: CFRetroNoteUpdateRequest
   ): Promise<CFRetroNote> {
     return this.request<CFRetroNote>(`/api/content-factory/retros/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getCFGuestStories(
+    params?: CFGuestStoryListParams
+  ): Promise<CFGuestStory[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFGuestStory[]>(`/api/content-factory/guests${query}`);
+  }
+
+  async createCFGuestStory(
+    data: CFGuestStoryCreateRequest
+  ): Promise<CFGuestStory> {
+    return this.request<CFGuestStory>("/api/content-factory/guests", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCFGuestStory(
+    id: string,
+    data: CFGuestStoryUpdateRequest
+  ): Promise<CFGuestStory> {
+    return this.request<CFGuestStory>(`/api/content-factory/guests/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });

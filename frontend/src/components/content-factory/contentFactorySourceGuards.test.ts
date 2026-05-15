@@ -441,3 +441,56 @@ test("effectiveness route loads outcome evidence and is linked from workspace na
   );
   assert.match(tableSource, /\/content-factory\/bundles\/\$\{row\.bundle\.id\}/);
 });
+
+test("guest story workspace exposes list create edit and navigation", () => {
+  assert.equal(sourceExists("app/content-factory/guests/page.tsx"), true);
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryGuestStoryDialog.tsx"),
+    true,
+  );
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryGuestStoryTable.tsx"),
+    true,
+  );
+
+  const routeSource = readSource("app/content-factory/guests/page.tsx");
+  const dialogSource = readSource(
+    "components/content-factory/ContentFactoryGuestStoryDialog.tsx",
+  );
+  const tableSource = readSource(
+    "components/content-factory/ContentFactoryGuestStoryTable.tsx",
+  );
+  const uiSource = readSource("lib/contentFactoryUi.ts");
+  const navSource = readSource(
+    "components/content-factory/ContentFactoryWorkspaceNav.tsx",
+  );
+  const headerSource = readSource("components/layout/Header.tsx");
+  const helpSource = readSource("app/content-factory/help/page.tsx");
+
+  assert.match(uiSource, /\/content-factory\/guests/);
+  assert.match(uiSource, /Гости и истории/);
+  assert.match(navSource, /\/content-factory\/guests/);
+  assert.match(headerSource, /\/content-factory\/guests/);
+  assert.match(headerSource, /Гости и истории/);
+  assert.match(helpSource, /гост/i);
+  assert.match(routeSource, /ContentFactoryGuestsPage/);
+  assert.match(routeSource, /api\.getCFGuestStories\(\{ limit: 500 \}\)/);
+  assert.match(routeSource, /api\.getTeam/);
+  assert.match(routeSource, /api\.getCFBundles\(\{ limit: 500 \}\)/);
+  assert.match(routeSource, /api\.getCFPublications\(\{ limit: 500 \}\)/);
+  assert.match(routeSource, /api\.getCFNosologies\(\{ only_active: false \}\)/);
+  assert.match(routeSource, /summarizeContentFactoryGuestStories/);
+  assert.match(routeSource, /filterContentFactoryGuestStories/);
+  assert.match(routeSource, /ContentFactoryGuestStoryDialog/);
+  assert.match(routeSource, /ContentFactoryGuestStoryTable/);
+  assert.match(dialogSource, /api\.createCFGuestStory/);
+  assert.match(dialogSource, /api\.updateCFGuestStory/);
+  assert.match(dialogSource, /Кто это/);
+  assert.match(dialogSource, /Согласие и границы/);
+  assert.match(tableSource, /ContentFactoryGuestStoryTable/);
+  assert.match(tableSource, /\/content-factory\/bundles\/\$\{bundle\.id\}/);
+  assert.match(
+    tableSource,
+    /\/content-factory\/publications\/\$\{publication\.id\}/,
+  );
+});

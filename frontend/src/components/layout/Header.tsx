@@ -58,6 +58,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/dashboard": { title: "Контент-фабрика", icon: Factory },
   "/content-factory/calendar": { title: "Календарь", icon: CalendarDays },
   "/content-factory/bundles": { title: "Кампании", icon: FolderKanban },
+  "/content-factory/guests": { title: "Гости и истории", icon: UserPlus },
   "/content-factory/effectiveness": { title: "Эффективность", icon: BarChart3 },
   "/content-factory/segments": { title: "Аудитории", icon: Users },
   "/content-factory/segments/analytics": {

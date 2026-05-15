@@ -23,6 +23,11 @@ export const CONTENT_FACTORY_SECTIONS: ContentFactorySection[] = [
     description: "Единые смысловые блоки, из которых рождаются публикации.",
   },
   {
+    href: "/content-factory/guests",
+    label: "Гости и истории",
+    description: "Отбор гостей, согласия, границы публичности и follow-up.",
+  },
+  {
     href: "/content-factory/review",
     label: "Очередь проверки",
     description: "Публикации, которым нужен текст, дизайн, фактчек или одобрение.",
@@ -78,6 +83,14 @@ export function getContentFactorySectionForPath(
       href: "/content-factory/bundles",
       label: "Кампания",
       description: "Рабочее пространство кампании и связанные публикации.",
+    };
+  }
+
+  if (pathname.startsWith("/content-factory/guests/")) {
+    return {
+      href: "/content-factory/guests",
+      label: "Гость или история",
+      description: "Карточка гостя, согласие, границы и следующие шаги.",
     };
   }
 
