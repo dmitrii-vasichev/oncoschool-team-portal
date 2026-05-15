@@ -47,6 +47,7 @@ const {
   getContentFactoryReferenceLabel,
   getContentFactoryRetroTitle,
   getContentFactoryReviewQueueGroups,
+  getContentFactoryReviewQueueItemSignal,
   groupPublicationsByDate,
   isContentFactoryGuestFollowUpDue,
   isContentFactoryGuestStoryActive,
@@ -54,6 +55,7 @@ const {
   summarizeContentFactoryGuestStories,
   summarizeContentFactoryCalendar,
   summarizeContentFactoryPublicationIndex,
+  summarizeContentFactoryReviewQueue,
   summarizeContentFactorySegments,
   summarizeContentFactorySegmentUsage,
   summarizeContentFactoryReferenceRecords,
@@ -1107,6 +1109,103 @@ test("getContentFactoryReviewQueueGroups groups review statuses", () => {
       ["failed", ["failed"]],
     ],
   );
+  assert.deepEqual(
+    groups.map((group) => [group.key, group.label]),
+    [
+      ["production", "Производство"],
+      ["factcheck", "Фактчек"],
+      ["doctor_review", "Проверка врача"],
+      ["approval", "Готовы к расписанию"],
+      ["scheduling", "В календаре"],
+      ["failed", "Ошибки"],
+    ],
+  );
+});
+
+test("getContentFactoryReviewQueueItemSignal describes review next actions", () => {
+  const now = new Date("2026-05-15T12:00:00Z");
+  const cases = [
+    { id: "copy", status: "needs_copy", scheduled_at: null },
+    { id: "design", status: "needs_design", scheduled_at: null },
+    { id: "fact", status: "factcheck", scheduled_at: null },
+    { id: "doctor", status: "doctor_review", scheduled_at: null },
+    { id: "approved-missing-date", status: "approved", scheduled_at: null },
+    {
+      id: "scheduled-overdue",
+      status: "scheduled",
+      scheduled_at: "2026-05-14T10:00:00Z",
+    },
+    {
+      id: "scheduled",
+      status: "scheduled",
+      scheduled_at: "2026-05-16T10:00:00Z",
+    },
+    { id: "failed", status: "failed", scheduled_at: null },
+    { id: "cancelled", status: "cancelled", scheduled_at: null },
+  ];
+
+  assert.deepEqual(
+    cases.map((publication) => {
+      const signal = getContentFactoryReviewQueueItemSignal(publication, now);
+      return [
+        publication.id,
+        signal.key,
+        signal.label,
+        signal.actionLabel,
+        signal.urgent,
+      ];
+    }),
+    [
+      ["copy", "needs_copy", "Нужен текст", "Дописать текст", false],
+      ["design", "needs_design", "Нужен дизайн", "Подготовить визуалы", false],
+      ["fact", "factcheck", "Фактчек", "Проверить факты", false],
+      ["doctor", "doctor_review", "Проверка врача", "Передать врачу", false],
+      [
+        "approved-missing-date",
+        "needs_schedule",
+        "Назначить дату",
+        "Поставить в календарь",
+        false,
+      ],
+      [
+        "scheduled-overdue",
+        "scheduled_overdue",
+        "План просрочен",
+        "Проверить выпуск",
+        true,
+      ],
+      ["scheduled", "scheduled", "В календаре", "Проверить пакет", false],
+      ["failed", "failed", "Ошибка публикации", "Разобрать ошибку", true],
+      ["cancelled", "cancelled", "Отменено", "Открыть причину", false],
+    ],
+  );
+});
+
+test("summarizeContentFactoryReviewQueue counts triage buckets", () => {
+  const summary = summarizeContentFactoryReviewQueue(
+    [
+      { status: "draft", scheduled_at: null },
+      { status: "needs_copy", scheduled_at: null },
+      { status: "factcheck", scheduled_at: null },
+      { status: "doctor_review", scheduled_at: null },
+      { status: "approved", scheduled_at: null },
+      {
+        status: "scheduled",
+        scheduled_at: "2026-05-14T10:00:00Z",
+      },
+      { status: "failed", scheduled_at: null },
+    ],
+    new Date("2026-05-15T12:00:00Z"),
+  );
+
+  assert.deepEqual(summary, {
+    total: 6,
+    production: 1,
+    medicalReview: 2,
+    scheduling: 2,
+    urgent: 2,
+    needsAction: 6,
+  });
 });
 
 test("getAvailableContentFactorySegments excludes selected segment targets", () => {

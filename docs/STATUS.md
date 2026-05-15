@@ -1,5 +1,37 @@
 # Status
 
+## Content Factory Sprint 25 Review Queue Triage
+
+- Current phase: implemented and full frontend verification passed on branch `codex/content-factory-sprint-25-review-triage`
+- Source: the review queue grouped publications by workflow status, but users still had to infer the operational meaning from raw-ish group labels and open each publication to understand the next action.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-25-review-triage-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-25-review-triage.md`
+- Scope: frontend-only review queue helper tests, source guards, Russian queue labels, triage signals, summary cards, row-level `Сейчас нужно` guidance, and frontend verification
+- Latest progress:
+  - Confirmed branch `codex/content-factory-sprint-25-review-triage` was active.
+  - Wrote Sprint 25 design and implementation plan.
+  - Added failing helper tests for review queue Russian labels, item signals, and summary counts.
+  - Added failing source guards for review route summary wiring, item-signal wiring, `Сейчас нужно`, `Срочно`, `Открыть`, and raw English label regressions.
+  - Added `getContentFactoryReviewQueueItemSignal` and `summarizeContentFactoryReviewQueue`.
+  - Updated `/content-factory/review` with summary cards, triage pills, row-level next-action guidance, and explicit `Открыть` affordances.
+  - Focused frontend test command passed after implementation: 82 tests, with existing Node module-type warnings.
+  - Full frontend verification passed after implementation.
+- Key decisions:
+  - Keep Sprint 25 frontend-only and derive triage from existing publication fields.
+  - Treat the review queue as an operational worklist, not as an editing surface.
+  - Keep backend transitions, approval automation, notifications, automatic publishing, and platform integrations out of scope.
+- Next actions:
+  - Merge and push Sprint 25.
+  - Run authenticated manual QA against real review queue records when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 82 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 173 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/review`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 24 Calendar Operations
 
 - Current phase: implemented, verified, merged to `main`, and pushed

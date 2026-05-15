@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 25 Review Queue Triage
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/review`.
+2. Confirm the summary strip shows `В очереди`, `Производство`, `Фактчек и врач`, `Расписание`, and `Срочно`.
+3. Confirm the queue sections use Russian labels such as `Фактчек`, `Готовы к расписанию`, `В календаре`, and `Ошибки`.
+4. Confirm each row shows the existing publication status and a readable triage badge.
+5. Confirm each row shows `Сейчас нужно` with a concrete next action and explanatory sentence.
+6. Confirm failed publications appear as urgent with `Ошибка публикации`.
+7. Confirm scheduled publications with a past planned date appear as `План просрочен`.
+8. Confirm approved publications without a date show `Назначить дату`.
+9. Confirm clicking a row or its `Открыть` affordance opens the publication detail page.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 24 Calendar Operations
 
 ### Automated

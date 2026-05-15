@@ -353,10 +353,21 @@ test("metric capture surfaces use readable labels and presets", () => {
 
 test("review queue route groups publications by workflow status", () => {
   const source = readSource("app/content-factory/review/page.tsx");
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
 
   assert.match(source, /api\.getCFPublications/);
   assert.match(source, /getContentFactoryReviewQueueGroups/);
+  assert.match(source, /getContentFactoryReviewQueueItemSignal/);
+  assert.match(source, /summarizeContentFactoryReviewQueue/);
+  assert.match(source, /Сейчас нужно/);
+  assert.match(source, /Срочно/);
+  assert.match(source, /Открыть/);
   assert.match(source, /\/content-factory\/publications\/\$\{publication\.id\}/);
+  assert.match(utilsSource, /ContentFactoryReviewQueueItemSignal/);
+  assert.match(utilsSource, /summarizeContentFactoryReviewQueue/);
+  assert.doesNotMatch(utilsSource, /label:\s*"Approval"/);
+  assert.doesNotMatch(utilsSource, /label:\s*"Scheduling"/);
+  assert.doesNotMatch(utilsSource, /label:\s*"Failed"/);
 });
 
 test("retro dialog exposes create and update fields", () => {

@@ -1,3 +1,67 @@
+# Active Plan: Content Factory Sprint 25 Review Queue Triage
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-25-review-triage.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Make `/content-factory/review` an operational triage screen with readable queue labels, summary counts, and row-level next actions.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-25-review-triage-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-25-review-triage.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add helper tests and source guards for review queue triage.
+2. Localize all review queue group labels.
+3. Add `getContentFactoryReviewQueueItemSignal`.
+4. Add `summarizeContentFactoryReviewQueue`.
+5. Render summary cards on `/content-factory/review`.
+6. Render row-level signal badges, `Сейчас нужно` guidance, and clear detail affordances.
+7. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented and full frontend verification passed on branch `codex/content-factory-sprint-25-review-triage`.
+- Sprint 1 through Sprint 24 work is merged to `main`.
+- Sprint 25 builds on publication readiness, publish packages, and calendar operations by turning the review queue into an actionable worklist.
+
+**Definition of done:**
+
+- `/content-factory/review` shows summary cards for `В очереди`, `Производство`, `Фактчек и врач`, `Расписание`, and `Срочно`.
+- Review queue group labels are Russian and do not expose raw English workflow labels.
+- Each publication row shows a readable triage state such as `Нужен текст`, `Фактчек`, `Проверка врача`, `Назначить дату`, `План просрочен`, or `Ошибка публикации`.
+- Each row shows `Сейчас нужно`, a next-action label, explanatory copy, and an `Открыть` affordance to the publication detail page.
+- Summary counts are derived from the currently loaded publication list.
+- No backend schema, endpoint, automatic approval, automatic publishing, notification, or platform integration is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 82 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 173 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/review`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 24 Calendar Operations
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-24-calendar-ops.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

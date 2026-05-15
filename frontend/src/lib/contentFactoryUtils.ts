@@ -383,6 +383,45 @@ export type ContentFactoryReviewQueueGroup<TPublication> = {
   publications: TPublication[];
 };
 
+export type ContentFactoryReviewQueueSignalTone =
+  | "warning"
+  | "info"
+  | "success"
+  | "critical"
+  | "muted";
+
+export type ContentFactoryReviewQueueSignalKey =
+  | "needs_copy"
+  | "needs_design"
+  | "factcheck"
+  | "doctor_review"
+  | "needs_schedule"
+  | "approved"
+  | "scheduled_overdue"
+  | "scheduled"
+  | "failed"
+  | "cancelled"
+  | "open";
+
+export type ContentFactoryReviewQueueItemSignal = {
+  key: ContentFactoryReviewQueueSignalKey;
+  label: string;
+  actionLabel: string;
+  description: string;
+  tone: ContentFactoryReviewQueueSignalTone;
+  urgent: boolean;
+  needsAction: boolean;
+};
+
+export type ContentFactoryReviewQueueSummary = {
+  total: number;
+  production: number;
+  medicalReview: number;
+  scheduling: number;
+  urgent: number;
+  needsAction: number;
+};
+
 export type ContentFactoryRetroSectionSummary = {
   bestByObjective: number;
   broken: number;
@@ -2776,13 +2815,23 @@ const REVIEW_QUEUE_META: Array<{
   statuses: CFPublicationStatus[];
 }> = [
   { key: "production", label: "Производство", statuses: ["needs_copy", "needs_design"] },
-  { key: "factcheck", label: "Factcheck", statuses: ["factcheck"] },
+  { key: "factcheck", label: "Фактчек", statuses: ["factcheck"] },
   { key: "doctor_review", label: "Проверка врача", statuses: ["doctor_review"] },
-  { key: "approval", label: "Approval", statuses: ["approved"] },
-  { key: "scheduling", label: "Scheduling", statuses: ["scheduled"] },
-  { key: "failed", label: "Failed", statuses: ["failed"] },
-  { key: "cancelled", label: "Cancelled", statuses: ["cancelled"] },
+  { key: "approval", label: "Готовы к расписанию", statuses: ["approved"] },
+  { key: "scheduling", label: "В календаре", statuses: ["scheduled"] },
+  { key: "failed", label: "Ошибки", statuses: ["failed"] },
+  { key: "cancelled", label: "Отменены", statuses: ["cancelled"] },
 ];
+
+function getContentFactoryReviewQueueKey(
+  status: CFPublicationStatus | string,
+): ContentFactoryReviewQueueKey | null {
+  return (
+    REVIEW_QUEUE_META.find((queue) =>
+      queue.statuses.includes(status as CFPublicationStatus),
+    )?.key ?? null
+  );
+}
 
 export function getContentFactoryReviewQueueGroups<
   TPublication extends PublicationStatusLike,
@@ -2800,6 +2849,166 @@ export function getContentFactoryReviewQueueGroups<
           (dateTime(b.scheduled_at) ?? Number.MAX_SAFE_INTEGER),
       ),
   })).filter((queue) => queue.publications.length > 0);
+}
+
+export function getContentFactoryReviewQueueItemSignal<
+  TPublication extends PublicationStatusLike,
+>(
+  publication: TPublication,
+  now: Date = new Date(),
+): ContentFactoryReviewQueueItemSignal {
+  const nowTime = now.getTime();
+  const scheduledTime = dateTime(publication.scheduled_at);
+
+  switch (publication.status) {
+    case "needs_copy":
+      return {
+        key: "needs_copy",
+        label: "Нужен текст",
+        actionLabel: "Дописать текст",
+        description: "Заполните или доработайте текст публикации.",
+        tone: "warning",
+        urgent: false,
+        needsAction: true,
+      };
+    case "needs_design":
+      return {
+        key: "needs_design",
+        label: "Нужен дизайн",
+        actionLabel: "Подготовить визуалы",
+        description: "Подготовьте визуалы или материалы к публикации.",
+        tone: "warning",
+        urgent: false,
+        needsAction: true,
+      };
+    case "factcheck":
+      return {
+        key: "factcheck",
+        label: "Фактчек",
+        actionLabel: "Проверить факты",
+        description: "Проверьте цифры, источники и чувствительные формулировки.",
+        tone: "info",
+        urgent: false,
+        needsAction: true,
+      };
+    case "doctor_review":
+      return {
+        key: "doctor_review",
+        label: "Проверка врача",
+        actionLabel: "Передать врачу",
+        description: "Нужно медицинское согласование перед выходом.",
+        tone: "info",
+        urgent: false,
+        needsAction: true,
+      };
+    case "approved":
+      if (scheduledTime === null) {
+        return {
+          key: "needs_schedule",
+          label: "Назначить дату",
+          actionLabel: "Поставить в календарь",
+          description: "Публикация одобрена, но дата выхода еще не задана.",
+          tone: "warning",
+          urgent: false,
+          needsAction: true,
+        };
+      }
+      return {
+        key: "approved",
+        label: "Одобрено",
+        actionLabel: "Проверить пакет",
+        description: "Проверьте текст, UTM и материалы перед расписанием.",
+        tone: "success",
+        urgent: false,
+        needsAction: false,
+      };
+    case "scheduled":
+      if (scheduledTime !== null && scheduledTime < nowTime) {
+        return {
+          key: "scheduled_overdue",
+          label: "План просрочен",
+          actionLabel: "Проверить выпуск",
+          description: "Плановая дата уже прошла: подтвердите публикацию или перенесите.",
+          tone: "critical",
+          urgent: true,
+          needsAction: true,
+        };
+      }
+      return {
+        key: "scheduled",
+        label: "В календаре",
+        actionLabel: "Проверить пакет",
+        description: "Публикация запланирована, проверьте готовность пакета.",
+        tone: "success",
+        urgent: false,
+        needsAction: false,
+      };
+    case "failed":
+      return {
+        key: "failed",
+        label: "Ошибка публикации",
+        actionLabel: "Разобрать ошибку",
+        description: "Нужно понять причину сбоя и вернуть публикацию в работу.",
+        tone: "critical",
+        urgent: true,
+        needsAction: true,
+      };
+    case "cancelled":
+      return {
+        key: "cancelled",
+        label: "Отменено",
+        actionLabel: "Открыть причину",
+        description: "Проверьте контекст отмены, если публикацию нужно вернуть в план.",
+        tone: "muted",
+        urgent: false,
+        needsAction: true,
+      };
+    default:
+      return {
+        key: "open",
+        label: "Открыть карточку",
+        actionLabel: "Открыть карточку",
+        description: "Откройте публикацию и проверьте текущий статус.",
+        tone: "muted",
+        urgent: false,
+        needsAction: true,
+      };
+  }
+}
+
+export function summarizeContentFactoryReviewQueue<
+  TPublication extends PublicationStatusLike,
+>(
+  publications: TPublication[],
+  now: Date = new Date(),
+): ContentFactoryReviewQueueSummary {
+  const summary: ContentFactoryReviewQueueSummary = {
+    total: 0,
+    production: 0,
+    medicalReview: 0,
+    scheduling: 0,
+    urgent: 0,
+    needsAction: 0,
+  };
+
+  for (const publication of publications) {
+    const queueKey = getContentFactoryReviewQueueKey(publication.status);
+    if (queueKey === null) continue;
+
+    const signal = getContentFactoryReviewQueueItemSignal(publication, now);
+    summary.total += 1;
+    if (queueKey === "production") summary.production += 1;
+    if (queueKey === "factcheck" || queueKey === "doctor_review") {
+      summary.medicalReview += 1;
+    }
+    if (queueKey === "approval" || queueKey === "scheduling") {
+      summary.scheduling += 1;
+    }
+    if (signal.urgent) summary.urgent += 1;
+    if (signal.needsAction) summary.needsAction += 1;
+  }
+
+  return summary;
 }
 
 export function summarizeContentFactoryDashboard<
