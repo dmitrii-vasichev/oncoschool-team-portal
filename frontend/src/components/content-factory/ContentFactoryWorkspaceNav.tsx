@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Factory,
+  FileText,
   FolderKanban,
   History,
   ListChecks,
@@ -27,6 +28,7 @@ import { cn } from "@/lib/utils";
 const ICONS: Record<string, React.ElementType> = {
   "/content-factory/dashboard": Factory,
   "/content-factory/calendar": CalendarDays,
+  "/content-factory/publications": FileText,
   "/content-factory/bundles": FolderKanban,
   "/content-factory/guests": UserRoundPlus,
   "/content-factory/review": ListChecks,

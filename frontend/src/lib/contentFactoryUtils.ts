@@ -245,6 +245,33 @@ export type ContentFactoryPublicationFilters = {
   responsible_id?: string | null;
 };
 
+type PublicationIndexLike = ContentFactoryPublicationFilters & {
+  id: string;
+  title?: string | null;
+  body_text?: string | null;
+  status: CFPublicationStatus | string;
+  scheduled_at?: string | null;
+  actual_published_at?: string | null;
+  platform_post_url?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+};
+
+export type ContentFactoryPublicationIndexLookup = {
+  bundleNames?: Map<string, string>;
+  platformNames?: Map<string, string>;
+  formatNames?: Map<string, string>;
+  responsibleNames?: Map<string, string>;
+};
+
+export type ContentFactoryPublicationIndexSummary = {
+  total: number;
+  inProduction: number;
+  scheduled: number;
+  published: number;
+  publishedWithoutPostUrl: number;
+};
+
 export type ContentFactoryUtmInput = {
   bundleId: string;
   publicationId: string;
@@ -1538,6 +1565,93 @@ export function matchesContentFactoryPublicationFilters<
     return false;
   }
   return true;
+}
+
+function publicationIndexSearchText(
+  publication: PublicationIndexLike,
+  lookup: ContentFactoryPublicationIndexLookup,
+): string {
+  const statusLabel =
+    CF_PUBLICATION_STATUS_LABELS[publication.status as CFPublicationStatus] ??
+    publication.status;
+  return [
+    publication.id,
+    publication.title,
+    publication.body_text,
+    publication.status,
+    statusLabel,
+    publication.bundle_id,
+    publication.platform_id,
+    publication.format_id,
+    publication.responsible_id,
+    publication.bundle_id ? lookup.bundleNames?.get(publication.bundle_id) : null,
+    publication.platform_id
+      ? lookup.platformNames?.get(publication.platform_id)
+      : null,
+    publication.format_id ? lookup.formatNames?.get(publication.format_id) : null,
+    publication.responsible_id
+      ? lookup.responsibleNames?.get(publication.responsible_id)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+export function filterContentFactoryPublicationIndex<
+  T extends PublicationIndexLike,
+>(
+  publications: T[],
+  filters: ContentFactoryPublicationFilters,
+  search: string | null | undefined,
+  lookup: ContentFactoryPublicationIndexLookup = {},
+): T[] {
+  const filtered = filterContentFactoryPublications(publications, filters);
+  const query = search?.trim().toLowerCase();
+  if (!query) return filtered;
+  return filtered.filter((publication) =>
+    publicationIndexSearchText(publication, lookup).includes(query),
+  );
+}
+
+function publicationIndexTime(publication: PublicationIndexLike): number {
+  return Math.max(
+    dateTime(publication.scheduled_at) ?? 0,
+    dateTime(publication.actual_published_at) ?? 0,
+    dateTime(publication.updated_at) ?? 0,
+    dateTime(publication.created_at) ?? 0,
+  );
+}
+
+export function sortContentFactoryPublicationsForIndex<
+  T extends PublicationIndexLike,
+>(publications: T[]): T[] {
+  return [...publications].sort(
+    (left, right) =>
+      publicationIndexTime(right) - publicationIndexTime(left) ||
+      (left.title ?? left.id).localeCompare(right.title ?? right.id, "ru"),
+  );
+}
+
+export function summarizeContentFactoryPublicationIndex<
+  T extends PublicationIndexLike,
+>(publications: T[]): ContentFactoryPublicationIndexSummary {
+  return {
+    total: publications.length,
+    inProduction: publications.filter(
+      (publication) =>
+        publication.status !== "published" && publication.status !== "cancelled",
+    ).length,
+    scheduled: publications.filter((publication) => publication.status === "scheduled")
+      .length,
+    published: publications.filter((publication) => publication.status === "published")
+      .length,
+    publishedWithoutPostUrl: publications.filter(
+      (publication) =>
+        publication.status === "published" &&
+        !publication.platform_post_url?.trim(),
+    ).length,
+  };
 }
 
 export function buildContentFactoryBundleParams(

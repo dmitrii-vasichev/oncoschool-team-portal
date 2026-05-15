@@ -4,6 +4,7 @@
 
 ### Next
 
+- Run authenticated manual QA for the Sprint 19 publications index against real publication records.
 - Run authenticated manual QA for the Sprint 15 guest story attention queue against real guest story records.
 - Run authenticated manual QA for the Sprint 16 threaded activity workflow against real guest story records.
 - Run authenticated manual QA for the Sprint 17 guest stage timeline against real guest story records.

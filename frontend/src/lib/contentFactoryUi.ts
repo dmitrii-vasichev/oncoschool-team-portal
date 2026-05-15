@@ -18,6 +18,11 @@ export const CONTENT_FACTORY_SECTIONS: ContentFactorySection[] = [
     description: "План публикаций по датам и каналам.",
   },
   {
+    href: "/content-factory/publications",
+    label: "Публикации",
+    description: "Все посты, письма и материалы в одном рабочем списке.",
+  },
+  {
     href: "/content-factory/bundles",
     label: "Кампании",
     description: "Единые смысловые блоки, из которых рождаются публикации.",

@@ -23,6 +23,7 @@ const {
   compareContentFactorySegmentSnapshots,
   filterContentFactoryEffectivenessRows,
   filterContentFactoryGuestStories,
+  filterContentFactoryPublicationIndex,
   filterContentFactorySegmentUsageRows,
   filterContentFactoryPublications,
   filterContentFactorySegments,
@@ -44,11 +45,13 @@ const {
   isContentFactoryGuestStoryActive,
   summarizeContentFactoryEffectiveness,
   summarizeContentFactoryGuestStories,
+  summarizeContentFactoryPublicationIndex,
   summarizeContentFactorySegments,
   summarizeContentFactorySegmentUsage,
   summarizeContentFactoryReferenceRecords,
   summarizeContentFactoryRetroSections,
   summarizeContentFactoryDashboard,
+  sortContentFactoryPublicationsForIndex,
   sortContentFactoryGuestStoriesByAttention,
 } = contentFactoryUtils;
 
@@ -500,6 +503,102 @@ test("filterContentFactoryPublications applies calendar filters together", () =>
   assert.deepEqual(
     result.map((publication) => publication.id),
     ["keep"],
+  );
+});
+
+test("publication index helpers summarize search and sort rows", () => {
+  assert.equal(typeof summarizeContentFactoryPublicationIndex, "function");
+  assert.equal(typeof filterContentFactoryPublicationIndex, "function");
+  assert.equal(typeof sortContentFactoryPublicationsForIndex, "function");
+
+  const publications = [
+    {
+      id: "published-without-url",
+      bundle_id: "bundle-webinar",
+      platform_id: "telegram",
+      format_id: "post",
+      responsible_id: "member-1",
+      title: "Reminder",
+      body_text: "Registration closes tomorrow",
+      status: "published",
+      scheduled_at: "2026-05-14T10:00:00Z",
+      actual_published_at: "2026-05-14T11:00:00Z",
+      platform_post_url: null,
+      updated_at: "2026-05-14T11:05:00Z",
+      created_at: "2026-05-13T10:00:00Z",
+    },
+    {
+      id: "scheduled-vk",
+      bundle_id: "bundle-story",
+      platform_id: "vk",
+      format_id: "story",
+      responsible_id: "member-2",
+      title: "Patient story",
+      body_text: "Warm trust content",
+      status: "scheduled",
+      scheduled_at: "2026-05-20T10:00:00Z",
+      actual_published_at: null,
+      platform_post_url: null,
+      updated_at: "2026-05-13T12:00:00Z",
+      created_at: "2026-05-12T10:00:00Z",
+    },
+    {
+      id: "draft-email",
+      bundle_id: "bundle-webinar",
+      platform_id: "email",
+      format_id: "letter",
+      responsible_id: "member-1",
+      title: "Draft letter",
+      body_text: null,
+      status: "needs_copy",
+      scheduled_at: null,
+      actual_published_at: null,
+      platform_post_url: null,
+      updated_at: "2026-05-10T12:00:00Z",
+      created_at: "2026-05-10T10:00:00Z",
+    },
+  ];
+
+  assert.deepEqual(summarizeContentFactoryPublicationIndex(publications), {
+    total: 3,
+    inProduction: 2,
+    scheduled: 1,
+    published: 1,
+    publishedWithoutPostUrl: 1,
+  });
+
+  assert.deepEqual(
+    filterContentFactoryPublicationIndex(
+      publications,
+      { platform_id: "vk" },
+      "trust",
+      {
+        bundleNames: new Map([
+          ["bundle-story", "Patient stories"],
+          ["bundle-webinar", "May webinar"],
+        ]),
+        platformNames: new Map([
+          ["vk", "VK"],
+          ["telegram", "Telegram"],
+        ]),
+        formatNames: new Map([
+          ["story", "История"],
+          ["post", "Пост"],
+        ]),
+        responsibleNames: new Map([
+          ["member-1", "Мария"],
+          ["member-2", "Олег"],
+        ]),
+      },
+    ).map((publication) => publication.id),
+    ["scheduled-vk"],
+  );
+
+  assert.deepEqual(
+    sortContentFactoryPublicationsForIndex(publications).map(
+      (publication) => publication.id,
+    ),
+    ["scheduled-vk", "published-without-url", "draft-email"],
   );
 });
 

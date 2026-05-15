@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 19 Publications Index
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/publications`.
+2. Confirm `Публикации` appears in the horizontal Content Factory navigation.
+3. Confirm the page loads all publications and shows summary counts.
+4. Search by publication title or body text and confirm the list narrows.
+5. Search by campaign, platform, format, responsible person, or status label and confirm matching rows remain.
+6. Apply status, platform, format, responsible, and campaign filters together.
+7. Confirm every row shows campaign, channel/format, responsible person, planned date, actual date, and link state.
+8. Click a row and confirm the publication detail page opens.
+9. Confirm the header breadcrumb for a publication detail page goes through `Публикации`.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Telegram Overdue Task Report Readability
 
 ### Automated

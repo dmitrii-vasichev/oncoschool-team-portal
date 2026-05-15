@@ -32,6 +32,7 @@ test("header knows content factory workspace routes", () => {
 
   assert.match(source, /Контент-фабрика/);
   assert.match(source, /Календарь/);
+  assert.match(source, /Публикации/);
   assert.match(source, /Кампании/);
   assert.match(source, /Публикация/);
   assert.match(source, /Очередь проверки/);
@@ -69,6 +70,7 @@ test("content factory internal navigation exposes Russian sections", () => {
   assert.match(uiSource, /Контент-фабрика/);
   assert.match(uiSource, /Обзор/);
   assert.match(uiSource, /Календарь/);
+  assert.match(uiSource, /Публикации/);
   assert.match(uiSource, /Кампании/);
   assert.match(uiSource, /Очередь проверки/);
   assert.match(uiSource, /Аудитории/);
@@ -132,6 +134,10 @@ test("dashboard and calendar routes exist", () => {
     readSource("app/content-factory/calendar/page.tsx"),
     /ContentFactoryCalendarPage/,
   );
+  assert.match(
+    readSource("app/content-factory/publications/page.tsx"),
+    /ContentFactoryPublicationsPage/,
+  );
 });
 
 test("bundle and publication workspace routes exist", () => {
@@ -180,6 +186,26 @@ test("calendar route uses content factory filters and date grouping", () => {
   assert.match(source, /ContentFactoryFilters/);
   assert.match(source, /ContentFactoryStatusBadge/);
   assert.match(source, /href="\/content-factory\/dashboard"/);
+});
+
+test("publications route lists all publications with search filters and detail links", () => {
+  const source = readSource("app/content-factory/publications/page.tsx");
+  const uiSource = readSource("lib/contentFactoryUi.ts");
+  const navSource = readSource(
+    "components/content-factory/ContentFactoryWorkspaceNav.tsx",
+  );
+
+  assert.match(uiSource, /href:\s*"\/content-factory\/publications"/);
+  assert.match(navSource, /"\/content-factory\/publications"/);
+  assert.match(source, /ContentFactoryPublicationsPage/);
+  assert.match(source, /api\.getCFPublications/);
+  assert.match(source, /ContentFactoryFilters/);
+  assert.match(source, /filterContentFactoryPublicationIndex/);
+  assert.match(source, /sortContentFactoryPublicationsForIndex/);
+  assert.match(source, /summarizeContentFactoryPublicationIndex/);
+  assert.match(source, /href=\{`\/content-factory\/publications\/\$\{publication\.id\}`\}/);
+  assert.match(source, /Публикации/);
+  assert.match(source, /Поиск/);
 });
 
 test("workspace routes use bundle and publication APIs", () => {

@@ -57,6 +57,7 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content/telegram-analysis": { title: "Telegram-анализ", icon: Search },
   "/content-factory/dashboard": { title: "Контент-фабрика", icon: Factory },
   "/content-factory/calendar": { title: "Календарь", icon: CalendarDays },
+  "/content-factory/publications": { title: "Публикации", icon: FileText },
   "/content-factory/bundles": { title: "Кампании", icon: FolderKanban },
   "/content-factory/guests": { title: "Гости и истории", icon: UserPlus },
   "/content-factory/effectiveness": { title: "Эффективность", icon: BarChart3 },
@@ -69,11 +70,6 @@ const PAGE_META: Record<string, PageMeta> = {
   "/content-factory/retros": { title: "Ретроспективы", icon: History },
   "/content-factory/references": { title: "Справочники", icon: Settings2 },
   "/content-factory/help": { title: "Справка", icon: FileText },
-  "/content-factory/publications": {
-    title: "Публикация",
-    icon: FileText,
-    parent: "/content-factory/bundles",
-  },
   "/team": { title: "Команда", icon: Users },
   "/broadcasts": { title: "Рассылки", icon: Megaphone },
   "/settings": { title: "Настройки", icon: Settings },
@@ -106,13 +102,13 @@ function getPageMeta(
   }
 
   if (pathname.startsWith("/content-factory/publications/")) {
-    const parentMeta = PAGE_META["/content-factory/bundles"];
+    const parentMeta = PAGE_META["/content-factory/publications"];
     return {
       ...PAGE_META["/content-factory/publications"],
       title: pageTitle || "Публикация",
-      parent: "/content-factory/bundles",
+      parent: "/content-factory/publications",
       crumbs: [
-        { label: parentMeta.title, href: "/content-factory/bundles" },
+        { label: parentMeta.title, href: "/content-factory/publications" },
         { label: pageTitle || "Публикация" },
       ],
     };
