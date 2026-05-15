@@ -84,7 +84,7 @@ test("content factory API client exposes Sprint 7 reference admin endpoints", ()
   assert.match(source, /\/api\/content-factory\/funnel-templates\/\$\{id\}/);
 });
 
-test("content factory API client exposes Sprint 12 guest story endpoints", () => {
+test("content factory API client exposes guest story endpoints", () => {
   const typesSource = readSource("lib/types.ts");
   const apiSource = readSource("lib/api.ts");
 
@@ -93,6 +93,7 @@ test("content factory API client exposes Sprint 12 guest story endpoints", () =>
   assert.match(typesSource, /export interface CFGuestStoryUpdateRequest/);
   assert.match(typesSource, /export interface CFGuestStoryListParams/);
   assert.match(apiSource, /async getCFGuestStories/);
+  assert.match(apiSource, /async getCFGuestStory/);
   assert.match(apiSource, /async createCFGuestStory/);
   assert.match(apiSource, /async updateCFGuestStory/);
   assert.match(apiSource, /\/api\/content-factory\/guests\$\{query\}/);

@@ -117,7 +117,12 @@ export function ContentFactoryGuestStoryTable({
 
                 <div className="min-w-0">
                   <h2 className="truncate text-sm font-semibold text-foreground">
-                    {story.display_name}
+                    <Link
+                      href={`/content-factory/guests/${story.id}`}
+                      className="hover:text-primary hover:underline"
+                    >
+                      {story.display_name}
+                    </Link>
                   </h2>
                   <p className="mt-1 line-clamp-2 text-sm leading-6 text-muted-foreground">
                     {story.story_brief || "Короткое описание пока не заполнено."}

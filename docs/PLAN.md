@@ -24,7 +24,7 @@
 
 **Implementation status:**
 
-- Planning started on branch `codex/content-factory-sprint-13-guest-detail`.
+- Implemented and verified on branch `codex/content-factory-sprint-13-guest-detail`.
 - Sprint 1 through Sprint 12 work is merged to `main`.
 - Sprint 13 builds on the Sprint 11 single-story backend endpoint and Sprint 12 guest story list/create/edit workspace.
 
@@ -51,7 +51,13 @@ git diff --check
 
 **Latest verification result:**
 
-- Not yet run for Sprint 13 implementation.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 69 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 153 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+- Local dev server smoke on `http://127.0.0.1:3014/content-factory/guests/00000000-0000-0000-0000-000000000000` returned HTTP 200 and compiled the dynamic route.
+- `git diff --check` passed.
 
 ---
 

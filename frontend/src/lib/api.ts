@@ -967,6 +967,10 @@ class ApiClient {
     return this.request<CFGuestStory[]>(`/api/content-factory/guests${query}`);
   }
 
+  async getCFGuestStory(id: string): Promise<CFGuestStory> {
+    return this.request<CFGuestStory>(`/api/content-factory/guests/${id}`);
+  }
+
   async createCFGuestStory(
     data: CFGuestStoryCreateRequest
   ): Promise<CFGuestStory> {

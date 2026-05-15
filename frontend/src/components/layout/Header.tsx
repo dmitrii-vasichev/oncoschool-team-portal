@@ -118,6 +118,19 @@ function getPageMeta(
     };
   }
 
+  if (pathname.startsWith("/content-factory/guests/")) {
+    const parentMeta = PAGE_META["/content-factory/guests"];
+    return {
+      ...parentMeta,
+      title: pageTitle || "История",
+      parent: "/content-factory/guests",
+      crumbs: [
+        { label: parentMeta.title, href: "/content-factory/guests" },
+        { label: pageTitle || "История" },
+      ],
+    };
+  }
+
   if (pathname.startsWith("/content-factory/retros/")) {
     const parentMeta = PAGE_META["/content-factory/retros"];
     return {

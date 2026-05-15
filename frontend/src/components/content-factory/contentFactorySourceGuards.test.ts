@@ -494,3 +494,40 @@ test("guest story workspace exposes list create edit and navigation", () => {
     /\/content-factory\/publications\/\$\{publication\.id\}/,
   );
 });
+
+test("guest story detail route exposes readable story context", () => {
+  assert.equal(sourceExists("app/content-factory/guests/[id]/page.tsx"), true);
+  assert.equal(
+    sourceExists(
+      "components/content-factory/ContentFactoryGuestStoryDetailPanels.tsx",
+    ),
+    true,
+  );
+
+  const routeSource = readSource("app/content-factory/guests/[id]/page.tsx");
+  const panelSource = readSource(
+    "components/content-factory/ContentFactoryGuestStoryDetailPanels.tsx",
+  );
+  const tableSource = readSource(
+    "components/content-factory/ContentFactoryGuestStoryTable.tsx",
+  );
+
+  assert.match(tableSource, /\/content-factory\/guests\/\$\{story\.id\}/);
+  assert.match(routeSource, /ContentFactoryGuestDetailPage/);
+  assert.match(routeSource, /api\.getCFGuestStory\(id\)/);
+  assert.match(routeSource, /api\.getTeam/);
+  assert.match(routeSource, /api\.getCFBundles\(\{ limit: 500 \}\)/);
+  assert.match(routeSource, /api\.getCFPublications\(\{ limit: 500 \}\)/);
+  assert.match(routeSource, /api\.getCFNosologies\(\{ only_active: false \}\)/);
+  assert.match(routeSource, /ContentFactoryGuestStoryDetailPanels/);
+  assert.match(routeSource, /ContentFactoryGuestStoryDialog/);
+  assert.match(routeSource, /setPageTitle/);
+  assert.match(panelSource, /История/);
+  assert.match(panelSource, /Согласие и границы/);
+  assert.match(panelSource, /Связи/);
+  assert.match(panelSource, /\/content-factory\/bundles\/\$\{bundle\.id\}/);
+  assert.match(
+    panelSource,
+    /\/content-factory\/publications\/\$\{publication\.id\}/,
+  );
+});

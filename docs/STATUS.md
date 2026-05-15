@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 13 Guest Detail
 
-- Current phase: planning started on branch `codex/content-factory-sprint-13-guest-detail`
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-13-guest-detail`
 - Source: user approval to continue development after Sprint 12, preserved Content Factory research, restored Content Factory design doc, and Sprint 12 guest story workspace
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-13-guest-detail-design.md`
@@ -15,17 +15,30 @@
   - Confirmed the backend already exposes `GET /api/content-factory/guests/{id}`.
   - Wrote Sprint 13 design and implementation plan.
   - Made Sprint 13 the active repository plan.
+  - Added `api.getCFGuestStory(id)`.
+  - Linked guest story titles from the list to `/content-factory/guests/{id}`.
+  - Added `ContentFactoryGuestStoryDetailPanels` for pipeline, story notes, consent, boundaries, linked records, gift, and follow-up context.
+  - Added `/content-factory/guests/[id]` with loading, not-found, refresh, edit, and page-title behavior.
+  - Added Content Factory header breadcrumb handling for guest detail routes.
+  - Added API and UI source guards for the detail route.
+  - Ran Sprint 13 frontend verification successfully.
 - Key decisions:
   - Keep Sprint 13 frontend-only and reuse the Sprint 11 backend endpoint.
   - Build a detail page before adding history, comments, uploads, reminders, or imports.
   - Reuse the Sprint 12 edit dialog from the detail page.
   - Render friendly Russian fallbacks for missing optional fields.
 - Next actions:
-  - Write failing API and UI source guards.
-  - Add `api.getCFGuestStory`, list links, detail panels, and detail route.
-  - Run frontend verification and update docs with results.
+  - Commit Sprint 13 implementation.
+  - Merge and push after final whitespace/status checks.
+  - Run authenticated manual QA against real guest story records when useful.
 - Latest verification:
-  - Not yet run for Sprint 13 implementation.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 69 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 153 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+  - Local dev server smoke on `http://127.0.0.1:3014/content-factory/guests/00000000-0000-0000-0000-000000000000` returned HTTP 200 and compiled the dynamic route.
+  - `git diff --check` passed.
 
 ## Content Factory Sprint 12 Guest Workspace
 
