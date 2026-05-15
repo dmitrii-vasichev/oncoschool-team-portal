@@ -1,5 +1,27 @@
 # Test Plan
 
+## Content Factory Sprint 35 Variant Handoff
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page with saved current Telegram and Email adaptations.
+2. Confirm `Готовность адаптаций` shows the `Скопировать готовые` action.
+3. Click `Скопировать готовые` and paste into a scratch note.
+4. Confirm the package includes publication title, version, Telegram, Email, notes, and UTM.
+5. Confirm missing and stale channels are listed as skipped.
+6. Edit the source publication so saved variants become stale.
+7. Confirm `Скопировать готовые` disables when no current saved variants remain.
+8. Confirm single-channel copy, save, reset, and channel switching still work.
+
 ## Content Factory Sprint 34 Variant Coverage
 
 ### Automated

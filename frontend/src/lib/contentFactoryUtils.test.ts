@@ -21,6 +21,7 @@ const {
   buildContentFactoryEffectivenessRows,
   buildContentFactoryGuestStageTimeline,
   buildContentFactoryPublishPackage,
+  buildContentFactoryPublicationVariantHandoff,
   buildContentFactoryPublicationVariants,
   buildContentFactorySegmentUsageRows,
   buildContentFactoryUtm,
@@ -1582,6 +1583,108 @@ test("publication variant coverage asks for the first adaptation when nothing is
   assert.equal(coverage.missingCount, 6);
   assert.equal(coverage.staleCount, 0);
   assert.equal(coverage.nextAction, "Сохраните первую адаптацию");
+});
+
+test("publication variant handoff copies only ready saved adaptations", () => {
+  const handoff = buildContentFactoryPublicationVariantHandoff({
+    publication: {
+      title: "Вебинар по РМЖ",
+      version_number: 5,
+      utm: {
+        utm_source: "telegram",
+        utm_medium: "post",
+      },
+    },
+    savedVariants: [
+      {
+        channel: "email",
+        title: "Email title",
+        body_text: "Email body",
+        notes: "Email note",
+        source_version_number: 5,
+      },
+      {
+        channel: "telegram",
+        title: "Telegram title",
+        body_text: "Telegram body",
+        notes: null,
+        source_version_number: 5,
+      },
+      {
+        channel: "vk",
+        title: "VK stale",
+        body_text: "VK stale body",
+        notes: null,
+        source_version_number: 4,
+      },
+      {
+        channel: "push",
+        title: "Push blank",
+        body_text: "   ",
+        notes: null,
+        source_version_number: 5,
+      },
+    ],
+  });
+
+  assert.equal(handoff.canCopy, true);
+  assert.equal(handoff.readyCount, 2);
+  assert.equal(handoff.totalChannels, 6);
+  assert.deepEqual(handoff.readyChannelLabels, ["Telegram", "Email"]);
+  assert.deepEqual(handoff.skippedChannelLabels, ["VK", "Push", "Max", "Дзен"]);
+  assert.equal(handoff.nextAction, "Скопируйте готовые адаптации");
+  assert.match(handoff.copyText, /Пакет адаптаций/);
+  assert.match(handoff.copyText, /Публикация: Вебинар по РМЖ/);
+  assert.match(handoff.copyText, /Версия источника: v5/);
+  assert.match(handoff.copyText, /Готово: 2 из 6/);
+  assert.match(handoff.copyText, /Не включено: VK, Push, Max, Дзен/);
+  assert.ok(
+    handoff.copyText.indexOf("Канал: Telegram") <
+      handoff.copyText.indexOf("Канал: Email"),
+  );
+  assert.match(handoff.copyText, /Заголовок:\nTelegram title/);
+  assert.match(handoff.copyText, /Текст:\nTelegram body/);
+  assert.match(handoff.copyText, /Заметки:\nEmail note/);
+  assert.match(handoff.copyText, /UTM:/);
+  assert.match(handoff.copyText, /"utm_source": "telegram"/);
+  assert.doesNotMatch(handoff.copyText, /VK stale body/);
+  assert.doesNotMatch(handoff.copyText, /Push blank/);
+});
+
+test("publication variant handoff disables copy when no current variants are ready", () => {
+  const handoff = buildContentFactoryPublicationVariantHandoff({
+    publication: {
+      title: "Без готовых адаптаций",
+      version_number: 3,
+      utm: {},
+    },
+    savedVariants: [
+      {
+        channel: "telegram",
+        title: "Old Telegram",
+        body_text: "Old body",
+        notes: null,
+        source_version_number: 2,
+      },
+      {
+        channel: "email",
+        title: "Blank email",
+        body_text: "",
+        notes: null,
+        source_version_number: 3,
+      },
+    ],
+  });
+
+  assert.equal(handoff.canCopy, false);
+  assert.equal(handoff.readyCount, 0);
+  assert.deepEqual(handoff.readyChannelLabels, []);
+  assert.deepEqual(
+    handoff.skippedChannelLabels,
+    ["Telegram", "VK", "Email", "Push", "Max", "Дзен"],
+  );
+  assert.equal(handoff.copyText, "");
+  assert.equal(handoff.nextAction, "Сначала сохраните актуальную адаптацию");
 });
 
 test("formatContentFactoryMetricValue renders numeric and text metrics", () => {

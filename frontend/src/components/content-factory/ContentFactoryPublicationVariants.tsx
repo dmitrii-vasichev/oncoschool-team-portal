@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/Toast";
 import { api } from "@/lib/api";
 import {
+  buildContentFactoryPublicationVariantHandoff,
   buildContentFactoryPublicationVariants,
   getContentFactoryPublicationVariantCoverage,
   type ContentFactoryPublicationVariantKey,
@@ -115,6 +116,14 @@ export function ContentFactoryPublicationVariants({
       }),
     [publication, savedVariants],
   );
+  const handoff = useMemo(
+    () =>
+      buildContentFactoryPublicationVariantHandoff({
+        publication,
+        savedVariants,
+      }),
+    [publication, savedVariants],
+  );
   const [selectedKey, setSelectedKey] =
     useState<ContentFactoryPublicationVariantKey>("telegram");
   const [draftTitle, setDraftTitle] = useState("");
@@ -155,6 +164,19 @@ export function ContentFactoryPublicationVariants({
       toastSuccess("Адаптация скопирована");
     } catch {
       toastError("Не удалось скопировать адаптацию");
+    }
+  }
+
+  async function handleCopyReadyVariants() {
+    if (!handoff.canCopy) {
+      toastError(handoff.nextAction);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(handoff.copyText);
+      toastSuccess("Готовые адаптации скопированы");
+    } catch {
+      toastError("Не удалось скопировать готовые адаптации");
     }
   }
 
@@ -265,25 +287,38 @@ export function ContentFactoryPublicationVariants({
                 {coverage.nextAction}
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-[280px]">
-              <div>
-                <p className="font-semibold text-foreground">
-                  {coverage.readyCount}
-                </p>
-                <p className="text-muted-foreground">готово</p>
+            <div className="flex flex-col gap-2 sm:min-w-[280px]">
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {coverage.readyCount}
+                  </p>
+                  <p className="text-muted-foreground">готово</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {coverage.missingCount}
+                  </p>
+                  <p className="text-muted-foreground">нет текста</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {coverage.staleCount}
+                  </p>
+                  <p className="text-muted-foreground">устарело</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-foreground">
-                  {coverage.missingCount}
-                </p>
-                <p className="text-muted-foreground">нет текста</p>
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">
-                  {coverage.staleCount}
-                </p>
-                <p className="text-muted-foreground">устарело</p>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-full gap-1.5 rounded-md px-3 text-xs"
+                disabled={!handoff.canCopy}
+                onClick={() => void handleCopyReadyVariants()}
+              >
+                <Clipboard className="h-3.5 w-3.5" />
+                Скопировать готовые
+              </Button>
             </div>
           </div>
           {coverage.missingCount > 0 || coverage.staleCount > 0 ? (

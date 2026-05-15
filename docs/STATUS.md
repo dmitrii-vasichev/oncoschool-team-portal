@@ -1,5 +1,35 @@
 # Status
 
+## Content Factory Sprint 35 Variant Handoff
+
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-35-variant-handoff`
+- Source: Sprint 34 shows adaptation readiness, but editors still need to copy each ready channel one by one for manual publication handoff.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-35-variant-handoff-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-35-variant-handoff.md`
+- Scope: frontend-only handoff helper, adaptations panel copy action, source guards, helper tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-35-variant-handoff`.
+  - Wrote Sprint 35 design and implementation plan.
+  - Added failing helper tests for ready variant package generation and no-ready state.
+  - Added source guards for `buildContentFactoryPublicationVariantHandoff` and `Скопировать готовые`.
+  - Added `buildContentFactoryPublicationVariantHandoff`.
+  - Added the `Скопировать готовые` action inside the adaptations coverage block.
+  - Focused and full frontend verification passed after implementation.
+- Key decisions:
+  - Keep Sprint 35 frontend-only and reuse saved variants plus coverage rules.
+  - Copy only current saved variants so stale text is not published accidentally.
+  - Include skipped channels in the copied package to make partial readiness explicit.
+- Next actions:
+  - Merge Sprint 35 into `main` and push when ready.
+- Latest verification:
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the handoff helper and UI action did not exist.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 98 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 190 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 34 Variant Coverage
 
 - Current phase: implemented, verified, merged to `main`, and pushed

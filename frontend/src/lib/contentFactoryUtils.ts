@@ -1023,6 +1023,33 @@ export type ContentFactoryPublicationVariantCoverageInput = {
   savedVariants?: PublicationVariantCoverageSavedVariantLike[] | null;
 };
 
+type PublicationVariantHandoffPublicationLike =
+  PublicationVariantCoveragePublicationLike & {
+    title?: string | null;
+    utm?: Record<string, unknown> | null;
+  };
+
+type PublicationVariantHandoffSavedVariantLike =
+  PublicationVariantCoverageSavedVariantLike & {
+    title?: string | null;
+    notes?: string | null;
+  };
+
+export type ContentFactoryPublicationVariantHandoff = {
+  canCopy: boolean;
+  readyCount: number;
+  totalChannels: number;
+  readyChannelLabels: string[];
+  skippedChannelLabels: string[];
+  nextAction: string;
+  copyText: string;
+};
+
+export type ContentFactoryPublicationVariantHandoffInput = {
+  publication: PublicationVariantHandoffPublicationLike;
+  savedVariants?: PublicationVariantHandoffSavedVariantLike[] | null;
+};
+
 export type ContentFactorySegmentSummary = {
   total: number;
   active: number;
@@ -2532,6 +2559,96 @@ export function getContentFactoryPublicationVariantCoverage({
     staleChannels,
     channels,
     nextAction,
+  };
+}
+
+export function buildContentFactoryPublicationVariantHandoff({
+  publication,
+  savedVariants = [],
+}: ContentFactoryPublicationVariantHandoffInput): ContentFactoryPublicationVariantHandoff {
+  const coverage = getContentFactoryPublicationVariantCoverage({
+    publication,
+    savedVariants,
+  });
+  const savedByChannel = new Map<
+    ContentFactoryPublicationVariantKey,
+    PublicationVariantHandoffSavedVariantLike
+  >();
+
+  for (const variant of savedVariants ?? []) {
+    const channel = CONTENT_FACTORY_PUBLICATION_VARIANT_CHANNELS.find(
+      (item) => item.key === variant.channel,
+    );
+    if (channel) {
+      savedByChannel.set(channel.key, variant);
+    }
+  }
+
+  const readyChannels = coverage.channels.filter(
+    (channel) => channel.saved && !channel.stale,
+  );
+  const skippedChannels = coverage.channels.filter(
+    (channel) => !channel.saved || channel.stale,
+  );
+  const readyChannelLabels = readyChannels.map((channel) => channel.label);
+  const skippedChannelLabels = skippedChannels.map((channel) => channel.label);
+  const canCopy = readyChannels.length > 0;
+
+  if (!canCopy) {
+    return {
+      canCopy,
+      readyCount: 0,
+      totalChannels: coverage.totalChannels,
+      readyChannelLabels,
+      skippedChannelLabels,
+      nextAction: "Сначала сохраните актуальную адаптацию",
+      copyText: "",
+    };
+  }
+
+  const publicationTitle = publication.title?.trim() || "Без названия";
+  const sourceVersion = publication.version_number ?? 0;
+  const lines = [
+    "Пакет адаптаций",
+    `Публикация: ${publicationTitle}`,
+    `Версия источника: v${sourceVersion}`,
+    `Готово: ${readyChannels.length} из ${coverage.totalChannels}`,
+  ];
+
+  if (skippedChannelLabels.length > 0) {
+    lines.push(`Не включено: ${skippedChannelLabels.join(", ")}`);
+  }
+
+  for (const channel of readyChannels) {
+    const variant = savedByChannel.get(channel.key);
+    if (!variant) continue;
+    lines.push("", "---", `Канал: ${channel.label}`);
+
+    const title = variant.title?.trim();
+    if (title) {
+      lines.push("Заголовок:", title);
+    }
+
+    lines.push("Текст:", variant.body_text?.trim() || "Текст адаптации не заполнен");
+
+    const notes = variant.notes?.trim();
+    if (notes) {
+      lines.push("Заметки:", notes);
+    }
+  }
+
+  if (cleanUtmEntries(publication.utm).length > 0) {
+    lines.push("", "UTM:", formatPublishPackageUtm(publication.utm));
+  }
+
+  return {
+    canCopy,
+    readyCount: readyChannels.length,
+    totalChannels: coverage.totalChannels,
+    readyChannelLabels,
+    skippedChannelLabels,
+    nextAction: "Скопируйте готовые адаптации",
+    copyText: lines.join("\n"),
   };
 }
 
