@@ -25,8 +25,7 @@
 
 **Implementation status:**
 
-- Implemented, verified, and merged to `main`.
-- Pending push to `origin/main`.
+- Implemented, verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 26 work is merged to `main`.
 - Sprint 27 builds on Sprint 26 quick workflow actions by making those status moves visible in the publication history trail.
 
