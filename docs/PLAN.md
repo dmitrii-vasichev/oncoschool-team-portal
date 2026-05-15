@@ -17,8 +17,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-34-variant-coverage`.
-- Sprint 1 through Sprint 33 work is merged to `main`.
+- Implemented, verified, and merged to `main`.
+- Sprint 1 through Sprint 34 work is merged to `main`.
 
 **Definition of done:**
 
