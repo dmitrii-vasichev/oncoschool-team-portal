@@ -6,6 +6,7 @@
 
 - Run authenticated manual QA for the Sprint 15 guest story attention queue against real guest story records.
 - Run authenticated manual QA for the Sprint 16 threaded activity workflow against real guest story records.
+- Run authenticated manual QA for the Sprint 17 guest stage timeline against real guest story records.
 - Run authenticated manual QA for the Sprint 12 guest story workspace against real guest and patient story records.
 - Run authenticated manual QA for the Sprint 13 guest story detail page against real guest story records.
 - Run authenticated manual QA for the Sprint 14 guest story activity journal against real guest story records.
@@ -14,7 +15,7 @@
 
 ### Later
 
-- Add richer guest story stage history after the threaded activity workflow is validated.
+- Add guest stage-history editing/backfill only if the derived Sprint 17 timeline is not enough for operations.
 - Add guest intake-form imports after the manual guest pipeline is validated.
 - Add consent document storage/signature integration only after the consent metadata workflow is used by the team.
 - Add gift delivery confirmation/reminders after the guest story workspace exists.

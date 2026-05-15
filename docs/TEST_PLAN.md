@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 17 Guest Stage Timeline
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a guest story detail page with status-change activity events.
+2. Confirm `Путь истории` appears between attention and detail panels.
+3. Confirm stage labels are Russian.
+4. Confirm the current stage is marked as current.
+5. Confirm the current-stage duration is visible.
+6. Confirm the next-step date is visible when `stage_due_at` exists.
+7. Confirm active stories without `stage_due_at` show a warning to assign the next step.
+8. Confirm stories without activity history still render one timeline item for the current status.
+9. Edit a story status and confirm the timeline refreshes after save.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 16 Threaded Activity
 
 ### Automated

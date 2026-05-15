@@ -1,3 +1,60 @@
+# Active Plan: Content Factory Sprint 17 Guest Stage Timeline
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-17-stage-timeline.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a readable stage timeline to the guest story detail page.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-17-stage-timeline-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-17-stage-timeline.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add a pure frontend helper for guest story stage timeline derivation.
+2. Derive stage entries from `created` and `status_changed` guest story events.
+3. Fall back gracefully for older stories without activity history.
+4. Add a compact `Путь истории` panel to `/content-factory/guests/[id]`.
+5. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Planned on branch `codex/content-factory-sprint-17-stage-timeline`.
+- Sprint 1 through Sprint 16 work is merged to `main`.
+- Sprint 17 builds on the Sprint 14 activity journal and Sprint 16 threaded activity.
+
+**Definition of done:**
+
+- Guest detail page shows `Путь истории`.
+- Timeline labels are Russian and do not expose raw enum values.
+- Current stage and duration are visible.
+- Active stories without `stage_due_at` show a readable warning.
+- Stories without activity events still show a useful single-stage timeline.
+- No backend schema, API endpoint, imports, consent document storage, reminders, or gift automation is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not run yet for Sprint 17.
+
+---
+
 # Active Plan: Content Factory Sprint 16 Threaded Activity
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-16-threaded-activity.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
