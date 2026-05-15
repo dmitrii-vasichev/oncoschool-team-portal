@@ -24,8 +24,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-14-guest-activity`.
-- Sprint 1 through Sprint 13 work is merged to `main`.
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 14 work is merged to `main`.
 - Sprint 14 builds on the Sprint 13 guest story detail page.
 
 **Definition of done:**

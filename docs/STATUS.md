@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 14 Guest Activity
 
-- Current phase: implemented and verified on branch `codex/content-factory-sprint-14-guest-activity`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: user approval to continue development after Sprint 13, preserved Content Factory research, restored Content Factory design doc, and the guest story detail page
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-14-guest-activity-design.md`
@@ -23,15 +23,15 @@
   - Added `ContentFactoryGuestActivityPanel` to the guest detail page.
   - Added backend and frontend tests/source guards.
   - Ran Sprint 14 backend and frontend verification successfully.
+  - Merged Sprint 14 to `main` with a fast-forward merge and pushed `main` to GitHub.
 - Key decisions:
   - Use a dedicated `cf_guest_story_event` table instead of overloading the guest story JSON fields.
   - Allow manual comment creation from the frontend; reserve system event types for backend-generated events.
   - Auto-log only high-signal watched fields in this sprint: status, consent state, gift state, and follow-up date.
   - Keep reminders, uploads, threaded comments, editing/deleting events, and import history out of scope.
 - Next actions:
-  - Commit Sprint 14 implementation.
-  - Merge and push after final status checks.
   - Run authenticated manual QA against real guest story activity after deployment.
+  - Continue the next Content Factory slice from the preserved design and backlog.
 - Latest verification:
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 51 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `043_content_factory_guest_story_events`.

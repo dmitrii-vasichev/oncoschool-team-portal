@@ -5,7 +5,8 @@
 ### Next
 
 - Run authenticated manual QA for the Sprint 12 guest story workspace against real guest and patient story records.
-- Run authenticated manual QA for the Sprint 13 guest story detail page after it is merged.
+- Run authenticated manual QA for the Sprint 13 guest story detail page against real guest story records.
+- Run authenticated manual QA for the Sprint 14 guest story activity journal against real guest story records.
 - Run authenticated manual QA across the consolidated Content Factory workspace.
 - Run authenticated manual QA for Sprint 10 effectiveness analytics against real metric rows.
 
