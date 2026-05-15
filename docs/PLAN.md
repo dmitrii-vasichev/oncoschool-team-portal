@@ -25,8 +25,7 @@
 
 **Implementation status:**
 
-- Implemented, verified, and merged to `main`.
-- Pending push to `origin/main`.
+- Implemented, verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 27 work is merged to `main`.
 - Sprint 28 builds on Sprint 26 quick actions and Sprint 27 history by preventing accidental workflow jumps.
 
