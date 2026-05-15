@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 15 Guest Attention Queue
 
-- Current phase: implemented and verified on branch `codex/content-factory-sprint-15-attention-queue`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: user approval to continue with Sprint 15, preserved Content Factory research, restored Content Factory design doc, and Sprint 14 guest story activity journal
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-15-attention-queue-design.md`
@@ -20,14 +20,14 @@
   - Added a guest detail attention panel.
   - Added helper tests and source guards.
   - Ran Sprint 15 frontend verification successfully.
+  - Merged Sprint 15 to `main` with a fast-forward merge and pushed `main` to GitHub.
 - Key decisions:
   - Keep Sprint 15 frontend-only and derive attention from existing guest story fields.
   - Use deterministic reasons instead of a vague score.
   - Keep notification delivery, threaded comments, consent documents, imports, and gift automation out of scope.
 - Next actions:
-  - Commit Sprint 15 implementation.
-  - Merge and push after final status checks.
   - Run authenticated manual QA for guest story attention states against real records.
+  - Continue the next Content Factory slice from the preserved design and backlog.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 65 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 156 tests, with existing Node module-type warnings.

@@ -25,8 +25,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-15-attention-queue`.
-- Sprint 1 through Sprint 14 work is merged to `main`.
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 15 work is merged to `main`.
 - Sprint 15 is frontend-only and builds on the Sprint 14 activity journal.
 
 **Definition of done:**
