@@ -25,7 +25,7 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-24-calendar-ops`.
+- Implemented, verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 23 work is merged to `main`.
 - Sprint 24 builds on publication creation, readiness, and manual publish packages by making calendar rows operationally actionable.
 

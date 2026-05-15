@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 24 Calendar Operations
 
-- Current phase: implemented and full frontend verification passed
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: the calendar grouped publications by date and filters, but users still had to open each publication to know whether it was overdue, ready, missing text or UTM, or needed publication fact cleanup.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-24-calendar-ops-design.md`
@@ -22,7 +22,7 @@
   - Keep full readiness checks that require segment target and metric fan-out on the publication detail page.
   - Keep drag-and-drop rescheduling, backend endpoints, automatic publishing, and platform integrations out of scope.
 - Next actions:
-  - Commit, merge to `main`, and push.
+  - Run authenticated manual QA against real calendar publication records when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 80 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 171 tests, with existing Node module-type warnings.
