@@ -4,7 +4,6 @@
 
 ### Next
 
-- Execute Sprint 40: detailed help for campaigns, review queue, and audiences.
 - Execute Sprint 41: detailed help for metrics, effectiveness, retrospectives, and references.
 - Execute Sprint 42: publication plan import from spreadsheet-like manual planning data.
 - Execute Sprint 43: campaign-level cross-channel planning matrix.

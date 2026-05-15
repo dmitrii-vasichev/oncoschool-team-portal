@@ -154,6 +154,19 @@ test("content factory help explains publication planning readiness and adaptatio
   assert.match(source, /скопировать готовые/i);
 });
 
+test("content factory help explains campaigns review queue and audiences", () => {
+  const source = readSource("app/content-factory/help/page.tsx");
+
+  assert.match(source, /Кампании, проверка и аудитории/);
+  assert.match(source, /Кампания связывает смысл, сроки и публикации/);
+  assert.match(source, /Очередь проверки показывает, где застрял материал/);
+  assert.match(source, /Аудитории помогают не писать в пустоту/);
+  assert.match(source, /Аналитика аудиторий показывает использование сегментов/);
+  assert.match(source, /медицинск/i);
+  assert.match(source, /GetCourse/);
+  assert.match(source, /целевая, исключение, контрольная и ретаргетинг/);
+});
+
 test("dashboard and calendar routes exist", () => {
   assert.match(
     readSource("app/content-factory/dashboard/page.tsx"),

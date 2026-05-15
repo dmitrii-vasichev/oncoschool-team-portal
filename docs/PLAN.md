@@ -1,3 +1,57 @@
+# Active Plan: Content Factory Sprint 40 Help For Campaigns
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-40-help-campaigns.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add detailed practical help for campaigns, review queue, audience registry, and audience analytics.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-40-help-campaigns-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-40-help-campaigns.md`
+
+**Milestones:**
+
+1. Add a failing source-guard test for campaign, review queue, and audience help.
+2. Expand `/content-factory/help` with campaign workspace, review triage, audience registry, audience analytics, practical flow, and confusion-note guidance.
+3. Run focused and full frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 40 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- The help page explains that a campaign is a working context, not just a folder.
+- The help page explains review queue triage, including text, design, factcheck, medical review, approval, and scheduling.
+- The help page explains audience segments as external/GetCourse-oriented mirrors and names audience roles.
+- The help page explains audience analytics as segment usage, unused active audiences, linked publications, and metric evidence.
+- Existing overview and publication-planning help remains intact.
+- No backend schema or API changes are added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: focused source-guard tests failed before implementation because the help page did not contain the campaign/review/audience section.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 35 tests, with existing Node module-type warning.
+- `cd frontend && npm test` passed: 194 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/help`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 39 Help For Publications
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-39-help-publications.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

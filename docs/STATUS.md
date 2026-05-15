@@ -1,5 +1,37 @@
 # Status
 
+## Content Factory Sprint 40 Help For Campaigns
+
+- Current phase: implemented, verified, merged to `main`, and pushed
+- Source: Sprint 39 explained one publication from calendar to readiness. Sprint 40 explains the surrounding operating layer: campaigns, review queue, audience registry, and audience analytics.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-40-help-campaigns-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-40-help-campaigns.md`
+- Scope: frontend-only help expansion for campaign workspaces, review triage, audience segments, audience analytics, source guard, durable docs, and frontend verification
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-40-help-campaigns`.
+  - Wrote Sprint 40 design and implementation plan.
+  - Added a failing source-guard test for campaign, review queue, and audience help.
+  - Expanded `/content-factory/help` with practical guidance for campaigns, review queue triage, audience registry, audience roles, audience analytics, campaign flow, and common confusion points.
+  - Focused source-guard verification passed after implementation.
+  - Full frontend verification passed.
+  - Merged Sprint 40 into local `main`.
+  - Pushed Sprint 40 to `origin/main`.
+- Key decisions:
+  - Keep detailed campaign/review/audience help inside the existing `/content-factory/help` route.
+  - Explain campaigns as working contexts, not folders.
+  - Explain the review queue as triage, not a blame list.
+  - Keep publishing and metric integrations out of this help sprint.
+- Next actions:
+  - Start Sprint 41: detailed help for metrics, effectiveness, retrospectives, and references.
+- Latest verification:
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the help page did not contain the campaign/review/audience section.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 35 tests, with existing Node module-type warning.
+  - `cd frontend && npm test` passed: 194 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/help`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 39 Help For Publications
 
 - Current phase: implemented, verified, merged to `main`, and pushed

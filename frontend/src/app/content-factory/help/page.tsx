@@ -3,12 +3,14 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  BarChart3,
   BookOpen,
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
   Compass,
   FileText,
+  FolderKanban,
   Info,
   Layers3,
   Lightbulb,
@@ -17,6 +19,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  Users,
   Workflow,
 } from "lucide-react";
 import { CONTENT_FACTORY_SECTIONS } from "@/lib/contentFactoryUi";
@@ -161,6 +164,66 @@ const PUBLICATION_CONFUSION_NOTES = [
   "Устаревшая адаптация не удаляется сама: она остается как рабочая версия, но команда видит, что исходный текст уже изменился.",
   "Метрики нужны не для красивого отчета, а как evidence: по ним видно, какой канал, тема, аудитория и CTA действительно сработали.",
   "Чек-лист готовности помогает принять решение, но ранний черновик может быть неполным - это нормальное состояние производства.",
+];
+
+const CAMPAIGN_REVIEW_AUDIENCE_HELP = [
+  {
+    icon: FolderKanban,
+    title: "Кампания связывает смысл, сроки и публикации",
+    text: "Кампания - это рабочий контекст для эфира, запуска, пациентской истории, сезонной темы или серии материалов. В ней удобно держать цель, продуктовый поток, дату события, владельца, brief, исходные материалы и все связанные публикации.",
+    tips: [
+      "Кампания - не просто папка: она объясняет, зачем выходят публикации и как они связаны между собой.",
+      "Brief и материалы помогают не искать исходники в чатах перед каждой новой публикацией.",
+      "Если публикации живут в одной кампании, проще увидеть пропущенные каналы и подготовить будущую матрицу планирования.",
+    ],
+  },
+  {
+    icon: ListChecks,
+    title: "Очередь проверки показывает, где застрял материал",
+    text: "Очередь проверки собирает публикации, которым нужен текст, дизайн, фактчек, медицинская проверка, одобрение или расписание. Это операционный triage: команда видит следующий шаг, срочность и ответственного без ручной сверки таблиц.",
+    tips: [
+      "Очередь проверки - не список виноватых, а способ быстро понять, что сейчас мешает выпуску.",
+      "Медицинская проверка особенно важна для формулировок, обещаний, фактов и чувствительных тем.",
+      "После одобрения публикацию нужно довести до календаря или факта выхода, иначе она останется в подвешенном состоянии.",
+    ],
+  },
+  {
+    icon: Users,
+    title: "Аудитории помогают не писать в пустоту",
+    text: "Аудитории - это зеркало внешних сегментов, сейчас прежде всего GetCourse. Их стоит привязывать к публикации до выхода, чтобы команда понимала, кому предназначен материал и какие группы нужно включить или исключить.",
+    tips: [
+      "Роли аудитории: целевая, исключение, контрольная и ретаргетинг.",
+      "Размер базы и история обновлений помогают заметить, что сегмент устарел или больше не подходит.",
+      "Владелец аудитории отвечает за смысл сегмента и за то, когда его нужно обновить.",
+    ],
+  },
+  {
+    icon: BarChart3,
+    title: "Аналитика аудиторий показывает использование сегментов",
+    text: "Аналитика аудиторий показывает, какие сегменты реально используются в публикациях, какие активные аудитории простаивают, с какими кампаниями они связаны и есть ли метрики по публикациям.",
+    tips: [
+      "Если аудитория активна, но нигде не используется, это сигнал пересмотреть план коммуникаций.",
+      "Если публикация использует аудиторию, но метрик нет, эффективность невозможно нормально оценить.",
+      "Связка аудитория -> публикация -> метрики нужна для будущих решений, а не только для отчета после факта.",
+    ],
+  },
+];
+
+const CAMPAIGN_REVIEW_AUDIENCE_FLOW = [
+  "Создайте кампанию и зафиксируйте цель, владельца, дату события и brief.",
+  "Добавьте исходные материалы: расшифровки, ссылки, тезисы, экспертные заметки или документы.",
+  "Создайте связанные публикации под нужные площадки и форматы.",
+  "Назначьте ответственных и переведите материалы в понятные статусы производства.",
+  "Используйте очередь проверки, чтобы закрыть текст, дизайн, фактчек, медицинскую проверку и одобрение.",
+  "Привяжите аудитории к публикациям в правильных ролях: целевая, исключение, контрольная и ретаргетинг.",
+  "Проверьте аналитику аудиторий: какие сегменты используются, какие простаивают и где есть evidence по метрикам.",
+];
+
+const CAMPAIGN_REVIEW_AUDIENCE_NOTES = [
+  "Кампания - не просто папка для публикаций: она хранит общий смысл, сроки, материалы, владельца и будущие выводы.",
+  "Очередь проверки не заменяет личную коммуникацию, но показывает, где нужен следующий редакционный или медицинский шаг.",
+  "Аудитория из GetCourse не обновляется магически каждую минуту: размер базы и снимки нужно периодически сверять.",
+  "Аналитика аудиторий становится полезной только тогда, когда публикации связаны с сегментами и по ним есть метрики.",
 ];
 
 const GLOSSARY = [
@@ -427,6 +490,93 @@ export default function ContentFactoryHelpPage() {
               {PUBLICATION_CONFUSION_NOTES.map((note) => (
                 <li key={note} className="flex gap-2">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5">
+        <div className="flex items-center gap-2">
+          <FolderKanban className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">
+            Кампании, проверка и аудитории
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Этот слой связывает отдельные публикации в управляемую работу:
+          кампания хранит общий смысл, очередь проверки показывает следующий
+          редакционный шаг, а аудитории помогают заранее понять, для кого и зачем
+          выходит материал.
+        </p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {CAMPAIGN_REVIEW_AUDIENCE_HELP.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article
+                key={item.title}
+                className="rounded-lg border border-border/70 bg-background px-4 py-4"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {item.text}
+                    </p>
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-xs leading-5 text-muted-foreground">
+                  {item.tips.map((tip) => (
+                    <li key={tip} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" />
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)]">
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Как вести кампанию с проверкой и аудиториями
+              </h3>
+            </div>
+            <ol className="mt-3 grid gap-2 md:grid-cols-2">
+              {CAMPAIGN_REVIEW_AUDIENCE_FLOW.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex gap-3 rounded-md bg-background px-3 py-2 text-sm leading-6 text-muted-foreground"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-4 text-sky-950">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <h3 className="text-sm font-semibold">Что часто путают</h3>
+            </div>
+            <ul className="mt-3 space-y-2 text-sm leading-6">
+              {CAMPAIGN_REVIEW_AUDIENCE_NOTES.map((note) => (
+                <li key={note} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-700" />
                   <span>{note}</span>
                 </li>
               ))}

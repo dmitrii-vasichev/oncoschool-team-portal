@@ -1,5 +1,27 @@
 # Test Plan
 
+## Content Factory Sprint 40 Help For Campaigns
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/help`.
+2. Confirm there is a section named `Кампании, проверка и аудитории`.
+3. Confirm the campaign guidance explains goal, owner, brief, materials, event timing, and linked publications.
+4. Confirm the review queue guidance explains text, design, factcheck, medical review, approval, and scheduling.
+5. Confirm the audience guidance mentions GetCourse and the roles target, exclusion, control, and retargeting.
+6. Confirm the audience analytics guidance explains segment usage, unused active audiences, linked publications, and metric evidence.
+7. Confirm the common-confusion notes say a campaign is not just a folder and the review queue is triage.
+8. Confirm the layout remains readable on desktop and mobile without overlapping text.
+
 ## Content Factory Sprint 39 Help For Publications
 
 ### Automated
