@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 27 Publication Workflow History
 
-- Current phase: implemented and full verification passed on branch; pending commit, merge to `main`, and push
+- Current phase: implemented, verified, and merged to `main`; pending push to `origin/main`
 - Source: Sprint 26 added quick workflow status actions, but backend status-only updates did not create publication history because `CFPublicationVersion` rows were only created for body text changes.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-27-publication-workflow-history-design.md`
@@ -24,7 +24,7 @@
   - Derive approval events from the target status when no explicit event is provided.
   - Keep backend transition validation, approval comments, notifications, and platform integrations out of scope.
 - Next actions:
-  - Commit, merge to `main`, and push.
+  - Push `main` to `origin/main`.
   - Run authenticated manual QA against real publication workflow records when useful.
 - Latest verification:
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q` passed: 14 tests, with existing AsyncMock/pytest-asyncio warnings.
