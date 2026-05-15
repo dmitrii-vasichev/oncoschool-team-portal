@@ -1,5 +1,16 @@
 # Test Plan
 
+## Content Factory Sprint 33 RLS Migration Safety
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_supabase_rls_migration.py -q`
+- `git diff --check`
+
+### Manual
+
+No manual QA required. This is a source-level migration safety fix.
+
 ## Content Factory Sprint 32 Saved Publication Variants
 
 ### Automated

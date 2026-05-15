@@ -1,5 +1,29 @@
 # Status
 
+## Content Factory Sprint 33 RLS Migration Safety
+
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-33-rls-migration-safety`; pending merge to `main` and push
+- Source: Sprint 32 kept migration 038's RLS registry synchronized with all application tables, including tables created by later migrations. Fresh database migration needs the bootstrap RLS loop to tolerate those future tables.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-33-rls-migration-safety-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-33-rls-migration-safety.md`
+- Scope: source-level RLS migration regression test, migration 038 safety fix, focused backend verification, and durable docs
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-33-rls-migration-safety`.
+  - Found that migration 038's registry includes tables created by later migrations, but bootstrap RLS enablement used plain `ALTER TABLE`.
+  - Added failing regression test `test_rls_migration_bootstrap_tolerates_future_tables`.
+  - Updated migration 038 bootstrap loop to use `ALTER TABLE IF EXISTS`.
+  - Focused RLS migration verification passed after the fix.
+- Key decisions:
+  - Keep the complete RLS registry in migration 038 so `Base.metadata` coverage remains visible.
+  - Keep the future-table event trigger unchanged.
+  - Avoid any product feature changes in this sprint.
+- Next actions:
+  - Merge and push.
+- Latest verification:
+  - RED confirmed: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_supabase_rls_migration.py::test_rls_migration_bootstrap_tolerates_future_tables -q` failed before the fix because migration 038 used `ALTER TABLE` without `IF EXISTS`.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_supabase_rls_migration.py -q` passed: 4 tests, with existing pytest-asyncio warning.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 32 Saved Publication Variants
 
 - Current phase: implemented, verified, merged to `main`, and pushed

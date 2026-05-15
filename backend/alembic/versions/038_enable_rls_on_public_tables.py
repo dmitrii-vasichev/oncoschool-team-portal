@@ -171,7 +171,7 @@ $$;
 
 def upgrade() -> None:
     for table_name in PUBLIC_TABLES:
-        op.execute(f"ALTER TABLE {_qualified_table(table_name)} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE IF EXISTS {_qualified_table(table_name)} ENABLE ROW LEVEL SECURITY")
         for role_name in RESTRICTED_API_ROLES:
             op.execute(_revoke_api_role_access_sql(table_name, role_name))
 
