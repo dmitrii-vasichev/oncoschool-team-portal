@@ -25,8 +25,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-28-workflow-guardrails`.
-- Pending commit, merge to `main`, and push.
+- Implemented, verified, and merged to `main`.
+- Pending push to `origin/main`.
 - Sprint 1 through Sprint 27 work is merged to `main`.
 - Sprint 28 builds on Sprint 26 quick actions and Sprint 27 history by preventing accidental workflow jumps.
 

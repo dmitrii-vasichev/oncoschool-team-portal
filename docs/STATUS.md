@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 28 Workflow Guardrails
 
-- Current phase: implemented and full verification passed on branch; pending commit, merge to `main`, and push
+- Current phase: implemented, verified, and merged to `main`; pending push to `origin/main`
 - Source: Sprint 26 added quick publication workflow actions and Sprint 27 recorded status moves in publication history, but the backend still accepted arbitrary status jumps through the generic PATCH endpoint.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-28-workflow-guardrails-design.md`
@@ -25,7 +25,7 @@
   - Allow `approved -> published` for manual publishing without forcing every record through `scheduled`.
   - Keep role-specific permissions, transition comments, notifications, and auto-publishing out of scope.
 - Next actions:
-  - Commit, merge to `main`, and push.
+  - Push `main` to `origin/main`.
   - Run authenticated manual QA against real publication workflow records when useful.
 - Latest verification:
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://test:test@localhost:5432/test OPENAI_API_KEY=test pytest tests/test_cf_publication_service.py tests/test_content_factory_publications_api.py -q` passed: 18 tests, with existing AsyncMock/pytest-asyncio warnings.
