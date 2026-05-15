@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 16 Threaded Activity
 
-- Current phase: implemented and verified on branch `codex/content-factory-sprint-16-threaded-activity`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: user approval to continue with Sprint 16, preserved Content Factory research, restored Content Factory design doc, Sprint 14 guest story activity journal, Sprint 15 attention queue, and backlog item for threaded comment workflows
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-16-threaded-activity-design.md`
@@ -21,14 +21,14 @@
   - Passed `parent_event_id` through the guest activity create endpoint and return 404 for invalid reply parents.
   - Added frontend event typing, reply state, nested thread rendering, and reply/cancel-reply UI in the guest activity panel.
   - Ran Sprint 16 backend and frontend verification successfully.
+  - Merged Sprint 16 to `main` with a fast-forward merge and pushed `main` to GitHub.
 - Key decisions:
   - Keep the event API response flat and build nesting in the existing activity panel.
   - Add only reply threading in this sprint; keep notifications, mentions, files, editing/deleting events, and separate discussion pages out of scope.
   - Validate `parent_event_id` on the backend so replies cannot cross guest story boundaries.
 - Next actions:
-  - Commit Sprint 16 implementation.
-  - Merge and push after final whitespace/status checks.
   - Run authenticated manual QA against real guest story threads when useful.
+  - Continue the next Content Factory slice from the preserved design and backlog.
 - Latest verification:
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q` passed: 56 tests, with the existing pytest-asyncio fixture-loop deprecation warning.
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads` returned one head: `044_cf_guest_event_threads`.

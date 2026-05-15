@@ -25,8 +25,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-16-threaded-activity`.
-- Sprint 1 through Sprint 15 work is merged to `main`.
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 16 work is merged to `main`.
 - Sprint 16 builds on the Sprint 14 activity journal and Sprint 15 attention queue.
 
 **Definition of done:**
