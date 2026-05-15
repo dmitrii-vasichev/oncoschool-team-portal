@@ -24,8 +24,7 @@
 
 **Implementation status:**
 
-- Implemented, verified, and merged to `main`.
-- Pending push to `origin/main`.
+- Implemented, verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 29 work is merged to `main`.
 - Sprint 30 turns manual/imported metric snapshots into a readable publication-level summary before any external platform integration work.
 
