@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 17 Guest Stage Timeline
 
-- Current phase: planned on branch `codex/content-factory-sprint-17-stage-timeline`
+- Current phase: implemented and verified on branch `codex/content-factory-sprint-17-stage-timeline`
 - Source: user approval to continue with Sprint 17, preserved Content Factory research, restored Content Factory design doc, Sprint 14 activity events, Sprint 15 attention queue, Sprint 16 threaded activity, and backlog item for richer guest story stage history
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-17-stage-timeline-design.md`
@@ -14,16 +14,26 @@
   - Reviewed the guest detail page, existing guest activity loading, guest status labels, attention helpers, and backlog.
   - Wrote Sprint 17 design and implementation plan.
   - Made Sprint 17 the active repository plan.
+  - Added failing helper tests for timeline derivation from activity events and legacy fallback.
+  - Added source guards for the new stage timeline panel and guest detail route integration.
+  - Added `buildContentFactoryGuestStageTimeline` with Russian labels, current-stage metadata, duration labels, and missing-next-step detection.
+  - Added `ContentFactoryGuestStageTimelinePanel` to the guest detail page between attention and detail panels.
+  - Ran Sprint 17 frontend verification successfully.
 - Key decisions:
   - Keep Sprint 17 frontend-only and derive the timeline from existing guest activity events.
   - Use existing `created` and `status_changed` events rather than adding a duplicate stage-history table.
   - Keep imports, consent documents, reminders, and gift automation out of scope.
 - Next actions:
-  - Add failing helper tests and source guards for the stage timeline.
-  - Implement the timeline helper and `ContentFactoryGuestStageTimelinePanel`.
-  - Run frontend verification and update docs.
+  - Commit Sprint 17 implementation.
+  - Merge and push after final whitespace/status checks.
+  - Run authenticated manual QA against real guest story timelines when useful.
 - Latest verification:
-  - Not run yet for Sprint 17.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 67 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 158 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+  - `git diff --check` passed.
 
 ## Content Factory Sprint 16 Threaded Activity
 

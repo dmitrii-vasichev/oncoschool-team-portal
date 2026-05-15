@@ -15,6 +15,7 @@ const {
   CF_SEGMENT_SOURCE_LABELS,
   buildContentFactoryBundleParams,
   buildContentFactoryEffectivenessRows,
+  buildContentFactoryGuestStageTimeline,
   buildContentFactorySegmentUsageRows,
   buildContentFactoryUtm,
   canAccessContentFactory,
@@ -118,6 +119,79 @@ test("guest story helpers detect active pipeline and due follow-up", () => {
     ),
     false,
   );
+});
+
+test("guest story stage timeline derives stages from activity events", () => {
+  const timeline = buildContentFactoryGuestStageTimeline(
+    {
+      id: "guest-1",
+      status: "published",
+      stage_due_at: "2026-05-20T10:00:00Z",
+      created_at: "2026-05-10T09:00:00Z",
+    },
+    [
+      {
+        id: "event-created",
+        event_type: "created",
+        old_value: null,
+        new_value: "sourced",
+        created_at: "2026-05-10T09:00:00Z",
+      },
+      {
+        id: "event-consent",
+        event_type: "status_changed",
+        old_value: "sourced",
+        new_value: "consent_sent",
+        created_at: "2026-05-11T10:00:00Z",
+      },
+      {
+        id: "event-published",
+        event_type: "status_changed",
+        old_value: "consent_sent",
+        new_value: "published",
+        created_at: "2026-05-13T10:00:00Z",
+      },
+      {
+        id: "event-comment",
+        event_type: "comment",
+        old_value: null,
+        new_value: null,
+        created_at: "2026-05-13T12:00:00Z",
+      },
+    ],
+    new Date("2026-05-15T10:00:00Z"),
+  );
+
+  assert.deepEqual(
+    timeline.items.map((item) => item.status),
+    ["sourced", "consent_sent", "published"],
+  );
+  assert.equal(timeline.items[0].label, "Найден кандидат");
+  assert.equal(timeline.items[0].durationLabel, "1 день");
+  assert.equal(timeline.items[1].durationLabel, "2 дня");
+  assert.equal(timeline.currentItem.status, "published");
+  assert.equal(timeline.currentItem.isCurrent, true);
+  assert.equal(timeline.currentDurationLabel, "2 дня");
+  assert.equal(timeline.missingNextStep, false);
+});
+
+test("guest story stage timeline falls back when activity is missing", () => {
+  const timeline = buildContentFactoryGuestStageTimeline(
+    {
+      id: "guest-legacy",
+      status: "editorial_screening",
+      stage_due_at: null,
+      created_at: "2026-05-14T12:00:00Z",
+    },
+    [],
+    new Date("2026-05-15T12:00:00Z"),
+  );
+
+  assert.equal(timeline.items.length, 1);
+  assert.equal(timeline.currentItem.status, "editorial_screening");
+  assert.equal(timeline.currentItem.label, "Редакционный отбор");
+  assert.equal(timeline.currentDurationLabel, "1 день");
+  assert.equal(timeline.missingNextStep, true);
 });
 
 test("guest story summary counts operational states", () => {

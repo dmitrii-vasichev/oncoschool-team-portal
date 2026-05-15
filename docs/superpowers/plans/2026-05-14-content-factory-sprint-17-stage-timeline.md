@@ -21,33 +21,33 @@
 
 ## Phase 1: Plan And Failing Tests
 
-- [ ] Make Sprint 17 the active repository plan.
-- [ ] Add helper tests for status timeline derivation from `created` and `status_changed` events.
-- [ ] Add helper tests for legacy fallback when events are missing.
-- [ ] Add source guards for the new panel and route integration.
-- [ ] Run focused tests once and confirm they fail for missing helper/panel integration.
+- [x] Make Sprint 17 the active repository plan.
+- [x] Add helper tests for status timeline derivation from `created` and `status_changed` events.
+- [x] Add helper tests for legacy fallback when events are missing.
+- [x] Add source guards for the new panel and route integration.
+- [x] Run focused tests once and confirm they fail for missing helper/panel integration.
 
 ## Phase 2: Timeline Helper
 
-- [ ] Add timeline item types.
-- [ ] Add duration label formatting for stage time.
-- [ ] Build `buildContentFactoryGuestStageTimeline(story, events, now)`.
-- [ ] Ignore malformed or duplicate status transitions.
-- [ ] Return current-stage metadata and missing-next-step state.
+- [x] Add timeline item types.
+- [x] Add duration label formatting for stage time.
+- [x] Build `buildContentFactoryGuestStageTimeline(story, events, now)`.
+- [x] Ignore malformed or duplicate status transitions.
+- [x] Return current-stage metadata and missing-next-step state.
 
 ## Phase 3: UI Panel
 
-- [ ] Create `ContentFactoryGuestStageTimelinePanel`.
-- [ ] Render title, current stage, current duration, next-step date, and missing next-step warning.
-- [ ] Render a compact vertical timeline with current-stage badge.
-- [ ] Add the panel to `/content-factory/guests/[id]` between attention and details.
+- [x] Create `ContentFactoryGuestStageTimelinePanel`.
+- [x] Render title, current stage, current duration, next-step date, and missing next-step warning.
+- [x] Render a compact vertical timeline with current-stage badge.
+- [x] Add the panel to `/content-factory/guests/[id]` between attention and details.
 
 ## Phase 4: Verification And Integration
 
-- [ ] Run focused frontend tests.
-- [ ] Run full frontend tests, typecheck, lint, and build.
-- [ ] Run `git diff --check`.
-- [ ] Update status docs with final verification.
+- [x] Run focused frontend tests.
+- [x] Run full frontend tests, typecheck, lint, and build.
+- [x] Run `git diff --check`.
+- [x] Update status docs with final verification.
 - [ ] Commit, merge to `main`, and push.
 
 ## Validation Commands

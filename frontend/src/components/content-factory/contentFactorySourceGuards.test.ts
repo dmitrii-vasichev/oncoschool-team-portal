@@ -518,6 +518,12 @@ test("guest story detail route exposes readable story context", () => {
     sourceExists("components/content-factory/ContentFactoryGuestAttentionPanel.tsx"),
     true,
   );
+  assert.equal(
+    sourceExists(
+      "components/content-factory/ContentFactoryGuestStageTimelinePanel.tsx",
+    ),
+    true,
+  );
 
   const routeSource = readSource("app/content-factory/guests/[id]/page.tsx");
   const panelSource = readSource(
@@ -528,6 +534,9 @@ test("guest story detail route exposes readable story context", () => {
   );
   const attentionSource = readSource(
     "components/content-factory/ContentFactoryGuestAttentionPanel.tsx",
+  );
+  const timelineSource = readSource(
+    "components/content-factory/ContentFactoryGuestStageTimelinePanel.tsx",
   );
   const tableSource = readSource(
     "components/content-factory/ContentFactoryGuestStoryTable.tsx",
@@ -543,6 +552,8 @@ test("guest story detail route exposes readable story context", () => {
   assert.match(routeSource, /api\.getCFNosologies\(\{ only_active: false \}\)/);
   assert.match(routeSource, /ContentFactoryGuestStoryDetailPanels/);
   assert.match(routeSource, /ContentFactoryGuestAttentionPanel/);
+  assert.match(routeSource, /ContentFactoryGuestStageTimelinePanel/);
+  assert.match(routeSource, /events=\{events\}/);
   assert.match(routeSource, /ContentFactoryGuestActivityPanel/);
   assert.match(routeSource, /ContentFactoryGuestStoryDialog/);
   assert.match(routeSource, /setPageTitle/);
@@ -566,4 +577,8 @@ test("guest story detail route exposes readable story context", () => {
   assert.match(attentionSource, /getContentFactoryGuestAttention/);
   assert.match(attentionSource, /Следующее действие/);
   assert.match(attentionSource, /Сейчас без срочных действий/);
+  assert.match(timelineSource, /Путь истории/);
+  assert.match(timelineSource, /buildContentFactoryGuestStageTimeline/);
+  assert.match(timelineSource, /Назначьте следующий шаг/);
+  assert.match(timelineSource, /Текущий этап/);
 });

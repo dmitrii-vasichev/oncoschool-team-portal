@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/Toast";
 import { ContentFactoryGuestActivityPanel } from "@/components/content-factory/ContentFactoryGuestActivityPanel";
 import { ContentFactoryGuestAttentionPanel } from "@/components/content-factory/ContentFactoryGuestAttentionPanel";
+import { ContentFactoryGuestStageTimelinePanel } from "@/components/content-factory/ContentFactoryGuestStageTimelinePanel";
 import { ContentFactoryGuestStoryDetailPanels } from "@/components/content-factory/ContentFactoryGuestStoryDetailPanels";
 import { ContentFactoryGuestStoryDialog } from "@/components/content-factory/ContentFactoryGuestStoryDialog";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -224,6 +225,8 @@ export default function ContentFactoryGuestDetailPage() {
       </section>
 
       <ContentFactoryGuestAttentionPanel story={story} />
+
+      <ContentFactoryGuestStageTimelinePanel story={story} events={events} />
 
       <ContentFactoryGuestStoryDetailPanels
         story={story}

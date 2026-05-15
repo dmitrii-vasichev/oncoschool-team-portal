@@ -24,7 +24,7 @@
 
 **Implementation status:**
 
-- Planned on branch `codex/content-factory-sprint-17-stage-timeline`.
+- Implemented and verified on branch `codex/content-factory-sprint-17-stage-timeline`.
 - Sprint 1 through Sprint 16 work is merged to `main`.
 - Sprint 17 builds on the Sprint 14 activity journal and Sprint 16 threaded activity.
 
@@ -51,7 +51,12 @@ git diff --check
 
 **Latest verification result:**
 
-- Not run yet for Sprint 17.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 67 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 158 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/guests/[id]`.
+- `git diff --check` passed.
 
 ---
 

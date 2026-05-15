@@ -6,6 +6,8 @@ import type {
   CFGuestAnonymityLevel,
   CFGuestConsentStatus,
   CFGuestGiftStatus,
+  CFGuestStory,
+  CFGuestStoryEvent,
   CFGuestStoryRole,
   CFGuestStorySource,
   CFGuestStoryStatus,
@@ -325,6 +327,26 @@ export type ContentFactoryGuestStoryFilters = {
   ownerId?: "all" | string | null;
   bundleId?: "all" | string | null;
   attention?: "all" | "needs_attention" | string | null;
+};
+
+export type ContentFactoryGuestStageTimelineItem = {
+  id: string;
+  eventId: string | null;
+  status: CFGuestStoryStatus;
+  label: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationDays: number;
+  durationLabel: string;
+  isCurrent: boolean;
+};
+
+export type ContentFactoryGuestStageTimeline = {
+  items: ContentFactoryGuestStageTimelineItem[];
+  currentItem: ContentFactoryGuestStageTimelineItem;
+  currentDurationLabel: string;
+  nextStepAt: string | null;
+  missingNextStep: boolean;
 };
 
 type GuestStoryStatusLike = {
@@ -869,6 +891,155 @@ export function sortContentFactoryGuestStoriesByAttention<
       )
     );
   });
+}
+
+type GuestStageTimelineStoryLike = Pick<
+  CFGuestStory,
+  "id" | "status" | "stage_due_at" | "created_at"
+>;
+
+type GuestStageTimelineEventLike = Pick<
+  CFGuestStoryEvent,
+  "id" | "event_type" | "old_value" | "new_value" | "created_at"
+>;
+
+function isContentFactoryGuestStatus(
+  value: string | null | undefined,
+): value is CFGuestStoryStatus {
+  return Boolean(value && value in CF_GUEST_STATUS_LABELS);
+}
+
+function russianDayNoun(count: number): string {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  if (lastDigit === 1 && lastTwoDigits !== 11) return "день";
+  if (
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14)
+  ) {
+    return "дня";
+  }
+  return "дней";
+}
+
+function formatGuestStageDuration(startTime: number, endTime: number): {
+  days: number;
+  label: string;
+} {
+  const diffMs = Math.max(0, endTime - startTime);
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (days < 1) return { days, label: "меньше 1 дня" };
+  return { days, label: `${days} ${russianDayNoun(days)}` };
+}
+
+function guestStageTimelineItem({
+  status,
+  startedAt,
+  endedAt,
+  nowTime,
+  eventId,
+  isCurrent,
+}: {
+  status: CFGuestStoryStatus;
+  startedAt: string;
+  endedAt: string | null;
+  nowTime: number;
+  eventId: string | null;
+  isCurrent: boolean;
+}): ContentFactoryGuestStageTimelineItem {
+  const startTime = dateTime(startedAt) ?? nowTime;
+  const endTime = dateTime(endedAt) ?? nowTime;
+  const duration = formatGuestStageDuration(startTime, endTime);
+  return {
+    id: `${status}-${startedAt}-${eventId ?? "initial"}`,
+    eventId,
+    status,
+    label: CF_GUEST_STATUS_LABELS[status],
+    startedAt,
+    endedAt,
+    durationDays: duration.days,
+    durationLabel: duration.label,
+    isCurrent,
+  };
+}
+
+export function buildContentFactoryGuestStageTimeline(
+  story: GuestStageTimelineStoryLike,
+  events: GuestStageTimelineEventLike[],
+  now: Date | string = new Date(),
+): ContentFactoryGuestStageTimeline {
+  const nowTime = dateInputTime(now);
+  const sortedEvents = [...events].sort(
+    (left, right) =>
+      (dateTime(left.created_at) ?? 0) - (dateTime(right.created_at) ?? 0) ||
+      left.id.localeCompare(right.id),
+  );
+  const createdEvent = sortedEvents.find(
+    (event) => event.event_type === "created" && dateTime(event.created_at) !== null,
+  );
+  const statusEvents = sortedEvents.filter(
+    (event) =>
+      event.event_type === "status_changed" &&
+      isContentFactoryGuestStatus(event.new_value) &&
+      dateTime(event.created_at) !== null,
+  );
+  const firstStatusEvent = statusEvents[0] ?? null;
+  const initialStatus =
+    (isContentFactoryGuestStatus(createdEvent?.new_value) && createdEvent?.new_value) ||
+    (isContentFactoryGuestStatus(firstStatusEvent?.old_value) &&
+      firstStatusEvent?.old_value) ||
+    story.status;
+  const initialStartedAt =
+    createdEvent?.created_at ||
+    (dateTime(story.created_at) !== null
+      ? story.created_at
+      : new Date(nowTime).toISOString());
+  const draftItems: Array<{
+    status: CFGuestStoryStatus;
+    startedAt: string;
+    endedAt: string | null;
+    eventId: string | null;
+  }> = [
+    {
+      status: initialStatus,
+      startedAt: initialStartedAt,
+      endedAt: null,
+      eventId: createdEvent?.id ?? null,
+    },
+  ];
+
+  statusEvents.forEach((event) => {
+    const nextStatus = event.new_value;
+    if (!isContentFactoryGuestStatus(nextStatus)) return;
+    const previous = draftItems[draftItems.length - 1];
+    if (!previous || previous.status === nextStatus) return;
+    previous.endedAt = event.created_at;
+    draftItems.push({
+      status: nextStatus,
+      startedAt: event.created_at,
+      endedAt: null,
+      eventId: event.id,
+    });
+  });
+
+  const items = draftItems.map((item, index) =>
+    guestStageTimelineItem({
+      ...item,
+      nowTime,
+      isCurrent: index === draftItems.length - 1,
+    }),
+  );
+  const currentItem = items[items.length - 1];
+
+  return {
+    items,
+    currentItem,
+    currentDurationLabel: currentItem.durationLabel,
+    nextStepAt: story.stage_due_at ?? null,
+    missingNextStep:
+      isContentFactoryGuestStoryActive(story) && dateTime(story.stage_due_at) === null,
+  };
 }
 
 function dateTime(value: string | null | undefined): number | null {
