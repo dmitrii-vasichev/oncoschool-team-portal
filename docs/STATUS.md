@@ -1,5 +1,31 @@
 # Status
 
+## Content Factory Sprint 12 Guest Workspace
+
+- Current phase: planning started on branch `codex/content-factory-sprint-12-guest-workspace`
+- Source: user approval to continue development on 2026-05-14, preserved Content Factory research, restored Content Factory design doc, and Sprint 11 guest story backend foundation
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-12-guest-workspace-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-12-guest-workspace.md`
+- Scope: frontend guest/patient story workspace, API client methods, helper labels/filters/summaries, create/edit dialog, navigation, help, and verification
+- Latest progress:
+  - Confirmed Sprint 11 is merged to `main` and local `main` was clean before starting.
+  - Created branch `codex/content-factory-sprint-12-guest-workspace`.
+  - Reviewed existing Content Factory frontend page, dialog, helper, navigation, and source-guard patterns.
+  - Wrote Sprint 12 design and implementation plan.
+  - Made Sprint 12 the active repository plan.
+- Key decisions:
+  - Build list/create/edit first; defer a dedicated guest detail page to a later sprint.
+  - Use the section name `Гости и истории`.
+  - Keep array fields as newline-separated text in the first UI instead of exposing JSON.
+  - Use existing Content Factory compact operational UI patterns.
+- Next actions:
+  - Write failing helper and source-guard tests.
+  - Add guest story types, API client methods, helper labels, summary, and filters.
+  - Build dialog, table, route, navigation, help, verification, and docs updates.
+- Latest verification:
+  - Not yet run for Sprint 12 implementation.
+
 ## Content Factory Sprint 11 Guest CRM Foundation
 
 - Current phase: implemented and under validation on branch `codex/content-factory-sprint-11-guest-crm`

@@ -4,7 +4,7 @@
 
 ### Next
 
-- Build the Sprint 12 frontend workspace for guest/patient stories after Sprint 11 backend foundation is merged.
+- Build a dedicated guest-story detail page after the Sprint 12 list/create/edit workspace is validated.
 - Run authenticated manual QA across the consolidated Content Factory workspace.
 - Run authenticated manual QA for Sprint 10 effectiveness analytics against real metric rows.
 

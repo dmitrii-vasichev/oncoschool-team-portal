@@ -1,3 +1,60 @@
+# Active Plan: Content Factory Sprint 12 Guest Workspace
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-12-guest-workspace.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Build the first frontend workspace for guest and patient story CRM records inside Content Factory.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-12-guest-workspace-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-12-guest-workspace.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add frontend guest story types, API methods, labels, filters, and summaries.
+2. Add a create/edit dialog with Russian field groups and newline array inputs.
+3. Add a compact `/content-factory/guests` workspace with filters, summary cards, and story rows.
+4. Add `Гости и истории` to internal Content Factory navigation, header, and help.
+5. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- In progress on branch `codex/content-factory-sprint-12-guest-workspace`.
+- Sprint 1 through Sprint 11 work is merged to `main`.
+- Sprint 12 builds on the Sprint 11 `/api/content-factory/guests` backend foundation.
+
+**Definition of done:**
+
+- `/content-factory/guests` lists guest/patient story records.
+- Users can create and edit guest stories with clear Russian labels.
+- Search and filters cover status, consent, owner, and campaign.
+- Summary counters show total, active pipeline, consent signed, follow-ups due, and gift pending.
+- Linked campaign and publication records are visible when present.
+- No hard delete, consent uploads, external imports, reminders, or AI drafting are added in this sprint.
+- Frontend verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not yet run for Sprint 12 implementation.
+
+---
+
 # Active Plan: Content Factory Sprint 11 Guest CRM Foundation
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-11-guest-crm.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

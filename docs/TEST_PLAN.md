@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 12 Guest Workspace
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/guests` and confirm guest stories load.
+2. Search by guest name, contact, brief, source notes, screening notes, legal notes, and rejection reason.
+3. Filter by pipeline stage, consent state, owner, and campaign.
+4. Create a guest story with display name, role, source, owner, stage, consent state, allowed channels, boundaries, and follow-up fields.
+5. Edit an existing guest story and confirm the list refreshes.
+6. Confirm linked campaign and publication links open the expected pages.
+7. Confirm missing reference data falls back to readable labels instead of breaking the page.
+8. Confirm no hard delete action exists.
+9. Confirm unauthenticated access reaches the existing login flow instead of a blank page or runtime crash.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 11 Guest CRM Foundation
 
 ### Automated
