@@ -1,8 +1,39 @@
 # Status
 
-## Content Factory Sprint 22 Publication Readiness
+## Content Factory Sprint 23 Publish Package
 
 - Current phase: implemented and full frontend verification passed
+- Source: the publication detail page now has creation, UTM, audience targeting, readiness, publication fact capture, and manual metrics. The remaining manual publishing gap is hand-off: users still need to gather text, media, UTM, schedule, campaign, and audience context from several panels before posting.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-23-publish-package-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-23-publish-package.md`
+- Scope: frontend-only publish package helper, publication detail panel, clipboard action, source guards, tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-23-publish-package`.
+  - Wrote Sprint 23 design and implementation plan.
+  - Added failing helper tests for `buildContentFactoryPublishPackage`.
+  - Added failing source guards for the package component, clipboard action, and route wiring.
+  - Added `buildContentFactoryPublishPackage` with readable fallbacks for missing references, text, media, UTM, and audiences.
+  - Added `ContentFactoryPublicationPublishPackage` to `/content-factory/publications/[id]`.
+  - Focused frontend test command passed after implementation: 78 tests, with existing Node module-type warnings.
+  - Full frontend verification passed after the final helper polish.
+- Key decisions:
+  - Keep Sprint 23 frontend-only and use existing publication, bundle, reference, segment, and UTM data.
+  - Treat the package as a manual hand-off aid, not as automatic publishing.
+  - Keep backend validation, external platform integrations, media upload/storage, and automatic metric collection out of scope.
+- Next actions:
+  - Commit, merge to `main`, and push.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 78 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 169 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
+## Content Factory Sprint 22 Publication Readiness
+
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: the publication detail page now has creation, UTM, audience targeting, publication fact capture, and manual metrics, but users still had to scan several panels to understand readiness for manual publishing.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-22-publication-readiness-design.md`
@@ -21,7 +52,7 @@
   - Make the checklist informational rather than blocking status transitions.
   - Keep automatic publishing, automatic metric collection, and backend validation out of scope.
 - Next actions:
-  - Commit, merge to `main`, and push.
+  - Run authenticated manual QA against real publication readiness states when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 76 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 167 tests, with existing Node module-type warnings.

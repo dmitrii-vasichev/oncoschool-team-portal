@@ -695,6 +695,59 @@ type PublicationReadinessSegmentTargetLike = {
   external_segment_id?: string | null;
 };
 
+type PublishPackagePublicationLike = {
+  id: string;
+  title?: string | null;
+  body_text?: string | null;
+  media_refs?: unknown[] | null;
+  scheduled_at?: string | null;
+  utm?: Record<string, unknown> | null;
+};
+
+type PublishPackageReferenceLike = {
+  id?: string;
+  code?: string | null;
+  display_name?: string | null;
+  name?: string | null;
+} | null | undefined;
+
+type PublishPackageSegmentLike = {
+  id: string;
+  name?: string | null;
+  display_name?: string | null;
+  source_segment_id?: string | null;
+};
+
+type PublishPackageSegmentTargetLike = {
+  external_segment_id?: string | null;
+  role?: CFSegmentRole | string | null;
+};
+
+export type ContentFactoryPublishPackageRow = {
+  label: string;
+  value: string;
+};
+
+export type ContentFactoryPublishPackage = {
+  title: string;
+  rows: ContentFactoryPublishPackageRow[];
+  bodyText: string;
+  mediaRefs: string[];
+  mediaText: string;
+  utmText: string;
+  audienceText: string;
+  copyText: string;
+};
+
+export type ContentFactoryPublishPackageInput = {
+  publication: PublishPackagePublicationLike;
+  platform?: PublishPackageReferenceLike;
+  format?: PublishPackageReferenceLike;
+  bundle?: PublishPackageReferenceLike;
+  segments?: PublishPackageSegmentLike[];
+  segmentTargets?: PublishPackageSegmentTargetLike[];
+};
+
 export type ContentFactorySegmentSummary = {
   total: number;
   active: number;
@@ -1531,6 +1584,211 @@ export function getContentFactoryPublicationReadiness(
           : "Добавьте первый ручной замер результата.",
     ),
   ];
+}
+
+function publishPackageReferenceLabel(
+  record: PublishPackageReferenceLike,
+  fallback: string,
+): string {
+  const value =
+    record?.display_name?.trim() ||
+    record?.name?.trim() ||
+    record?.code?.trim() ||
+    record?.id?.trim();
+  return value || fallback;
+}
+
+function formatPublishPackageDateTime(value: string | null | undefined): string {
+  if (!value) return "Без даты";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Без даты";
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function cleanUtmEntries(
+  value: Record<string, unknown> | null | undefined,
+): Array<[string, string]> {
+  if (!value) return [];
+  return Object.entries(value)
+    .map<[string, string]>(([key, item]) => [
+      key,
+      item == null ? "" : String(item).trim(),
+    ])
+    .filter(([, item]) => item.length > 0);
+}
+
+function formatPublishPackageUtm(
+  value: Record<string, unknown> | null | undefined,
+): string {
+  const entries = cleanUtmEntries(value);
+  if (entries.length === 0) return "UTM не заполнены";
+  return JSON.stringify(Object.fromEntries(entries), null, 2);
+}
+
+function formatPublishPackageMediaRef(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const directValue = record.url ?? record.href ?? record.name ?? record.title;
+    if (
+      typeof directValue === "string" ||
+      typeof directValue === "number"
+    ) {
+      return String(directValue).trim();
+    }
+    return "Материал";
+  }
+  return String(value).trim();
+}
+
+function materialNoun(count: number): string {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  if (lastDigit === 1 && lastTwoDigits !== 11) return "материал";
+  if (
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14)
+  ) {
+    return "материала";
+  }
+  return "материалов";
+}
+
+function utmTagNoun(count: number): string {
+  const lastDigit = count % 10;
+  const lastTwoDigits = count % 100;
+  if (lastDigit === 1 && lastTwoDigits !== 11) return "метка";
+  if (
+    lastDigit >= 2 &&
+    lastDigit <= 4 &&
+    (lastTwoDigits < 12 || lastTwoDigits > 14)
+  ) {
+    return "метки";
+  }
+  return "меток";
+}
+
+function formatPublishPackageAudience(
+  segmentTargets: PublishPackageSegmentTargetLike[],
+  segments: PublishPackageSegmentLike[],
+): string {
+  const segmentNames = new Map(
+    segments.map((segment) => [
+      segment.id,
+      segment.name?.trim() ||
+        segment.display_name?.trim() ||
+        segment.source_segment_id?.trim() ||
+        segment.id,
+    ]),
+  );
+  const labels = segmentTargets
+    .map((target) => {
+      const segmentId = target.external_segment_id?.trim();
+      if (!segmentId) return null;
+      const role = target.role ?? "target";
+      const roleLabel =
+        CF_SEGMENT_ROLE_LABELS[role as CFSegmentRole] ?? String(role);
+      return `${roleLabel}: ${segmentNames.get(segmentId) ?? segmentId}`;
+    })
+    .filter((item): item is string => Boolean(item));
+
+  return labels.length > 0 ? labels.join("; ") : "Аудитории не указаны";
+}
+
+export function buildContentFactoryPublishPackage(
+  input: ContentFactoryPublishPackageInput,
+): ContentFactoryPublishPackage {
+  const { publication } = input;
+  const mediaRefs = (publication.media_refs ?? [])
+    .map(formatPublishPackageMediaRef)
+    .filter((item) => item.length > 0);
+  const mediaText =
+    mediaRefs.length > 0 ? mediaRefs.map((ref) => `- ${ref}`).join("\n") : "Медиа не указаны";
+  const bodyText = publication.body_text?.trim() || "Текст не заполнен";
+  const utmText = formatPublishPackageUtm(publication.utm);
+  const utmEntryCount = cleanUtmEntries(publication.utm).length;
+  const audienceText = formatPublishPackageAudience(
+    input.segmentTargets ?? [],
+    input.segments ?? [],
+  );
+  const title = publication.title?.trim() || "Без названия";
+  const rows: ContentFactoryPublishPackageRow[] = [
+    {
+      label: "Канал",
+      value: publishPackageReferenceLabel(input.platform, "Площадка не указана"),
+    },
+    {
+      label: "Формат",
+      value: publishPackageReferenceLabel(input.format, "Формат не указан"),
+    },
+    {
+      label: "Кампания",
+      value: publishPackageReferenceLabel(input.bundle, "Кампания не указана"),
+    },
+    {
+      label: "План",
+      value: formatPublishPackageDateTime(publication.scheduled_at),
+    },
+    {
+      label: "Аудитории",
+      value: audienceText,
+    },
+    {
+      label: "UTM-метки",
+      value:
+        utmEntryCount > 0
+          ? `${utmEntryCount} ${utmTagNoun(utmEntryCount)}`
+          : "UTM не заполнены",
+    },
+    {
+      label: "Текст",
+      value: publication.body_text?.trim() ? "Заполнен" : "Текст не заполнен",
+    },
+    {
+      label: "Медиа",
+      value:
+        mediaRefs.length > 0
+          ? `${mediaRefs.length} ${materialNoun(mediaRefs.length)}`
+          : "Медиа не указаны",
+    },
+  ];
+
+  const summaryLines = rows.map((row) => `${row.label}: ${row.value}`);
+  const copyText = [
+    `Пакет для публикации: ${title}`,
+    "",
+    ...summaryLines,
+    "",
+    "Текст:",
+    bodyText,
+    "",
+    "Медиа:",
+    mediaText,
+    "",
+    "UTM:",
+    utmText,
+  ].join("\n");
+
+  return {
+    title,
+    rows,
+    bodyText,
+    mediaRefs,
+    mediaText,
+    utmText,
+    audienceText,
+    copyText,
+  };
 }
 
 export function buildContentFactoryEffectivenessRows<

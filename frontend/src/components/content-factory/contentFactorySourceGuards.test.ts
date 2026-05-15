@@ -286,6 +286,30 @@ test("publication detail route exposes publication operations panel", () => {
   assert.match(utilsSource, /getContentFactoryPublicationReadiness/);
 });
 
+test("publication detail route exposes manual publish package", () => {
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryPublicationPublishPackage.tsx"),
+    true,
+  );
+
+  const source = readSource("app/content-factory/publications/[id]/page.tsx");
+  const packageSource = readSource(
+    "components/content-factory/ContentFactoryPublicationPublishPackage.tsx",
+  );
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
+
+  assert.match(source, /ContentFactoryPublicationPublishPackage/);
+  assert.match(source, /platform={platform}/);
+  assert.match(source, /format={format}/);
+  assert.match(source, /segmentTargets={segmentTargets}/);
+  assert.match(packageSource, /Пакет для публикации/);
+  assert.match(packageSource, /Скопировать пакет/);
+  assert.match(packageSource, /navigator\.clipboard\.writeText/);
+  assert.match(packageSource, /buildContentFactoryPublishPackage/);
+  assert.match(utilsSource, /buildContentFactoryPublishPackage/);
+  assert.match(utilsSource, /ContentFactoryPublishPackage/);
+});
+
 test("metric capture surfaces use readable labels and presets", () => {
   const dialogSource = readSource(
     "components/content-factory/ContentFactoryMetricDialog.tsx",

@@ -17,6 +17,7 @@ import { useToast } from "@/components/shared/Toast";
 import { ContentFactoryMetricHistory } from "@/components/content-factory/ContentFactoryMetricHistory";
 import { ContentFactoryPublicationOperationsPanel } from "@/components/content-factory/ContentFactoryPublicationOperationsPanel";
 import { ContentFactoryPublicationDialog } from "@/components/content-factory/ContentFactoryPublicationDialog";
+import { ContentFactoryPublicationPublishPackage } from "@/components/content-factory/ContentFactoryPublicationPublishPackage";
 import { ContentFactoryPublicationVersionList } from "@/components/content-factory/ContentFactoryPublicationVersionList";
 import { ContentFactorySegmentTargetsPanel } from "@/components/content-factory/ContentFactorySegmentTargetsPanel";
 import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentFactoryStatusBadge";
@@ -187,6 +188,7 @@ export default function ContentFactoryPublicationDetailPage() {
   const platform =
     platforms.find((item) => item.id === publication.platform_id) ?? null;
   const formatName = getContentFactoryDisplayName(publication.format_id, formats);
+  const format = formats.find((item) => item.id === publication.format_id) ?? null;
   const rubricName = getContentFactoryDisplayName(publication.rubric_id, rubrics);
   const nosologyName = getContentFactoryDisplayName(
     publication.nosology_id,
@@ -269,6 +271,15 @@ export default function ContentFactoryPublicationDetailPage() {
               </p>
             </div>
           </section>
+
+          <ContentFactoryPublicationPublishPackage
+            publication={publication}
+            platform={platform}
+            format={format}
+            bundle={bundle}
+            segments={segments}
+            segmentTargets={segmentTargets}
+          />
 
           <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm">
             <div className="flex items-center gap-2">

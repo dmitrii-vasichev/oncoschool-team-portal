@@ -20,6 +20,7 @@ const {
   buildContentFactoryBundleParams,
   buildContentFactoryEffectivenessRows,
   buildContentFactoryGuestStageTimeline,
+  buildContentFactoryPublishPackage,
   buildContentFactorySegmentUsageRows,
   buildContentFactoryUtm,
   canAccessContentFactory,
@@ -858,6 +859,74 @@ test("publication readiness checklist explains missing and after-publish steps",
       ["metrics", "Нужно заполнить"],
     ],
   );
+});
+
+test("publication publish package composes a copy-ready handoff", () => {
+  const publishPackage = buildContentFactoryPublishPackage({
+    publication: {
+      id: "pub-telegram-reminder",
+      title: "Напоминание о вебинаре",
+      body_text: "Друзья, завтра встречаемся на вебинаре.",
+      media_refs: ["https://assets.example.com/banner.png"],
+      scheduled_at: "2026-05-20T10:30:00Z",
+      utm: {
+        utm_source: "telegram",
+        utm_medium: "post",
+        utm_campaign: "bundle-rmj-may",
+      },
+    },
+    platform: {
+      id: "platform-telegram",
+      code: "telegram",
+      display_name: "Telegram",
+    },
+    format: {
+      id: "format-post",
+      code: "post",
+      display_name: "Пост",
+    },
+    bundle: {
+      id: "bundle-rmj-may",
+      name: "РМЖ май",
+    },
+    segments: [
+      {
+        id: "segment-survivors",
+        name: "Пациенты после лечения",
+      },
+    ],
+    segmentTargets: [
+      {
+        external_segment_id: "segment-survivors",
+        role: "target",
+      },
+    ],
+  });
+
+  assert.equal(publishPackage.title, "Напоминание о вебинаре");
+  assert.deepEqual(
+    publishPackage.rows.map((row) => row.label),
+    [
+      "Канал",
+      "Формат",
+      "Кампания",
+      "План",
+      "Аудитории",
+      "UTM-метки",
+      "Текст",
+      "Медиа",
+    ],
+  );
+  assert.equal(publishPackage.bodyText, "Друзья, завтра встречаемся на вебинаре.");
+  assert.deepEqual(publishPackage.mediaRefs, ["https://assets.example.com/banner.png"]);
+  assert.match(publishPackage.copyText, /Канал: Telegram/);
+  assert.match(publishPackage.copyText, /Формат: Пост/);
+  assert.match(publishPackage.copyText, /Кампания: РМЖ май/);
+  assert.match(publishPackage.copyText, /Аудитории: Целевая: Пациенты после лечения/);
+  assert.match(publishPackage.copyText, /UTM:/);
+  assert.match(publishPackage.copyText, /"utm_source": "telegram"/);
+  assert.match(publishPackage.copyText, /Друзья, завтра встречаемся на вебинаре\./);
+  assert.match(publishPackage.copyText, /https:\/\/assets\.example\.com\/banner\.png/);
 });
 
 test("formatContentFactoryMetricValue renders numeric and text metrics", () => {

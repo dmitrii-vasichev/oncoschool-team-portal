@@ -1,42 +1,42 @@
-# Active Plan: Content Factory Sprint 22 Publication Readiness
+# Active Plan: Content Factory Sprint 23 Publish Package
 
-> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-22-publication-readiness.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-23-publish-package.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
 
-**Goal:** Add a publication readiness checklist to the publication operations panel so users can see what is ready, what is missing, and what is due after publication.
+**Goal:** Add a copy-ready manual publishing package to the publication detail page.
 
 **Recovered design:** `docs/content-factory-design.md`
 
 **Preserved market research:** `docs/content-factory-market-context-report.md`
 
-**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-22-publication-readiness-design.md`
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-23-publish-package-design.md`
 
-**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-22-publication-readiness.md`
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-23-publish-package.md`
 
 **Backlog:** `docs/BACKLOG.md`
 
 **Milestones:**
 
-1. Add helper tests and source guards for publication readiness.
-2. Add `getContentFactoryPublicationReadiness`.
-3. Derive text, schedule, UTM, audience, publication fact, and metric evidence states.
-4. Pass segment targets into the operations panel.
-5. Render `Чек-лист готовности` in the publication operations panel.
+1. Add helper tests and source guards for a manual publish package.
+2. Add `buildContentFactoryPublishPackage`.
+3. Render `Пакет для публикации` on the publication detail page.
+4. Include platform, format, campaign, planned time, audiences, UTM, body text, and media references.
+5. Add a `Скопировать пакет` clipboard action.
 6. Run frontend verification and update durable repo docs.
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-22-publication-readiness`.
-- Sprint 1 through Sprint 21 work is merged to `main`.
-- Sprint 22 builds on publication creation, UTM, audience targeting, fact capture, and manual metrics by making readiness visible in one place.
+- Implemented and verified on branch `codex/content-factory-sprint-23-publish-package`.
+- Sprint 1 through Sprint 22 work is merged to `main`.
+- Sprint 23 builds on publication creation, UTM, audience targeting, readiness, fact capture, and manual metrics by making manual publishing hand-off copy-ready.
 
 **Definition of done:**
 
-- Publication detail operations panel shows `Чек-лист готовности`.
-- Checklist includes text, scheduled date, UTM, audience, publication fact, and first metrics.
-- Each item has a readable status: `Готово`, `Нужно заполнить`, or `После публикации`.
-- Checklist derives from existing publication, segment target, and metric data.
-- Existing publication fact and metric actions continue to work.
-- No backend schema, blocking validation, automatic publishing, or automatic metric collection is added.
+- Publication detail page shows `Пакет для публикации`.
+- The package includes channel, format, campaign, planned date, audiences, UTM, text, and media references.
+- `Скопировать пакет` writes a structured plain-text package to the clipboard.
+- Missing text, media, UTM, references, or audiences have readable fallback labels.
+- Existing publication detail, UTM, audience, fact, and metric actions continue to work.
+- No backend schema, endpoint, automatic publishing, automatic metric collection, or media storage workflow is added.
 - Verification commands pass and docs are updated.
 
 **Validation commands:**
@@ -52,8 +52,8 @@ git diff --check
 
 **Latest verification result:**
 
-- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 76 tests, with existing Node module-type warnings.
-- `cd frontend && npm test` passed: 167 tests, with existing Node module-type warnings.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 78 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 169 tests, with existing Node module-type warnings.
 - `cd frontend && npx tsc --noEmit` passed.
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
 - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.

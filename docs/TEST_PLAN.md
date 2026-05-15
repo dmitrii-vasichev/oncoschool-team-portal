@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 23 Publish Package
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page.
+2. Confirm `Пакет для публикации` appears after the text panel.
+3. Confirm the package shows channel, format, campaign, planned date, audiences, UTM state, text state, and media state.
+4. Confirm the text preview matches the publication body.
+5. Confirm media references are visible when `media_refs` is filled and `Медиа не указаны` appears when it is empty.
+6. Confirm UTM tags are shown as readable JSON when filled and `UTM не заполнены` appears when empty.
+7. Click `Скопировать пакет` and paste into a scratch field to confirm the copied text includes title, channel, format, campaign, plan, audiences, text, media, and UTM.
+8. Open a publication with missing references or no target audiences and confirm readable fallback labels appear.
+9. Confirm existing UTM, audience, publication fact, and metric panels still work.
+10. Confirm desktop and mobile layouts stay readable and do not overlap text.
+
 ## Content Factory Sprint 22 Publication Readiness
 
 ### Automated
