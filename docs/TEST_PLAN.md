@@ -1,5 +1,31 @@
 # Test Plan
 
+## Content Factory Sprint 16 Threaded Activity
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads`
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a guest story detail page with existing activity.
+2. Add a normal top-level comment and confirm it appears as before.
+3. Click `Ответить` on an existing event and confirm the form shows reply context.
+4. Submit the reply and confirm it appears nested under the selected event.
+5. Click `Ответить` on a nested reply and confirm deeper replies remain readable.
+6. Click `Отменить ответ` and confirm the next comment is top-level again.
+7. Refresh the page and confirm the nesting is preserved.
+8. Confirm automatic system events remain top-level unless a user explicitly replies to them.
+9. Confirm invalid reply parents are rejected by the API with a readable error.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 15 Guest Attention Queue
 
 ### Automated

@@ -1,5 +1,30 @@
 # Status
 
+## Content Factory Sprint 16 Threaded Activity
+
+- Current phase: planned on branch `codex/content-factory-sprint-16-threaded-activity`
+- Source: user approval to continue with Sprint 16, preserved Content Factory research, restored Content Factory design doc, Sprint 14 guest story activity journal, Sprint 15 attention queue, and backlog item for threaded comment workflows
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-16-threaded-activity-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-16-threaded-activity.md`
+- Scope: optional activity `parent_event_id`, same-story parent validation, API schema passthrough, nested reply rendering, reply/cancel-reply UI, and focused backend/frontend verification
+- Latest progress:
+  - Confirmed Sprint 15 and the guest filter overlap hotfix are merged to `main` and local `main` is clean.
+  - Created branch `codex/content-factory-sprint-16-threaded-activity`.
+  - Reviewed the existing guest story event model, schemas, service, API endpoints, frontend activity panel, and source guards.
+  - Wrote Sprint 16 design and implementation plan.
+  - Made Sprint 16 the active repository plan.
+- Key decisions:
+  - Keep the event API response flat and build nesting in the existing activity panel.
+  - Add only reply threading in this sprint; keep notifications, mentions, files, editing/deleting events, and separate discussion pages out of scope.
+  - Validate `parent_event_id` on the backend so replies cannot cross guest story boundaries.
+- Next actions:
+  - Add failing backend and frontend tests/source guards for threaded activity.
+  - Implement the backend migration, model, schemas, service, and router changes.
+  - Implement the nested reply UI and run verification.
+- Latest verification:
+  - Not run yet for Sprint 16.
+
 ## Content Factory Sprint 15 Guest Attention Queue
 
 - Current phase: implemented, verified, merged to `main`, and pushed

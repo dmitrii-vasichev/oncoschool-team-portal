@@ -1,3 +1,63 @@
+# Active Plan: Content Factory Sprint 16 Threaded Activity
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-16-threaded-activity.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add threaded replies to the guest story activity journal.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-16-threaded-activity-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-16-threaded-activity.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add a self-referential `parent_event_id` backend contract for guest story activity.
+2. Validate reply parent ownership inside the guest story service.
+3. Expose `parent_event_id` through event create and response schemas.
+4. Render nested replies in the guest activity panel.
+5. Add reply/cancel-reply interactions and submit replies with context.
+6. Run backend/frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Planned on branch `codex/content-factory-sprint-16-threaded-activity`.
+- Sprint 1 through Sprint 15 work is merged to `main`.
+- Sprint 16 builds on the Sprint 14 activity journal and Sprint 15 attention queue.
+
+**Definition of done:**
+
+- Guest activity comments can reply to another event from the same guest story.
+- Invalid reply parents are rejected with a user-facing 404.
+- Existing top-level comments and automatic events still work.
+- Guest detail activity renders top-level events with nested replies.
+- UI labels are Russian and avoid raw ids/system field names.
+- No notifications, mentions, files, edit/delete activity, or separate discussion page is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_guest_stories_api.py tests/test_cf_guest_story_service.py tests/test_content_factory_models.py tests/test_content_factory_schemas.py tests/test_content_factory_guest_story_migration.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test alembic heads
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not run yet for Sprint 16.
+
+---
+
 # Active Plan: Content Factory Sprint 15 Guest Attention Queue
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-15-attention-queue.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
