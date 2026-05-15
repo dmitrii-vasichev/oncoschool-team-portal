@@ -1,5 +1,28 @@
 # Test Plan
 
+## Content Factory Sprint 41 Help For Metrics
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/help`.
+2. Confirm there is a section named `Метрики, эффективность, ретроспективы и справочники`.
+3. Confirm the metric guidance explains source, confidence, windows, manual entry, and paste import.
+4. Confirm the measurement-window guidance mentions `3 часа`, `24 часа`, `72 часа`, `7 дней`, and final/custom periods.
+5. Confirm the effectiveness guidance explains objective fit, evidence health, stale data, missing data, and comparison limits.
+6. Confirm the retrospective guidance explains what worked, what broke, learnings, decisions, and next actions.
+7. Confirm the reference guidance explains ownership, careful edits, deactivation, and shared taxonomy.
+8. Confirm the common-confusion notes say not to change a reference for one card and that metrics without source/confidence are weak evidence.
+9. Confirm the layout remains readable on desktop and mobile without overlapping text.
+
 ## Content Factory Sprint 40 Help For Campaigns
 
 ### Automated

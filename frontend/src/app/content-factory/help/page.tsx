@@ -9,8 +9,11 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Compass,
+  Database,
   FileText,
   FolderKanban,
+  Gauge,
+  History,
   Info,
   Layers3,
   Lightbulb,
@@ -224,6 +227,66 @@ const CAMPAIGN_REVIEW_AUDIENCE_NOTES = [
   "Очередь проверки не заменяет личную коммуникацию, но показывает, где нужен следующий редакционный или медицинский шаг.",
   "Аудитория из GetCourse не обновляется магически каждую минуту: размер базы и снимки нужно периодически сверять.",
   "Аналитика аудиторий становится полезной только тогда, когда публикации связаны с сегментами и по ним есть метрики.",
+];
+
+const METRICS_LEARNING_HELP = [
+  {
+    icon: BarChart3,
+    title: "Метрики фиксируют evidence, а не просто числа",
+    text: "Метрика - это снимок результата в конкретное окно времени. Важно сохранять не только значение, но и источник, доверие к данным, окно замера, заметку и связь с публикацией. Так команда понимает, откуда взялась цифра и можно ли на нее опираться.",
+    tips: [
+      "Стандартные окна помогают сравнивать публикации честнее: 3 часа, 24 часа, 72 часа, 7 дней и финальный замер.",
+      "Ручной ввод и paste-import нормальны, если указаны источник и доверие к данным.",
+      "Низкое доверие не делает метрику бесполезной, но предупреждает, что выводы нужно делать осторожно.",
+    ],
+  },
+  {
+    icon: Gauge,
+    title: "Эффективность показывает, где есть уверенные выводы",
+    text: "Эффективность соединяет цель публикации, площадку, аудиторию, UTM, метрики и состояние evidence. Это не просто рейтинг постов: экран помогает увидеть, где данных достаточно, где они устарели, а где нельзя сравнивать результаты без дополнительных замеров.",
+    tips: [
+      "Высокие просмотры не всегда означают успех, если целью были регистрации, заявки или переходы.",
+      "Публикации без ссылки, окна замера или надежного источника будут слабее для анализа.",
+      "Сравнивать площадки полезно только после проверки, что метрики собраны в похожие окна и по понятным источникам.",
+    ],
+  },
+  {
+    icon: History,
+    title: "Ретроспектива превращает результат в следующее решение",
+    text: "Ретроспектива нужна, чтобы команда не начинала каждую кампанию с нуля. В ней фиксируются лучшие связки по цели, сбои, выводы, решения и следующие действия: что повторить, что исправить, кому передать задачу и что проверить в следующем запуске.",
+    tips: [
+      "Ретро лучше писать вскоре после финального замера, пока контекст еще свежий.",
+      "Формулируйте выводы как решения для будущей работы, а не как общие впечатления.",
+      "Следующие действия должны быть понятны конкретному человеку или роли, иначе они останутся заметкой.",
+    ],
+  },
+  {
+    icon: Database,
+    title: "Справочники держат язык системы единым",
+    text: "Справочники задают общие названия для площадок, форматов, рубрик, нозологий, статусов, целей и других классификаторов. От них зависят фильтры, аналитика, импорт из таблиц, отчеты и то, насколько одинаково команда понимает контент.",
+    tips: [
+      "Редактируйте справочник только когда меняется общий язык команды, а не ради одного разового случая.",
+      "Если значение устарело, чаще безопаснее отключить его, чем переименовать задним числом.",
+      "У справочников должен быть понятный владелец: иначе одинаковые смыслы быстро расползутся на несколько названий.",
+    ],
+  },
+];
+
+const METRICS_LEARNING_FLOW = [
+  "После выхода публикации сохраните факт: ссылку, фактическую дату и внешний ID, если он есть.",
+  "Добавьте первые метрики вручную или через импорт: значение, окно замера, источник и доверие.",
+  "Используйте сопоставимые окна: 3 часа, 24 часа, 72 часа, 7 дней, финал или осознанный custom-период.",
+  "Проверьте сводку метрик в карточке публикации и посмотрите, каких окон или источников не хватает.",
+  "Откройте эффективность, чтобы увидеть цель, evidence health, устаревшие данные и слабые места сравнения.",
+  "Запишите ретроспективу: что сработало, что сломалось, чему научились, какие решения и действия берем дальше.",
+  "Обновляйте справочники только после согласования таксономии, чтобы будущие фильтры и импорт оставались чистыми.",
+];
+
+const METRICS_LEARNING_NOTES = [
+  "Число без источника и доверия - слабое evidence: его можно хранить, но на нем опасно строить уверенные выводы.",
+  "Высокая метрика не всегда означает успех: результат нужно читать через цель публикации и аудиторию.",
+  "Ретроспектива - это память для планирования, а не отчет после факта ради галочки.",
+  "Не меняйте справочник ради одной карточки: лучше добавить заметку или обсудить изменение таксономии.",
 ];
 
 const GLOSSARY = [
@@ -577,6 +640,93 @@ export default function ContentFactoryHelpPage() {
               {CAMPAIGN_REVIEW_AUDIENCE_NOTES.map((note) => (
                 <li key={note} className="flex gap-2">
                   <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-700" />
+                  <span>{note}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">
+            Метрики, эффективность, ретроспективы и справочники
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Этот блок закрывает петлю обучения: публикация получает ссылку и
+          метрики, эффективность показывает качество evidence, ретроспектива
+          превращает результат в решения, а справочники сохраняют единый язык
+          для планирования и анализа.
+        </p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {METRICS_LEARNING_HELP.map((item) => {
+            const Icon = item.icon;
+            return (
+              <article
+                key={item.title}
+                className="rounded-lg border border-border/70 bg-background px-4 py-4"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {item.text}
+                    </p>
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-xs leading-5 text-muted-foreground">
+                  {item.tips.map((tip) => (
+                    <li key={tip} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" />
+                      <span>{tip}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)]">
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">
+                Как пройти путь от факта публикации к решению
+              </h3>
+            </div>
+            <ol className="mt-3 grid gap-2 md:grid-cols-2">
+              {METRICS_LEARNING_FLOW.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex gap-3 rounded-md bg-background px-3 py-2 text-sm leading-6 text-muted-foreground"
+                >
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-950">
+            <div className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              <h3 className="text-sm font-semibold">Что часто путают</h3>
+            </div>
+            <ul className="mt-3 space-y-2 text-sm leading-6">
+              {METRICS_LEARNING_NOTES.map((note) => (
+                <li key={note} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-700" />
                   <span>{note}</span>
                 </li>
               ))}

@@ -167,6 +167,20 @@ test("content factory help explains campaigns review queue and audiences", () =>
   assert.match(source, /целевая, исключение, контрольная и ретаргетинг/);
 });
 
+test("content factory help explains metrics effectiveness retrospectives and references", () => {
+  const source = readSource("app/content-factory/help/page.tsx");
+
+  assert.match(source, /Метрики, эффективность, ретроспективы и справочники/);
+  assert.match(source, /Метрики фиксируют evidence, а не просто числа/);
+  assert.match(source, /Эффективность показывает, где есть уверенные выводы/);
+  assert.match(source, /Ретроспектива превращает результат в следующее решение/);
+  assert.match(source, /Справочники держат язык системы единым/);
+  assert.match(source, /источник/i);
+  assert.match(source, /довер/i);
+  assert.match(source, /3 часа, 24 часа, 72 часа, 7 дней/);
+  assert.match(source, /не меняйте справочник/i);
+});
+
 test("dashboard and calendar routes exist", () => {
   assert.match(
     readSource("app/content-factory/dashboard/page.tsx"),

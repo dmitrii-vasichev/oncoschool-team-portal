@@ -1,5 +1,37 @@
 # Status
 
+## Content Factory Sprint 41 Help For Metrics
+
+- Current phase: implemented, verified, merged to `main`, and pushed
+- Source: Sprint 39 explained publication planning and Sprint 40 explained the campaign/review/audience operating layer. Sprint 41 closes the detailed help wave by explaining metrics, effectiveness, retrospectives, and references.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-41-help-metrics-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-41-help-metrics.md`
+- Scope: frontend-only help expansion for metric evidence, effectiveness analytics, retrospective learning, reference taxonomy, source guard, durable docs, and frontend verification
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-41-help-metrics`.
+  - Wrote Sprint 41 design and implementation plan.
+  - Added a failing source-guard test for metrics, effectiveness, retrospectives, and references help.
+  - Expanded `/content-factory/help` with practical guidance for metric source, confidence, windows, effectiveness evidence health, retrospectives, reference ownership, evidence-to-learning flow, and common confusion points.
+  - Focused source-guard verification passed after implementation.
+  - Full frontend verification passed.
+  - Merged Sprint 41 into local `main`.
+  - Pushed Sprint 41 to `origin/main`.
+- Key decisions:
+  - Keep detailed metrics/effectiveness/retro/reference help inside the existing `/content-factory/help` route.
+  - Explain metrics as evidence with source and confidence, not only numbers.
+  - Explain retrospectives as planning memory, not after-the-fact reporting.
+  - Keep automated metric collection out of this help sprint.
+- Next actions:
+  - Start Sprint 42: publication plan import from spreadsheet-like manual planning data.
+- Latest verification:
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the help page did not contain the metrics/effectiveness/retrospectives/references section.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 36 tests, with existing Node module-type warning.
+  - `cd frontend && npm test` passed: 195 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/help`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 40 Help For Campaigns
 
 - Current phase: implemented, verified, merged to `main`, and pushed

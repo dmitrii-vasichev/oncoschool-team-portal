@@ -1,3 +1,57 @@
+# Active Plan: Content Factory Sprint 41 Help For Metrics
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-41-help-metrics.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add detailed practical help for metric capture, effectiveness analytics, retrospectives, and reference data.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-41-help-metrics-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-41-help-metrics.md`
+
+**Milestones:**
+
+1. Add a failing source-guard test for metrics, effectiveness, retrospectives, and references help.
+2. Expand `/content-factory/help` with metric evidence, effectiveness health, retrospective learning, reference taxonomy, practical flow, and confusion-note guidance.
+3. Run focused and full frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 41 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- The help page explains metric source, confidence, measurement windows, manual entry, and paste import.
+- The help page explains effectiveness analytics as evidence health and decision support rather than only a scoreboard.
+- The help page explains retrospectives as reusable learning for future planning.
+- The help page explains reference data ownership and careful taxonomy changes.
+- Existing overview, publication-planning, and campaign/review/audience help remains intact.
+- No backend schema or API changes are added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: focused source-guard tests failed before implementation because the help page did not contain the metrics/effectiveness/retrospectives/references section.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 36 tests, with existing Node module-type warning.
+- `cd frontend && npm test` passed: 195 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/help`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 40 Help For Campaigns
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-40-help-campaigns.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
