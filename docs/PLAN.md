@@ -1,3 +1,56 @@
+# Active Plan: Content Factory Sprint 15 Guest Attention Queue
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-15-attention-queue.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a guest story attention queue that shows which guest stories need action and what the next action is.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-15-attention-queue-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-15-attention-queue.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add deterministic guest story attention helper logic.
+2. Add a `Требуют внимания` summary and filter to `/content-factory/guests`.
+3. Sort guest stories by attention priority.
+4. Add list-row badges and next-action text.
+5. Add a detail-page attention panel.
+6. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Planned on branch `codex/content-factory-sprint-15-attention-queue`.
+- Sprint 1 through Sprint 14 work is merged to `main`.
+- Sprint 15 is frontend-only and builds on the Sprint 14 activity journal.
+
+**Definition of done:**
+
+- Guest stories can be filtered to records requiring attention.
+- Attention reasons are readable Russian labels, not raw enum names.
+- List and detail pages show a recommended next action.
+- Closed stories do not appear in the attention queue.
+- No backend schema, reminders, imports, signature storage, or gift automation is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+---
+
 # Active Plan: Content Factory Sprint 14 Guest Activity
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-14-guest-activity.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

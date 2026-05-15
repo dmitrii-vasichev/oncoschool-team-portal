@@ -1,5 +1,28 @@
 # Status
 
+## Content Factory Sprint 15 Guest Attention Queue
+
+- Current phase: planned on branch `codex/content-factory-sprint-15-attention-queue`
+- Source: user approval to continue with Sprint 15, preserved Content Factory research, restored Content Factory design doc, and Sprint 14 guest story activity journal
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-15-attention-queue-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-15-attention-queue.md`
+- Scope: guest story attention helper logic, attention summary and filter, list-row next actions, detail-page attention panel, and frontend verification
+- Latest progress:
+  - Confirmed Sprint 14 and its Railway hotfix are merged to `main` and local `main` is clean.
+  - Created branch `codex/content-factory-sprint-15-attention-queue`.
+  - Reviewed existing guest story helpers, list route, table component, detail route, detail panels, activity panel, source guards, and backlog.
+  - Wrote Sprint 15 design and implementation plan.
+  - Made Sprint 15 the active repository plan.
+- Key decisions:
+  - Keep Sprint 15 frontend-only and derive attention from existing guest story fields.
+  - Use deterministic reasons instead of a vague score.
+  - Keep notification delivery, threaded comments, consent documents, imports, and gift automation out of scope.
+- Next actions:
+  - Add failing helper/source-guard tests for attention logic.
+  - Implement helper/UI changes.
+  - Run frontend verification and commit.
+
 ## Content Factory Sprint 14 Guest Activity
 
 - Current phase: implemented, verified, merged to `main`, and pushed
