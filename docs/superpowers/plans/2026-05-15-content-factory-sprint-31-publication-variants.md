@@ -55,8 +55,8 @@ git diff --check
 ```
 
 - [x] Update durable docs with verification results.
-- [ ] Commit, merge to `main`, and push.
-- [ ] Mark Sprint 31 as pushed in docs, commit, and push the final docs update.
+- [x] Commit, merge to `main`, and push.
+- [x] Mark Sprint 31 as pushed in docs, commit, and push the final docs update.
 
 ## Self-Review
 

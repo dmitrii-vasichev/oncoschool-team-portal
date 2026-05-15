@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 31 Publication Variants
 
-- Current phase: implemented, verified, and merged to local `main`; pending push to `origin/main`
+- Current phase: implemented, verified, merged to `main`, and pushed
 - Source: the research warns against one shared post text for all channels, and the current publication detail page still has only one body text plus a manual publish package.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-31-publication-variants-design.md`
@@ -19,12 +19,13 @@
   - Focused frontend verification passed after implementation.
   - Full frontend verification passed after implementation.
   - Merged Sprint 31 into local `main`.
+  - Pushed Sprint 31 to `origin/main`.
 - Key decisions:
   - Keep Sprint 31 frontend-only and deterministic.
   - Treat manual adaptations as the bridge before backend variant persistence or AI draft generation.
   - Defer saving variants, AI generation, style guides, medical claims extraction, and platform posting APIs.
 - Next actions:
-  - Push Sprint 31 to `origin/main`.
+  - Run authenticated manual QA against real publication texts when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 93 tests, with existing Node module-type warnings.
   - `cd frontend && npm test` passed: 184 tests, with existing Node module-type warnings.

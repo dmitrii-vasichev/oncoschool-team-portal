@@ -24,9 +24,8 @@
 
 **Implementation status:**
 
-- Implemented, verified, and merged to `main`.
-- Pending push to `origin/main`.
-- Sprint 1 through Sprint 30 work is merged to `main`.
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 31 work is merged to `main`.
 - Sprint 31 introduces manual channel adaptations before backend variant persistence or AI generation.
 
 **Definition of done:**
