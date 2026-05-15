@@ -1,5 +1,32 @@
 # Status
 
+## Content Factory Sprint 13 Guest Detail
+
+- Current phase: planning started on branch `codex/content-factory-sprint-13-guest-detail`
+- Source: user approval to continue development after Sprint 12, preserved Content Factory research, restored Content Factory design doc, and Sprint 12 guest story workspace
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-14-content-factory-sprint-13-guest-detail-design.md`
+- Plan: `docs/superpowers/plans/2026-05-14-content-factory-sprint-13-guest-detail.md`
+- Scope: frontend guest story detail page, API client single-record method, list-to-detail link, readable detail panels, edit-from-detail, and verification
+- Latest progress:
+  - Confirmed Sprint 12 is merged to `main` and local `main` was clean before starting.
+  - Created branch `codex/content-factory-sprint-13-guest-detail`.
+  - Reviewed existing guest story list, dialog, table, route, API methods, navigation helpers, and Content Factory detail page patterns.
+  - Confirmed the backend already exposes `GET /api/content-factory/guests/{id}`.
+  - Wrote Sprint 13 design and implementation plan.
+  - Made Sprint 13 the active repository plan.
+- Key decisions:
+  - Keep Sprint 13 frontend-only and reuse the Sprint 11 backend endpoint.
+  - Build a detail page before adding history, comments, uploads, reminders, or imports.
+  - Reuse the Sprint 12 edit dialog from the detail page.
+  - Render friendly Russian fallbacks for missing optional fields.
+- Next actions:
+  - Write failing API and UI source guards.
+  - Add `api.getCFGuestStory`, list links, detail panels, and detail route.
+  - Run frontend verification and update docs with results.
+- Latest verification:
+  - Not yet run for Sprint 13 implementation.
+
 ## Content Factory Sprint 12 Guest Workspace
 
 - Current phase: implemented and verified on branch `codex/content-factory-sprint-12-guest-workspace`

@@ -1,3 +1,60 @@
+# Active Plan: Content Factory Sprint 13 Guest Detail
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-13-guest-detail.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a dedicated detail page for one guest or patient story inside Content Factory.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-14-content-factory-sprint-13-guest-detail-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-14-content-factory-sprint-13-guest-detail.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add `api.getCFGuestStory(id)` and source guards.
+2. Link guest story rows to `/content-factory/guests/[id]`.
+3. Add a read-only detail panel component for pipeline, story context, consent, boundaries, links, gift, and follow-up.
+4. Add `/content-factory/guests/[id]` with loading, not-found, refresh, edit, and page-title behavior.
+5. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Planning started on branch `codex/content-factory-sprint-13-guest-detail`.
+- Sprint 1 through Sprint 12 work is merged to `main`.
+- Sprint 13 builds on the Sprint 11 single-story backend endpoint and Sprint 12 guest story list/create/edit workspace.
+
+**Definition of done:**
+
+- Guest story rows open a detail page.
+- `/content-factory/guests/[id]` shows a readable Russian detail view for one story.
+- Users can refresh and edit from the detail page.
+- Linked campaign and publication records are visible and clickable when present.
+- Missing optional fields render friendly fallbacks.
+- No stage history, comments, uploads, reminders, imports, hard delete, or backend schema changes are added in this sprint.
+- Frontend verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Not yet run for Sprint 13 implementation.
+
+---
+
 # Active Plan: Content Factory Sprint 12 Guest Workspace
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-14-content-factory-sprint-12-guest-workspace.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

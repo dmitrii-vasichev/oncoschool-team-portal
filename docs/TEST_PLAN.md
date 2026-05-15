@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 13 Guest Detail
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/lib/contentFactoryApiSourceGuards.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/guests` and click a guest story title.
+2. Confirm `/content-factory/guests/{id}` loads the selected story.
+3. Confirm the detail page shows stage, role, owner, source, due date, consent, anonymity, gift, and follow-up context.
+4. Confirm story brief, source notes, screening notes, factcheck notes, rejection/pause reason, allowed channels, sensitive topics, and legal notes render as readable Russian fields.
+5. Confirm linked campaign and publication links open the expected pages.
+6. Confirm missing optional values show friendly fallback text.
+7. Edit a story from the detail page and confirm the detail view refreshes.
+8. Confirm the refresh action reloads the detail data.
+9. Confirm a missing or inaccessible story shows the not-found state and a link back to `Гости и истории`.
+10. Confirm desktop and mobile layouts stay compact and do not overlap text.
+
 ## Content Factory Sprint 12 Guest Workspace
 
 ### Automated

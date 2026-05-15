@@ -4,13 +4,14 @@
 
 ### Next
 
-- Build a dedicated guest-story detail page after the Sprint 12 list/create/edit workspace is validated.
 - Run authenticated manual QA for the Sprint 12 guest story workspace against real guest and patient story records.
+- Run authenticated manual QA for the Sprint 13 guest story detail page after it is merged.
 - Run authenticated manual QA across the consolidated Content Factory workspace.
 - Run authenticated manual QA for Sprint 10 effectiveness analytics against real metric rows.
 
 ### Later
 
+- Add guest story stage history and comment threads after the detail page is validated.
 - Add guest intake-form imports after the manual guest pipeline is validated.
 - Add consent document storage/signature integration only after the consent metadata workflow is used by the team.
 - Add gift delivery confirmation/reminders after the guest story workspace exists.
