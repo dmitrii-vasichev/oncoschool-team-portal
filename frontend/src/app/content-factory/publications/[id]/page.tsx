@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/shared/Toast";
 import { ContentFactoryMetricHistory } from "@/components/content-factory/ContentFactoryMetricHistory";
+import { ContentFactoryMetricInsights } from "@/components/content-factory/ContentFactoryMetricInsights";
 import { ContentFactoryPublicationOperationsPanel } from "@/components/content-factory/ContentFactoryPublicationOperationsPanel";
 import { ContentFactoryPublicationDialog } from "@/components/content-factory/ContentFactoryPublicationDialog";
 import { ContentFactoryPublicationPublishPackage } from "@/components/content-factory/ContentFactoryPublicationPublishPackage";
@@ -308,6 +309,8 @@ export default function ContentFactoryPublicationDetailPage() {
           </section>
 
           <ContentFactoryPublicationVersionList versions={versions} members={members} />
+
+          <ContentFactoryMetricInsights metrics={metrics} />
 
           <ContentFactoryMetricHistory
             publicationId={publication.id}

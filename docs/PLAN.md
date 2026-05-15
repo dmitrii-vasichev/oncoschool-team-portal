@@ -1,3 +1,66 @@
+# Active Plan: Content Factory Sprint 30 Metric Insights
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-30-metric-insights.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a publication-level metric insights panel that summarizes existing metric snapshots.
+
+**Recovered design:** `docs/content-factory-design.md`
+
+**Preserved market research:** `docs/content-factory-market-context-report.md`
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-30-metric-insights-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-30-metric-insights.md`
+
+**Backlog:** `docs/BACKLOG.md`
+
+**Milestones:**
+
+1. Add helper tests for latest/best metric grouping, window coverage, empty state, and next action.
+2. Add `getContentFactoryPublicationMetricInsights`.
+3. Add `ContentFactoryMetricInsights`.
+4. Wire the insights panel into the publication detail page above the metric history.
+5. Run frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented and verified on branch `codex/content-factory-sprint-30-metric-insights`.
+- Pending commit, merge to `main`, and push.
+- Sprint 1 through Sprint 29 work is merged to `main`.
+- Sprint 30 turns manual/imported metric snapshots into a readable publication-level summary before any external platform integration work.
+
+**Definition of done:**
+
+- Publication detail pages show `Сводка метрик` above the metric history log.
+- The panel shows total metric count, unique metric names, latest metric, and next action.
+- Metric groups show latest value and best numeric value where available.
+- Standard windows `3h`, `24h`, `72h`, `7d`, and `final` show covered or missing state.
+- Empty metric state explains that metrics can be added manually or through import.
+- No backend schema, endpoint, chart library, external API integration, metric edit/delete, or deduplication logic is added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 90 tests, with existing Node module-type warnings.
+- `cd frontend && npm test` passed: 181 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 29 Metric Paste Import
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-29-metric-import.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

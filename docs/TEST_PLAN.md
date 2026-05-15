@@ -1,5 +1,27 @@
 # Test Plan
 
+## Content Factory Sprint 30 Metric Insights
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open a publication detail page with no metric snapshots.
+2. Confirm `Сводка метрик` appears above the metric history.
+3. Confirm the empty state explains that metrics can be added manually or through import.
+4. Add or import metrics for `24h` and `7d`.
+5. Confirm total count, unique metric count, latest metric, and next action update after refresh.
+6. Confirm metric groups show latest value and best numeric value.
+7. Confirm standard windows `3h`, `24h`, `72h`, `7d`, and `Финал` show covered or missing state.
+8. Confirm the full metric history still appears below the insights panel and manual/import actions still work.
+
 ## Content Factory Sprint 29 Metric Paste Import
 
 ### Automated

@@ -1,5 +1,38 @@
 # Status
 
+## Content Factory Sprint 30 Metric Insights
+
+- Current phase: implemented and full frontend verification passed on branch; pending commit, merge to `main`, and push
+- Source: Sprint 29 made metric import fast, but publication detail pages still show metrics mostly as a chronological log instead of an operational summary.
+- Deep research: `docs/content-factory-market-context-report.md`
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-30-metric-insights-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-30-metric-insights.md`
+- Scope: frontend-only metric insights helper, summary component, publication detail wiring, source guards, helper tests, and frontend verification
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-sprint-30-metric-insights`.
+  - Wrote Sprint 30 design and implementation plan.
+  - Added failing helper tests for metric insight grouping, latest/best values, window coverage, empty state, and next action.
+  - Added failing source guards for `ContentFactoryMetricInsights` and publication detail route wiring.
+  - Added `getContentFactoryPublicationMetricInsights`.
+  - Added `ContentFactoryMetricInsights` with summary stats, metric groups, window coverage, and empty state.
+  - Wired metric insights above the metric history on publication detail pages.
+  - Focused frontend verification passed after implementation.
+  - Full frontend verification passed after implementation.
+- Key decisions:
+  - Keep Sprint 30 frontend-only and summarize existing metric snapshots.
+  - Put insights above the metric history so the log remains available as the audit trail.
+  - Defer charts, backend aggregates, deduplication, metric editing, and external platform integrations.
+- Next actions:
+  - Commit, merge to `main`, and push.
+  - Run authenticated manual QA against real publication metric rows when useful.
+- Latest verification:
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 90 tests, with existing Node module-type warnings.
+  - `cd frontend && npm test` passed: 181 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 29 Metric Paste Import
 
 - Current phase: implemented, verified, merged to `main`, and pushed

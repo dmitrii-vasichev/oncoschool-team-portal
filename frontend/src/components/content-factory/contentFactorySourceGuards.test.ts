@@ -270,8 +270,34 @@ test("publication detail route exposes Sprint 5 outcomes panels", () => {
   assert.match(source, /api\.getCFPublicationSegmentTargets/);
   assert.match(source, /api\.getCFMetrics/);
   assert.match(source, /ContentFactorySegmentTargetsPanel/);
+  assert.match(source, /ContentFactoryMetricInsights/);
   assert.match(source, /ContentFactoryMetricHistory/);
   assert.match(source, /ContentFactoryUtmHelper/);
+});
+
+test("publication detail exposes metric insights above history", () => {
+  assert.equal(
+    sourceExists("components/content-factory/ContentFactoryMetricInsights.tsx"),
+    true,
+  );
+
+  const source = readSource("app/content-factory/publications/[id]/page.tsx");
+  const insightsSource = readSource(
+    "components/content-factory/ContentFactoryMetricInsights.tsx",
+  );
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
+
+  assert.match(source, /ContentFactoryMetricInsights/);
+  assert.match(source, /<ContentFactoryMetricInsights\s+metrics=\{metrics\}/);
+  assert.ok(
+    source.indexOf("<ContentFactoryMetricInsights") <
+      source.indexOf("<ContentFactoryMetricHistory"),
+  );
+  assert.match(insightsSource, /Сводка метрик/);
+  assert.match(insightsSource, /getContentFactoryPublicationMetricInsights/);
+  assert.match(insightsSource, /insights\.groups/);
+  assert.match(insightsSource, /insights\.windows/);
+  assert.match(utilsSource, /getContentFactoryPublicationMetricInsights/);
 });
 
 test("publication detail route exposes publication operations panel", () => {

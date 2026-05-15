@@ -155,6 +155,55 @@ export type ContentFactoryMetricImportPreview = {
   invalidRows: ContentFactoryMetricImportRow[];
 };
 
+type PublicationMetricInsightLike = Pick<
+  CFMetricSnapshot,
+  | "window"
+  | "metric_name"
+  | "metric_value"
+  | "metric_value_text"
+  | "source"
+  | "confidence"
+  | "captured_at"
+> & {
+  id?: string;
+};
+
+export type ContentFactoryPublicationMetricWindowCoverage<
+  TMetric extends PublicationMetricInsightLike = PublicationMetricInsightLike,
+> = {
+  window: CFMetricWindow;
+  label: string;
+  covered: boolean;
+  metricCount: number;
+  latestMetric: TMetric | null;
+};
+
+export type ContentFactoryPublicationMetricInsightGroup<
+  TMetric extends PublicationMetricInsightLike = PublicationMetricInsightLike,
+> = {
+  metricName: string;
+  count: number;
+  latestMetric: TMetric;
+  latestValueLabel: string;
+  latestCapturedAt: string | null;
+  bestNumericMetric: TMetric | null;
+  bestNumericValueLabel: string | null;
+  coveredWindows: CFMetricWindow[];
+};
+
+export type ContentFactoryPublicationMetricInsights<
+  TMetric extends PublicationMetricInsightLike = PublicationMetricInsightLike,
+> = {
+  totalMetrics: number;
+  uniqueMetricNames: number;
+  latestMetric: TMetric | null;
+  latestMetricLabel: string;
+  nextAction: string;
+  groups: Array<ContentFactoryPublicationMetricInsightGroup<TMetric>>;
+  windows: Array<ContentFactoryPublicationMetricWindowCoverage<TMetric>>;
+  missingWindows: CFMetricWindow[];
+};
+
 export const CF_GUEST_ROLE_LABELS: Record<CFGuestStoryRole, string> = {
   patient: "Пациент",
   relative: "Родственник",
@@ -2807,6 +2856,155 @@ export function formatContentFactoryMetricValue(metric: MetricValueLike): string
   })
     .format(numericValue)
     .replace(/\u00a0/g, " ");
+}
+
+const CONTENT_FACTORY_METRIC_INSIGHT_WINDOWS: CFMetricWindow[] = [
+  "3h",
+  "24h",
+  "72h",
+  "7d",
+  "final",
+];
+
+const CONTENT_FACTORY_METRIC_INSIGHT_WINDOW_LABELS: Record<CFMetricWindow, string> =
+  {
+    "3h": "3 часа",
+    "24h": "24 часа",
+    "72h": "72 часа",
+    "7d": "7 дней",
+    final: "Финал",
+    custom: "Другое",
+  };
+
+function metricInsightName(value: string | null | undefined): string {
+  return value?.trim() || "Метрика без названия";
+}
+
+function metricInsightNumericValue(metric: MetricValueLike): number | null {
+  if (metric.metric_value === null || metric.metric_value === undefined) return null;
+  if (typeof metric.metric_value === "number") {
+    return Number.isFinite(metric.metric_value) ? metric.metric_value : null;
+  }
+  const normalized = metric.metric_value
+    .trim()
+    .replace(/[\s\u00a0]/g, "")
+    .replace(",", ".");
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sortMetricInsightsByCapturedAt<TMetric extends PublicationMetricInsightLike>(
+  metrics: TMetric[],
+): TMetric[] {
+  return [...metrics].sort(
+    (left, right) =>
+      (dateTime(right.captured_at) ?? 0) - (dateTime(left.captured_at) ?? 0),
+  );
+}
+
+function formatMetricInsightLatestLabel(
+  metric: PublicationMetricInsightLike | null,
+): string {
+  if (!metric) return "Метрик пока нет";
+  return `${metricInsightName(metric.metric_name)} · ${formatContentFactoryMetricValue(
+    metric,
+  )} · ${CONTENT_FACTORY_METRIC_INSIGHT_WINDOW_LABELS[metric.window]}`;
+}
+
+function metricInsightNextAction(
+  totalMetrics: number,
+  missingWindows: CFMetricWindow[],
+  metrics: PublicationMetricInsightLike[],
+): string {
+  if (totalMetrics === 0) {
+    return "Добавьте первые метрики вручную или через импорт.";
+  }
+  if (missingWindows.includes("24h")) return "Добавьте срез 24 часа.";
+  if (missingWindows.includes("7d")) return "Добавьте срез 7 дней.";
+  if (missingWindows.includes("final")) return "Добавьте финальный срез.";
+  if (metrics.some((metric) => metric.confidence === "low")) {
+    return "Проверьте метрики с низким доверием.";
+  }
+  return "Метрики покрывают основные срезы.";
+}
+
+export function getContentFactoryPublicationMetricInsights<
+  TMetric extends PublicationMetricInsightLike,
+>(
+  metrics: TMetric[],
+): ContentFactoryPublicationMetricInsights<TMetric> {
+  const sortedMetrics = sortMetricInsightsByCapturedAt(metrics);
+  const latestMetric = sortedMetrics[0] ?? null;
+  const groupsByName = new Map<string, TMetric[]>();
+
+  for (const metric of sortedMetrics) {
+    const name = metricInsightName(metric.metric_name);
+    groupsByName.set(name, [...(groupsByName.get(name) ?? []), metric]);
+  }
+
+  const groups = Array.from(groupsByName.entries())
+    .map(([metricName, groupMetrics]) => {
+      const latestGroupMetric = groupMetrics[0];
+      let bestNumericMetric: TMetric | null = null;
+      let bestNumericValue: number | null = null;
+
+      for (const metric of groupMetrics) {
+        const numericValue = metricInsightNumericValue(metric);
+        if (numericValue === null) continue;
+        if (bestNumericValue === null || numericValue > bestNumericValue) {
+          bestNumericValue = numericValue;
+          bestNumericMetric = metric;
+        }
+      }
+
+      const coveredWindows = CONTENT_FACTORY_METRIC_INSIGHT_WINDOWS.filter((window) =>
+        groupMetrics.some((metric) => metric.window === window),
+      );
+
+      return {
+        metricName,
+        count: groupMetrics.length,
+        latestMetric: latestGroupMetric,
+        latestValueLabel: formatContentFactoryMetricValue(latestGroupMetric),
+        latestCapturedAt: latestGroupMetric.captured_at ?? null,
+        bestNumericMetric,
+        bestNumericValueLabel: bestNumericMetric
+          ? formatContentFactoryMetricValue(bestNumericMetric)
+          : null,
+        coveredWindows,
+      };
+    })
+    .sort(
+      (left, right) =>
+        (dateTime(right.latestCapturedAt) ?? 0) -
+        (dateTime(left.latestCapturedAt) ?? 0),
+    );
+
+  const windows = CONTENT_FACTORY_METRIC_INSIGHT_WINDOWS.map((window) => {
+    const windowMetrics = sortedMetrics.filter((metric) => metric.window === window);
+    return {
+      window,
+      label: CONTENT_FACTORY_METRIC_INSIGHT_WINDOW_LABELS[window],
+      covered: windowMetrics.length > 0,
+      metricCount: windowMetrics.length,
+      latestMetric: windowMetrics[0] ?? null,
+    };
+  });
+  const missingWindows = windows
+    .filter((window) => !window.covered)
+    .map((window) => window.window);
+
+  return {
+    totalMetrics: metrics.length,
+    uniqueMetricNames: groups.length,
+    latestMetric,
+    latestMetricLabel: formatMetricInsightLatestLabel(latestMetric),
+    nextAction: metricInsightNextAction(metrics.length, missingWindows, metrics),
+    groups,
+    windows,
+    missingWindows,
+  };
 }
 
 const METRIC_IMPORT_WINDOW_ALIASES: Record<string, CFMetricWindow> = {

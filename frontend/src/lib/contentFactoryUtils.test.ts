@@ -42,6 +42,7 @@ const {
   getContentFactoryGuestAttention,
   getContentFactoryDisplayName,
   getContentFactoryPlatformCapabilities,
+  getContentFactoryPublicationMetricInsights,
   getContentFactoryPublicationOperations,
   getContentFactoryPublicationReadiness,
   getContentFactoryPublicationWorkflowActions,
@@ -1052,6 +1053,173 @@ bad;Охват;100
       [4, "Укажите название метрики"],
       [5, "Значение метрики должно быть числом"],
     ],
+  );
+});
+
+test("publication metric insights summarize latest best and windows", () => {
+  const insights = getContentFactoryPublicationMetricInsights([
+    {
+      id: "views-24h",
+      publication_id: "pub-1",
+      window: "24h",
+      metric_name: "Просмотры",
+      metric_value: 1200,
+      metric_value_text: null,
+      source: "tgstat",
+      source_method: "import",
+      confidence: "high",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-15T12:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-15T12:00:00Z",
+    },
+    {
+      id: "views-7d",
+      publication_id: "pub-1",
+      window: "7d",
+      metric_name: "Просмотры",
+      metric_value: 1800,
+      metric_value_text: null,
+      source: "tgstat",
+      source_method: "import",
+      confidence: "medium",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-16T12:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-16T12:00:00Z",
+    },
+    {
+      id: "regs-24h",
+      publication_id: "pub-1",
+      window: "24h",
+      metric_name: "Регистрации",
+      metric_value: 24,
+      metric_value_text: null,
+      source: "getcourse",
+      source_method: "manual",
+      confidence: "low",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-15T13:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-15T13:00:00Z",
+    },
+  ]);
+
+  assert.equal(insights.totalMetrics, 3);
+  assert.equal(insights.uniqueMetricNames, 2);
+  assert.equal(insights.latestMetric?.id, "views-7d");
+  assert.equal(insights.latestMetricLabel, "Просмотры · 1 800 · 7 дней");
+  assert.equal(insights.nextAction, "Добавьте финальный срез.");
+  assert.deepEqual(
+    insights.groups.map((group) => [
+      group.metricName,
+      group.count,
+      group.latestMetric.id,
+      group.latestValueLabel,
+      group.bestNumericMetric?.id,
+      group.bestNumericValueLabel,
+      group.coveredWindows,
+    ]),
+    [
+      [
+        "Просмотры",
+        2,
+        "views-7d",
+        "1 800",
+        "views-7d",
+        "1 800",
+        ["24h", "7d"],
+      ],
+      [
+        "Регистрации",
+        1,
+        "regs-24h",
+        "24",
+        "regs-24h",
+        "24",
+        ["24h"],
+      ],
+    ],
+  );
+  assert.deepEqual(
+    insights.windows.map((window) => [window.window, window.covered]),
+    [
+      ["3h", false],
+      ["24h", true],
+      ["72h", false],
+      ["7d", true],
+      ["final", false],
+    ],
+  );
+});
+
+test("publication metric insights handles empty and low-confidence states", () => {
+  const empty = getContentFactoryPublicationMetricInsights([]);
+
+  assert.equal(empty.totalMetrics, 0);
+  assert.equal(empty.uniqueMetricNames, 0);
+  assert.equal(empty.latestMetric, null);
+  assert.equal(empty.latestMetricLabel, "Метрик пока нет");
+  assert.equal(empty.nextAction, "Добавьте первые метрики вручную или через импорт.");
+  assert.equal(empty.groups.length, 0);
+
+  const completeButLowConfidence = getContentFactoryPublicationMetricInsights([
+    {
+      id: "views-24h",
+      publication_id: "pub-1",
+      window: "24h",
+      metric_name: "Просмотры",
+      metric_value: 100,
+      metric_value_text: null,
+      source: "manual",
+      source_method: "manual",
+      confidence: "low",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-15T12:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-15T12:00:00Z",
+    },
+    {
+      id: "views-7d",
+      publication_id: "pub-1",
+      window: "7d",
+      metric_name: "Просмотры",
+      metric_value: 400,
+      metric_value_text: null,
+      source: "manual",
+      source_method: "manual",
+      confidence: "medium",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-16T12:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-16T12:00:00Z",
+    },
+    {
+      id: "views-final",
+      publication_id: "pub-1",
+      window: "final",
+      metric_name: "Просмотры",
+      metric_value: 550,
+      metric_value_text: null,
+      source: "manual",
+      source_method: "manual",
+      confidence: "medium",
+      note: null,
+      captured_by_id: null,
+      captured_at: "2026-05-17T12:00:00Z",
+      raw_payload: null,
+      created_at: "2026-05-17T12:00:00Z",
+    },
+  ]);
+
+  assert.equal(
+    completeButLowConfidence.nextAction,
+    "Проверьте метрики с низким доверием.",
   );
 });
 
