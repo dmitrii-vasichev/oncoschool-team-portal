@@ -1,5 +1,26 @@
 # Status
 
+## Content Factory Completion Roadmap / Sprint 37
+
+- Current phase: documented and verified
+- Roadmap: `docs/content-factory-roadmap.md`
+- Source: after Sprint 36, the product has a strong manual and semi-automated foundation, but the team still needs detailed help, Excel/planning migration, cross-channel planning, publishing automation, and metric integrations.
+- Scope: durable roadmap, current capability inventory, explicit remaining gaps, sprint wave order, backlog update, and docs-only validation
+- Latest progress:
+  - Confirmed local `main` was clean and created branch `codex/content-factory-roadmap`.
+  - Added `docs/content-factory-roadmap.md` with the target end state, current capability, explicit remaining gaps, and roadmap waves through production readiness.
+  - Updated `docs/PLAN.md`, `docs/BACKLOG.md`, and `docs/TEST_PLAN.md` to use the roadmap as the durable source of truth.
+  - Ran docs-only validation.
+- Key decisions:
+  - The next wave should explain the system before adding more complexity.
+  - Help is a product feature, not only documentation.
+  - Automatic publishing and automatic metrics remain future waves after the manual workflow and import/planning workflow are clear.
+  - Each future roadmap block should be expanded into its own detailed sprint design and plan before implementation.
+- Next actions:
+  - Start Sprint 38: detailed Content Factory overview help and operating model.
+- Latest verification:
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 36 Readiness Adaptations
 
 - Current phase: implemented, verified, merged to `main`, and pushed

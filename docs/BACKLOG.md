@@ -4,6 +4,19 @@
 
 ### Next
 
+- Execute Sprint 37: master roadmap and help architecture.
+- Execute Sprint 38: detailed help overview and Content Factory operating model.
+- Execute Sprint 39: detailed help for calendar, publications, adaptations, and readiness.
+- Execute Sprint 40: detailed help for campaigns, review queue, and audiences.
+- Execute Sprint 41: detailed help for metrics, effectiveness, retrospectives, and references.
+- Execute Sprint 42: publication plan import from spreadsheet-like manual planning data.
+- Execute Sprint 43: campaign-level cross-channel planning matrix.
+- Execute Sprint 44: publishing queue foundation with audit, retry, and manual fallback.
+- Execute Sprint 45: first practical platform publishing integration.
+- Execute Sprint 46: second practical platform publishing integration.
+- Execute Sprint 47: metrics integration foundation.
+- Execute Sprint 48: first automated metric source integrations.
+- Execute Sprint 49: production readiness, onboarding, and authenticated end-to-end QA.
 - Run authenticated manual QA for the Sprint 36 adaptation readiness checklist against saved publication variants.
 - Run authenticated manual QA for the Sprint 35 variant handoff package against saved publication variants.
 - Run authenticated manual QA for the Sprint 34 variant coverage summary against saved publication variants.
@@ -43,5 +56,6 @@
 
 ### Documentation
 
+- Keep `docs/content-factory-roadmap.md` synchronized whenever the agreed Content Factory target or sprint order changes.
 - Keep durable Content Factory docs in tracked paths such as `docs/content-factory-design.md`, `docs/PLAN.md`, `docs/STATUS.md`, and `docs/TEST_PLAN.md`.
 - Do not place critical Content Factory docs under `docs/plans/` while that path is gitignored.

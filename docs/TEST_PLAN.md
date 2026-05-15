@@ -1,5 +1,18 @@
 # Test Plan
 
+## Content Factory Completion Roadmap
+
+### Automated
+
+- `git diff --check`
+
+### Manual
+
+1. Review `docs/content-factory-roadmap.md`.
+2. Confirm the roadmap separates implemented manual/semi-automated capability from planned automation.
+3. Confirm the next waves cover detailed help, Excel/planning import, cross-channel planning, publishing automation, metrics automation, and production readiness.
+4. Confirm each future roadmap block is expected to receive its own detailed sprint design and implementation plan before code changes.
+
 ## Content Factory Sprint 36 Readiness Adaptations
 
 ### Automated

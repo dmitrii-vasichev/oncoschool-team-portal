@@ -1,3 +1,50 @@
+# Active Plan: Content Factory Completion Roadmap
+
+> **For agentic workers:** Use `docs/content-factory-roadmap.md` as the source of truth for the next Content Factory waves. Before implementing any roadmap block, expand it into a sprint-level design under `docs/superpowers/specs/` and an implementation plan under `docs/superpowers/plans/`.
+
+**Goal:** Preserve the agreed Content Factory completion direction: detailed help first, then Excel/planning scale-up, then controlled publishing automation, then metrics automation and production readiness.
+
+**Roadmap:** `docs/content-factory-roadmap.md`
+
+**Planning inputs:**
+
+- Recovered design: `docs/content-factory-design.md`
+- Preserved market research: `docs/content-factory-market-context-report.md`
+- Current implementation through Sprint 36
+- Manual Excel planning workflow represented by `Контент.xlsx`
+
+**Milestones:**
+
+1. Record the target end state and current capability after Sprint 36.
+2. Explicitly separate implemented manual/semi-automated features from planned automation.
+3. Define roadmap waves for help, Excel import, cross-channel planning, publishing automation, metrics automation, and stabilization.
+4. Update durable repo planning, status, backlog, and test-plan documents.
+
+**Implementation status:**
+
+- Documented and verified.
+- Sprint 1 through Sprint 36 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- The completion roadmap is tracked in the repository.
+- Future sprints have a clear order and a clear rule for expanding each block before implementation.
+- The help system is treated as a first-class product deliverable.
+- Planned publishing and metric automation are named honestly as future work.
+- Repo-local docs remain the source of truth for execution.
+
+**Validation commands:**
+
+```bash
+git diff --check
+```
+
+**Latest verification result:**
+
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 36 Readiness Adaptations
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-36-readiness-adaptations.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
