@@ -16,16 +16,20 @@ import type {
   CFMetricSnapshot,
   CFMetricSnapshotCreateRequest,
   CFMetricWindow,
+  CFNosology,
   CFPlatform,
   CFProductStream,
+  CFPublicationCreateRequest,
   CFPublicationSegmentTarget,
   CFPublicationUpdateRequest,
   CFPublicationStatus,
+  CFRubric,
   CFRetroType,
   CFSegmentRole,
   CFSegmentSnapshot,
   CFSegmentSource,
   MemberRole,
+  TeamMember,
 } from "./types";
 
 export type ContentFactoryReferenceTableKey =
@@ -153,6 +157,40 @@ export type ContentFactoryMetricImportPreview = {
   rows: ContentFactoryMetricImportRow[];
   validRows: ContentFactoryMetricImportRow[];
   invalidRows: ContentFactoryMetricImportRow[];
+};
+
+export type ContentFactoryPublicationPlanImportPayload =
+  CFPublicationCreateRequest;
+
+export type ContentFactoryPublicationPlanImportRow = {
+  lineNumber: number;
+  raw: string;
+  columns: string[];
+  payload: ContentFactoryPublicationPlanImportPayload | null;
+  error: string | null;
+};
+
+export type ContentFactoryPublicationPlanImportPreview = {
+  rows: ContentFactoryPublicationPlanImportRow[];
+  validRows: ContentFactoryPublicationPlanImportRow[];
+  invalidRows: ContentFactoryPublicationPlanImportRow[];
+};
+
+export type ContentFactoryPublicationPlanImportOptions = {
+  bundles: Array<Pick<CFBundle, "id" | "name">>;
+  platforms: Array<Pick<CFPlatform, "id" | "code" | "display_name">>;
+  formats: Array<Pick<CFFormat, "id" | "code" | "display_name">>;
+  rubrics?: Array<Pick<CFRubric, "id" | "code" | "display_name">>;
+  nosologies?: Array<Pick<CFNosology, "id" | "code" | "display_name">>;
+  members: Array<
+    Pick<TeamMember, "id" | "full_name" | "name_variants" | "is_active">
+  >;
+  defaults: {
+    bundle_id?: string;
+    platform_id?: string;
+    format_id?: string;
+    responsible_id?: string;
+  };
 };
 
 type PublicationMetricInsightLike = Pick<
@@ -3743,6 +3781,511 @@ export function parseContentFactoryMetricImportRows(
         source_method: "импорт из буфера",
         confidence,
         note: noteColumn || null,
+      },
+      error: null,
+    });
+  });
+
+  return {
+    rows,
+    validRows: rows.filter((row) => row.payload !== null),
+    invalidRows: rows.filter((row) => row.error !== null),
+  };
+}
+
+type PublicationPlanColumnKey =
+  | "bundle"
+  | "date"
+  | "title"
+  | "platform"
+  | "format"
+  | "status"
+  | "responsible"
+  | "rubric"
+  | "nosology"
+  | "body"
+  | "note";
+
+const PUBLICATION_PLAN_IMPORT_HEADER_ALIASES: Record<
+  PublicationPlanColumnKey,
+  string[]
+> = {
+  bundle: ["кампания", "bundle", "мероприятие", "проект", "запуск"],
+  date: ["дата", "дата публикации", "план", "scheduled_at", "scheduled at"],
+  title: ["тема", "название", "контент", "пост", "title", "publication"],
+  platform: ["канал", "площадка", "платформа", "channel", "platform"],
+  format: ["формат", "тип", "format", "type"],
+  status: ["статус", "state", "status"],
+  responsible: [
+    "ответственный",
+    "исполнитель",
+    "ответственный исполнитель",
+    "responsible",
+    "owner",
+  ],
+  rubric: ["рубрика", "рубрикатор", "rubric"],
+  nosology: ["нозология", "нозалогии", "нозологии", "диагноз", "nosology"],
+  body: ["текст", "черновик", "body", "text", "сообщение"],
+  note: ["примечание", "примечания", "комментарий", "notes", "note"],
+};
+
+const PUBLICATION_PLAN_PLATFORM_ALIASES: Record<string, string> = {
+  tg: "telegram",
+  тг: "telegram",
+  телега: "telegram",
+  телеграм: "telegram",
+  telegram: "telegram",
+  vk: "vk",
+  вк: "vk",
+  вконтакте: "vk",
+  dzen: "dzen",
+  дзен: "dzen",
+  instagram: "instagram",
+  инста: "instagram",
+  max: "max",
+  макс: "max",
+  email: "email",
+  "email дайджест": "email",
+  дайджест: "email",
+  push: "getcourse_push",
+  пуш: "getcourse_push",
+  getcourse: "getcourse_push",
+};
+
+const PUBLICATION_PLAN_FORMAT_ALIASES: Record<string, string> = {
+  анонс: "announcement",
+  прогрев: "warming",
+  кнопка: "button",
+  cta: "button",
+  эфир: "live",
+  "прямой эфир": "live",
+  дожим: "follow_up",
+  "дожимной пост": "follow_up",
+  лонгрид: "longread",
+  "история пациента": "patient_story",
+  экспертный: "expert",
+  "экспертный пост": "expert",
+  "вопрос ответ": "q_and_a",
+  "вопрос-ответ": "q_and_a",
+  закреп: "pin",
+  методичка: "methodology_pdf",
+  pdf: "methodology_pdf",
+  дайджест: "digest",
+  push: "push",
+  пуш: "push",
+  рилс: "reel_shorts",
+  reels: "reel_shorts",
+  shorts: "reel_shorts",
+  карусель: "carousel",
+  цитата: "citation",
+};
+
+const PUBLICATION_PLAN_GENERIC_FORMATS = new Set([
+  "пост",
+  "публикация",
+  "материал",
+]);
+
+const PUBLICATION_PLAN_STATUS_ALIASES: Record<string, CFPublicationStatus> = {
+  draft: "draft",
+  черновик: "draft",
+  идея: "draft",
+  "нужен текст": "needs_copy",
+  копирайт: "needs_copy",
+  "нужен дизайн": "needs_design",
+  дизайн: "needs_design",
+  factcheck: "factcheck",
+  фактчек: "factcheck",
+  "проверка врача": "doctor_review",
+  врач: "doctor_review",
+  одобрено: "approved",
+  approved: "approved",
+  scheduled: "scheduled",
+  запланировано: "scheduled",
+  публикуем: "scheduled",
+  published: "published",
+  опубликовано: "published",
+  вышло: "published",
+  failed: "failed",
+  ошибка: "failed",
+  cancelled: "cancelled",
+  отменено: "cancelled",
+  "не выйдет": "cancelled",
+};
+
+function normalizePublicationPlanToken(value: string): string {
+  return value
+    .trim()
+    .replace(/ё/g, "е")
+    .replace(/[«»"“”]/g, "")
+    .replace(/[().,]/g, " ")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function detectPublicationPlanDelimiter(line: string): string {
+  const delimiters = ["\t", "|", ";", ","];
+  return delimiters.reduce((best, delimiter) => {
+    const count = line.split(delimiter).length - 1;
+    const bestCount = line.split(best).length - 1;
+    return count > bestCount ? delimiter : best;
+  }, "\t");
+}
+
+function isPublicationPlanHeader(columns: string[]): boolean {
+  const aliases = Object.values(PUBLICATION_PLAN_IMPORT_HEADER_ALIASES)
+    .flat()
+    .map(normalizePublicationPlanToken);
+  const aliasSet = new Set(aliases);
+  return columns.some((column) =>
+    aliasSet.has(normalizePublicationPlanToken(column)),
+  );
+}
+
+function buildPublicationPlanHeaderMap(
+  columns: string[],
+): Partial<Record<PublicationPlanColumnKey, number>> {
+  const map: Partial<Record<PublicationPlanColumnKey, number>> = {};
+  for (const key of Object.keys(
+    PUBLICATION_PLAN_IMPORT_HEADER_ALIASES,
+  ) as PublicationPlanColumnKey[]) {
+    const aliases = new Set(
+      PUBLICATION_PLAN_IMPORT_HEADER_ALIASES[key].map(
+        normalizePublicationPlanToken,
+      ),
+    );
+    const index = columns.findIndex((column) =>
+      aliases.has(normalizePublicationPlanToken(column)),
+    );
+    if (index >= 0) map[key] = index;
+  }
+  return map;
+}
+
+function publicationPlanColumn(
+  columns: string[],
+  headerMap: Partial<Record<PublicationPlanColumnKey, number>>,
+  key: PublicationPlanColumnKey,
+): string {
+  const index = headerMap[key];
+  return index === undefined ? "" : columns[index]?.trim() ?? "";
+}
+
+function referenceCandidates(item: {
+  id: string;
+  code?: string;
+  display_name?: string;
+  name?: string;
+  full_name?: string;
+  name_variants?: string[];
+}): string[] {
+  return [
+    item.id,
+    item.code,
+    item.display_name,
+    item.name,
+    item.full_name,
+    ...(item.name_variants ?? []),
+  ].filter((value): value is string => Boolean(value));
+}
+
+function matchPublicationPlanReference<T extends { id: string }>(
+  value: string,
+  items: T[],
+  getCandidates: (item: T) => string[],
+  aliases: Record<string, string> = {},
+): T | null {
+  const normalized = normalizePublicationPlanToken(value);
+  const target = aliases[normalized] ?? normalized;
+  return (
+    items.find((item) =>
+      getCandidates(item)
+        .map(normalizePublicationPlanToken)
+        .includes(target),
+    ) ?? null
+  );
+}
+
+function resolvePublicationPlanRequiredId<T extends { id: string }>(
+  rawValue: string,
+  defaultId: string | undefined,
+  items: T[],
+  getCandidates: (item: T) => string[],
+  error: string,
+  aliases?: Record<string, string>,
+): { id: string | null; error: string | null } {
+  const value = rawValue.trim();
+  if (!value) return { id: defaultId ?? null, error: defaultId ? null : error };
+  const match = matchPublicationPlanReference(value, items, getCandidates, aliases);
+  return match ? { id: match.id, error: null } : { id: null, error };
+}
+
+function resolvePublicationPlanOptionalId<T extends { id: string }>(
+  rawValue: string,
+  items: T[],
+  getCandidates: (item: T) => string[],
+  error: string,
+  aliases?: Record<string, string>,
+): { id: string | null; error: string | null } {
+  const value = rawValue.trim();
+  if (!value) return { id: null, error: null };
+  const match = matchPublicationPlanReference(value, items, getCandidates, aliases);
+  return match ? { id: match.id, error: null } : { id: null, error };
+}
+
+function resolvePublicationPlanFormatId(
+  rawValue: string,
+  options: ContentFactoryPublicationPlanImportOptions,
+): { id: string | null; error: string | null } {
+  const value = rawValue.trim();
+  if (!value) {
+    return {
+      id: options.defaults.format_id ?? null,
+      error: options.defaults.format_id ? null : "Не найден формат",
+    };
+  }
+  const normalized = normalizePublicationPlanToken(value);
+  if (PUBLICATION_PLAN_GENERIC_FORMATS.has(normalized)) {
+    return {
+      id: options.defaults.format_id ?? null,
+      error: options.defaults.format_id ? null : "Не найден формат",
+    };
+  }
+  return resolvePublicationPlanRequiredId(
+    value,
+    options.defaults.format_id,
+    options.formats,
+    referenceCandidates,
+    "Не найден формат",
+    PUBLICATION_PLAN_FORMAT_ALIASES,
+  );
+}
+
+function parsePublicationPlanDate(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const isoMatch = raw.match(
+    /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2})(?::(\d{1,2}))?)?/,
+  );
+  const ruMatch = raw.match(
+    /^(\d{1,2})[./](\d{1,2})[./](\d{4})(?:\s+(\d{1,2})(?::(\d{1,2}))?)?/,
+  );
+  const match = isoMatch ?? ruMatch;
+  if (!match) throw new Error("Не удалось разобрать дату");
+
+  const [, first, second, third, hourValue, minuteValue] = match;
+  const year = isoMatch ? Number(first) : Number(third);
+  const month = isoMatch ? Number(second) : Number(second);
+  const day = isoMatch ? Number(third) : Number(first);
+  const hour = hourValue === undefined ? 9 : Number(hourValue);
+  const minute = minuteValue === undefined ? 0 : Number(minuteValue);
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute
+  ) {
+    throw new Error("Не удалось разобрать дату");
+  }
+
+  return date.toISOString();
+}
+
+function normalizePublicationPlanStatus(value: string): CFPublicationStatus | null {
+  const normalized = normalizePublicationPlanToken(value);
+  if (!normalized) return "draft";
+  return PUBLICATION_PLAN_STATUS_ALIASES[normalized] ?? null;
+}
+
+function publicationPlanInvalidRow(
+  lineNumber: number,
+  raw: string,
+  columns: string[],
+  error: string,
+): ContentFactoryPublicationPlanImportRow {
+  return { lineNumber, raw, columns, payload: null, error };
+}
+
+export function parseContentFactoryPublicationPlanImportRows(
+  input: string,
+  options: ContentFactoryPublicationPlanImportOptions,
+): ContentFactoryPublicationPlanImportPreview {
+  const rows: ContentFactoryPublicationPlanImportRow[] = [];
+  let headerMap: Partial<Record<PublicationPlanColumnKey, number>> | null = null;
+  let delimiter = "\t";
+
+  input.split(/\r?\n/).forEach((rawLine, index) => {
+    const raw = rawLine.trim();
+    if (!raw) return;
+
+    if (!headerMap) {
+      delimiter = detectPublicationPlanDelimiter(raw);
+      const columns = raw.split(delimiter).map((column) => column.trim());
+      if (!isPublicationPlanHeader(columns)) {
+        rows.push(
+          publicationPlanInvalidRow(
+            index + 1,
+            raw,
+            columns,
+            "Добавьте строку заголовков",
+          ),
+        );
+        return;
+      }
+      headerMap = buildPublicationPlanHeaderMap(columns);
+      return;
+    }
+
+    const columns = raw.split(delimiter).map((column) => column.trim());
+    const lineNumber = index + 1;
+    const title = publicationPlanColumn(columns, headerMap, "title");
+    const body = publicationPlanColumn(columns, headerMap, "body");
+    if (!title && !body) {
+      rows.push(
+        publicationPlanInvalidRow(
+          lineNumber,
+          raw,
+          columns,
+          "Укажите тему или текст публикации",
+        ),
+      );
+      return;
+    }
+
+    const bundle = resolvePublicationPlanRequiredId(
+      publicationPlanColumn(columns, headerMap, "bundle"),
+      options.defaults.bundle_id,
+      options.bundles,
+      referenceCandidates,
+      "Не найдена кампания",
+    );
+    if (bundle.error || !bundle.id) {
+      rows.push(
+        publicationPlanInvalidRow(lineNumber, raw, columns, bundle.error ?? "Не найдена кампания"),
+      );
+      return;
+    }
+
+    const platform = resolvePublicationPlanRequiredId(
+      publicationPlanColumn(columns, headerMap, "platform"),
+      options.defaults.platform_id,
+      options.platforms,
+      referenceCandidates,
+      "Не найдена площадка",
+      PUBLICATION_PLAN_PLATFORM_ALIASES,
+    );
+    if (platform.error || !platform.id) {
+      rows.push(
+        publicationPlanInvalidRow(lineNumber, raw, columns, platform.error ?? "Не найдена площадка"),
+      );
+      return;
+    }
+
+    const format = resolvePublicationPlanFormatId(
+      publicationPlanColumn(columns, headerMap, "format"),
+      options,
+    );
+    if (format.error || !format.id) {
+      rows.push(
+        publicationPlanInvalidRow(lineNumber, raw, columns, format.error ?? "Не найден формат"),
+      );
+      return;
+    }
+
+    const responsible = resolvePublicationPlanRequiredId(
+      publicationPlanColumn(columns, headerMap, "responsible"),
+      options.defaults.responsible_id,
+      options.members.filter((member) => member.is_active),
+      referenceCandidates,
+      "Не найден ответственный",
+    );
+    if (responsible.error || !responsible.id) {
+      rows.push(
+        publicationPlanInvalidRow(
+          lineNumber,
+          raw,
+          columns,
+          responsible.error ?? "Не найден ответственный",
+        ),
+      );
+      return;
+    }
+
+    const rubric = resolvePublicationPlanOptionalId(
+      publicationPlanColumn(columns, headerMap, "rubric"),
+      options.rubrics ?? [],
+      referenceCandidates,
+      "Не найдена рубрика",
+    );
+    if (rubric.error) {
+      rows.push(publicationPlanInvalidRow(lineNumber, raw, columns, rubric.error));
+      return;
+    }
+
+    const nosology = resolvePublicationPlanOptionalId(
+      publicationPlanColumn(columns, headerMap, "nosology"),
+      options.nosologies ?? [],
+      referenceCandidates,
+      "Не найдена нозология",
+    );
+    if (nosology.error) {
+      rows.push(publicationPlanInvalidRow(lineNumber, raw, columns, nosology.error));
+      return;
+    }
+
+    let scheduledAt: string | null;
+    try {
+      scheduledAt = parsePublicationPlanDate(
+        publicationPlanColumn(columns, headerMap, "date"),
+      );
+    } catch (err) {
+      rows.push(
+        publicationPlanInvalidRow(
+          lineNumber,
+          raw,
+          columns,
+          err instanceof Error ? err.message : "Не удалось разобрать дату",
+        ),
+      );
+      return;
+    }
+
+    const status = normalizePublicationPlanStatus(
+      publicationPlanColumn(columns, headerMap, "status"),
+    );
+    if (!status) {
+      rows.push(
+        publicationPlanInvalidRow(lineNumber, raw, columns, "Неизвестный статус"),
+      );
+      return;
+    }
+
+    const note = publicationPlanColumn(columns, headerMap, "note");
+    const utm: Record<string, string> = {
+      cf_import_source: "publication_plan_paste",
+    };
+    if (note) utm.cf_import_note = note;
+
+    rows.push({
+      lineNumber,
+      raw,
+      columns,
+      payload: {
+        bundle_id: bundle.id,
+        platform_id: platform.id,
+        format_id: format.id,
+        responsible_id: responsible.id,
+        rubric_id: rubric.id,
+        nosology_id: nosology.id,
+        title: title || null,
+        body_text: body || null,
+        scheduled_at: scheduledAt,
+        status,
+        utm,
       },
       error: null,
     });

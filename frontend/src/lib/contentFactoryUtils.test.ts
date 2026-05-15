@@ -54,6 +54,7 @@ const {
   getContentFactoryReviewQueueGroups,
   getContentFactoryReviewQueueItemSignal,
   parseContentFactoryMetricImportRows,
+  parseContentFactoryPublicationPlanImportRows,
   groupPublicationsByDate,
   isContentFactoryGuestFollowUpDue,
   isContentFactoryGuestStoryActive,
@@ -1055,6 +1056,111 @@ bad;Охват;100
       [3, "Неизвестное окно измерения"],
       [4, "Укажите название метрики"],
       [5, "Значение метрики должно быть числом"],
+    ],
+  );
+});
+
+const publicationPlanImportReferences = {
+  bundles: [{ id: "bundle-live", name: "Марафон" }],
+  platforms: [
+    { id: "platform-telegram", code: "telegram", display_name: "Telegram" },
+    { id: "platform-vk", code: "vk", display_name: "ВКонтакте" },
+  ],
+  formats: [
+    { id: "format-announcement", code: "announcement", display_name: "Анонс" },
+    { id: "format-live", code: "live", display_name: "Эфир / прямой эфир" },
+  ],
+  rubrics: [{ id: "rubric-live", code: "live", display_name: "Эфир" }],
+  nosologies: [{ id: "nosology-rmj", code: "rmj", display_name: "РМЖ" }],
+  members: [
+    {
+      id: "member-dmitry",
+      full_name: "Дмитрий Васичев",
+      name_variants: ["Дмитрий"],
+      is_active: true,
+    },
+    {
+      id: "member-nadya",
+      full_name: "Надя",
+      name_variants: ["Надежда"],
+      is_active: true,
+    },
+  ],
+  defaults: {
+    bundle_id: "bundle-live",
+    platform_id: "platform-telegram",
+    format_id: "format-announcement",
+    responsible_id: "member-dmitry",
+  },
+};
+
+test("publication plan import maps localized spreadsheet rows to create payloads", () => {
+  const preview = parseContentFactoryPublicationPlanImportRows(
+    `
+Кампания | Дата | Тема | Канал | Формат | Статус | Ответственный | Рубрика | Нозология | Текст | Примечания
+Марафон | 29.01.2026 | Анонс эфира | ВК | Эфир | запланировано | Надя | Эфир | РМЖ | Текст поста | взять фото
+ | 2026-01-30 13:30 | История пациента | | | черновик | | | | |
+`,
+    publicationPlanImportReferences,
+  );
+
+  assert.equal(preview.validRows.length, 2);
+  assert.equal(preview.invalidRows.length, 0);
+  assert.deepEqual(preview.validRows[0]?.payload, {
+    bundle_id: "bundle-live",
+    platform_id: "platform-vk",
+    format_id: "format-live",
+    responsible_id: "member-nadya",
+    rubric_id: "rubric-live",
+    nosology_id: "nosology-rmj",
+    title: "Анонс эфира",
+    body_text: "Текст поста",
+    scheduled_at: "2026-01-29T09:00:00.000Z",
+    status: "scheduled",
+    utm: {
+      cf_import_source: "publication_plan_paste",
+      cf_import_note: "взять фото",
+    },
+  });
+  assert.deepEqual(preview.validRows[1]?.payload, {
+    bundle_id: "bundle-live",
+    platform_id: "platform-telegram",
+    format_id: "format-announcement",
+    responsible_id: "member-dmitry",
+    rubric_id: null,
+    nosology_id: null,
+    title: "История пациента",
+    body_text: null,
+    scheduled_at: "2026-01-30T13:30:00.000Z",
+    status: "draft",
+    utm: {
+      cf_import_source: "publication_plan_paste",
+    },
+  });
+});
+
+test("publication plan import reports validation errors before saving", () => {
+  const preview = parseContentFactoryPublicationPlanImportRows(
+    `
+Дата;Тема;Канал;Формат;Ответственный
+bad;Тема;Telegram;Анонс;Дмитрий
+2026-01-30; ;Telegram;Анонс;Дмитрий
+2026-01-31;Тема;Неизвестно;Анонс;Дмитрий
+2026-02-01;Тема;Telegram;???;Дмитрий
+2026-02-02;Тема;Telegram;Анонс;Никто
+`,
+    publicationPlanImportReferences,
+  );
+
+  assert.equal(preview.validRows.length, 0);
+  assert.deepEqual(
+    preview.invalidRows.map((row) => [row.lineNumber, row.error]),
+    [
+      [3, "Не удалось разобрать дату"],
+      [4, "Укажите тему или текст публикации"],
+      [5, "Не найдена площадка"],
+      [6, "Не найден формат"],
+      [7, "Не найден ответственный"],
     ],
   );
 });

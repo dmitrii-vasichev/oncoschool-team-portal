@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   type ContentFactoryFilterValues,
 } from "@/components/content-factory/ContentFactoryFilters";
 import { ContentFactoryPublicationDialog } from "@/components/content-factory/ContentFactoryPublicationDialog";
+import { ContentFactoryPublicationPlanImportDialog } from "@/components/content-factory/ContentFactoryPublicationPlanImportDialog";
 import { ContentFactoryStatusBadge } from "@/components/content-factory/ContentFactoryStatusBadge";
 import { api } from "@/lib/api";
 import {
@@ -144,6 +146,7 @@ export default function ContentFactoryPublicationsPage() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const latestRequestSeqRef = useRef(0);
 
@@ -273,6 +276,16 @@ export default function ContentFactoryPublicationsPage() {
           </div>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 w-full gap-1.5 rounded-md px-3 text-xs sm:w-auto"
+            onClick={() => setImportOpen(true)}
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Импорт плана
+          </Button>
           <Button
             type="button"
             size="sm"
@@ -463,6 +476,17 @@ export default function ContentFactoryPublicationsPage() {
         nosologies={nosologies}
         members={members}
         onSaved={handlePublicationCreated}
+      />
+      <ContentFactoryPublicationPlanImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        bundles={bundles}
+        platforms={platforms}
+        formats={formats}
+        rubrics={rubrics}
+        nosologies={nosologies}
+        members={members}
+        onImported={fetchData}
       />
     </div>
   );

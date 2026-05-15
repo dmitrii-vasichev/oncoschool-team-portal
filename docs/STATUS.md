@@ -1,5 +1,45 @@
 # Status
 
+## Content Factory Sprint 42 Publication Plan Import
+
+- Current phase: implemented, verified, merged to `main`, and pushed
+- Source: Wave A detailed help is complete through Sprint 41. Sprint 42 starts Wave B by moving the manual Excel/Sheets planning workflow into Content Factory through a safe paste/import preview.
+- Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-42-publication-plan-import-design.md`
+- Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-42-publication-plan-import.md`
+- Scope: frontend-only publication plan parser, import dialog, publications page wiring, source guards, helper tests, durable docs, and frontend verification
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-42-publication-plan-import`.
+  - Inspected `~/Downloads/Контент.xlsx` and confirmed the first import slice should target row-per-publication planning columns, not historical metrics sheets.
+  - Wrote Sprint 42 design and implementation plan.
+  - Added failing helper tests for localized headers, defaults, reference matching, notes, stable dates, and validation errors.
+  - Added `parseContentFactoryPublicationPlanImportRows`.
+  - Added a failing source guard for the publication plan import dialog and route wiring.
+  - Added `ContentFactoryPublicationPlanImportDialog`.
+  - Wired `Импорт плана` into `/content-factory/publications`.
+  - Focused helper and source-guard verification passed after implementation.
+  - Full frontend verification passed.
+  - Merged Sprint 42 into local `main`.
+  - Pushed Sprint 42 to `origin/main`.
+- Key decisions:
+  - Start with paste/import preview instead of direct XLSX upload.
+  - Keep Sprint 42 frontend-only and reuse `createCFPublicationForBundle`.
+  - Block import while any pasted row has validation errors to avoid surprising partial imports.
+  - Store planning notes in `utm.cf_import_note` and mark the source with `utm.cf_import_source`.
+  - Use a stable `09:00:00Z` default for date-only rows so imported items appear in the calendar and can be corrected later.
+- Next actions:
+  - Start Sprint 43: campaign-level cross-channel planning matrix.
+- Latest verification:
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts` failed before implementation because `parseContentFactoryPublicationPlanImportRows` did not exist.
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the import dialog did not exist.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts` passed: 69 tests, with existing Node module-type warning.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 37 tests, with existing Node module-type warning.
+  - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 106 tests, with existing Node module-type warning.
+  - `cd frontend && npm test` passed: 198 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 41 Help For Metrics
 
 - Current phase: implemented, verified, merged to `main`, and pushed

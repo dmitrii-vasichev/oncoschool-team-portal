@@ -1,3 +1,62 @@
+# Active Plan: Content Factory Sprint 42 Publication Plan Import
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-42-publication-plan-import.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add a safe paste/import preview for spreadsheet-like publication plans.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-15-content-factory-sprint-42-publication-plan-import-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-15-content-factory-sprint-42-publication-plan-import.md`
+
+**Milestones:**
+
+1. Add failing helper tests for localized publication plan parsing, reference matching, defaults, notes, dates, and validation errors.
+2. Add a publication plan import dialog and source guard.
+3. Wire the import action into `/content-factory/publications`.
+4. Run focused and full frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented, verified, merged to `main`, and pushed.
+- Sprint 1 through Sprint 42 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- Users can open `Импорт плана` from the publications page.
+- Users can choose default campaign, platform, format, and responsible user.
+- Users can paste rows copied from Excel/Sheets and see a preview.
+- Common columns map to publication payloads: campaign, date, title/theme, platform/channel, format, status, responsible user, rubric, nosology, text, and notes.
+- The import shows row-level validation errors before saving and blocks save while errors exist.
+- Valid rows are created through the existing publication create API.
+- No backend schema or API changes are added.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: helper tests failed before implementation because `parseContentFactoryPublicationPlanImportRows` did not exist.
+- RED confirmed: source-guard tests failed before implementation because the publication plan import dialog did not exist.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts` passed: 69 tests, with existing Node module-type warning.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 37 tests, with existing Node module-type warning.
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 106 tests, with existing Node module-type warning.
+- `cd frontend && npm test` passed: 198 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 41 Help For Metrics
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-41-help-metrics.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

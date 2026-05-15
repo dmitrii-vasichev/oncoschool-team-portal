@@ -296,6 +296,35 @@ test("publications route can create a publication and redirect to detail", () =>
   assert.match(dialogSource, /Кампания/);
 });
 
+test("publications route exposes publication plan import preview", () => {
+  const source = readSource("app/content-factory/publications/page.tsx");
+  const importDialogSource = sourceExists(
+    "components/content-factory/ContentFactoryPublicationPlanImportDialog.tsx",
+  )
+    ? readSource(
+        "components/content-factory/ContentFactoryPublicationPlanImportDialog.tsx",
+      )
+    : "";
+  const utilsSource = readSource("lib/contentFactoryUtils.ts");
+
+  assert.equal(
+    sourceExists(
+      "components/content-factory/ContentFactoryPublicationPlanImportDialog.tsx",
+    ),
+    true,
+  );
+  assert.match(source, /ContentFactoryPublicationPlanImportDialog/);
+  assert.match(source, /setImportOpen/);
+  assert.match(source, /Импорт плана/);
+  assert.match(importDialogSource, /parseContentFactoryPublicationPlanImportRows/);
+  assert.match(importDialogSource, /api\.createCFPublicationForBundle/);
+  assert.match(importDialogSource, /Готово к созданию/);
+  assert.match(importDialogSource, /С ошибками/);
+  assert.match(importDialogSource, /preview\.invalidRows\.length === 0/);
+  assert.match(utilsSource, /parseContentFactoryPublicationPlanImportRows/);
+  assert.match(utilsSource, /cf_import_source/);
+});
+
 test("workspace routes use bundle and publication APIs", () => {
   const bundlesSource = readSource("app/content-factory/bundles/page.tsx");
   const bundleDetailSource = readSource("app/content-factory/bundles/[id]/page.tsx");

@@ -1,5 +1,29 @@
 # Test Plan
 
+## Content Factory Sprint 42 Publication Plan Import
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/publications`.
+2. Click `Импорт плана`.
+3. Confirm default selectors exist for campaign, platform, format, and responsible user.
+4. Paste rows with headers such as `Дата | Тема | Канал | Формат | Статус | Ответственный | Рубрика | Нозология | Текст | Примечания`.
+5. Confirm valid rows appear under `Готово к созданию` with campaign, platform, format, responsible user, status, and date.
+6. Paste a row with an unknown platform or missing topic/text and confirm it appears under `С ошибками`.
+7. Confirm `Импортировать план` is disabled while any row has errors.
+8. Fix the row and confirm the import button becomes enabled.
+9. Import a small test set and confirm the publication list refreshes without redirecting into one created publication.
+10. Open an imported publication and confirm title, body, status, schedule, rubric/nosology, and `utm.cf_import_note` are preserved where provided.
+
 ## Content Factory Sprint 41 Help For Metrics
 
 ### Automated
