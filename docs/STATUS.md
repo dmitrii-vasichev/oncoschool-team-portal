@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 26 Publication Workflow Actions
 
-- Current phase: implemented and full frontend verification passed on branch `codex/content-factory-sprint-26-publication-workflow-actions`
+- Current phase: implemented, verified, merged to `main`, and ready to push
 - Source: Sprint 25 made the review queue actionable, but moving a publication forward still required opening the full edit dialog and choosing a raw workflow status from a generic dropdown.
 - Deep research: `docs/content-factory-market-context-report.md`
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-26-publication-workflow-actions-design.md`
@@ -23,7 +23,7 @@
   - Keep publishing fact capture in the existing `Факт публикации` dialog because it needs actual date and post reference.
   - Keep backend transition validation, approval comments, notifications, bulk changes, automatic publishing, and platform integrations out of scope.
 - Next actions:
-  - Merge and push Sprint 26.
+  - Push `main` to GitHub.
   - Run authenticated manual QA against real publication detail records when useful.
 - Latest verification:
   - `cd frontend && node --test --experimental-strip-types src/lib/contentFactoryUtils.test.ts src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 84 tests, with existing Node module-type warnings.

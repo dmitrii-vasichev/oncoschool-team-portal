@@ -25,7 +25,7 @@
 
 **Implementation status:**
 
-- Implemented and full frontend verification passed on branch `codex/content-factory-sprint-26-publication-workflow-actions`.
+- Implemented, verified, merged to `main`, and ready to push.
 - Sprint 1 through Sprint 25 work is merged to `main`.
 - Sprint 26 builds on the Sprint 25 review triage screen by letting users execute workflow moves from the publication detail page.
 
