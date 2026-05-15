@@ -25,8 +25,8 @@
 
 **Implementation status:**
 
-- Implemented and verified on branch `codex/content-factory-sprint-29-metric-import`.
-- Pending commit, merge to `main`, and push.
+- Implemented, verified, and merged to `main`.
+- Pending push to `origin/main`.
 - Sprint 1 through Sprint 28 work is merged to `main`.
 - Sprint 29 builds on manual metric capture by letting users paste several metric rows from dashboards or spreadsheets without waiting for unstable platform API integrations.
 
