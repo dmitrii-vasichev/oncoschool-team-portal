@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 45 Telegram Publisher
 
-- Current phase: implemented and verified locally; merge and push are next
+- Current phase: implemented, verified, and merged to `main`
 - Source: Wave C first practical platform publishing integration after the platform-neutral queue foundation in Sprint 44.
 - Design: `docs/superpowers/specs/2026-05-15-content-factory-sprint-45-telegram-publisher-design.md`
 - Plan: `docs/superpowers/plans/2026-05-15-content-factory-sprint-45-telegram-publisher.md`
@@ -18,6 +18,8 @@
   - Added failing frontend source guard and implemented `sendCFPublishingQueueItemNow` plus `Отправить сейчас`.
   - Focused backend and frontend source-guard verification passed.
   - Full backend and frontend verification passed.
+  - Fast-forward merged Sprint 45 into local `main`.
+  - Post-merge smoke verification passed on `main`.
 - Key decisions:
   - Sprint 45 is Telegram-only and uses the existing application bot.
   - Only text posts are auto-sent; non-empty `media_refs` fail safely with a readable message.
@@ -25,8 +27,7 @@
   - The queue remains the durable audit trail for automatic publishing attempts.
   - Public post URL is best-effort; Telegram `message_id` is always stored on success.
 - Next actions:
-  - Commit Sprint 45 implementation.
-  - Merge Sprint 45 into `main` and push.
+  - Start Sprint 46: second practical platform publishing integration.
 - Latest verification:
   - RED confirmed: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_publishing_queue_service.py -q` failed before implementation because queue processing primitives did not exist.
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_publishing_queue_service.py -q` passed: 11 tests, with existing pytest-asyncio warning.
@@ -45,6 +46,8 @@
   - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
   - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
   - `git diff --check` passed.
+  - Post-merge smoke on `main`: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_telegram_publisher_service.py tests/test_cf_publishing_scheduler_service.py tests/test_content_factory_publishing_queue_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+  - Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 39 tests, with existing Node module-type warning.
 
 ## Content Factory Sprint 44 Publishing Queue
 
