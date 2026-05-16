@@ -1,3 +1,69 @@
+# Active Plan: Content Factory Sprint 46 VK Publisher
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-16-content-factory-sprint-46-vk-publisher.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add the second real Content Factory publishing integration by sending due VK text publications through the existing publishing queue.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-16-content-factory-sprint-46-vk-publisher-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-16-content-factory-sprint-46-vk-publisher.md`
+
+**Milestones:**
+
+1. Add VK publishing settings and a common platform-neutral publisher error.
+2. Add a VK publisher service that builds plain-text VK posts and calls VK `wall.post`.
+3. Add a Content Factory publisher router and make the scheduler route Telegram and VK by platform code.
+4. Make the frontend queue panel copy platform-neutral for Telegram and VK.
+5. Run backend and frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented and verified locally; merge and push are next.
+- Sprint 1 through Sprint 45 work is merged to `main`.
+
+**Definition of done:**
+
+- Due queued VK text publications can be sent by scheduler or send-now.
+- VK publishing uses configured `VK_API_ACCESS_TOKEN`, `VK_OWNER_ID`, `VK_API_VERSION`, and `VK_FROM_GROUP`.
+- VK text comes from the current `vk` adaptation when available, otherwise from the main publication title/body.
+- Success writes queue audit evidence and updates publication status, published timestamp, VK post id, and best-effort VK wall URL.
+- Failures are visible, retryable, bounded, and written to queue history without leaking tokens.
+- Media posts are blocked with a readable error instead of being sent without attachments.
+- Existing Telegram auto publishing and manual publish evidence remain available.
+- Verification commands pass and docs are updated.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_publisher_service.py tests/test_cf_publishing_scheduler_service.py tests/test_content_factory_publishing_queue_api.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: VK publisher tests failed before implementation because the common publisher error and VK service did not exist.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_publisher_service.py -q` passed: 8 tests, with existing pytest-asyncio warning.
+- RED confirmed: scheduler tests failed before implementation because `publisher_router_service` did not exist.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_publishing_scheduler_service.py -q` passed: 6 tests, with existing pytest-asyncio warning.
+- RED confirmed: frontend source guard failed before implementation because the queue panel still used Telegram-only auto-publishing copy.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 39 tests, with existing Node module-type warning.
+- RED confirmed: scheduler regression test failed before implementation because VK `post_id` was not copied into `publication.platform_post_id`.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_publisher_service.py tests/test_cf_publishing_scheduler_service.py tests/test_content_factory_publishing_queue_api.py -q` passed: 25 tests, with existing pytest-asyncio warning.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q` passed: 679 tests, with existing warnings.
+- `cd frontend && npm test` passed: 202 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 45 Telegram Publisher
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-15-content-factory-sprint-45-telegram-publisher.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

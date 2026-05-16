@@ -489,6 +489,9 @@ test("publication detail route exposes publishing queue foundation", () => {
   assert.match(panelSource, /Ручной обход/);
   assert.match(panelSource, /Отправить сейчас/);
   assert.match(panelSource, /Telegram/);
+  assert.match(panelSource, /VK/);
+  assert.match(panelSource, /Автоотправка/);
+  assert.doesNotMatch(panelSource, /Telegram-автоотправка/);
   assert.match(panelSource, /Журнал очереди/);
   assert.match(panelSource, /api\.enqueueCFPublicationForPublishing/);
   assert.match(panelSource, /api\.retryCFPublishingQueueItem/);

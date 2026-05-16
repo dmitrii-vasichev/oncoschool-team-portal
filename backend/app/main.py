@@ -30,9 +30,14 @@ from app.config import settings
 from app.db.database import async_session
 from app.services.broadcast_scheduler_service import BroadcastSchedulerService
 from app.services.content_cleanup_service import ContentCleanupService
+from app.services.content_factory.publisher_router_service import (
+    ContentFactoryPublisherRouter,
+)
 from app.services.content_factory.publishing_scheduler_service import (
     ContentFactoryPublishingSchedulerService,
 )
+from app.services.content_factory.telegram_publisher_service import TelegramPublisherService
+from app.services.content_factory.vk_publisher_service import VKPublisherService
 from app.services.meeting_scheduler_service import MeetingSchedulerService
 from app.services.meeting_transcription_scheduler_service import (
     MeetingTranscriptionSchedulerService,
@@ -179,6 +184,10 @@ broadcast_scheduler = BroadcastSchedulerService(
 content_factory_publishing_scheduler = ContentFactoryPublishingSchedulerService(
     bot=bot,
     session_maker=async_session,
+    publisher=ContentFactoryPublisherRouter(
+        telegram_provider=TelegramPublisherService(),
+        vk_provider=VKPublisherService(),
+    ),
 )
 app.state.content_factory_publishing_scheduler = content_factory_publishing_scheduler
 

@@ -1,5 +1,33 @@
 # Test Plan
 
+## Content Factory Sprint 46 VK Publisher
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_publisher_service.py tests/test_cf_publishing_scheduler_service.py tests/test_content_factory_publishing_queue_api.py -q`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q`
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Configure `VK_API_ACCESS_TOKEN`, `VK_OWNER_ID`, `VK_API_VERSION`, and `VK_FROM_GROUP`.
+2. Open a scheduled VK publication without `media_refs`.
+3. Save a current VK channel adaptation.
+4. Put it into the publishing queue.
+5. Click `Отправить сейчас` and confirm the queue item becomes successful.
+6. Confirm the publication status becomes `Опубликовано`.
+7. Confirm `platform_post_id` and `platform_post_url` are filled.
+8. Open the VK wall URL and confirm the post text is correct.
+9. Repeat with missing VK config and confirm the queue records a readable configuration error.
+10. Repeat with non-empty `media_refs` and confirm the queue records a readable text-only limitation.
+11. Confirm Telegram auto publishing still works after the provider router change.
+12. Confirm manual publish evidence controls remain available after automatic publishing.
+
 ## Content Factory Sprint 45 Telegram Publisher
 
 ### Automated

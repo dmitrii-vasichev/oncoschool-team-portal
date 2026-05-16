@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # Content module — Telegram userbot encryption
     TELEGRAM_ENCRYPTION_KEY: str = ""
 
+    # Content Factory — VK publishing
+    VK_API_ACCESS_TOKEN: str = ""
+    VK_API_VERSION: str = "5.199"
+    VK_OWNER_ID: str = ""
+    VK_FROM_GROUP: bool = True
+
     # General
     DEBUG: bool = False
     TIMEZONE: str = "Europe/Moscow"

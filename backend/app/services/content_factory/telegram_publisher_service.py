@@ -15,6 +15,7 @@ from app.db.models import (
     TelegramNotificationTarget,
 )
 from app.db.repositories import TelegramTargetRepository
+from app.services.content_factory.publisher_errors import ContentFactoryPublisherError
 
 
 CONTENT_FACTORY_TARGET_TYPE = "content_factory"
@@ -22,8 +23,11 @@ TELEGRAM_CHANNEL = "telegram"
 PUBLISHABLE_STATUSES = {"approved", "scheduled"}
 
 
-class TelegramPublisherError(RuntimeError):
+class TelegramPublisherError(ContentFactoryPublisherError):
     """Raised when a Telegram publication cannot be sent safely."""
+
+    def __init__(self, message: str):
+        super().__init__(message, platform=TELEGRAM_CHANNEL)
 
 
 def build_telegram_message(

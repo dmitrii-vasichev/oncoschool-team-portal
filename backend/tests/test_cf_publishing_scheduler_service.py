@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.services.content_factory.publisher_errors import ContentFactoryPublisherError
+from app.services.content_factory.publisher_router_service import (
+    ContentFactoryPublisherRouter,
+)
 from app.services.content_factory.publishing_queue_service import PublishingQueueService
 from app.services.content_factory.publishing_scheduler_service import (
     ContentFactoryPublishingSchedulerService,
@@ -29,6 +33,7 @@ def make_publication(item=None, **overrides):
     item = item or make_queue_item()
     base = {
         "id": item.publication_id,
+        "platform_id": item.platform_id,
         "status": "scheduled",
         "actual_published_at": None,
         "platform_post_id": None,
@@ -114,6 +119,48 @@ async def test_send_now_marks_processing_sends_and_marks_success(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_now_records_vk_post_id_on_publication(monkeypatch):
+    item = make_queue_item()
+    publication = make_publication(item)
+    session = make_session(publication)
+    publisher = SimpleNamespace(
+        publish=AsyncMock(
+            return_value={
+                "platform": "vk",
+                "post_id": "456",
+                "post_url": "https://vk.com/wall-123_456",
+            }
+        )
+    )
+    service = ContentFactoryPublishingSchedulerService(
+        bot=SimpleNamespace(),
+        session_maker=FakeSessionMaker(session),
+        publisher=publisher,
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "get_item",
+        AsyncMock(return_value=item),
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "mark_processing",
+        AsyncMock(return_value=item),
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "record_attempt_success",
+        AsyncMock(return_value=item),
+    )
+
+    await service.send_now(session, item.id, actor_id=uuid.uuid4())
+
+    assert publication.status == "published"
+    assert publication.platform_post_id == "456"
+    assert publication.platform_post_url == "https://vk.com/wall-123_456"
+
+
+@pytest.mark.asyncio
 async def test_send_now_records_failure_when_publisher_rejects(monkeypatch):
     item = make_queue_item()
     session = make_session(make_publication(item))
@@ -170,3 +217,70 @@ async def test_process_due_queue_processes_each_due_item(monkeypatch):
     assert result == {"attempted": 2, "succeeded": 2, "failed": 0}
     assert service._process_item.await_count == 2
     session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_router_sends_vk_publication_to_vk_provider():
+    item = make_queue_item()
+    publication = make_publication(item)
+    platform = SimpleNamespace(id=item.platform_id, code="vk")
+    session = make_session(publication)
+    session.get = AsyncMock(side_effect=[publication, platform])
+    vk_provider = SimpleNamespace(
+        publish_loaded=AsyncMock(return_value={"platform": "vk", "post_id": "1"})
+    )
+    router = ContentFactoryPublisherRouter(
+        telegram_provider=SimpleNamespace(),
+        vk_provider=vk_provider,
+    )
+
+    result = await router.publish(session, item, bot=SimpleNamespace())
+
+    assert result == {"platform": "vk", "post_id": "1"}
+    vk_provider.publish_loaded.assert_awaited_once_with(
+        session=session,
+        publication=publication,
+        platform=platform,
+        item=item,
+    )
+
+
+@pytest.mark.asyncio
+async def test_send_now_records_common_provider_failure_platform(monkeypatch):
+    item = make_queue_item()
+    session = make_session(make_publication(item))
+    publisher = SimpleNamespace(
+        publish=AsyncMock(
+            side_effect=ContentFactoryPublisherError(
+                "VK API token is not configured",
+                platform="vk",
+            )
+        )
+    )
+    service = ContentFactoryPublishingSchedulerService(
+        bot=SimpleNamespace(),
+        session_maker=FakeSessionMaker(session),
+        publisher=publisher,
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "get_item",
+        AsyncMock(return_value=item),
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "mark_processing",
+        AsyncMock(return_value=item),
+    )
+    monkeypatch.setattr(
+        PublishingQueueService,
+        "record_attempt_failure",
+        AsyncMock(return_value=item),
+    )
+
+    result = await service.send_now(session, item.id, actor_id=uuid.uuid4())
+
+    assert result is item
+    failure_kwargs = PublishingQueueService.record_attempt_failure.await_args.kwargs
+    assert failure_kwargs["error_message"] == "VK API token is not configured"
+    assert failure_kwargs["provider_response"] == {"platform": "vk"}

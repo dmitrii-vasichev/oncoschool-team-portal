@@ -114,7 +114,7 @@ In `backend/app/config.py`, add:
     # VK publishing
     VK_API_ACCESS_TOKEN: str = ""
     VK_API_VERSION: str = "5.199"
-    VK_OWNER_ID: int | None = None
+    VK_OWNER_ID: str = ""
     VK_FROM_GROUP: bool = True
 ```
 
@@ -172,9 +172,10 @@ class VKPublisherConfig:
 
     @classmethod
     def from_settings(cls) -> "VKPublisherConfig":
+        raw_owner_id = str(settings.VK_OWNER_ID).strip()
         return cls(
             access_token=settings.VK_API_ACCESS_TOKEN,
-            owner_id=settings.VK_OWNER_ID,
+            owner_id=int(raw_owner_id) if raw_owner_id else None,
             api_version=settings.VK_API_VERSION,
             from_group=settings.VK_FROM_GROUP,
         )

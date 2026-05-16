@@ -40,7 +40,7 @@ Add these backend settings:
 
 - `VK_API_ACCESS_TOKEN: str = ""`
 - `VK_API_VERSION: str = "5.199"`
-- `VK_OWNER_ID: int | None = None`
+- `VK_OWNER_ID: str = ""`, parsed to `int | None` by the VK publisher
 - `VK_FROM_GROUP: bool = True`
 
 The first implementation uses a single configured VK destination because the team needs one working publishing path before target management becomes useful. For group/community posting, `VK_OWNER_ID` is expected to be the VK wall owner id used by `wall.post`; community walls normally use a negative owner id. `VK_FROM_GROUP` is sent as `1` when enabled.

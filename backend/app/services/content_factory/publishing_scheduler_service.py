@@ -8,13 +8,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.models import CFPublication, CFPublishingQueueItem
+from app.services.content_factory.publisher_errors import ContentFactoryPublisherError
+from app.services.content_factory.publisher_router_service import (
+    ContentFactoryPublisherRouter,
+)
 from app.services.content_factory.publishing_queue_service import (
     PublishingQueueService,
     PublishingQueueValidationError,
-)
-from app.services.content_factory.telegram_publisher_service import (
-    TelegramPublisherError,
-    TelegramPublisherService,
 )
 
 
@@ -31,11 +31,11 @@ class ContentFactoryPublishingSchedulerService:
         *,
         bot,
         session_maker: async_sessionmaker,
-        publisher: TelegramPublisherService | None = None,
+        publisher: ContentFactoryPublisherRouter | None = None,
     ):
         self.bot = bot
         self.session_maker = session_maker
-        self.publisher = publisher or TelegramPublisherService()
+        self.publisher = publisher or ContentFactoryPublisherRouter()
         self.scheduler = AsyncIOScheduler()
 
     def start(self) -> None:
@@ -143,13 +143,13 @@ class ContentFactoryPublishingSchedulerService:
                 item,
                 bot=self.bot,
             )
-        except TelegramPublisherError as exc:
+        except ContentFactoryPublisherError as exc:
             await PublishingQueueService.record_attempt_failure(
                 session,
                 item,
                 error_message=str(exc),
                 retry_after=timedelta(minutes=5),
-                provider_response={"platform": "telegram"},
+                provider_response={"platform": exc.platform or "unknown"},
             )
             return False
 
@@ -177,6 +177,8 @@ class ContentFactoryPublishingSchedulerService:
             return
         publication.status = "published"
         publication.actual_published_at = datetime.now(timezone.utc)
-        publication.platform_post_id = provider_response.get("message_id")
+        publication.platform_post_id = provider_response.get(
+            "message_id"
+        ) or provider_response.get("post_id")
         publication.platform_post_url = provider_response.get("post_url")
         await session.flush()

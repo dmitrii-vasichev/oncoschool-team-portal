@@ -145,7 +145,7 @@ export function ContentFactoryPublishingQueuePanel({
     setAction("send_now");
     try {
       await api.sendCFPublishingQueueItemNow(latestItem.id);
-      toastSuccess("Отправка в Telegram выполнена или записана в журнал");
+      toastSuccess("Автоотправка выполнена или записана в журнал");
       await onChanged();
     } catch (err) {
       toastError(
@@ -190,8 +190,8 @@ export function ContentFactoryPublishingQueuePanel({
               Очередь публикации
             </h2>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Telegram-автоотправка: очередь, попытки, ошибки и ручной обход.
-              Факт выхода всё ещё можно фиксировать отдельно.
+              Автоотправка в Telegram и VK: очередь, попытки, ошибки и
+              ручной обход. Факт выхода всё ещё можно фиксировать отдельно.
             </p>
           </div>
         </div>
