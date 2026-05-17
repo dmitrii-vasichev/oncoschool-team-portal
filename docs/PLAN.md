@@ -19,8 +19,7 @@
 
 **Implementation status:**
 
-- Implemented and locally verified on branch `codex/content-factory-sprint-48-vk-metrics-collector`.
-- Merge to `main` and push are pending.
+- Implemented, locally verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 47 work is merged to `main` and pushed.
 - Full DB-dependent backend verification is still pending a local Postgres/Docker runtime; local Postgres on `localhost:5434` is currently unavailable.
 
@@ -66,6 +65,8 @@ git diff --check
 - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
 - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
 - `git diff --check` passed.
+- Post-merge smoke on `main`: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+- Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 40 tests, with existing Node module-type warning.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 48 VK Metrics Collector
 
-- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-48-vk-metrics-collector`
+- Current phase: implemented, locally verified, merged to `main`, and pushed
 - Source: Wave D first practical automated metric source after the Sprint 47 metric integration foundation.
 - Design: `docs/superpowers/specs/2026-05-17-content-factory-sprint-48-vk-metrics-collector-design.md`
 - Plan: `docs/superpowers/plans/2026-05-17-content-factory-sprint-48-vk-metrics-collector.md`
@@ -17,6 +17,9 @@
   - Wired the metric import scheduler into FastAPI startup/shutdown.
   - Added failing frontend source guard and implemented `CFMetricSourceRunRequest` plus `api.runCFMetricSource`.
   - Focused backend verification, extended backend verification, frontend tests, typecheck, lint, build, and diff verification passed.
+  - Fast-forward merged Sprint 48 into local `main`.
+  - Post-merge smoke verification passed on `main`.
+  - Pushed Sprint 48 to `origin/main`.
 - Key decisions:
   - Sprint 48 starts with VK because VK exposes post-level counters through API methods that fit the current publication model.
   - Telegram metric automation is deferred because the Telegram Bot API does not expose post analytics; Telegram Core stats require separate MTProto/admin access.
@@ -25,7 +28,6 @@
   - VK collector stores raw provider snippets on each metric snapshot for audit without storing credentials.
   - Automatic metric import is scheduler-driven but does nothing unless active `vk_api` metric sources exist.
 - Next actions:
-  - Merge Sprint 48 into `main` and push.
   - Run authenticated manual QA for Sprint 48 against a real VK community, a real published VK post, missing-token config, invalid post identity, dedupe behavior, import-run history, and metric-history provenance.
   - Start Sprint 49: production readiness, onboarding, and end-to-end QA for the full Content Factory workflow.
 - Latest verification:
@@ -45,6 +47,8 @@
   - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
   - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
   - `git diff --check` passed.
+  - Post-merge smoke on `main`: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+  - Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 40 tests, with existing Node module-type warning.
 
 ## Content Factory Sprint 47 Metrics Integration Foundation
 
