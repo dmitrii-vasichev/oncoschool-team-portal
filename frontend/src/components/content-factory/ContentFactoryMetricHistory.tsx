@@ -11,7 +11,11 @@ import {
   CF_METRIC_WINDOW_LABELS,
   formatContentFactoryMetricValue,
 } from "@/lib/contentFactoryUtils";
-import type { CFMetricSnapshot, TeamMember } from "@/lib/types";
+import type {
+  CFMetricSnapshot,
+  CFMetricSourceConfig,
+  TeamMember,
+} from "@/lib/types";
 
 function formatDateTime(value: string): string {
   const date = new Date(value);
@@ -27,11 +31,13 @@ function formatDateTime(value: string): string {
 export function ContentFactoryMetricHistory({
   publicationId,
   metrics,
+  metricSources = [],
   members,
   onRecorded,
 }: {
   publicationId: string;
   metrics: CFMetricSnapshot[];
+  metricSources?: CFMetricSourceConfig[];
   members: TeamMember[];
   onRecorded: () => void | Promise<void>;
 }) {
@@ -40,6 +46,10 @@ export function ContentFactoryMetricHistory({
   const memberNames = useMemo(
     () => new Map(members.map((member) => [member.id, member.full_name])),
     [members],
+  );
+  const metricSourceNames = useMemo(
+    () => new Map(metricSources.map((source) => [source.id, source.name])),
+    [metricSources],
   );
   const sortedMetrics = useMemo(
     () =>
@@ -116,6 +126,27 @@ export function ContentFactoryMetricHistory({
                 </span>
                 {metric.source_method && <span>{metric.source_method}</span>}
               </div>
+              {(metric.source_config_id ||
+                metric.import_run_id ||
+                metric.external_metric_id ||
+                metric.dedupe_key) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>
+                    Интеграция:{" "}
+                    {metric.source_config_id
+                      ? metricSourceNames.get(metric.source_config_id) ??
+                        "Источник метрик"
+                      : "Источник метрик"}
+                  </span>
+                  {metric.import_run_id && (
+                    <span>Прогон: {metric.import_run_id.slice(0, 8)}</span>
+                  )}
+                  {metric.external_metric_id && (
+                    <span>Внешний ID: {metric.external_metric_id}</span>
+                  )}
+                  {metric.dedupe_key && <span>Дубликаты защищены</span>}
+                </div>
+              )}
               {metric.note && (
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                   {metric.note}

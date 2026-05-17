@@ -35,6 +35,7 @@ import type {
   CFExternalSegment,
   CFFormat,
   CFMetricSnapshot,
+  CFMetricSourceConfig,
   CFNosology,
   CFPlatform,
   CFPublication,
@@ -95,6 +96,7 @@ export default function ContentFactoryPublicationDetailPage() {
   >([]);
   const [variants, setVariants] = useState<CFPublicationVariant[]>([]);
   const [metrics, setMetrics] = useState<CFMetricSnapshot[]>([]);
+  const [metricSources, setMetricSources] = useState<CFMetricSourceConfig[]>([]);
   const [publishingQueueItems, setPublishingQueueItems] = useState<
     CFPublishingQueueItem[]
   >([]);
@@ -124,6 +126,7 @@ export default function ContentFactoryPublicationDetailPage() {
         segmentTargetRes,
         variantRes,
         metricRes,
+        metricSourceRes,
         publishingQueueRes,
       ] = await Promise.all([
         api.getCFPublication(id),
@@ -138,6 +141,7 @@ export default function ContentFactoryPublicationDetailPage() {
           .catch(() => [] as CFPublicationSegmentTarget[]),
         api.getCFPublicationVariants(id).catch(() => [] as CFPublicationVariant[]),
         api.getCFMetrics(id).catch(() => [] as CFMetricSnapshot[]),
+        api.getCFMetricSources().catch(() => [] as CFMetricSourceConfig[]),
         api.getCFPublishingQueueForPublication(id)
           .catch(() => [] as CFPublishingQueueItem[]),
       ]);
@@ -161,6 +165,7 @@ export default function ContentFactoryPublicationDetailPage() {
       setSegmentTargets(segmentTargetRes);
       setVariants(variantRes);
       setMetrics(metricRes);
+      setMetricSources(metricSourceRes);
       setPublishingQueueItems(publishingQueueRes);
       setPublishingQueueEvents(publishingQueueEventRes);
     } catch (err) {
@@ -348,6 +353,7 @@ export default function ContentFactoryPublicationDetailPage() {
           <ContentFactoryMetricHistory
             publicationId={publication.id}
             metrics={metrics}
+            metricSources={metricSources}
             members={members}
             onRecorded={handleSaved}
           />

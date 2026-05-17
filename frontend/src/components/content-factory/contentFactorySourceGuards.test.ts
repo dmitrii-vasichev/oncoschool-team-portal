@@ -623,6 +623,26 @@ test("metric capture surfaces use readable labels and presets", () => {
   assert.doesNotMatch(effectivenessSource, /\{latestMetric\.confidence\}/);
 });
 
+test("metric integration foundation is visible in frontend contracts and history", () => {
+  const typesSource = readSource("lib/types.ts");
+  const apiSource = readSource("lib/api.ts");
+  const historySource = readSource(
+    "components/content-factory/ContentFactoryMetricHistory.tsx",
+  );
+  const detailSource = readSource("app/content-factory/publications/[id]/page.tsx");
+
+  assert.match(typesSource, /CFMetricSourceConfig/);
+  assert.match(typesSource, /CFMetricImportRun/);
+  assert.match(typesSource, /source_config_id/);
+  assert.match(typesSource, /import_run_id/);
+  assert.match(apiSource, /getCFMetricSources/);
+  assert.match(apiSource, /getCFMetricImportRuns/);
+  assert.match(detailSource, /api\.getCFMetricSources/);
+  assert.match(historySource, /metricSources/);
+  assert.match(historySource, /Интеграция/);
+  assert.match(historySource, /external_metric_id/);
+});
+
 test("review queue route groups publications by workflow status", () => {
   const source = readSource("app/content-factory/review/page.tsx");
   const utilsSource = readSource("lib/contentFactoryUtils.ts");

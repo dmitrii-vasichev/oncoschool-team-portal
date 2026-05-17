@@ -124,6 +124,12 @@ import type {
   CFSegmentSnapshot,
   CFMetricSnapshot,
   CFMetricSnapshotCreateRequest,
+  CFMetricSourceConfig,
+  CFMetricSourceConfigCreateRequest,
+  CFMetricSourceConfigUpdateRequest,
+  CFMetricSourceListParams,
+  CFMetricImportRun,
+  CFMetricImportRunListParams,
   CFRetroNote,
   CFRetroNoteCreateRequest,
   CFRetroNoteUpdateRequest,
@@ -1027,6 +1033,59 @@ class ApiClient {
         method: "POST",
         body: JSON.stringify(data),
       }
+    );
+  }
+
+  async getCFMetricSources(
+    params?: CFMetricSourceListParams
+  ): Promise<CFMetricSourceConfig[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFMetricSourceConfig[]>(
+      `/api/content-factory/metric-sources${query}`
+    );
+  }
+
+  async createCFMetricSource(
+    data: CFMetricSourceConfigCreateRequest
+  ): Promise<CFMetricSourceConfig> {
+    return this.request<CFMetricSourceConfig>(
+      "/api/content-factory/metric-sources",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async updateCFMetricSource(
+    sourceConfigId: string,
+    data: CFMetricSourceConfigUpdateRequest
+  ): Promise<CFMetricSourceConfig> {
+    return this.request<CFMetricSourceConfig>(
+      `/api/content-factory/metric-sources/${sourceConfigId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async getCFMetricImportRuns(
+    params?: CFMetricImportRunListParams
+  ): Promise<CFMetricImportRun[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFMetricImportRun[]>(
+      `/api/content-factory/metric-import-runs${query}`
+    );
+  }
+
+  async getCFMetricSourceImportRuns(
+    sourceConfigId: string,
+    params?: Omit<CFMetricImportRunListParams, "source_config_id">
+  ): Promise<CFMetricImportRun[]> {
+    const query = this.buildQuery(params);
+    return this.request<CFMetricImportRun[]>(
+      `/api/content-factory/metric-sources/${sourceConfigId}/import-runs${query}`
     );
   }
 

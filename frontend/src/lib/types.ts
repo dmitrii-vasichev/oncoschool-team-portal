@@ -143,6 +143,13 @@ export type CFMetricSource =
   | "parser"
   | "import";
 export type CFConfidence = "high" | "medium" | "low";
+export type CFMetricImportRunStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "partial";
+export type CFMetricImportRunTrigger = "manual" | "scheduled" | "system" | "test";
 export type CFRetroType = "weekly" | "monthly" | "bundle" | "adhoc";
 export type CFSegmentSource = "getcourse";
 export type CFGuestStoryRole =
@@ -1490,6 +1497,10 @@ export interface CFMetricSnapshot {
   raw_payload: CFJsonObject | null;
   note: string | null;
   captured_by_id: string | null;
+  source_config_id: string | null;
+  import_run_id: string | null;
+  external_metric_id: string | null;
+  dedupe_key: string | null;
   captured_at: string;
 }
 
@@ -1505,6 +1516,82 @@ export interface CFMetricSnapshotCreateRequest {
   raw_payload?: CFJsonObject | null;
   note?: string | null;
   captured_by_id?: string | null;
+  source_config_id?: string | null;
+  import_run_id?: string | null;
+  external_metric_id?: string | null;
+  dedupe_key?: string | null;
+}
+
+export interface CFMetricSourceConfig {
+  id: string;
+  source: CFMetricSource;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  freshness_window_hours: number;
+  default_confidence: CFConfidence;
+  config: CFJsonObject;
+  credentials_ref: string | null;
+  created_by_id: string | null;
+  last_run_at: string | null;
+  last_success_at: string | null;
+  last_error_at: string | null;
+  last_error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFMetricSourceConfigCreateRequest {
+  source: CFMetricSource;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+  freshness_window_hours?: number;
+  default_confidence?: CFConfidence;
+  config?: CFJsonObject;
+  credentials_ref?: string | null;
+}
+
+export interface CFMetricSourceConfigUpdateRequest {
+  name?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+  freshness_window_hours?: number;
+  default_confidence?: CFConfidence;
+  config?: CFJsonObject;
+  credentials_ref?: string | null;
+}
+
+export interface CFMetricSourceListParams {
+  source?: CFMetricSource;
+  is_active?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CFMetricImportRun {
+  id: string;
+  source_config_id: string;
+  status: CFMetricImportRunStatus;
+  triggered_by: CFMetricImportRunTrigger;
+  requested_by_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  found_count: number;
+  created_count: number;
+  skipped_duplicate_count: number;
+  error_count: number;
+  error_message: string | null;
+  raw_summary: CFJsonObject | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CFMetricImportRunListParams {
+  source_config_id?: string;
+  status?: CFMetricImportRunStatus;
+  limit?: number;
+  offset?: number;
 }
 
 export interface CFRetroNote {
