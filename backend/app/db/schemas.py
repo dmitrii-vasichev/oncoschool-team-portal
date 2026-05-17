@@ -101,6 +101,8 @@ CFMetricSourceType = Literal[
     "email_provider", "getcourse", "parser", "import",
 ]
 CFConfidenceType = Literal["high", "medium", "low"]
+CFMetricImportRunStatusType = Literal["pending", "running", "succeeded", "failed", "partial"]
+CFMetricImportRunTriggerType = Literal["manual", "scheduled", "system", "test"]
 CFRetroType = Literal["weekly", "monthly", "bundle", "adhoc"]
 CFSegmentSourceType = Literal["getcourse"]
 CFGuestStoryRoleType = Literal[
@@ -1675,11 +1677,89 @@ class CFMetricSnapshotCreate(BaseModel):
     raw_payload: dict | None = None
     note: str | None = None
     captured_by_id: uuid.UUID | None = None
+    source_config_id: uuid.UUID | None = None
+    import_run_id: uuid.UUID | None = None
+    external_metric_id: str | None = Field(default=None, max_length=200)
+    dedupe_key: str | None = Field(default=None, max_length=500)
 
 
 class CFMetricSnapshotResponse(CFMetricSnapshotCreate):
     id: uuid.UUID
     captured_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFMetricSourceConfigBase(BaseModel):
+    source: CFMetricSourceType
+    name: str = Field(..., max_length=200)
+    description: str | None = None
+    is_active: bool = True
+    freshness_window_hours: int = Field(default=24, ge=1)
+    default_confidence: CFConfidenceType = "medium"
+    config: dict = Field(default_factory=dict)
+    credentials_ref: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name must not be blank")
+        return stripped
+
+
+class CFMetricSourceConfigCreate(CFMetricSourceConfigBase):
+    created_by_id: uuid.UUID | None = None
+
+
+class CFMetricSourceConfigUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    description: str | None = None
+    is_active: bool | None = None
+    freshness_window_hours: int | None = Field(default=None, ge=1)
+    default_confidence: CFConfidenceType | None = None
+    config: dict | None = None
+    credentials_ref: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name must not be blank")
+        return stripped
+
+
+class CFMetricSourceConfigResponse(CFMetricSourceConfigBase):
+    id: uuid.UUID
+    created_by_id: uuid.UUID | None = None
+    last_run_at: datetime | None = None
+    last_success_at: datetime | None = None
+    last_error_at: datetime | None = None
+    last_error_message: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CFMetricImportRunResponse(BaseModel):
+    id: uuid.UUID
+    source_config_id: uuid.UUID
+    status: CFMetricImportRunStatusType
+    triggered_by: CFMetricImportRunTriggerType
+    requested_by_id: uuid.UUID | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    found_count: int = 0
+    created_count: int = 0
+    skipped_duplicate_count: int = 0
+    error_count: int = 0
+    error_message: str | None = None
+    raw_summary: dict | None = None
+    created_at: datetime
+    updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -23,6 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
     and_,
     inspect,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, foreign, mapped_column, relationship
@@ -1818,8 +1819,82 @@ class CFPublicationSegmentTarget(Base):
     publication: Mapped["CFPublication"] = relationship(back_populates="segment_targets")
 
 
+class CFMetricSourceConfig(Base):
+    __tablename__ = "cf_metric_source_config"
+    __table_args__ = (
+        Index("ix_cf_metric_source_config_source_active", "source", "is_active"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source: Mapped[str] = mapped_column(String(30), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    freshness_window_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24, server_default="24")
+    default_confidence: Mapped[str] = mapped_column(String(10), nullable=False, default="medium", server_default="medium")
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    credentials_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    import_runs: Mapped[list["CFMetricImportRun"]] = relationship(
+        back_populates="source_config",
+        cascade="all, delete-orphan",
+        order_by="CFMetricImportRun.created_at.desc()",
+    )
+    metric_snapshots: Mapped[list["CFMetricSnapshot"]] = relationship(back_populates="source_config")
+
+
+class CFMetricImportRun(Base):
+    __tablename__ = "cf_metric_import_run"
+    __table_args__ = (
+        Index("ix_cf_metric_import_run_source_created", "source_config_id", "created_at"),
+        Index("ix_cf_metric_import_run_status", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_config_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_metric_source_config.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending", server_default="pending")
+    triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="manual", server_default="manual")
+    requested_by_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True
+    )
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    found_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    skipped_duplicate_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    error_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    source_config: Mapped["CFMetricSourceConfig"] = relationship(back_populates="import_runs")
+    metric_snapshots: Mapped[list["CFMetricSnapshot"]] = relationship(back_populates="import_run")
+
+
 class CFMetricSnapshot(Base):
     __tablename__ = "cf_metric_snapshot"
+    __table_args__ = (
+        Index("ix_cf_metric_snapshot_source_config", "source_config_id"),
+        Index("ix_cf_metric_snapshot_import_run", "import_run_id"),
+        Index(
+            "uq_cf_metric_snapshot_dedupe_key",
+            "dedupe_key",
+            unique=True,
+            postgresql_where=text("dedupe_key IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     publication_id: Mapped[uuid.UUID] = mapped_column(
@@ -1838,8 +1913,18 @@ class CFMetricSnapshot(Base):
     captured_by_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("team_members.id"), nullable=True
     )
+    source_config_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_metric_source_config.id", ondelete="SET NULL"), nullable=True
+    )
+    import_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cf_metric_import_run.id", ondelete="SET NULL"), nullable=True
+    )
+    external_metric_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    dedupe_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     publication: Mapped["CFPublication"] = relationship(back_populates="metric_snapshots")
+    source_config: Mapped["CFMetricSourceConfig | None"] = relationship(back_populates="metric_snapshots")
+    import_run: Mapped["CFMetricImportRun | None"] = relationship(back_populates="metric_snapshots")
 
 
 class CFRetroNote(Base):

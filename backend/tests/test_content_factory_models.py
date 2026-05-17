@@ -74,6 +74,22 @@ class TestContentFactoryCoreModels(unittest.TestCase):
     def test_cf_metric_snapshot_exists(self):
         self.assertEqual(models.CFMetricSnapshot.__tablename__, "cf_metric_snapshot")
 
+    def test_cf_metric_source_config_exists(self):
+        self.assertEqual(models.CFMetricSourceConfig.__tablename__, "cf_metric_source_config")
+        self.assertTrue(hasattr(models.CFMetricSourceConfig, "freshness_window_hours"))
+        self.assertTrue(hasattr(models.CFMetricSourceConfig, "last_success_at"))
+
+    def test_cf_metric_import_run_exists(self):
+        self.assertEqual(models.CFMetricImportRun.__tablename__, "cf_metric_import_run")
+        self.assertTrue(hasattr(models.CFMetricImportRun, "skipped_duplicate_count"))
+        self.assertTrue(hasattr(models.CFMetricImportRun, "raw_summary"))
+
+    def test_cf_metric_snapshot_provenance_fields_exist(self):
+        self.assertTrue(hasattr(models.CFMetricSnapshot, "source_config_id"))
+        self.assertTrue(hasattr(models.CFMetricSnapshot, "import_run_id"))
+        self.assertTrue(hasattr(models.CFMetricSnapshot, "external_metric_id"))
+        self.assertTrue(hasattr(models.CFMetricSnapshot, "dedupe_key"))
+
     def test_cf_retro_note_exists(self):
         self.assertEqual(models.CFRetroNote.__tablename__, "cf_retro_note")
 

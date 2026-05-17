@@ -181,6 +181,61 @@ class TestCFCoreSchemas(unittest.TestCase):
         )
         self.assertEqual(m.metric_value, 605)
 
+    def test_cf_metric_source_config_create_ok(self):
+        payload = schemas.CFMetricSourceConfigCreate(
+            source="vk_api",
+            name="VK community metrics",
+            freshness_window_hours=24,
+            default_confidence="medium",
+            config={"owner_id": "-123"},
+        )
+        self.assertEqual(payload.source, "vk_api")
+        self.assertEqual(payload.name, "VK community metrics")
+        self.assertEqual(payload.config["owner_id"], "-123")
+
+    def test_cf_metric_source_config_rejects_blank_name(self):
+        with self.assertRaises(ValidationError):
+            schemas.CFMetricSourceConfigCreate(source="vk_api", name=" ")
+
+    def test_cf_metric_import_run_response_ok(self):
+        now = datetime.now(UTC)
+        run = schemas.CFMetricImportRunResponse(
+            id=uuid.uuid4(),
+            source_config_id=uuid.uuid4(),
+            status="succeeded",
+            triggered_by="manual",
+            requested_by_id=uuid.uuid4(),
+            started_at=now,
+            finished_at=now,
+            found_count=10,
+            created_count=8,
+            skipped_duplicate_count=2,
+            error_count=0,
+            error_message=None,
+            raw_summary={"provider": "test"},
+            created_at=now,
+            updated_at=now,
+        )
+        self.assertEqual(run.skipped_duplicate_count, 2)
+
+    def test_cf_metric_snapshot_create_accepts_integration_provenance(self):
+        run_id = uuid.uuid4()
+        source_config_id = uuid.uuid4()
+        payload = schemas.CFMetricSnapshotCreate(
+            publication_id=uuid.uuid4(),
+            window="24h",
+            metric_name="views",
+            metric_value=100,
+            source="vk_api",
+            confidence="medium",
+            source_config_id=source_config_id,
+            import_run_id=run_id,
+            external_metric_id="post-123:views:24h",
+            dedupe_key="vk-api:source:publication:24h:views",
+        )
+        self.assertEqual(payload.source_config_id, source_config_id)
+        self.assertEqual(payload.import_run_id, run_id)
+
     def test_cf_retro_note_create(self):
         m = schemas.CFRetroNoteCreate(
             period_start=date(2026, 5, 6), period_end=date(2026, 5, 12),
