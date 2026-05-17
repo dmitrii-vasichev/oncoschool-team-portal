@@ -1,11 +1,15 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from app.services.content_factory.vk_metric_collector_service import (
     VKMetricCollectorError,
+    VKMetricCollectorService,
     VKMetricsClient,
+    VKPostMetrics,
     due_metric_windows,
     parse_vk_post_identity,
 )
@@ -130,3 +134,212 @@ async def test_vk_metrics_client_raises_on_vk_error_without_token_leak():
 
     assert "super-secret-token" not in str(exc_info.value)
     assert "VK API rejected metrics request" in str(exc_info.value)
+
+
+def _mock_publication_query(session, publications):
+    result = Mock()
+    result.scalars.return_value.all.return_value = publications
+    session.execute.return_value = result
+
+
+@pytest.mark.asyncio
+async def test_vk_metric_collector_records_due_snapshots_with_provenance():
+    publication = SimpleNamespace(
+        id=uuid.uuid4(),
+        published_at=datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc),
+        actual_published_at=datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc),
+        platform_post_id="-123_456",
+        platform_post_url=None,
+    )
+    session = AsyncMock()
+    _mock_publication_query(session, [publication])
+    session.add = Mock()
+    run = SimpleNamespace(id=uuid.uuid4(), status="running", source_config=None)
+    source_config = SimpleNamespace(
+        id=uuid.uuid4(),
+        source="vk_api",
+        config={"owner_id": "-123", "windows": ["24h"]},
+        default_confidence="high",
+        freshness_window_hours=24,
+    )
+
+    import_run_service = SimpleNamespace(
+        start_run=AsyncMock(return_value=run),
+        finish_run=AsyncMock(
+            side_effect=lambda session, run, **kwargs: SimpleNamespace(
+                **kwargs, id=run.id
+            )
+        ),
+    )
+    metric_service = SimpleNamespace(
+        record_deduped=AsyncMock(
+            side_effect=[
+                SimpleNamespace(snapshot=SimpleNamespace(id=uuid.uuid4()), created=True),
+                SimpleNamespace(snapshot=SimpleNamespace(id=uuid.uuid4()), created=True),
+            ]
+        )
+    )
+    client = SimpleNamespace(
+        fetch_post_metrics=AsyncMock(
+            return_value=VKPostMetrics(
+                owner_id=-123,
+                post_id=456,
+                counters={"views": 1000, "likes": 40},
+                raw_post={"id": 456},
+                raw_comments={"count": 9},
+            )
+        )
+    )
+    collector = VKMetricCollectorService(
+        client_factory=lambda access_token, api_version: client,
+        import_run_service=import_run_service,
+        metric_service=metric_service,
+        access_token="token",
+        default_owner_id=None,
+        default_api_version="5.199",
+        now_provider=lambda: datetime(2026, 5, 11, 13, 0, tzinfo=timezone.utc),
+    )
+
+    result = await collector.collect_for_source(
+        session,
+        source_config,
+        triggered_by="manual",
+    )
+
+    assert result.status == "succeeded"
+    assert result.found_count == 2
+    assert result.created_count == 2
+    first_payload = metric_service.record_deduped.await_args_list[0].args[1]
+    assert first_payload.publication_id == publication.id
+    assert first_payload.window == "24h"
+    assert first_payload.metric_name == "views"
+    assert first_payload.source == "vk_api"
+    assert first_payload.source_method == "vk_api.wall.getById"
+    assert first_payload.confidence == "high"
+    assert first_payload.source_config_id == source_config.id
+    assert first_payload.import_run_id == run.id
+    assert first_payload.external_metric_id == "-123_456:views"
+    assert first_payload.dedupe_key.endswith(":24h:views")
+
+
+@pytest.mark.asyncio
+async def test_vk_metric_collector_skips_duplicate_snapshots():
+    publication = SimpleNamespace(
+        id=uuid.uuid4(),
+        published_at=datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc),
+        actual_published_at=datetime(2026, 5, 10, 12, 0, tzinfo=timezone.utc),
+        platform_post_id="-123_456",
+        platform_post_url=None,
+    )
+    session = AsyncMock()
+    _mock_publication_query(session, [publication])
+    source_config = SimpleNamespace(
+        id=uuid.uuid4(),
+        source="vk_api",
+        config={"owner_id": "-123", "windows": ["24h"]},
+        default_confidence="medium",
+        freshness_window_hours=24,
+    )
+    run = SimpleNamespace(id=uuid.uuid4(), status="running", source_config=None)
+    import_run_service = SimpleNamespace(
+        start_run=AsyncMock(return_value=run),
+        finish_run=AsyncMock(
+            side_effect=lambda session, run, **kwargs: SimpleNamespace(
+                **kwargs, id=run.id
+            )
+        ),
+    )
+    metric_service = SimpleNamespace(
+        record_deduped=AsyncMock(
+            return_value=SimpleNamespace(
+                snapshot=SimpleNamespace(id=uuid.uuid4()), created=False
+            )
+        )
+    )
+    client = SimpleNamespace(
+        fetch_post_metrics=AsyncMock(
+            return_value=VKPostMetrics(
+                owner_id=-123,
+                post_id=456,
+                counters={"views": 1000},
+                raw_post={"id": 456},
+                raw_comments={"count": 0},
+            )
+        )
+    )
+    collector = VKMetricCollectorService(
+        client_factory=lambda access_token, api_version: client,
+        import_run_service=import_run_service,
+        metric_service=metric_service,
+        access_token="token",
+        default_owner_id=None,
+        default_api_version="5.199",
+        now_provider=lambda: datetime(2026, 5, 11, 13, 0, tzinfo=timezone.utc),
+    )
+
+    result = await collector.collect_for_source(session, source_config, triggered_by="manual")
+
+    assert result.created_count == 0
+    assert result.skipped_duplicate_count == 1
+
+
+@pytest.mark.asyncio
+async def test_vk_metric_collector_marks_failed_when_publication_fails():
+    session = AsyncMock()
+    _mock_publication_query(
+        session,
+        [
+            SimpleNamespace(
+                id=uuid.uuid4(),
+                published_at=datetime.now(timezone.utc),
+                actual_published_at=datetime.now(timezone.utc),
+                platform_post_id="bad",
+                platform_post_url=None,
+            )
+        ],
+    )
+    source_config = SimpleNamespace(
+        id=uuid.uuid4(),
+        source="vk_api",
+        config={"owner_id": "-123", "windows": ["3h"]},
+        default_confidence="medium",
+        freshness_window_hours=24,
+    )
+    run = SimpleNamespace(id=uuid.uuid4(), status="running", source_config=None)
+    import_run_service = SimpleNamespace(
+        start_run=AsyncMock(return_value=run),
+        finish_run=AsyncMock(
+            side_effect=lambda session, run, **kwargs: SimpleNamespace(
+                **kwargs, id=run.id
+            )
+        ),
+    )
+    collector = VKMetricCollectorService(
+        import_run_service=import_run_service,
+        access_token="token",
+        default_owner_id=None,
+        default_api_version="5.199",
+        now_provider=lambda: datetime.now(timezone.utc) + timedelta(hours=4),
+    )
+
+    result = await collector.collect_for_source(session, source_config, triggered_by="manual")
+
+    assert result.status == "failed"
+    assert result.error_count == 1
+    assert "failed" in result.error_message.lower()
+
+
+@pytest.mark.asyncio
+async def test_vk_metric_collector_rejects_missing_token_before_external_calls():
+    session = AsyncMock()
+    source_config = SimpleNamespace(
+        id=uuid.uuid4(),
+        source="vk_api",
+        config={"owner_id": "-123"},
+        default_confidence="medium",
+        freshness_window_hours=24,
+    )
+    collector = VKMetricCollectorService(access_token="", default_owner_id=None)
+
+    with pytest.raises(VKMetricCollectorError, match="token"):
+        await collector.collect_for_source(session, source_config, triggered_by="manual")
