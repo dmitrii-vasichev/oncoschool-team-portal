@@ -1,7 +1,8 @@
 import uuid
 import unittest
 from datetime import date
-from unittest.mock import AsyncMock
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock
 
 from app.services.content_factory.segment_service import SegmentService
 from app.services.content_factory.metric_service import MetricService
@@ -31,6 +32,45 @@ class TestServices(unittest.IsolatedAsyncioTestCase):
         )
         result = await MetricService.record(session, payload)
         self.assertEqual(result.metric_value, 605)
+        session.add.assert_called_once()
+
+    async def test_record_metric_with_dedupe_key_returns_existing_duplicate(self):
+        existing = SimpleNamespace(id=uuid.uuid4(), dedupe_key="same-key")
+        session = AsyncMock()
+        session.execute.return_value = SimpleNamespace(
+            scalar_one_or_none=lambda: existing,
+        )
+        payload = CFMetricSnapshotCreate(
+            publication_id=uuid.uuid4(),
+            window="24h",
+            metric_name="views",
+            metric_value=100,
+            source="vk_api",
+            confidence="medium",
+            dedupe_key="same-key",
+        )
+
+        result = await MetricService.record_deduped(session, payload)
+
+        self.assertIs(result.snapshot, existing)
+        self.assertFalse(result.created)
+        session.add.assert_not_called()
+
+    async def test_record_metric_without_dedupe_key_still_creates_new_snapshot(self):
+        session = AsyncMock()
+        session.add = Mock()
+        payload = CFMetricSnapshotCreate(
+            publication_id=uuid.uuid4(),
+            window="24h",
+            metric_name="views",
+            metric_value=100,
+            source="manual",
+            confidence="high",
+        )
+
+        result = await MetricService.record_deduped(session, payload)
+
+        self.assertTrue(result.created)
         session.add.assert_called_once()
 
     async def test_create_retro(self):
