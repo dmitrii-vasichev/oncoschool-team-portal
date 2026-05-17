@@ -4,8 +4,8 @@
 
 ### Next
 
-- Execute Sprint 48: first automated metric source integrations.
 - Execute Sprint 49: production readiness, onboarding, and authenticated end-to-end QA.
+- Run authenticated manual QA for the Sprint 48 VK metric collector against a real VK community/post, missing-token config, invalid post identity, dedupe behavior, scheduled runs, import-run history, and metric-history provenance.
 - Run authenticated manual QA for the Sprint 47 metrics integration foundation against manual metrics, paste import, metric source config API, import run listing, dedupe, and provenance display.
 - Run authenticated manual QA for the Sprint 46 VK publisher against configured, missing-config, API-error, and media-ref cases.
 - Run authenticated manual QA for the Sprint 45 Telegram publisher against configured, missing-target, ambiguous-target, and media-ref cases.
@@ -46,7 +46,7 @@
 - Add gift delivery confirmation/reminders after the guest story workspace exists.
 - Add a backend aggregate endpoint for effectiveness analytics if browser-side fan-out becomes slow.
 - Add backend segment update/deactivate/delete endpoints if operational use shows they are needed.
-- Explore publishing and metric API integrations after the manual workflow is usable.
+- Add additional metric providers after VK manual QA proves the Sprint 47/48 import foundation is operational.
 - Keep the preserved deep research at `docs/content-factory-market-context-report.md` and restored design at `docs/content-factory-design.md` as planning inputs for later slices.
 
 ### Documentation

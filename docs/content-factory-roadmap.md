@@ -159,9 +159,10 @@ Goal: reduce manual metric entry while preserving evidence quality.
 
 #### Sprint 48: First Automated Metric Sources
 
-- Integrate the first feasible metric sources, based on API reality and account access.
-- Candidate sources: Telegram statistics provider, VK metrics, GetCourse registrations/conversions, email provider reports.
-- Store raw payloads when useful for audit and later recalculation.
+- Implemented first as the VK metrics collector, based on API reality and account access.
+- Collect post-level `views`, `likes`, `reposts`, and `comments` into the Sprint 47 import foundation.
+- Keep Telegram analytics deferred until separate MTProto/admin access is explicitly available.
+- Store compact raw payloads when useful for audit and later recalculation.
 
 ### Wave E: Stabilization And Onboarding
 
@@ -185,4 +186,3 @@ Each block should be expanded only when it becomes the next active work:
 5. Implement, validate, fix, update docs, commit, merge, and push.
 
 This preserves the big direction while still letting each block be designed carefully when we have the newest product context.
-

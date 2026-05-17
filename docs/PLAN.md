@@ -1,3 +1,74 @@
+# Active Plan: Content Factory Sprint 48 VK Metrics Collector
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-17-content-factory-sprint-48-vk-metrics-collector.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add the first real automated metric source by collecting VK post counters into the Sprint 47 metric import foundation.
+
+**Detailed design:** `docs/superpowers/specs/2026-05-17-content-factory-sprint-48-vk-metrics-collector-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-05-17-content-factory-sprint-48-vk-metrics-collector.md`
+
+**Milestones:**
+
+1. Add VK post identity parsing, due-window helpers, and a VK metrics client.
+2. Add a VK metric collector that records deduped metric snapshots through the Sprint 47 services.
+3. Add a manual metric source run endpoint.
+4. Add a scheduler for active VK metric source configs.
+5. Add frontend API contract for manual source runs.
+6. Run backend/frontend verification and update durable repo docs.
+
+**Implementation status:**
+
+- Implemented and locally verified on branch `codex/content-factory-sprint-48-vk-metrics-collector`.
+- Merge to `main` and push are pending.
+- Sprint 1 through Sprint 47 work is merged to `main` and pushed.
+- Full DB-dependent backend verification is still pending a local Postgres/Docker runtime; local Postgres on `localhost:5434` is currently unavailable.
+
+**Definition of done:**
+
+- Active `vk_api` metric source configs can collect counters for published VK publications that have a VK post id or URL.
+- Collector maps VK counters into metric snapshots: `views`, `likes`, `reposts`, and `comments`.
+- Collector writes snapshots with `source_config_id`, `import_run_id`, `external_metric_id`, `dedupe_key`, raw provider payload, method, confidence, and import-run provenance.
+- Duplicate metric snapshots are skipped through the existing Sprint 47 dedupe behavior.
+- Manual run endpoint exists at `POST /api/content-factory/metric-sources/{source_config_id}/run`.
+- Scheduled import loop runs only when metric imports are enabled and active VK sources exist.
+- VK API token remains environment-based and is not stored in metric source config.
+- Telegram metric automation remains deferred because the Telegram Bot API does not expose post analytics; Telegram Core stats require separate MTProto/admin access.
+- Frontend API/types expose the manual metric source run contract for future UI.
+
+**Validation commands:**
+
+```bash
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q --ignore=tests/test_content_factory_publication_service_extras.py --ignore=tests/test_content_factory_retro_update.py
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- RED confirmed: VK parser/client tests failed before implementation because `vk_metric_collector_service.py` did not exist.
+- RED confirmed: collector orchestration tests failed before implementation because `VKMetricCollectorService` did not exist.
+- RED confirmed: metric source API tests failed before implementation because the manual run request/endpoint did not exist.
+- RED confirmed: scheduler tests failed before implementation because `metric_import_scheduler_service.py` did not exist.
+- RED confirmed: frontend source guard failed before implementation because the run request type and API client method did not exist.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q --ignore=tests/test_content_factory_publication_service_extras.py --ignore=tests/test_content_factory_retro_update.py` passed: 705 tests, with existing warnings. The ignored files require a live Postgres instance.
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q` could not complete because local Postgres on `localhost:5434` was unavailable: 705 passed, 5 failed in DB-dependent tests.
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 40 tests, with existing Node module-type warning.
+- `cd frontend && npm test` passed: 203 tests, with existing Node module-type warnings.
+- `cd frontend && npx tsc --noEmit` passed.
+- `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+- `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+- `git diff --check` passed.
+
+---
+
 # Active Plan: Content Factory Sprint 47 Metrics Integration Foundation
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-16-content-factory-sprint-47-metrics-foundation.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

@@ -1,5 +1,35 @@
 # Test Plan
 
+## Content Factory Sprint 48 VK Metrics Collector
+
+### Automated
+
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q --ignore=tests/test_content_factory_publication_service_extras.py --ignore=tests/test_content_factory_retro_update.py`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q`
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Configure `VK_API_ACCESS_TOKEN` in the backend environment and create an active `vk_api` metric source config.
+2. Set the source config `owner_id` to the VK community or wall owner used by Content Factory publications.
+3. Open or create a published VK publication with `platform_post_id` or `platform_post_url` filled.
+4. Trigger `POST /api/content-factory/metric-sources/{source_config_id}/run` without `force`.
+5. Confirm a metric import run is created and finishes with readable found, created, skipped, and error counts.
+6. Confirm metric snapshots are created for `views`, `likes`, `reposts`, and `comments` when the VK API returns those counters.
+7. Confirm each imported snapshot has source config, import run, external metric id, dedupe key, provider method, confidence, and compact raw payload provenance.
+8. Run the same source again and confirm existing dedupe keys are skipped rather than duplicated.
+9. Trigger a single-publication run with `publication_id` and confirm only that publication is collected.
+10. Remove or blank `VK_API_ACCESS_TOKEN` and confirm the manual run fails with a readable configuration error without leaking secrets.
+11. Test an invalid VK post id/URL and confirm the run records a readable per-publication error.
+12. Wait for or invoke the scheduled collector loop with an active source and confirm it does not run when metric imports are disabled or the source is inactive.
+13. Open publication metric history and confirm imported VK metrics show integration provenance alongside existing manual metrics.
+
 ## Content Factory Sprint 47 Metrics Integration Foundation
 
 ### Automated

@@ -1,5 +1,51 @@
 # Status
 
+## Content Factory Sprint 48 VK Metrics Collector
+
+- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-48-vk-metrics-collector`
+- Source: Wave D first practical automated metric source after the Sprint 47 metric integration foundation.
+- Design: `docs/superpowers/specs/2026-05-17-content-factory-sprint-48-vk-metrics-collector-design.md`
+- Plan: `docs/superpowers/plans/2026-05-17-content-factory-sprint-48-vk-metrics-collector.md`
+- Scope: VK metric parser/client, due-window helper, collector orchestration, import-run audit updates, manual run endpoint, scheduled import loop, frontend run contract, tests, and durable docs
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-48-vk-metrics-collector`.
+  - Wrote Sprint 48 design and implementation plan.
+  - Added failing parser/client tests and implemented VK post identity parsing, due-window helpers, and VK API counter mapping.
+  - Added failing collector orchestration tests and implemented `VKMetricCollectorService` with Sprint 47 deduped snapshot recording and import-run audit summaries.
+  - Added failing API tests and wired `POST /api/content-factory/metric-sources/{source_config_id}/run`.
+  - Added failing scheduler tests and implemented `ContentFactoryMetricImportSchedulerService`.
+  - Wired the metric import scheduler into FastAPI startup/shutdown.
+  - Added failing frontend source guard and implemented `CFMetricSourceRunRequest` plus `api.runCFMetricSource`.
+  - Focused backend verification, extended backend verification, frontend tests, typecheck, lint, build, and diff verification passed.
+- Key decisions:
+  - Sprint 48 starts with VK because VK exposes post-level counters through API methods that fit the current publication model.
+  - Telegram metric automation is deferred because the Telegram Bot API does not expose post analytics; Telegram Core stats require separate MTProto/admin access.
+  - VK access token is configured through backend environment/settings, not stored in metric source config.
+  - Metric source config keeps non-secret VK settings such as owner id, API version, metric windows, final window threshold, and publication limit.
+  - VK collector stores raw provider snippets on each metric snapshot for audit without storing credentials.
+  - Automatic metric import is scheduler-driven but does nothing unless active `vk_api` metric sources exist.
+- Next actions:
+  - Merge Sprint 48 into `main` and push.
+  - Run authenticated manual QA for Sprint 48 against a real VK community, a real published VK post, missing-token config, invalid post identity, dedupe behavior, import-run history, and metric-history provenance.
+  - Start Sprint 49: production readiness, onboarding, and end-to-end QA for the full Content Factory workflow.
+- Latest verification:
+  - RED confirmed: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py -q` failed before implementation because `vk_metric_collector_service.py` did not exist.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py -q` passed: 9 tests, with existing pytest-asyncio warning.
+  - RED confirmed: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_metric_sources_api.py -q` failed before implementation because `CFMetricSourceRunRequest` did not exist.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_content_factory_metric_sources_api.py -q` passed: 6 tests, with existing pytest-asyncio warning.
+  - RED confirmed: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_metric_import_scheduler_service.py -q` failed before implementation because `metric_import_scheduler_service.py` did not exist.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_metric_import_scheduler_service.py -q` passed: 2 tests, with existing pytest-asyncio warning.
+  - RED confirmed: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` failed before implementation because the metric source run type and API method did not exist.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 40 tests, with existing Node module-type warning.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q --ignore=tests/test_content_factory_publication_service_extras.py --ignore=tests/test_content_factory_retro_update.py` passed: 705 tests, with existing warnings. The ignored files require a live Postgres instance.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest -q` could not complete because local Postgres on `localhost:5434` was unavailable: 705 passed, 5 failed in DB-dependent tests.
+  - `cd frontend && npm test` passed: 203 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/publications/[id]`.
+  - `git diff --check` passed.
+
 ## Content Factory Sprint 47 Metrics Integration Foundation
 
 - Current phase: implemented, locally verified, merged to `main`, and pushed
