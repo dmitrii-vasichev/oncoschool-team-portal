@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Circle,
   ListChecks,
+  XCircle,
 } from "lucide-react";
 import { TaskLabelChips } from "@/components/tasks/TaskLabelChips";
+import { humanizeCancellationReason } from "@/lib/cancellation";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import {
   Tooltip,
@@ -40,6 +42,10 @@ function isOverdue(task: Task): boolean {
 
 export function TaskCard({ task }: { task: Task }) {
   const overdue = isOverdue(task);
+  const isCancelled = task.status === "cancelled";
+  const cancellationReason = isCancelled
+    ? humanizeCancellationReason(task.cancellation_reason)
+    : "";
   const urgent = isTaskUrgent(task.priority);
   const checklist = task.checklist || [];
   const completedChecklistCount = checklist.filter((item) => item.is_completed).length;
@@ -48,9 +54,11 @@ export function TaskCard({ task }: { task: Task }) {
   const { ref: titleRef, isTruncated: isTitleTruncated } =
     useIsTruncated<HTMLParagraphElement>(task.title);
 
-  const cardClass = overdue
-    ? "border-destructive/35 bg-destructive/[0.05] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset] hover:bg-destructive/[0.08] hover:border-destructive/45"
-    : "bg-card border-border/50 hover:border-primary/20";
+  const cardClass = isCancelled
+    ? "bg-card border-muted-foreground/30 opacity-60 hover:opacity-80 hover:border-muted-foreground/40"
+    : overdue
+      ? "border-destructive/35 bg-destructive/[0.05] shadow-[0_0_0_1px_hsl(var(--destructive)/0.12)_inset] hover:bg-destructive/[0.08] hover:border-destructive/45"
+      : "bg-card border-border/50 hover:border-primary/20";
   const titleClass = `min-h-10 overflow-hidden line-clamp-3 break-words [overflow-wrap:anywhere] text-sm leading-5 font-heading font-semibold ${
     overdue
       ? "text-destructive group-hover:text-destructive"
@@ -122,6 +130,27 @@ export function TaskCard({ task }: { task: Task }) {
                 )}
               </div>
 
+              {isCancelled && (
+                <Tooltip delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="shrink-0 text-status-cancelled-fg"
+                      aria-label={
+                        cancellationReason
+                          ? `Отменено: ${cancellationReason}`
+                          : "Отменено"
+                      }
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" align="end">
+                    {cancellationReason
+                      ? `Отменено: ${cancellationReason}`
+                      : "Отменено"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
             <TaskLabelChips labels={task.labels || []} maxVisible={2} />

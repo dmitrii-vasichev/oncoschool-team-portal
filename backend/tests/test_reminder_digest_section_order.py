@@ -2,7 +2,7 @@ import unittest
 import uuid
 from datetime import date, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from app.services.reminder_service import (
     ReminderService,
@@ -11,6 +11,20 @@ from app.services.reminder_service import (
     normalize_digest_sections_order,
     normalize_upcoming_days,
 )
+
+
+def _empty_result_session() -> AsyncMock:
+    """A mocked session whose execute() yields an empty scalars().all() list.
+
+    The close-candidates digest section (Task 14) runs an explicit query via
+    session.execute; these formatting-only unit tests have no DB rows for the
+    stand-in member, so the query must come back empty.
+    """
+    session = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.all.return_value = []
+    session.execute.return_value = result
+    return session
 
 
 class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
@@ -84,7 +98,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,
@@ -364,7 +378,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,

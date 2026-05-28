@@ -14,7 +14,7 @@ export type TaskLabelColor =
   | "coral"
   | "rose"
   | "slate";
-export type UpdateType = "progress" | "status_change" | "comment" | "blocker" | "completion";
+export type UpdateType = "progress" | "status_change" | "comment" | "blocker" | "completion" | "cancellation";
 export type MemberRole = "admin" | "moderator" | "member";
 export type MemberDeactivationStrategy = "unassign" | "reassign";
 export type MeetingRecurrence =
@@ -296,6 +296,9 @@ export interface Task {
   reminder_comment: string | null;
   reminder_sent_at: string | null;
   completed_at: string | null;
+  cancellation_reason: string | null;
+  last_activity_at: string;
+  escalation_dm_sent_at: string | null;
   created_at: string;
   updated_at: string;
   assignee: TeamMember | null;
@@ -1067,6 +1070,11 @@ export interface TaskUpdateCreateRequest {
   update_type?: UpdateType;
   progress_percent?: number | null;
   source?: string;
+}
+
+export interface BulkResult {
+  succeeded: number;
+  failed: { short_id: number; error: string }[];
 }
 
 export interface IdeaCreateRequest {

@@ -17,6 +17,52 @@ from app.services.task_urgency import is_task_urgent
 logger = logging.getLogger(__name__)
 
 
+# Past-tense Russian verbs for cross-notification, keyed by escalation action.
+_ESCALATION_ACTION_VERBS: dict[str, str] = {
+    "completed": "завершил(а)",
+    "cancelled": "отменил(а)",
+    "extended": "продлил(а)",
+}
+
+
+def resolve_counterpart_telegram_id(task, actor) -> int | None:
+    """Return the telegram_id of the *other* party on a task.
+
+    When the actor is the assignee, the counterpart is the author and vice
+    versa. Returns None when there is no distinct counterpart or the
+    counterpart has no telegram_id. Pure helper — works on any object exposing
+    ``assignee``/``created_by`` (with ``.id``/``.telegram_id``) and
+    ``assignee_id``/``created_by_id``; no DB access.
+    """
+    assignee = getattr(task, "assignee", None)
+    author = getattr(task, "created_by", None)
+
+    actor_id = getattr(actor, "id", None)
+    assignee_id = getattr(task, "assignee_id", None) or getattr(assignee, "id", None)
+
+    if actor_id is not None and assignee_id is not None and actor_id == assignee_id:
+        counterpart = author
+    else:
+        counterpart = assignee
+
+    if counterpart is None:
+        return None
+    counterpart_id = getattr(counterpart, "id", None)
+    if actor_id is not None and counterpart_id is not None and counterpart_id == actor_id:
+        return None
+    return getattr(counterpart, "telegram_id", None)
+
+
+def build_counterpart_message(actor, action: str, task) -> str:
+    """Build the cross-notification DM text. Raises KeyError on unknown action."""
+    verb = _ESCALATION_ACTION_VERBS[action]
+    actor_name = getattr(actor, "full_name", None) or "Коллега"
+    return (
+        f"♻️ {actor_name} {verb} задачу:\n\n"
+        f"#{task.short_id} · {task.title}"
+    )
+
+
 def _task_callback_markup(task: Task) -> InlineKeyboardMarkup:
     """Create inline keyboard with Telegram callback button for task card."""
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -154,6 +200,21 @@ class NotificationService:
                     f"👤 Завершил: {completed_by.full_name}"
                 )
                 await self._send_safe(member.telegram_id, text, _task_callback_markup(task))
+
+    async def notify_escalation_action(
+        self, session: AsyncSession, task: Task, actor: TeamMember, action: str
+    ) -> None:
+        """DM the counterpart (author/assignee) when one party acts on an
+        escalated task. No-op when there is no distinct counterpart with a
+        telegram_id. ``action`` ∈ {"completed", "cancelled", "extended"}.
+        """
+        counterpart_telegram_id = resolve_counterpart_telegram_id(task, actor)
+        if counterpart_telegram_id is None:
+            return
+        text = build_counterpart_message(actor, action, task)
+        await self._send_safe(
+            counterpart_telegram_id, text, _task_callback_markup(task)
+        )
 
     async def notify_task_assigned(
         self, session: AsyncSession, task: Task, assigned_by: TeamMember,

@@ -12,7 +12,16 @@ from app.api.auth import get_current_user, require_moderator
 from app.db.database import get_session
 from app.db.models import Task, TaskLabel, TeamMember
 from app.db.repositories import TaskLabelRepository
-from app.db.schemas import TaskCreate, TaskEdit, TaskResponse
+from app.db.schemas import (
+    BulkCancelRequest,
+    BulkCompleteRequest,
+    BulkExtendRequest,
+    BulkResult,
+    CancelTaskRequest,
+    TaskCreate,
+    TaskEdit,
+    TaskResponse,
+)
 from app.services.in_app_notification_service import InAppNotificationService
 from app.services.notification_service import NotificationService
 from app.services.permission_service import PermissionService
@@ -145,6 +154,7 @@ async def list_tasks(
     search: str | None = Query(None),
     label_ids: str | None = Query(None),
     has_overdue: bool | None = Query(None),
+    has_close_candidate: bool | None = Query(None),
     completed_since: datetime | None = Query(None),
     sort: str = Query("created_at_desc"),
     page: int = Query(1, ge=1),
@@ -198,6 +208,10 @@ async def list_tasks(
         )
     if has_overdue:
         base_stmt = base_stmt.where(Task.deadline < date.today(), Task.status.notin_(["done", "cancelled"]))
+    if has_close_candidate:
+        # Overdue by >= 14 days (inclusive), matching the frontend candidate view.
+        threshold = date.today() - timedelta(days=14)
+        base_stmt = base_stmt.where(Task.deadline <= threshold, Task.status.notin_(["done", "cancelled"]))
     if completed_since:
         base_stmt = base_stmt.where(Task.completed_at >= _to_utc_naive(completed_since))
     try:
@@ -246,6 +260,85 @@ async def list_tasks(
         per_page=per_page,
         pages=max(1, math.ceil(total / per_page)),
     )
+
+
+async def _bulk_fetch_accessible_task(
+    session: AsyncSession, member: TeamMember, short_id: int
+) -> Task:
+    """Fetch a task by short_id, enforcing per-user visibility.
+
+    Raises ValueError (mapped to a `failed` entry by the caller) when the task
+    is missing or out of the member's visibility scope.
+    """
+    task = await task_service.get_task_by_short_id(session, short_id)
+    if not task:
+        raise ValueError("Задача не найдена")
+    if not await can_access_task(session, member, task):
+        raise ValueError("Нет доступа к задаче")
+    return task
+
+
+@router.post("/bulk/cancel", response_model=BulkResult)
+async def bulk_cancel(
+    payload: BulkCancelRequest,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Cancel multiple tasks. Each task is processed independently; per-task
+    permission and access failures are reported in `failed` (partial success)."""
+    succeeded = 0
+    failed: list[dict] = []
+    for short_id in payload.task_short_ids:
+        try:
+            task = await _bulk_fetch_accessible_task(session, member, short_id)
+            await task_service.cancel_task(
+                session, task, member, payload.reason.value, payload.reason_text
+            )
+            succeeded += 1
+        except (PermissionError, ValueError) as e:
+            failed.append({"short_id": short_id, "error": str(e)})
+    await session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
+
+
+@router.post("/bulk/complete", response_model=BulkResult)
+async def bulk_complete(
+    payload: BulkCompleteRequest,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Complete multiple tasks (partial success per task)."""
+    succeeded = 0
+    failed: list[dict] = []
+    for short_id in payload.task_short_ids:
+        try:
+            task = await _bulk_fetch_accessible_task(session, member, short_id)
+            await task_service.complete_task(session, task, member)
+            succeeded += 1
+        except (PermissionError, ValueError) as e:
+            failed.append({"short_id": short_id, "error": str(e)})
+    await session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
+
+
+@router.post("/bulk/extend", response_model=BulkResult)
+async def bulk_extend(
+    payload: BulkExtendRequest,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Extend deadlines for multiple tasks by N days (partial success per task)."""
+    succeeded = 0
+    failed: list[dict] = []
+    for short_id in payload.task_short_ids:
+        try:
+            task = await _bulk_fetch_accessible_task(session, member, short_id)
+            await task_service.extend_deadline(session, task, member, payload.days)
+            succeeded += 1
+        except (PermissionError, ValueError) as e:
+            failed.append({"short_id": short_id, "error": str(e)})
+    await session.commit()
+    return BulkResult(succeeded=succeeded, failed=failed)
 
 
 @router.get("/{short_id}", response_model=TaskResponse)
@@ -338,6 +431,11 @@ async def update_task(
     try:
         # Handle status change separately (creates TaskUpdate)
         if data.status and data.status != task.status:
+            if data.status == "cancelled":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Для отмены задачи используйте endpoint /cancel с указанием причины",
+                )
             task = await task_service.update_status(
                 session, task, member, data.status
             )
@@ -411,6 +509,39 @@ async def update_task(
             task_repo = TaskRepository()
             task = await task_repo.update(session, task.id, **update_fields)
 
+        await session.commit()
+        return task
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{short_id}/cancel", response_model=TaskResponse)
+async def cancel_task_endpoint(
+    short_id: int,
+    data: CancelTaskRequest,
+    member: TeamMember = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Cancel a task with a required reason. Access check: same as edit."""
+    task = await task_service.get_task_by_short_id(session, short_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    if not await can_access_task(session, member, task):
+        raise HTTPException(
+            status_code=403,
+            detail="Нет доступа к задаче: она вне вашей зоны видимости",
+        )
+
+    try:
+        task = await task_service.cancel_task(
+            session,
+            task,
+            member,
+            data.reason.value,
+            data.reason_text,
+        )
         await session.commit()
         return task
     except PermissionError as e:

@@ -442,6 +442,83 @@ def voice_assignee_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
+# ── Escalation keyboards ──
+
+
+def escalation_actions_keyboard(short_id: int) -> InlineKeyboardMarkup:
+    """Main 3-button escalation keyboard for a long-overdue task."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="✅ Завершить", callback_data=f"esc:complete:{short_id}"
+            ),
+            InlineKeyboardButton(
+                text="❌ Отменить", callback_data=f"esc:cancel:{short_id}"
+            ),
+            InlineKeyboardButton(
+                text="⏰ Продлить", callback_data=f"esc:extend:{short_id}"
+            ),
+        ]
+    ])
+
+
+def escalation_extend_keyboard(short_id: int) -> InlineKeyboardMarkup:
+    """Duration picker for extending a task's deadline."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="+7 дней", callback_data=f"esc:extdays:{short_id}:7"
+            ),
+            InlineKeyboardButton(
+                text="+14 дней", callback_data=f"esc:extdays:{short_id}:14"
+            ),
+            InlineKeyboardButton(
+                text="+30 дней", callback_data=f"esc:extdays:{short_id}:30"
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩ Назад", callback_data=f"esc:back:{short_id}"
+            ),
+        ],
+    ])
+
+
+def escalation_cancel_reason_keyboard(short_id: int) -> InlineKeyboardMarkup:
+    """Reason picker shown before cancelling a task."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="Уже выполнено",
+                callback_data=f"esc:reason:{short_id}:completed",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Потеряло актуальность",
+                callback_data=f"esc:reason:{short_id}:obsolete",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Дубль другой задачи",
+                callback_data=f"esc:reason:{short_id}:duplicate",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="Другое",
+                callback_data=f"esc:reason:{short_id}:other",
+            ),
+        ],
+        [
+            InlineKeyboardButton(
+                text="↩ Назад", callback_data=f"esc:back:{short_id}"
+            ),
+        ],
+    ])
+
+
 # ── Subscription keyboards ──
 
 EVENT_TYPES = [

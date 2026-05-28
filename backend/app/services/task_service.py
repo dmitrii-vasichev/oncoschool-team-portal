@@ -1,6 +1,6 @@
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,16 @@ from app.services.permission_service import PermissionService
 from app.services.task_urgency import normalize_task_urgency
 from app.services.task_visibility_service import resolve_visible_department_ids
 
+# All valid values for TaskUpdate.update_type
+VALID_UPDATE_TYPES: frozenset[str] = frozenset({
+    "comment",
+    "progress",
+    "status_change",
+    "blocker",
+    "completion",
+    "cancellation",
+})
+
 
 class TaskService:
     def __init__(self):
@@ -20,6 +30,19 @@ class TaskService:
         self.update_repo = TaskUpdateRepository()
         self.member_repo = TeamMemberRepository()
         self.in_app_notifications = InAppNotificationService()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _now_utc() -> datetime:
+        """Return current UTC datetime (timezone-aware)."""
+        return datetime.now(timezone.utc)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     async def create_task(
         self,
@@ -156,6 +179,8 @@ class TaskService:
             task.id,
             status="done",
             completed_at=datetime.utcnow(),
+            last_activity_at=self._now_utc(),
+            cancellation_reason=None,
             reminder_at=None,
             reminder_comment=None,
             reminder_sent_at=None,
@@ -196,13 +221,16 @@ class TaskService:
 
         old_status = task.status
 
-        update_kwargs = {"status": new_status}
+        update_kwargs = {"status": new_status, "last_activity_at": self._now_utc()}
         if new_status == "done":
             update_kwargs["completed_at"] = datetime.utcnow()
         if new_status in ("done", "cancelled"):
             update_kwargs["reminder_at"] = None
             update_kwargs["reminder_comment"] = None
             update_kwargs["reminder_sent_at"] = None
+        # Re-opening a cancelled task clears the stale cancellation reason.
+        if new_status != "cancelled":
+            update_kwargs["cancellation_reason"] = None
 
         task = await self.task_repo.update(session, task.id, **update_kwargs)
 
@@ -218,6 +246,83 @@ class TaskService:
         )
         await self.in_app_notifications.notify_task_status_changed(
             session, task, member, old_status, new_status
+        )
+        return task
+
+    async def cancel_task(
+        self,
+        session: AsyncSession,
+        task: Task,
+        member: TeamMember,
+        reason: str,
+        reason_text: str | None = None,
+    ) -> Task:
+        """
+        Cancel a task with a required reason. Permission: assignee, author, or moderator.
+        Auto-creates TaskUpdate(type=cancellation).
+        """
+        if not PermissionService.can_change_task_status(member, task):
+            raise PermissionError("Нет прав на отмену этой задачи")
+
+        # Lazy import to avoid a circular dependency (schemas import models/services).
+        from app.db.schemas import CancellationReason
+
+        valid_reasons = {r.value for r in CancellationReason}
+        if reason not in valid_reasons:
+            raise ValueError(
+                f"Неизвестная причина отмены. Доступные: {', '.join(sorted(valid_reasons))}"
+            )
+
+        old_status = task.status
+
+        task = await self.task_repo.update(
+            session,
+            task.id,
+            status="cancelled",
+            cancellation_reason=reason,
+            last_activity_at=self._now_utc(),
+            reminder_at=None,
+            reminder_comment=None,
+            reminder_sent_at=None,
+        )
+
+        # Auto task update
+        await self.update_repo.create(
+            session,
+            task_id=task.id,
+            author_id=member.id,
+            content=reason_text or f"Отменено: {reason}",
+            update_type="cancellation",
+            old_status=old_status,
+            new_status="cancelled",
+        )
+        await self.in_app_notifications.notify_task_status_changed(
+            session, task, member, old_status, "cancelled"
+        )
+        return task
+
+    async def extend_deadline(
+        self, session: AsyncSession, task: Task, member: TeamMember, days: int
+    ) -> Task:
+        """Extend a task's deadline by N days from today. Resets escalation state.
+
+        Permission: assignee, author, or moderator. Clearing escalation_dm_sent_at
+        lets the task re-escalate cleanly if it goes overdue again.
+        """
+        if not PermissionService.can_change_task_status(member, task):
+            raise PermissionError("Нет прав на продление этой задачи")
+
+        if days not in {7, 14, 30}:
+            raise ValueError("Продлить можно только на 7, 14 или 30 дней")
+
+        new_deadline = date.today() + timedelta(days=days)
+
+        task = await self.task_repo.update(
+            session,
+            task.id,
+            deadline=new_deadline,
+            last_activity_at=self._now_utc(),
+            escalation_dm_sent_at=None,
         )
         return task
 
@@ -297,6 +402,7 @@ class TaskService:
         )
         # Treat timeline updates as task activity for stale-task tracking.
         task.updated_at = datetime.utcnow()
+        task.last_activity_at = self._now_utc()
         await session.flush()
         if update_type == "blocker":
             await self.in_app_notifications.notify_task_blocker_added(

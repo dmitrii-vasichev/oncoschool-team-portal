@@ -11,6 +11,7 @@ import type {
   TaskEditRequest,
   TaskUpdate,
   TaskUpdateCreateRequest,
+  BulkResult,
   Idea,
   IdeaCreateRequest,
   IdeaStatusChangeRequest,
@@ -384,9 +385,52 @@ class ApiClient {
     });
   }
 
+  async cancelTask(
+    shortId: number,
+    reason: string,
+    reasonText?: string
+  ): Promise<Task> {
+    return this.request<Task>(`/api/tasks/${shortId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason, reason_text: reasonText ?? null }),
+    });
+  }
+
   async deleteTask(shortId: number): Promise<void> {
     return this.request<void>(`/api/tasks/${shortId}`, {
       method: "DELETE",
+    });
+  }
+
+  async bulkCancelTasks(
+    shortIds: number[],
+    reason: string,
+    reasonText?: string
+  ): Promise<BulkResult> {
+    return this.request<BulkResult>(`/api/tasks/bulk/cancel`, {
+      method: "POST",
+      body: JSON.stringify({
+        task_short_ids: shortIds,
+        reason,
+        reason_text: reasonText ?? null,
+      }),
+    });
+  }
+
+  async bulkCompleteTasks(shortIds: number[]): Promise<BulkResult> {
+    return this.request<BulkResult>(`/api/tasks/bulk/complete`, {
+      method: "POST",
+      body: JSON.stringify({ task_short_ids: shortIds }),
+    });
+  }
+
+  async bulkExtendTasks(
+    shortIds: number[],
+    days: number
+  ): Promise<BulkResult> {
+    return this.request<BulkResult>(`/api/tasks/bulk/extend`, {
+      method: "POST",
+      body: JSON.stringify({ task_short_ids: shortIds, days }),
     });
   }
 

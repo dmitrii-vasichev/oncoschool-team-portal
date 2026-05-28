@@ -74,6 +74,8 @@ import { PermissionService } from "@/lib/permissions";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/shared/Toast";
 import { normalizeTaskUrgency } from "@/lib/taskUrgency";
+import { humanizeCancellationReason } from "@/lib/cancellation";
+import { CancelTaskDialog } from "@/components/tasks/CancelTaskDialog";
 import { TASK_SOURCE_LABELS } from "@/lib/types";
 import type { TaskLabel, TaskStatus, TaskChecklistItem } from "@/lib/types";
 import { parseLocalDate, parseUTCDate } from "@/lib/dateUtils";
@@ -88,7 +90,6 @@ const STATUS_TRANSITIONS: Record<
 > = {
   new: [
     { status: "in_progress", label: "В работу", icon: Play },
-    { status: "cancelled", label: "Отменить", icon: XCircle },
   ],
   in_progress: [
     { status: "review", label: "На согласование", icon: Eye },
@@ -244,6 +245,7 @@ export default function TaskDetailPage() {
   const [checklistSaving, setChecklistSaving] = useState(false);
   const [updatesKey, setUpdatesKey] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
@@ -355,6 +357,10 @@ export default function TaskDetailPage() {
   const hasReminder = Boolean(task.reminder_at);
   const overdue = isOverdue(task.deadline, task.status);
   const transitions = STATUS_TRANSITIONS[task.status] || [];
+  const canCancel =
+    !!canChangeStatus &&
+    task.status !== "done" &&
+    task.status !== "cancelled";
 
   /* ---- Handlers ---- */
   async function handleStatusChange(newStatus: TaskStatus) {
@@ -370,6 +376,12 @@ export default function TaskDetailPage() {
     } finally {
       setUpdatingStatus(false);
     }
+  }
+
+  function handleCancelled() {
+    void refetch();
+    refreshUpdates();
+    toastSuccess("Задача отменена");
   }
 
   async function handleReassign(assigneeId: string) {
@@ -710,6 +722,19 @@ export default function TaskDetailPage() {
           </div>
         </div>
 
+        {/* ── Cancellation reason ── */}
+        {task.status === "cancelled" && task.cancellation_reason && (
+          <div className="mb-4 rounded-md bg-muted px-3 py-2 text-sm">
+            <span className="font-medium">❌ Отменено: </span>
+            {humanizeCancellationReason(task.cancellation_reason)}
+            {task.cancellation_reason === "auto_inactivity" && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Автоматически отменено системой (60 дней без движения)
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ── Badges row ── */}
         <div className="flex items-center gap-2.5 flex-wrap mb-4">
           <StatusBadge status={task.status} />
@@ -914,7 +939,7 @@ export default function TaskDetailPage() {
         )}
 
         {/* ── Action bar ── */}
-        {(canChangeStatus || canEditTaskMeta) && (
+        {(canChangeStatus || canEditTaskMeta || canCancel) && (
           <div className="flex items-center gap-3 flex-wrap mb-8">
             {/* Status dropdown */}
             {canChangeStatus && transitions.length > 0 && (
@@ -973,7 +998,29 @@ export default function TaskDetailPage() {
               </Select>
             )}
 
+            {/* Cancel task (routes through the dedicated /cancel endpoint) */}
+            {canCancel && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowCancelDialog(true)}
+              >
+                <XCircle className="h-4 w-4" />
+                Отменить
+              </Button>
+            )}
           </div>
+        )}
+
+        {canCancel && (
+          <CancelTaskDialog
+            open={showCancelDialog}
+            onOpenChange={setShowCancelDialog}
+            task={task}
+            onCancelled={handleCancelled}
+          />
         )}
 
         {/* ── Meta grid ── */}

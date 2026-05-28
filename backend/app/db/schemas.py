@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -13,7 +14,7 @@ TaskPriorityType = Literal["normal", "urgent"]
 TaskSourceType = Literal["text", "voice", "summary", "web"]
 MemberRoleType = Literal["admin", "moderator", "member"]
 MemberDeactivationStrategyType = Literal["unassign", "reassign"]
-UpdateTypeType = Literal["progress", "status_change", "comment", "blocker", "completion"]
+UpdateTypeType = Literal["progress", "status_change", "comment", "blocker", "completion", "cancellation"]
 TelegramBroadcastStatusType = Literal["scheduled", "sent", "failed", "cancelled"]
 MeetingReminderZoomMissingBehaviorType = Literal["hide", "fallback"]
 ReminderDigestSectionKeyType = Literal["overdue", "upcoming", "in_progress", "new"]
@@ -331,11 +332,47 @@ class TaskResponse(BaseModel):
     reminder_comment: str | None
     reminder_sent_at: datetime | None
     completed_at: datetime | None
+    last_activity_at: datetime
+    escalation_dm_sent_at: datetime | None = None
+    cancellation_reason: str | None = None
     created_at: datetime
     updated_at: datetime
     assignee: TeamMemberResponse | None = None
     created_by: TeamMemberResponse | None = None
     labels: list[TaskLabelResponse] = Field(default_factory=list)
+
+
+class CancellationReason(str, enum.Enum):
+    completed = "completed"
+    obsolete = "obsolete"
+    duplicate = "duplicate"
+    other = "other"
+    auto_inactivity = "auto_inactivity"
+
+
+class CancelTaskRequest(BaseModel):
+    reason: CancellationReason
+    reason_text: str | None = None  # only for "other"
+
+
+class BulkCompleteRequest(BaseModel):
+    task_short_ids: list[int]
+
+
+class BulkCancelRequest(BaseModel):
+    task_short_ids: list[int]
+    reason: CancellationReason
+    reason_text: str | None = None
+
+
+class BulkExtendRequest(BaseModel):
+    task_short_ids: list[int]
+    days: int
+
+
+class BulkResult(BaseModel):
+    succeeded: int
+    failed: list[dict]  # [{"short_id": int, "error": str}]
 
 
 # ── Idea ──

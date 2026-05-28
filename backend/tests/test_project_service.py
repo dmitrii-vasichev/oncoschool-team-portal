@@ -65,6 +65,7 @@ def task_link(status: str, **overrides):
             reminder_comment=None,
             reminder_sent_at=None,
             completed_at=now if status == "done" else None,
+            last_activity_at=now,
             created_at=now,
             updated_at=now,
             labels=[],

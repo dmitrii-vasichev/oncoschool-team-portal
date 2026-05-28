@@ -10,6 +10,7 @@ import {
   Plus,
   Send,
   X,
+  XCircle,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -75,6 +76,14 @@ const UPDATE_TYPE_CONFIG: Record<
     dotColor: "bg-[hsl(var(--status-done-fg))]",
     dotGlow: "shadow-[0_0_0_4px_hsl(var(--status-done-bg))]",
     borderColor: "border-l-[hsl(var(--status-done-fg))]",
+    bgTint: "",
+  },
+  cancellation: {
+    icon: XCircle,
+    label: "Отмена",
+    dotColor: "bg-[hsl(var(--status-cancelled-fg))]",
+    dotGlow: "shadow-[0_0_0_4px_hsl(var(--status-cancelled-bg))]",
+    borderColor: "border-l-[hsl(var(--status-cancelled-fg))]",
     bgTint: "",
   },
 };

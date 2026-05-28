@@ -1,7 +1,7 @@
 import logging
 import re
 from collections import Counter
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from html import escape
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -20,6 +20,8 @@ from app.bot.callbacks import (
     TaskListFilter,
     TaskListScope,
 )
+from app.bot.handlers.escalation import build_escalation_dm_text
+from app.bot.keyboards import escalation_actions_keyboard
 from app.config import settings
 from app.db.models import ReminderSettings, Task, TeamMember
 from app.db.repositories import (
@@ -29,6 +31,7 @@ from app.db.repositories import (
     TaskRepository,
 )
 from app.services.in_app_notification_service import InAppNotificationService
+from app.services.permission_service import PermissionService
 from app.services.task_urgency import is_task_urgent
 
 logger = logging.getLogger(__name__)
@@ -51,6 +54,11 @@ TASK_LINE_FIELD_ORDER_DEFAULT = ("number", "title", "deadline", "priority")
 ALLOWED_TASK_LINE_FIELD_KEYS = set(TASK_LINE_FIELD_ORDER_DEFAULT)
 OVERDUE_REPORT_TOP_ASSIGNEES = 5
 OVERDUE_REPORT_TOP_TASKS = 5
+
+# Long-overdue escalation thresholds (code constants, not app_settings).
+OVERDUE_ESCALATION_DAYS = 30
+OVERDUE_ESCALATION_REPEAT_DAYS = 7
+OVERDUE_AUTOCANCEL_DAYS = 60
 
 
 def normalize_digest_sections_order(value: object | None) -> list[str]:
@@ -143,6 +151,56 @@ def _format_ru_count(value: int, forms: tuple[str, str, str]) -> str:
     else:
         form = forms[2]
     return f"{value} {form}"
+
+
+def build_close_candidates_section(tasks: list[Task], today: date) -> str | None:
+    """Build the per-user 'close candidates' digest block (Task 14).
+
+    Tasks are those the member is assignee or author of, overdue 14+ days and
+    not done/cancelled (caller is responsible for the query). Returns None when
+    the list is empty, otherwise an HTML block. Titles are HTML-escaped.
+    """
+    if not tasks:
+        return None
+
+    lines = ["\n🧹 <b>Кандидаты на закрытие (≥14 дней без движения):</b>"]
+    for task in tasks:
+        days = _days_overdue(task, today)
+        overdue_age = _format_ru_count(days, ("день", "дня", "дней"))
+        lines.append(
+            f"#{task.short_id} {escape(_task_title(task))} — {overdue_age}"
+        )
+    lines.append("Проверь — может уже сделано или больше не актуально.")
+    return "\n".join(lines)
+
+
+def build_moderator_escalation_block(
+    stuck_tasks: list[Task],
+    autocancelled_tasks: list[Task],
+    today: date,
+) -> str | None:
+    """Build the moderator 'needs decision' digest block (Task 15).
+
+    Returns None when both lists are empty. Stuck tasks are 30+ days overdue
+    with an escalation DM already sent; auto-cancelled tasks were cancelled by
+    the auto-inactivity job today. Titles and assignee names are HTML-escaped.
+    """
+    if not stuck_tasks and not autocancelled_tasks:
+        return None
+
+    lines = ["\n👁 <b>Контроль: задачи, требующие решения</b>"]
+    if stuck_tasks:
+        lines.append("≥30 дней без реакции:")
+        for task in stuck_tasks:
+            days = _days_overdue(task, today)
+            overdue_age = _format_ru_count(days, ("день", "дня", "дней"))
+            assignee_name = escape(_task_assignee_name(task))
+            lines.append(f"  #{task.short_id} @{assignee_name} — {overdue_age}")
+    if autocancelled_tasks:
+        lines.append("Авто-отменено за сегодня (≥60 дней):")
+        for task in autocancelled_tasks:
+            lines.append(f"  #{task.short_id} — «{escape(_task_title(task))}»")
+    return "\n".join(lines)
 
 
 def _overdue_task_sort_key(task: Task, today: date) -> tuple[int, date, str]:
@@ -299,6 +357,24 @@ class ReminderService:
             "cron",
             hour=3,
             id="cleanup_avatars",
+            replace_existing=True,
+        )
+        # Escalation DMs for tasks 30+ days overdue (daily at 09:00).
+        self.scheduler.add_job(
+            self._check_and_send_escalation_dms,
+            "cron",
+            hour=9,
+            minute=0,
+            id="escalation_dms",
+            replace_existing=True,
+        )
+        # Auto-cancel tasks 60+ days overdue and inactive (daily at 03:00).
+        self.scheduler.add_job(
+            self._daily_autocancel_job,
+            "cron",
+            hour=3,
+            minute=0,
+            id="autocancel_inactive_tasks",
             replace_existing=True,
         )
         self.scheduler.start()
@@ -602,11 +678,26 @@ class ReminderService:
             )
         ]])
 
-        if not active_tasks:
-            text = (
-                f"📊 <b>Ежедневный дайджест — {today.strftime('%d.%m.%Y')}</b>\n\n"
-                "У тебя нет активных задач. Отличная работа! 🎉"
+        # Moderator-only escalation block is team-wide and must be available
+        # even when the moderator personally has no active tasks (Task 15).
+        moderator_block: str | None = None
+        if getattr(member, "role", None) and PermissionService.is_moderator(member):
+            moderator_block = await self._build_moderator_escalation_block(
+                session, today
             )
+
+        header = f"📊 <b>Ежедневный дайджест — {today.strftime('%d.%m.%Y')}</b>"
+
+        if not active_tasks:
+            # Edge case: a moderator with no personal tasks but a non-empty
+            # escalation block still gets a digest (header + block).
+            if moderator_block:
+                text = "\n".join([header, moderator_block])
+            else:
+                text = (
+                    f"{header}\n\n"
+                    "У тебя нет активных задач. Отличная работа! 🎉"
+                )
             await self._send_safe(
                 member.telegram_id,
                 text,
@@ -616,7 +707,7 @@ class ReminderService:
             return
 
         sections = []
-        sections.append(f"📊 <b>Ежедневный дайджест — {today.strftime('%d.%m.%Y')}</b>")
+        sections.append(header)
         section_blocks: dict[str, str] = {}
         task_line_fields_order = normalize_task_line_fields_order(
             getattr(rs, "task_line_fields_order", None)
@@ -742,6 +833,20 @@ class ReminderService:
             if block:
                 sections.append(block)
 
+        # Close-candidates section (Task 14). Gated on the existing overdue flag
+        # (Task 16: reuse include_overdue, no new settings column).
+        if rs.include_overdue:
+            close_candidates = await self._fetch_close_candidate_tasks(
+                session, member, today
+            )
+            close_section = build_close_candidates_section(close_candidates, today)
+            if close_section:
+                sections.append(close_section)
+
+        # Moderator escalation block (Task 15), team-wide, moderators only.
+        if moderator_block:
+            sections.append(moderator_block)
+
         # Completed yesterday
         yesterday = today - timedelta(days=1)
         completed_yesterday = [
@@ -764,6 +869,79 @@ class ReminderService:
             digest_markup,
             parse_mode="HTML",
         )
+
+    async def _fetch_close_candidate_tasks(
+        self, session: AsyncSession, member: TeamMember, today: date
+    ) -> list[Task]:
+        """Tasks the member is assignee OR author of, 14+ days overdue, active.
+
+        The standard digest only loads assigned tasks, so this runs an explicit
+        query to also pick up authored tasks. Results are deduped by id.
+        """
+        # Overdue by >= 14 days (inclusive), matching the frontend candidate view.
+        threshold = today - timedelta(days=14)
+        stmt = (
+            select(Task)
+            .where(
+                or_(
+                    Task.assignee_id == member.id,
+                    Task.created_by_id == member.id,
+                ),
+                Task.deadline <= threshold,
+                Task.status.notin_(["done", "cancelled"]),
+            )
+            .order_by(Task.deadline.asc())
+        )
+        result = await session.execute(stmt)
+        tasks = result.scalars().all()
+        # Defensive: only treat a genuine sequence as task rows. Some unit tests
+        # exercise the digest with a mocked session whose execute() returns a
+        # non-iterable stand-in; in that case there are simply no candidates.
+        if not isinstance(tasks, (list, tuple)):
+            return []
+        seen: set[str] = set()
+        deduped: list[Task] = []
+        for task in tasks:
+            key = self._task_unique_key(task)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(task)
+        return deduped
+
+    async def _build_moderator_escalation_block(
+        self, session: AsyncSession, today: date
+    ) -> str | None:
+        """Build the team-wide moderator escalation block (Task 15).
+
+        Two queries: tasks stuck 30+ days with an escalation DM already sent,
+        and tasks auto-cancelled by the inactivity job earlier today.
+        """
+        threshold_30 = today - timedelta(days=30)
+        stuck_stmt = (
+            select(Task)
+            .options(selectinload(Task.assignee))
+            .where(
+                Task.status.notin_(["done", "cancelled"]),
+                Task.deadline < threshold_30,
+                Task.escalation_dm_sent_at.is_not(None),
+            )
+            .order_by(Task.deadline.asc())
+            .limit(20)
+        )
+        today_start = datetime.combine(today, time.min, tzinfo=timezone.utc)
+        auto_stmt = (
+            select(Task)
+            .where(
+                Task.status == "cancelled",
+                Task.cancellation_reason == "auto_inactivity",
+                Task.last_activity_at >= today_start,
+            )
+            .order_by(Task.last_activity_at.asc())
+        )
+        stuck_tasks = list((await session.execute(stuck_stmt)).scalars().all())
+        autocancelled_tasks = list((await session.execute(auto_stmt)).scalars().all())
+        return build_moderator_escalation_block(stuck_tasks, autocancelled_tasks, today)
 
     @staticmethod
     def _task_unique_key(task: Task) -> str:
@@ -845,6 +1023,130 @@ class ReminderService:
 
         except Exception as e:
             logger.error(f"Error in _check_overdue_tasks: {e}")
+
+    async def _check_and_send_escalation_dms(self) -> None:
+        """Daily job: DM assignee+author about tasks 30+ days overdue.
+
+        Two cohorts:
+          - first-time: crossed 30 days overdue and never got an escalation DM;
+          - repeat: a DM was already sent 7+ days ago and there has been no
+            activity since (last_activity_at < escalation_dm_sent_at).
+        Each qualifying task gets a DM to both the assignee and the author
+        (deduped by telegram_id) and has escalation_dm_sent_at advanced to now.
+        """
+        try:
+            today = date.today()
+            now = datetime.now(timezone.utc)
+            deadline_threshold = today - timedelta(days=OVERDUE_ESCALATION_DAYS)
+            repeat_threshold = now - timedelta(days=OVERDUE_ESCALATION_REPEAT_DAYS)
+
+            async with self.session_maker() as session:
+                base_options = (
+                    selectinload(Task.assignee),
+                    selectinload(Task.created_by),
+                )
+                first_time_stmt = (
+                    select(Task)
+                    .options(*base_options)
+                    .where(
+                        Task.status.notin_(["done", "cancelled"]),
+                        Task.deadline < deadline_threshold,
+                        Task.escalation_dm_sent_at.is_(None),
+                    )
+                )
+                repeat_stmt = (
+                    select(Task)
+                    .options(*base_options)
+                    .where(
+                        Task.status.notin_(["done", "cancelled"]),
+                        Task.deadline < deadline_threshold,
+                        Task.escalation_dm_sent_at.is_not(None),
+                        Task.escalation_dm_sent_at < repeat_threshold,
+                        Task.last_activity_at < Task.escalation_dm_sent_at,
+                    )
+                )
+
+                first_time = list(
+                    (await session.execute(first_time_stmt)).scalars().all()
+                )
+                repeat = list((await session.execute(repeat_stmt)).scalars().all())
+
+                if not first_time and not repeat:
+                    return
+
+                for is_repeat, task in (
+                    [(False, t) for t in first_time] + [(True, t) for t in repeat]
+                ):
+                    days = _days_overdue(task, today)
+                    text = build_escalation_dm_text(task, days, is_repeat=is_repeat)
+                    keyboard = escalation_actions_keyboard(task.short_id)
+                    recipient_ids: set[int] = set()
+                    for member in (task.assignee, task.created_by):
+                        tg_id = getattr(member, "telegram_id", None)
+                        if tg_id is not None:
+                            recipient_ids.add(tg_id)
+                    for tg_id in recipient_ids:
+                        await self._send_safe(tg_id, text, reply_markup=keyboard)
+                    task.escalation_dm_sent_at = now
+
+                await session.commit()
+        except Exception as e:
+            logger.error(f"Error in _check_and_send_escalation_dms: {e}")
+
+    async def _daily_autocancel_job(self) -> None:
+        """Daily job: auto-cancel tasks 60+ days overdue with no recent activity.
+
+        Qualifying tasks (status not done/cancelled, deadline 60+ days past, and
+        last_activity_at 60+ days ago) are set to cancelled with
+        cancellation_reason='auto_inactivity'. We intentionally do NOT create a
+        TaskUpdate: TaskUpdate.author_id is NOT NULL and there is no system
+        member to attribute the action to, so the cancellation_reason field is
+        the system-of-record for auto-cancellation. Both assignee and author get
+        a plain DM (no keyboard).
+        """
+        try:
+            today = date.today()
+            now = datetime.now(timezone.utc)
+            deadline_threshold = today - timedelta(days=OVERDUE_AUTOCANCEL_DAYS)
+            activity_threshold = now - timedelta(days=OVERDUE_AUTOCANCEL_DAYS)
+
+            async with self.session_maker() as session:
+                stmt = (
+                    select(Task)
+                    .options(
+                        selectinload(Task.assignee),
+                        selectinload(Task.created_by),
+                    )
+                    .where(
+                        Task.status.notin_(["done", "cancelled"]),
+                        Task.deadline < deadline_threshold,
+                        Task.last_activity_at < activity_threshold,
+                    )
+                )
+                tasks = list((await session.execute(stmt)).scalars().all())
+                if not tasks:
+                    return
+
+                for task in tasks:
+                    task.status = "cancelled"
+                    task.cancellation_reason = "auto_inactivity"
+                    task.last_activity_at = now
+                    text = (
+                        f"Задача #{task.short_id} автоматически отменена "
+                        f"(60 дней без движения). Если она всё ещё актуальна — "
+                        f"создай новую."
+                    )
+                    recipient_ids: set[int] = set()
+                    for member in (task.assignee, task.created_by):
+                        tg_id = getattr(member, "telegram_id", None)
+                        if tg_id is not None:
+                            recipient_ids.add(tg_id)
+                    for tg_id in recipient_ids:
+                        await self._send_safe(tg_id, text)
+
+                await session.commit()
+        except Exception as e:
+            logger.error(f"Error in _daily_autocancel_job: {e}")
 
     async def _check_in_app_deadlines(self) -> None:
         """Create in-app notifications for deadline-related task events."""

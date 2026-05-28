@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { Plus, LayoutGrid } from "lucide-react";
+import { Plus, LayoutGrid, Brush } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskCard } from "@/components/tasks/TaskCard";
+import { CloseCandidatesList } from "@/components/tasks/CloseCandidatesList";
+import { selectCloseCandidates } from "@/lib/closeCandidates";
 import {
   TaskFilters,
   EMPTY_FILTERS,
@@ -21,13 +23,14 @@ import type { Task, TaskStatus, TeamMember } from "@/lib/types";
 import { TASK_STATUS_LABELS } from "@/lib/types";
 import { PermissionService } from "@/lib/permissions";
 
-const COLUMNS: TaskStatus[] = ["new", "in_progress", "review", "done"];
+const COLUMNS: TaskStatus[] = ["new", "in_progress", "review", "done", "cancelled"];
 
 const COLUMN_DOT_COLORS: Record<string, string> = {
   new: "bg-status-new-fg",
   in_progress: "bg-status-progress-fg",
   review: "bg-status-review-fg",
   done: "bg-status-done-fg",
+  cancelled: "bg-status-cancelled-fg",
 };
 
 const COLUMN_BG: Record<string, string> = {
@@ -35,6 +38,7 @@ const COLUMN_BG: Record<string, string> = {
   in_progress: "bg-status-progress-bg/50",
   review: "bg-status-review-bg/50",
   done: "bg-status-done-bg/50",
+  cancelled: "bg-status-cancelled-bg/50",
 };
 
 export default function TasksPage() {
@@ -47,6 +51,7 @@ export default function TasksPage() {
   const [filters, setFilters] = useState<TaskFilterValues>(EMPTY_FILTERS);
   const [createOpen, setCreateOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<TaskStatus>("new");
+  const [viewMode, setViewMode] = useState<"board" | "candidates">("board");
   const defaultScopeUserIdRef = useRef<string | null>(null);
   const loadedDataUserIdRef = useRef<string | null>(null);
   const currentUserIdRef = useRef("");
@@ -206,6 +211,11 @@ export default function TasksPage() {
     );
   }, [filteredTasks]);
 
+  const closeCandidates = useMemo(
+    () => selectCloseCandidates(tasks, new Date()),
+    [tasks]
+  );
+
   // ── Native drag-and-drop handlers ──
 
   const handleDragStart = useCallback(
@@ -259,6 +269,16 @@ export default function TasksPage() {
       const task = tasks.find((t) => t.id === taskId);
       if (!task || task.status === newStatus) return;
 
+      // Cancellation must go through the dedicated dialog (PATCH status=cancelled
+      // is rejected by the backend). Dragging OUT of cancelled stays allowed.
+      if (newStatus === "cancelled") {
+        setDraggedTaskId(null);
+        setDragOverStatus(null);
+        dragCounterRef.current = {};
+        toastError("Для отмены задачи используйте кнопку «Отменить»");
+        return;
+      }
+
       // Permission check: moderator, task assignee, or task author
       if (user && !PermissionService.canChangeTaskStatus(user, task)) {
         setDraggedTaskId(null);
@@ -296,7 +316,7 @@ export default function TasksPage() {
           <Skeleton className="h-8 w-56 rounded-lg" />
           <Skeleton className="h-8 w-36 rounded-lg" />
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {COLUMNS.map((col) => (
             <div key={col} className="space-y-3">
               <Skeleton className="h-8 w-full rounded-lg" />
@@ -331,16 +351,44 @@ export default function TasksPage() {
         </Button>
       </div>
 
-      {/* Counter */}
-      <div className="flex items-center gap-3">
+      {/* Counter + view toggle */}
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <LayoutGrid className="h-4 w-4" />
           <span>
             {filteredTasks.length} из {tasks.length} задач
           </span>
         </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant={viewMode === "board" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-3 text-xs"
+            onClick={() => setViewMode("board")}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+            Доска
+          </Button>
+          <Button
+            size="sm"
+            variant={viewMode === "candidates" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-3 text-xs"
+            onClick={() => setViewMode("candidates")}
+          >
+            <Brush className="h-3.5 w-3.5" />
+            Кандидаты на закрытие ({closeCandidates.length})
+          </Button>
+        </div>
       </div>
 
+      {viewMode === "candidates" ? (
+        <CloseCandidatesList
+          tasks={closeCandidates}
+          members={members}
+          onChanged={fetchData}
+        />
+      ) : (
+        <>
       {/* Mobile tabs */}
       <div className="relative lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm">
         <div
@@ -391,8 +439,8 @@ export default function TasksPage() {
         />
       </div>
 
-      {/* Desktop: 4 columns with native drag-and-drop */}
-      <div className="hidden lg:grid lg:grid-cols-4 gap-4" data-no-transition>
+      {/* Desktop: 5 columns with native drag-and-drop */}
+      <div className="hidden lg:grid lg:grid-cols-5 gap-4" data-no-transition>
         {COLUMNS.map((status) => (
           <KanbanColumn
             key={status}
@@ -409,6 +457,8 @@ export default function TasksPage() {
           />
         ))}
       </div>
+        </>
+      )}
 
       {user && (
         <CreateTaskDialog
