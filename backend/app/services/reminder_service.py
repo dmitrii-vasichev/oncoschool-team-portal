@@ -1132,9 +1132,9 @@ class ReminderService:
                     task.cancellation_reason = "auto_inactivity"
                     task.last_activity_at = now
                     text = (
-                        f"Задача #{task.short_id} автоматически отменена "
-                        f"(60 дней без движения). Если она всё ещё актуальна — "
-                        f"создай новую."
+                        f"Задача #{task.short_id} · {_task_title(task)} "
+                        f"автоматически отменена (60 дней без движения). "
+                        f"Если она всё ещё актуальна — создай новую."
                     )
                     recipient_ids: set[int] = set()
                     for member in (task.assignee, task.created_by):

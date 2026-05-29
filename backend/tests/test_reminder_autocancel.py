@@ -140,6 +140,8 @@ async def test_autocancel_fires_at_65_days():
             for c in bot.send_message.await_args_list
         )
         assert "автоматически отменена" in all_texts
+        # The DM names the task (number + title), not just the number.
+        assert "autocancel test task" in all_texts
     finally:
         await _cleanup(task_ids, member_ids)
 
