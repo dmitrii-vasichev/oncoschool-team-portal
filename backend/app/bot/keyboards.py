@@ -519,6 +519,65 @@ def escalation_cancel_reason_keyboard(short_id: int) -> InlineKeyboardMarkup:
     ])
 
 
+# ── Pulse reaction keyboard ──
+
+#: Max completion buttons attached to a single company digest message.
+_PULSE_REACTION_MAX_BUTTONS = 8
+
+
+def build_pulse_reaction_keyboard(events) -> InlineKeyboardMarkup | None:
+    """Build the 👏 reaction keyboard for the company Pulse digest.
+
+    One button per ``task_completed`` event (capped at the first
+    ``_PULSE_REACTION_MAX_BUTTONS``), labelled with the actor's name. The
+    ``callback_data`` is ``pulse:react:clap:<event_id>`` (well under Telegram's
+    64-byte limit: 17 chars + a 36-char UUID = 53). Returns ``None`` when there
+    are no completion events, so the digest job can pass ``reply_markup=None``.
+    """
+    buttons: list[list[InlineKeyboardButton]] = []
+    for event in events:
+        if event.event_type != "task_completed":
+            continue
+        actor_name = (event.payload or {}).get("actor_name") or "Коллега"
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"👏 {actor_name}",
+                callback_data=f"pulse:react:clap:{event.id}",
+            )
+        ])
+        if len(buttons) >= _PULSE_REACTION_MAX_BUTTONS:
+            break
+
+    if not buttons:
+        return None
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def build_pulse_task_action_rows(tasks, limit: int = 5) -> list[list[InlineKeyboardButton]]:
+    """One-tap action rows for the personal daily digest (Task 15).
+
+    For each of the first ``limit`` tasks, build a row of three buttons that
+    fire the Pulse one-tap callbacks (handled in Task 14):
+
+      * ``✅ #<short_id>`` -> ``pulse:done:<short_id>``
+      * ``⏳``            -> ``pulse:wip:<short_id>``
+      * ``🚧``            -> ``pulse:blk:<short_id>``
+
+    ``callback_data`` like ``pulse:done:42`` stays well under Telegram's 64-byte
+    limit. Returns ``[]`` when ``tasks`` is empty so the caller can skip the
+    extend without a branch.
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    for task in tasks[:limit]:
+        short_id = task.short_id
+        rows.append([
+            InlineKeyboardButton(text=f"✅ #{short_id}", callback_data=f"pulse:done:{short_id}"),
+            InlineKeyboardButton(text="⏳", callback_data=f"pulse:wip:{short_id}"),
+            InlineKeyboardButton(text="🚧", callback_data=f"pulse:blk:{short_id}"),
+        ])
+    return rows
+
+
 # ── Subscription keyboards ──
 
 EVENT_TYPES = [

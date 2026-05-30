@@ -16,6 +16,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 PUBLIC_TABLES: tuple[str, ...] = (
+    "activity_events",
+    "activity_reactions",
     "ai_feature_config",
     "analysis_prompts",
     "analysis_runs",

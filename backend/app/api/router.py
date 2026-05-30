@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.activity import router as activity_router
 from app.api.admin import router as admin_router
 from app.api.reports import router as reports_router
 from app.api.content import content_router
@@ -41,3 +42,4 @@ api_router.include_router(reports_router)
 api_router.include_router(admin_router)
 api_router.include_router(content_router)
 api_router.include_router(content_factory_router)
+api_router.include_router(activity_router)

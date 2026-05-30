@@ -39,6 +39,9 @@ import type {
   DashboardActivityScope,
   MemberStats,
   MeetingAnalytics,
+  ActivityEvent,
+  ReactionSummary,
+  PulseEmoji,
   ReminderSettings,
   MeetingReminderTextsSettings,
   MeetingWeeklyDigestSettings,
@@ -1387,6 +1390,23 @@ class ApiClient {
   async markAllNotificationsRead(): Promise<{ updated: number }> {
     return this.request<{ updated: number }>("/api/notifications/read-all", {
       method: "POST",
+    });
+  }
+
+  // ==================== Team Pulse — Activity Feed ====================
+
+  async getActivity(params?: { limit?: number; offset?: number }): Promise<{ items: ActivityEvent[] }> {
+    const q = new URLSearchParams();
+    if (params?.limit) q.set("limit", String(params.limit));
+    if (params?.offset) q.set("offset", String(params.offset));
+    const qs = q.toString() ? `?${q}` : "";
+    return this.request<{ items: ActivityEvent[] }>(`/api/activity${qs}`);
+  }
+
+  async reactToEvent(eventId: string, emoji: PulseEmoji): Promise<{ added: boolean; summary: ReactionSummary }> {
+    return this.request(`/api/activity/${eventId}/reactions`, {
+      method: "POST",
+      body: JSON.stringify({ emoji }),
     });
   }
 

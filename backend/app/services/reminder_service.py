@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -21,9 +21,13 @@ from app.bot.callbacks import (
     TaskListScope,
 )
 from app.bot.handlers.escalation import build_escalation_dm_text
-from app.bot.keyboards import escalation_actions_keyboard
+from app.bot.keyboards import (
+    build_pulse_reaction_keyboard,
+    build_pulse_task_action_rows,
+    escalation_actions_keyboard,
+)
 from app.config import settings
-from app.db.models import ReminderSettings, Task, TeamMember
+from app.db.models import ActivityEvent, ReminderSettings, Task, TeamMember
 from app.db.repositories import (
     AppSettingsRepository,
     NotificationSubscriptionRepository,
@@ -32,6 +36,10 @@ from app.db.repositories import (
 )
 from app.services.in_app_notification_service import InAppNotificationService
 from app.services.permission_service import PermissionService
+from app.services.pulse_digest import (
+    build_company_digest,
+    build_personal_pulse_text,
+)
 from app.services.task_urgency import is_task_urgent
 
 logger = logging.getLogger(__name__)
@@ -59,6 +67,10 @@ OVERDUE_REPORT_TOP_TASKS = 5
 OVERDUE_ESCALATION_DAYS = 30
 OVERDUE_ESCALATION_REPEAT_DAYS = 7
 OVERDUE_AUTOCANCEL_DAYS = 60
+
+# app_settings key holding the company Pulse digest target chat:
+# {"chat_id": int, "thread_id": int | None}.
+PULSE_CHAT_KEY = "pulse_chat_id"
 
 
 def normalize_digest_sections_order(value: object | None) -> list[str]:
@@ -315,6 +327,9 @@ class ReminderService:
         self._task_overdue_daily_time_msk = DEFAULT_TASK_OVERDUE_DAILY_TIME_MSK
         # Track which members got digest today (member_id -> date)
         self._sent_today: dict[str, date] = {}
+        # Guard against double-posting the company Pulse digest on the same day
+        # (e.g. scheduler restart). Stores the local date of the last send.
+        self._company_digest_sent_on: date | None = None
 
     def start(self) -> None:
         """Start the scheduler with periodic checks."""
@@ -375,6 +390,15 @@ class ReminderService:
             hour=3,
             minute=0,
             id="autocancel_inactive_tasks",
+            replace_existing=True,
+        )
+        # Post the company Pulse digest of yesterday's activity (daily at 09:05).
+        self.scheduler.add_job(
+            self._send_company_pulse_digest,
+            "cron",
+            hour=9,
+            minute=5,
+            id="pulse_company_digest",
             replace_existing=True,
         )
         self.scheduler.start()
@@ -651,6 +675,22 @@ class ReminderService:
             k: v for k, v in self._sent_today.items() if v >= today
         }
 
+    async def _is_pulse_personal_enabled(
+        self, session: AsyncSession, member_id
+    ) -> bool:
+        """Personal Pulse block is opt-OUT: ON unless an explicit
+        ``pulse_personal`` subscription is ``is_active=False``.
+
+        Note: this gate is for the PERSONAL daily digest only. The company
+        Pulse digest (the group post in ``_send_company_pulse_digest``) has no
+        per-member opt-out by design.
+        """
+        subs = await self.sub_repo.get_by_member(session, member_id)
+        for s in subs:
+            if s.event_type == "pulse_personal":
+                return s.is_active
+        return True
+
     async def _send_daily_digest(
         self,
         session: AsyncSession,
@@ -665,6 +705,48 @@ class ReminderService:
         # Get all tasks for this member
         all_tasks = await self.task_repo.get_by_assignee(session, member.id)
         active_tasks = [t for t in all_tasks if t.status not in ("done", "cancelled")]
+
+        # Personal Pulse block (Task 15) is opt-OUT (Task 16): ON by default,
+        # off only when the member has a pulse_personal subscription with
+        # is_active=False. When opted out, skip the Pulse queries entirely (no
+        # double query) so the digest is exactly what it was before Task 15.
+        pulse_enabled = await self._is_pulse_personal_enabled(session, member.id)
+
+        # Personal Pulse block (Task 15): "what changed about you" in the last
+        # 24h (events on the member's OWN tasks by others) + a weekly recap of
+        # how many tasks they personally closed. Computed once, appended to both
+        # the no-tasks and normal digest paths below.
+        pulse_text: str | None = None
+        if pulse_enabled:
+            now_utc = datetime.now(timezone.utc)
+            changed_cutoff = now_utc - timedelta(hours=24)
+            changed_events = list(
+                (
+                    await session.execute(
+                        select(ActivityEvent)
+                        .join(Task, ActivityEvent.task_id == Task.id)
+                        .where(
+                            Task.assignee_id == member.id,
+                            ActivityEvent.actor_id != member.id,
+                            ActivityEvent.created_at >= changed_cutoff,
+                        )
+                        .order_by(ActivityEvent.created_at.desc())
+                    )
+                ).scalars().all()
+            )
+            week_cutoff = now_utc - timedelta(days=7)
+            completed_week_count = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(ActivityEvent)
+                    .where(
+                        ActivityEvent.actor_id == member.id,
+                        ActivityEvent.event_type == "task_completed",
+                        ActivityEvent.created_at >= week_cutoff,
+                    )
+                )
+            ).scalar() or 0
+            pulse_text = build_personal_pulse_text(changed_events, completed_week_count)
 
         digest_markup = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(
@@ -698,6 +780,11 @@ class ReminderService:
                     f"{header}\n\n"
                     "У тебя нет активных задач. Отличная работа! 🎉"
                 )
+            # Personal Pulse block (Task 15): no one-tap action buttons here
+            # since there are no active tasks to act on. Skipped entirely when
+            # the member has opted out (Task 16; pulse_text stays None).
+            if pulse_enabled and pulse_text:
+                text = text + "\n\n" + pulse_text
             await self._send_safe(
                 member.telegram_id,
                 text,
@@ -863,6 +950,20 @@ class ReminderService:
         )
 
         text = "\n".join(sections)
+
+        # Personal Pulse block (Task 15): append the "what changed" + weekly
+        # recap text, and the one-tap action rows (only present here because the
+        # member has active tasks). The action rows extend the existing markup
+        # so the "📋 Открыть мои задачи" button stays at the top. Both are
+        # skipped when the member has opted out (Task 16), making the digest
+        # identical to its pre-Task-15 form.
+        if pulse_enabled and pulse_text:
+            text = text + "\n\n" + pulse_text
+        if pulse_enabled:
+            digest_markup.inline_keyboard.extend(
+                build_pulse_task_action_rows(active_tasks)
+            )
+
         await self._send_safe(
             member.telegram_id,
             text,
@@ -1147,6 +1248,82 @@ class ReminderService:
                 await session.commit()
         except Exception as e:
             logger.error(f"Error in _daily_autocancel_job: {e}")
+
+    async def _send_company_pulse_digest(self) -> None:
+        """Daily job: post the redacted company Pulse digest of yesterday.
+
+        Reads the target chat from ``app_settings["pulse_chat_id"]`` and queries
+        all of yesterday's :class:`ActivityEvent` rows (the builder filters event
+        types itself). The window is the previous full calendar day in the
+        configured timezone, converted to UTC for the query. No-ops when the chat
+        is not configured or there is nothing shareable to send.
+        """
+        try:
+            try:
+                tz = ZoneInfo(settings.TIMEZONE)
+            except Exception:
+                tz = ZoneInfo("Europe/Moscow")
+
+            today_local = datetime.now(tz).date()
+            # Skip if we already posted today (guards scheduler restarts).
+            if self._company_digest_sent_on == today_local:
+                return
+
+            yesterday_local = today_local - timedelta(days=1)
+            start_local = datetime(
+                yesterday_local.year,
+                yesterday_local.month,
+                yesterday_local.day,
+                tzinfo=tz,
+            )
+            end_local = datetime(
+                today_local.year,
+                today_local.month,
+                today_local.day,
+                tzinfo=tz,
+            )
+            start_utc = start_local.astimezone(timezone.utc)
+            end_utc = end_local.astimezone(timezone.utc)
+
+            async with self.session_maker() as session:
+                setting = await self.app_settings_repo.get(session, PULSE_CHAT_KEY)
+                value = setting.value if setting is not None else None
+                if not isinstance(value, dict):
+                    return
+                chat_id = value.get("chat_id")
+                if chat_id is None:
+                    return
+                thread_id = value.get("thread_id")
+
+                stmt = (
+                    select(ActivityEvent)
+                    .where(
+                        ActivityEvent.created_at >= start_utc,
+                        ActivityEvent.created_at < end_utc,
+                    )
+                    .order_by(ActivityEvent.created_at.desc())
+                )
+                events = list((await session.execute(stmt)).scalars().all())
+
+            text = build_company_digest(events, settings.TIMEZONE)
+            if text is None:
+                return
+
+            keyboard = build_pulse_reaction_keyboard(events)
+
+            try:
+                await self.bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    message_thread_id=thread_id,
+                    parse_mode="HTML",
+                    reply_markup=keyboard,
+                )
+                self._company_digest_sent_on = today_local
+            except Exception as e:
+                logger.warning(f"Failed to send company Pulse digest to {chat_id}: {e}")
+        except Exception as e:
+            logger.error(f"Error in _send_company_pulse_digest: {e}")
 
     async def _check_in_app_deadlines(self) -> None:
         """Create in-app notifications for deadline-related task events."""

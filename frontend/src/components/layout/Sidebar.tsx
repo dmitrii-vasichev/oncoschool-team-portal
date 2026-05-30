@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CheckSquare,
+  Activity,
   CalendarDays,
   BarChart3,
   FileBarChart,
@@ -83,6 +84,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, section: "dashboard" },
   { href: "/tasks", label: "Задачи", icon: CheckSquare, section: "work" },
+  { href: "/pulse", label: "Team Pulse", icon: Activity, section: "work" },
   { href: "/ideas", label: "Идеи", icon: Lightbulb, section: "work" },
   { href: "/projects", label: "Проекты", icon: FolderKanban, section: "work" },
   { href: "/meetings", label: "Встречи", icon: CalendarDays, section: "work" },

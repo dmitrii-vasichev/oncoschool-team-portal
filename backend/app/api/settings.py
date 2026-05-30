@@ -49,6 +49,7 @@ BULK_COOLDOWN_SECONDS = 30
 REMINDER_TIMEZONE = "Europe/Moscow"
 MEETING_REMINDER_TEXTS_KEY = "meeting_reminder_texts"
 MEETING_WEEKLY_DIGEST_SETTINGS_KEY = "meeting_weekly_digest_settings"
+PULSE_CHAT_KEY = "pulse_chat_id"
 WEEKLY_DIGEST_ALLOWED_STATUSES = {"pending", "sent", "failed"}
 ALLOWED_MEETING_REMINDER_OFFSETS_MINUTES = {0, 15, 30, 60, 120}
 DEFAULT_MEETING_WEEKLY_DIGEST_DAY = 7
@@ -470,6 +471,63 @@ async def update_meeting_reminder_texts(
         texts_by_offset=normalized,
         updated_by_id=setting.updated_by_id,
         updated_at=setting.updated_at,
+    )
+
+
+# ── Company Pulse Digest Target Chat ──
+
+
+class PulseChatSettingsResponse(BaseModel):
+    chat_id: int | None = None
+    thread_id: int | None = None
+
+
+class PulseChatUpdateRequest(BaseModel):
+    chat_id: int
+    thread_id: int | None = None
+
+
+@router.get(
+    "/pulse-chat",
+    response_model=PulseChatSettingsResponse,
+)
+async def get_pulse_chat(
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get the target chat/thread for the company Pulse digest. Moderator only."""
+    setting = await app_settings_repo.get(session, PULSE_CHAT_KEY)
+    if not setting or not isinstance(setting.value, dict):
+        return PulseChatSettingsResponse(chat_id=None, thread_id=None)
+
+    return PulseChatSettingsResponse(
+        chat_id=setting.value.get("chat_id"),
+        thread_id=setting.value.get("thread_id"),
+    )
+
+
+@router.put(
+    "/pulse-chat",
+    response_model=PulseChatSettingsResponse,
+)
+async def update_pulse_chat(
+    data: PulseChatUpdateRequest,
+    member: TeamMember = Depends(require_moderator),
+    session: AsyncSession = Depends(get_session),
+):
+    """Set the target chat/thread for the company Pulse digest. Moderator only."""
+    value = {"chat_id": data.chat_id, "thread_id": data.thread_id}
+    await app_settings_repo.set(
+        session,
+        PULSE_CHAT_KEY,
+        value,
+        updated_by_id=member.id,
+    )
+    await session.commit()
+
+    return PulseChatSettingsResponse(
+        chat_id=data.chat_id,
+        thread_id=data.thread_id,
     )
 
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.models import Task, TaskUpdate, TeamMember
 from app.db.repositories import TaskRepository, TaskUpdateRepository, TeamMemberRepository
+from app.services.activity_service import ActivityService
 from app.services.in_app_notification_service import InAppNotificationService
 from app.services.permission_service import PermissionService
 from app.services.task_urgency import normalize_task_urgency
@@ -30,6 +31,7 @@ class TaskService:
         self.update_repo = TaskUpdateRepository()
         self.member_repo = TeamMemberRepository()
         self.in_app_notifications = InAppNotificationService()
+        self.activity_service = ActivityService()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -198,6 +200,10 @@ class TaskService:
         )
         await self.in_app_notifications.notify_task_status_changed(
             session, task, member, old_status, "done"
+        )
+        # Pulse event is recorded in the same transaction as the task change (atomic by design).
+        await self.activity_service.record(
+            session, event_type="task_completed", actor=member, task=task
         )
         return task
 
@@ -404,9 +410,25 @@ class TaskService:
         task.updated_at = datetime.utcnow()
         task.last_activity_at = self._now_utc()
         await session.flush()
+        # Emit at most one pulse event: blocker takes precedence over a progress update.
         if update_type == "blocker":
             await self.in_app_notifications.notify_task_blocker_added(
                 session, task, task_update, member
+            )
+            await self.activity_service.record(
+                session,
+                event_type="blocker_raised",
+                actor=member,
+                task=task,
+                extra={"blocker_text": content},
+            )
+        elif progress_percent is not None:
+            await self.activity_service.record(
+                session,
+                event_type="progress_update",
+                actor=member,
+                task=task,
+                extra={"progress_percent": progress_percent},
             )
         return task_update
 

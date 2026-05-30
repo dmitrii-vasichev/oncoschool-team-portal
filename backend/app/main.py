@@ -20,6 +20,7 @@ from app.api.router import api_router
 from app.bot.handlers.common import router as common_router
 from app.bot.handlers.escalation import router as escalation_router
 from app.bot.handlers.meetings import router as meetings_router
+from app.bot.handlers.pulse import router as pulse_router
 from app.bot.handlers.settings import router as settings_router
 from app.bot.handlers.summary import router as summary_router
 from app.bot.handlers.task_updates import router as task_updates_router
@@ -151,6 +152,7 @@ dp.include_router(voice_router)
 dp.include_router(settings_router)
 dp.include_router(meetings_router)
 dp.include_router(escalation_router)
+dp.include_router(pulse_router)
 
 # Zoom Service (optional — graceful fallback if not configured)
 zoom_service = None

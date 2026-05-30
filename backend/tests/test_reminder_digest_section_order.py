@@ -14,15 +14,19 @@ from app.services.reminder_service import (
 
 
 def _empty_result_session() -> AsyncMock:
-    """A mocked session whose execute() yields an empty scalars().all() list.
+    """A mocked session whose execute() yields empty results.
 
-    The close-candidates digest section (Task 14) runs an explicit query via
-    session.execute; these formatting-only unit tests have no DB rows for the
-    stand-in member, so the query must come back empty.
+    Several digest queries run via ``session.execute``: the close-candidates
+    section (Task 14, ``scalars().all()``), and the personal Pulse block
+    (Task 15) -- ``scalars().all()`` for "what changed" events plus a
+    ``scalar()`` count for the weekly recap. These formatting-only unit tests
+    have no DB rows for the stand-in member, so every query must come back
+    empty (no rows, count 0).
     """
     session = AsyncMock()
     result = MagicMock()
     result.scalars.return_value.all.return_value = []
+    result.scalar.return_value = 0
     session.execute.return_value = result
     return session
 
@@ -156,7 +160,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,
@@ -210,7 +214,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,
@@ -259,7 +263,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,
@@ -307,7 +311,7 @@ class ReminderDigestSectionOrderTests(unittest.IsolatedAsyncioTestCase):
         )
 
         await service._send_daily_digest(
-            session=AsyncMock(),
+            session=_empty_result_session(),
             member=member,
             rs=reminder_settings,
             today=today,

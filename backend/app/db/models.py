@@ -480,6 +480,44 @@ class TaskUpdate(Base):
     author: Mapped["TeamMember"] = relationship(back_populates="task_updates")
 
 
+class ActivityEvent(Base):
+    __tablename__ = "activity_events"
+    __table_args__ = (
+        Index("idx_activity_events_created_at", "created_at"),
+        Index("idx_activity_events_department_id", "department_id"),
+        Index("idx_activity_events_actor_id", "actor_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
+    department_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
+    visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="department", server_default="department")
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    actor: Mapped["TeamMember"] = relationship(foreign_keys=[actor_id])
+    reactions: Mapped[list["ActivityReaction"]] = relationship(back_populates="event", cascade="all, delete-orphan")
+
+
+class ActivityReaction(Base):
+    __tablename__ = "activity_reactions"
+    __table_args__ = (
+        UniqueConstraint("event_id", "member_id", "emoji"),
+        Index("idx_activity_reactions_event_id", "event_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("activity_events.id", ondelete="CASCADE"), nullable=False)
+    member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False)
+    emoji: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    event: Mapped["ActivityEvent"] = relationship(back_populates="reactions")
+
+
 class Idea(Base):
     __tablename__ = "ideas"
     __table_args__ = (

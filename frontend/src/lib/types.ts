@@ -1940,6 +1940,33 @@ export interface MeetingAnalytics {
 }
 
 // ============================================
+// Team Pulse — Activity Feed
+// ============================================
+
+export type PulseEventType = "task_completed" | "blocker_raised" | "progress_update";
+export type PulseEmoji = "clap" | "fire" | "party";
+
+export interface ReactionSummary {
+  counts: Partial<Record<PulseEmoji, number>>;
+  mine: PulseEmoji[];
+}
+
+export interface ActivityEvent {
+  id: string;
+  event_type: PulseEventType;
+  visibility: "company" | "department";
+  created_at: string;
+  actor_name: string | null;
+  department_name: string | null;
+  can_open: boolean;
+  reactions: ReactionSummary;
+  task_title?: string;
+  task_short_id?: number;
+  progress_percent?: number;
+  blocker_text?: string;
+}
+
+// ============================================
 // Meeting / Schedule Labels
 // ============================================
 

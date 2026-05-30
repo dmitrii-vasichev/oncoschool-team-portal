@@ -12,6 +12,7 @@ from app.bot.callbacks import (
 )
 from app.db.models import DailyMetric, Meeting, Task, TaskUpdate, TeamMember
 from app.db.repositories import NotificationSubscriptionRepository, TeamMemberRepository, TelegramTargetRepository
+from app.services.activity_service import EMOJI_SYMBOLS
 from app.services.task_urgency import is_task_urgent
 
 logger = logging.getLogger(__name__)
@@ -214,6 +215,18 @@ class NotificationService:
         text = build_counterpart_message(actor, action, task)
         await self._send_safe(
             counterpart_telegram_id, text, _task_callback_markup(task)
+        )
+
+    async def notify_reaction(self, session, event, reactor, emoji) -> None:
+        """Ping the event author that someone reacted."""
+        actor = await self.member_repo.get_by_id(session, event.actor_id)
+        if not actor or not actor.telegram_id:
+            return
+        symbol = EMOJI_SYMBOLS.get(emoji, "👏")
+        title = event.payload.get("task_title")
+        what = f"твою задачу «{title}»" if title else "твою активность"
+        await self._send_safe(
+            actor.telegram_id, f"{symbol} {reactor.full_name} отметил {what}"
         )
 
     async def notify_task_assigned(

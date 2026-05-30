@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.db.models import ActivityEvent, ActivityReaction, Department, Task, TeamMember
+from app.services.task_visibility_service import resolve_visible_department_ids
+
+COMPANY_EVENT_TYPES = {"task_completed"}
+EMOJI_SYMBOLS = {"clap": "👏", "fire": "🔥", "party": "🎉"}
+ALLOWED_EMOJI = set(EMOJI_SYMBOLS)
+
+
+class ActivityService:
+    """Records team activity events for the Team Pulse feed."""
+
+    @staticmethod
+    def _summarize_reactions(reactions, perspective_member_id) -> dict:
+        """Build {counts: {emoji: n}, mine: [emojis this member used]} from reaction rows."""
+        counts: dict[str, int] = {}
+        mine: set[str] = set()
+        for r in reactions:
+            counts[r.emoji] = counts.get(r.emoji, 0) + 1
+            if r.member_id == perspective_member_id:
+                mine.add(r.emoji)
+        return {"counts": counts, "mine": sorted(mine)}
+
+    async def record(
+        self,
+        session: AsyncSession,
+        *,
+        event_type: str,
+        actor: TeamMember,
+        task: Task | None = None,
+        extra: dict | None = None,
+    ) -> ActivityEvent:
+        visibility = "company" if event_type in COMPANY_EVENT_TYPES else "department"
+
+        department_id = None
+        department_name = None
+        payload: dict = {"actor_name": actor.full_name}
+
+        if task is not None:
+            payload["task_title"] = task.title
+            payload["task_short_id"] = task.short_id
+            department_id = await self._resolve_assignee_department(session, task)
+            if department_id is not None:
+                dept = await session.get(Department, department_id)
+                if dept is not None:
+                    department_name = dept.name
+            payload["department_name"] = department_name
+
+        if extra:
+            # extra is merged last and may intentionally override snapshot keys
+            payload.update(extra)
+
+        event = ActivityEvent(
+            event_type=event_type,
+            actor_id=actor.id,
+            task_id=task.id if task is not None else None,
+            department_id=department_id,
+            visibility=visibility,
+            payload=payload,
+        )
+        session.add(event)
+        await session.flush()
+        return event
+
+    async def _resolve_assignee_department(
+        self, session: AsyncSession, task: Task
+    ) -> uuid.UUID | None:
+        if task.assignee_id is None:
+            return None
+        result = await session.execute(
+            select(TeamMember.department_id).where(TeamMember.id == task.assignee_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_feed(
+        self,
+        session: AsyncSession,
+        viewer: TeamMember,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict]:
+        visible = await resolve_visible_department_ids(session, viewer)
+        is_full_scope = visible is None  # admin/moderator
+        visible_dept_ids: set[uuid.UUID] = set(visible) if visible else set()
+
+        stmt = (
+            select(ActivityEvent)
+            .options(selectinload(ActivityEvent.reactions))
+            .order_by(ActivityEvent.created_at.desc())
+        )
+        if not is_full_scope:
+            conds = [ActivityEvent.visibility == "company"]
+            if visible_dept_ids:
+                conds.append(ActivityEvent.department_id.in_(visible_dept_ids))
+            stmt = stmt.where(or_(*conds))
+        stmt = stmt.limit(limit).offset(offset)
+
+        events = (await session.execute(stmt)).scalars().all()
+        return [
+            self.serialize_event(ev, viewer, visible_dept_ids, is_full_scope)
+            for ev in events
+        ]
+
+    async def toggle_reaction(
+        self,
+        session: AsyncSession,
+        event_id: uuid.UUID,
+        member: TeamMember,
+        emoji: str,
+    ) -> dict:
+        if emoji not in ALLOWED_EMOJI:
+            raise ValueError(f"Unsupported reaction: {emoji}")
+        event = await session.get(ActivityEvent, event_id)
+        if event is None:
+            raise ValueError("Event not found")
+
+        existing = (await session.execute(
+            select(ActivityReaction).where(
+                ActivityReaction.event_id == event_id,
+                ActivityReaction.member_id == member.id,
+                ActivityReaction.emoji == emoji,
+            )
+        )).scalar_one_or_none()
+
+        if existing is not None:
+            await session.delete(existing)
+            added = False
+        else:
+            session.add(ActivityReaction(event_id=event_id, member_id=member.id, emoji=emoji))
+            added = True
+        await session.flush()
+
+        rows = (await session.execute(
+            select(ActivityReaction).where(ActivityReaction.event_id == event_id)
+        )).scalars().all()
+        summary = self._summarize_reactions(rows, member.id)
+
+        actor_id_to_ping = event.actor_id if (added and event.actor_id != member.id) else None
+        return {
+            "added": added,
+            "summary": summary,
+            "actor_id_to_ping": actor_id_to_ping,
+            "event": event,
+        }
+
+    def serialize_event(
+        self,
+        event: ActivityEvent,
+        viewer: TeamMember,
+        visible_dept_ids: set[uuid.UUID],
+        is_full_scope: bool,
+    ) -> dict:
+        can_open = is_full_scope or (
+            event.department_id is not None and event.department_id in visible_dept_ids
+        )
+
+        row = {
+            "id": str(event.id),
+            "event_type": event.event_type,
+            "visibility": event.visibility,
+            "created_at": event.created_at.isoformat() if event.created_at else None,
+            "actor_name": event.payload.get("actor_name"),
+            "department_name": event.payload.get("department_name"),
+            "can_open": can_open,
+            "reactions": self._summarize_reactions(event.reactions, viewer.id),
+        }
+        if can_open:
+            if "task_title" in event.payload:
+                row["task_title"] = event.payload["task_title"]
+            if "task_short_id" in event.payload:
+                row["task_short_id"] = event.payload["task_short_id"]
+            for k in ("progress_percent", "blocker_text"):
+                if k in event.payload:
+                    row[k] = event.payload[k]
+        return row

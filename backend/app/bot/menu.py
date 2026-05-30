@@ -27,6 +27,7 @@ COMMON_PRIVATE_COMMANDS: list[BotCommand] = [
     BotCommand(command="blocker", description="Сообщить блокер: /blocker <id> <текст>"),
     BotCommand(command="nextmeeting", description="Следующая встреча"),
     BotCommand(command="myreminder", description="Мои напоминания"),
+    BotCommand(command="pulse", description="Вкл/выкл блок Team Pulse в дайджесте"),
     BotCommand(command="start", description="Открыть главное меню"),
 ]
 
