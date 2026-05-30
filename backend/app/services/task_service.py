@@ -253,6 +253,10 @@ class TaskService:
         await self.in_app_notifications.notify_task_status_changed(
             session, task, member, old_status, new_status
         )
+        if old_status != "done" and new_status == "done":
+            await self.activity_service.record(
+                session, event_type="task_completed", actor=member, task=task
+            )
         return task
 
     async def cancel_task(

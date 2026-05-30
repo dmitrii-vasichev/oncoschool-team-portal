@@ -62,6 +62,26 @@ async def test_complete_task_emits_task_completed_event():
 
 
 @pytest.mark.asyncio
+async def test_update_status_to_done_emits_task_completed_event():
+    async with async_session() as session:
+        try:
+            m, t = await _seed(session)
+            await service.update_status(session, t, m, "done")
+            events = (
+                await session.execute(
+                    select(ActivityEvent).where(
+                        ActivityEvent.task_id == t.id,
+                        ActivityEvent.event_type == "task_completed",
+                    )
+                )
+            ).scalars().all()
+            assert len(events) == 1
+            assert events[0].visibility == "company"
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_blocker_update_emits_blocker_raised_event():
     async with async_session() as session:
         try:
