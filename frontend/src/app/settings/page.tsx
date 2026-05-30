@@ -21,6 +21,7 @@ import { TelegramConnectionSection } from "@/components/settings/TelegramConnect
 import { ContentAccessSection } from "@/components/settings/ContentAccessSection";
 import { TelegramTargetsSection } from "@/components/settings/TelegramTargetsSection";
 import { NotificationsSection } from "@/components/settings/NotificationsSection";
+import { PulseChatSection } from "@/components/settings/PulseChatSection";
 import { RemindersSection } from "@/components/settings/RemindersSection";
 import { TaskLabelsSection } from "@/components/settings/TaskLabelsSection";
 
@@ -194,6 +195,7 @@ function SettingsTabContent({
       return (
         <>
           <NotificationsSection />
+          <PulseChatSection />
           {isAdmin && <TelegramTargetsSection />}
         </>
       );

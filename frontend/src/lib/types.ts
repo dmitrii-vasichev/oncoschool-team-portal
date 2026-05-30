@@ -1966,6 +1966,11 @@ export interface ActivityEvent {
   blocker_text?: string;
 }
 
+export interface PulseChatSettings {
+  chat_id: number | null;
+  thread_id: number | null;
+}
+
 // ============================================
 // Meeting / Schedule Labels
 // ============================================

@@ -42,6 +42,7 @@ import type {
   ActivityEvent,
   ReactionSummary,
   PulseEmoji,
+  PulseChatSettings,
   ReminderSettings,
   MeetingReminderTextsSettings,
   MeetingWeeklyDigestSettings,
@@ -1407,6 +1408,17 @@ class ApiClient {
     return this.request(`/api/activity/${eventId}/reactions`, {
       method: "POST",
       body: JSON.stringify({ emoji }),
+    });
+  }
+
+  async getPulseChat(): Promise<PulseChatSettings> {
+    return this.request<PulseChatSettings>(`/api/settings/pulse-chat`);
+  }
+
+  async updatePulseChat(data: { chat_id: number; thread_id: number | null }): Promise<PulseChatSettings> {
+    return this.request<PulseChatSettings>(`/api/settings/pulse-chat`, {
+      method: "PUT",
+      body: JSON.stringify(data),
     });
   }
 
