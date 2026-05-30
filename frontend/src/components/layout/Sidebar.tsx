@@ -82,9 +82,9 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, section: "dashboard" },
+  { href: "/", label: "Дашборд", icon: LayoutDashboard, section: "dashboard" },
+  { href: "/pulse", label: "Пульс", icon: Activity, section: "dashboard" },
   { href: "/tasks", label: "Задачи", icon: CheckSquare, section: "work" },
-  { href: "/pulse", label: "Team Pulse", icon: Activity, section: "work" },
   { href: "/ideas", label: "Идеи", icon: Lightbulb, section: "work" },
   { href: "/projects", label: "Проекты", icon: FolderKanban, section: "work" },
   { href: "/meetings", label: "Встречи", icon: CalendarDays, section: "work" },

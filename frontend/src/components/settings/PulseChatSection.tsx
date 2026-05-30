@@ -52,7 +52,7 @@ export function PulseChatSection() {
         chat_id: chatIdNum,
         thread_id: threadId.trim() ? Number(threadId) : null,
       });
-      toastSuccess("Чат для Team Pulse сохранён");
+      toastSuccess("Чат для Пульса команды сохранён");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Ошибка сохранения";
       setError(msg);
@@ -84,7 +84,7 @@ export function PulseChatSection() {
         </div>
         <div className="flex-1">
           <h2 className="font-heading font-semibold text-base">
-            Чат для дайджеста Team Pulse
+            Чат для дайджеста «Пульс команды»
           </h2>
           <p className="text-xs text-muted-foreground">
             Куда отправлять ежедневный общий «Пульс команды» (~09:05)

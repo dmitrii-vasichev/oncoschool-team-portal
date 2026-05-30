@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Activity,
   AlertTriangle,
   Bell,
   CalendarCheck2,
@@ -49,7 +50,8 @@ interface PageMeta {
 }
 
 const PAGE_META: Record<string, PageMeta> = {
-  "/": { title: "Dashboard", icon: LayoutDashboard },
+  "/": { title: "Дашборд", icon: LayoutDashboard },
+  "/pulse": { title: "Пульс", icon: Activity },
   "/tasks": { title: "Задачи", icon: CheckSquare },
   "/meetings": { title: "Встречи", icon: CalendarDays },
   "/analytics": { title: "Статистика задач", icon: BarChart3 },

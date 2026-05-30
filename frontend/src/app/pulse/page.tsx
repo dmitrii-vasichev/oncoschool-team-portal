@@ -92,7 +92,7 @@ export default function PulsePage() {
         </span>
         <div className="min-w-0">
           <h1 className="text-xl font-semibold leading-7 text-foreground">
-            Team Pulse
+            Пульс команды
           </h1>
           <p className="text-sm text-muted-foreground">
             Закрытые задачи, блокеры и прогресс команды
