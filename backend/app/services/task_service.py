@@ -24,6 +24,15 @@ VALID_UPDATE_TYPES: frozenset[str] = frozenset({
     "cancellation",
 })
 
+# Russian labels for cancellation reasons shown in the Team Pulse feed.
+_CANCEL_REASON_LABELS = {
+    "completed": "выполнено",
+    "obsolete": "неактуально",
+    "duplicate": "дубликат",
+    "other": "другое",
+    "auto_inactivity": "неактивность",
+}
+
 
 class TaskService:
     def __init__(self):
@@ -308,6 +317,16 @@ class TaskService:
         )
         await self.in_app_notifications.notify_task_status_changed(
             session, task, member, old_status, "cancelled"
+        )
+        # Manual cancellation -> Team Pulse event (atomic with the task change).
+        # Auto-cancellation goes through _daily_autocancel_job (direct status set),
+        # not this method, so it never reaches here.
+        await self.activity_service.record(
+            session,
+            event_type="task_cancelled",
+            actor=member,
+            task=task,
+            extra={"reason": _CANCEL_REASON_LABELS.get(reason, reason)},
         )
         return task
 

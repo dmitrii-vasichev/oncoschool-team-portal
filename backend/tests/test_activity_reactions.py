@@ -68,6 +68,18 @@ async def test_invalid_emoji_raises():
 
 
 @pytest.mark.asyncio
+async def test_toggle_reaction_accepts_cancellation_emojis():
+    async with async_session() as session:
+        try:
+            actor, reactor, ev = await _seed(session)
+            for emoji in ("ok", "broom", "shrug"):
+                res = await service.toggle_reaction(session, ev.id, reactor, emoji)
+                assert res["added"] is True
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
 async def test_two_members_same_emoji_counts_two():
     async with async_session() as session:
         try:

@@ -9,8 +9,17 @@ from sqlalchemy.orm import selectinload
 from app.db.models import ActivityEvent, ActivityReaction, Department, Task, TeamMember
 from app.services.task_visibility_service import resolve_visible_department_ids
 
-COMPANY_EVENT_TYPES = {"task_completed"}
-EMOJI_SYMBOLS = {"clap": "👏", "fire": "🔥", "party": "🎉"}
+COMPANY_EVENT_TYPES = {"task_completed", "task_cancelled"}
+EMOJI_SYMBOLS = {
+    # celebratory set (completed / blocker / progress)
+    "clap": "👏",
+    "fire": "🔥",
+    "party": "🎉",
+    # cancellation set (non-celebratory)
+    "ok": "👍",
+    "broom": "🧹",
+    "shrug": "🤷",
+}
 ALLOWED_EMOJI = set(EMOJI_SYMBOLS)
 
 
@@ -41,7 +50,10 @@ class ActivityService:
 
         department_id = None
         department_name = None
-        payload: dict = {"actor_name": actor.full_name}
+        payload: dict = {
+            "actor_name": actor.full_name,
+            "actor_avatar_url": actor.avatar_url,
+        }
 
         if task is not None:
             payload["task_title"] = task.title
@@ -168,6 +180,7 @@ class ActivityService:
             "visibility": event.visibility,
             "created_at": event.created_at.isoformat() if event.created_at else None,
             "actor_name": event.payload.get("actor_name"),
+            "actor_avatar_url": event.payload.get("actor_avatar_url"),
             "department_name": event.payload.get("department_name"),
             "can_open": can_open,
             "reactions": self._summarize_reactions(event.reactions, viewer.id),
@@ -177,7 +190,7 @@ class ActivityService:
                 row["task_title"] = event.payload["task_title"]
             if "task_short_id" in event.payload:
                 row["task_short_id"] = event.payload["task_short_id"]
-            for k in ("progress_percent", "blocker_text"):
+            for k in ("progress_percent", "blocker_text", "reason"):
                 if k in event.payload:
                     row[k] = event.payload[k]
         return row

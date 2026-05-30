@@ -1943,8 +1943,12 @@ export interface MeetingAnalytics {
 // Team Pulse — Activity Feed
 // ============================================
 
-export type PulseEventType = "task_completed" | "blocker_raised" | "progress_update";
-export type PulseEmoji = "clap" | "fire" | "party";
+export type PulseEventType =
+  | "task_completed"
+  | "task_cancelled"
+  | "blocker_raised"
+  | "progress_update";
+export type PulseEmoji = "clap" | "fire" | "party" | "ok" | "broom" | "shrug";
 
 export interface ReactionSummary {
   counts: Partial<Record<PulseEmoji, number>>;
@@ -1957,6 +1961,7 @@ export interface ActivityEvent {
   visibility: "company" | "department";
   created_at: string;
   actor_name: string | null;
+  actor_avatar_url?: string | null;
   department_name: string | null;
   can_open: boolean;
   reactions: ReactionSummary;
@@ -1964,6 +1969,7 @@ export interface ActivityEvent {
   task_short_id?: number;
   progress_percent?: number;
   blocker_text?: string;
+  reason?: string;
 }
 
 export interface PulseChatSettings {

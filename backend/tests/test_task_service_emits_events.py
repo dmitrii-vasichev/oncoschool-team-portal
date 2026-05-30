@@ -147,3 +147,44 @@ async def test_plain_progress_update_without_percent_emits_no_event():
             assert events == []
         finally:
             await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_manual_cancel_emits_task_cancelled_event():
+    async with async_session() as session:
+        try:
+            m, t = await _seed(session)
+            await service.cancel_task(session, t, m, reason="duplicate")
+            events = (await session.execute(
+                select(ActivityEvent).where(
+                    ActivityEvent.task_id == t.id,
+                    ActivityEvent.event_type == "task_cancelled",
+                )
+            )).scalars().all()
+            assert len(events) == 1
+            assert events[0].actor_id == m.id
+            assert events[0].visibility == "company"
+            assert events[0].payload["reason"] == "дубликат"
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_direct_status_cancel_does_not_emit_event():
+    # Mimics _daily_autocancel_job: set status directly, no cancel_task call.
+    async with async_session() as session:
+        try:
+            m, t = await _seed(session)
+            t.status = "cancelled"
+            t.cancellation_reason = "auto_inactivity"
+            session.add(t)
+            await session.flush()
+            events = (await session.execute(
+                select(ActivityEvent).where(
+                    ActivityEvent.task_id == t.id,
+                    ActivityEvent.event_type == "task_cancelled",
+                )
+            )).scalars().all()
+            assert events == []
+        finally:
+            await session.rollback()

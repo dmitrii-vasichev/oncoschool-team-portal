@@ -108,3 +108,31 @@ async def test_record_unassigned_task_has_no_department():
             assert event.payload["department_name"] is None
         finally:
             await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_feed_serializes_cancelled_event_with_reason_and_avatar():
+    async with async_session() as session:
+        try:
+            dept, actor, task = await _seed(session)
+            actor.avatar_url = "/static/avatars/x.webp"
+            viewer = TeamMember(id=uuid.uuid4(), full_name="Mod", role="moderator")
+            session.add_all([actor, viewer])
+            await session.flush()
+
+            await service.record(
+                session,
+                event_type="task_cancelled",
+                actor=actor,
+                task=task,
+                extra={"reason": "дубликат"},
+            )
+            await session.flush()
+
+            feed = await service.get_feed(session, viewer)
+            ev = next(e for e in feed if e["event_type"] == "task_cancelled")
+            assert ev["actor_avatar_url"] == "/static/avatars/x.webp"
+            assert ev["visibility"] == "company"
+            assert ev["reason"] == "дубликат"
+        finally:
+            await session.rollback()
