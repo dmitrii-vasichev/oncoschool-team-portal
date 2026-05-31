@@ -3,7 +3,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
 from app.db.database import async_session, engine
-from app.db.models import Task, TeamMember, Department
+from app.db.models import ActivityEvent, Task, TeamMember, Department
 from app.services.activity_service import ActivityService
 
 service = ActivityService()
@@ -134,5 +134,40 @@ async def test_feed_serializes_cancelled_event_with_reason_and_avatar():
             assert ev["actor_avatar_url"] == "/static/avatars/x.webp"
             assert ev["visibility"] == "company"
             assert ev["reason"] == "дубликат"
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_feed_uses_live_actor_avatar_when_payload_has_none():
+    """Backfilled events have no avatar snapshot in their payload. The feed must
+    fall back to the actor's CURRENT avatar so photos still render (regression)."""
+    async with async_session() as session:
+        try:
+            dept, actor, task = await _seed(session)
+            actor.avatar_url = "/static/avatars/live.webp"
+            viewer = TeamMember(id=uuid.uuid4(), full_name="Mod", role="moderator")
+            session.add_all([actor, viewer])
+            await session.flush()
+
+            # Simulate a backfilled event: payload WITHOUT actor_avatar_url.
+            ev = ActivityEvent(
+                event_type="task_completed",
+                actor_id=actor.id,
+                task_id=task.id,
+                department_id=dept.id,
+                visibility="company",
+                payload={
+                    "actor_name": actor.full_name,
+                    "task_title": task.title,
+                    "task_short_id": task.short_id,
+                },
+            )
+            session.add(ev)
+            await session.flush()
+
+            feed = await service.get_feed(session, viewer)
+            row = next(e for e in feed if e["id"] == str(ev.id))
+            assert row["actor_avatar_url"] == "/static/avatars/live.webp"
         finally:
             await session.rollback()

@@ -105,7 +105,10 @@ class ActivityService:
 
         stmt = (
             select(ActivityEvent)
-            .options(selectinload(ActivityEvent.reactions))
+            .options(
+                selectinload(ActivityEvent.reactions),
+                selectinload(ActivityEvent.actor),
+            )
             .order_by(ActivityEvent.created_at.desc())
         )
         if not is_full_scope:
@@ -174,13 +177,23 @@ class ActivityService:
             event.department_id is not None and event.department_id in visible_dept_ids
         )
 
+        # Prefer the actor's CURRENT avatar: it reflects avatars uploaded after
+        # the event and covers backfilled events whose payload predates the
+        # avatar snapshot. Fall back to the payload snapshot only when the actor
+        # relationship is not loaded.
+        actor = event.actor
+        actor_avatar_url = (
+            actor.avatar_url if actor is not None
+            else event.payload.get("actor_avatar_url")
+        )
+
         row = {
             "id": str(event.id),
             "event_type": event.event_type,
             "visibility": event.visibility,
             "created_at": event.created_at.isoformat() if event.created_at else None,
             "actor_name": event.payload.get("actor_name"),
-            "actor_avatar_url": event.payload.get("actor_avatar_url"),
+            "actor_avatar_url": actor_avatar_url,
             "department_name": event.payload.get("department_name"),
             "can_open": can_open,
             "reactions": self._summarize_reactions(event.reactions, viewer.id),
