@@ -1947,7 +1947,10 @@ export type PulseEventType =
   | "task_completed"
   | "task_cancelled"
   | "blocker_raised"
-  | "progress_update";
+  | "progress_update"
+  | "kudos"
+  | "milestone_team"
+  | "milestone_personal";
 export type PulseEmoji = "clap" | "fire" | "party" | "ok" | "broom" | "shrug";
 
 export interface ReactionSummary {
@@ -1970,6 +1973,14 @@ export interface ActivityEvent {
   progress_percent?: number;
   blocker_text?: string;
   reason?: string;
+  // kudos
+  recipient_name?: string | null;
+  recipient_avatar_url?: string | null;
+  message?: string;
+  // milestones
+  milestone_kind?: "total" | "month" | "no_overdue";
+  milestone_count?: number;
+  period?: string;
 }
 
 export interface PulseChatSettings {

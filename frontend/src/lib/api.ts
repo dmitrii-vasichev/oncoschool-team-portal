@@ -1411,6 +1411,13 @@ class ApiClient {
     });
   }
 
+  async giveKudos(recipientId: string, message: string): Promise<ActivityEvent> {
+    return this.request<ActivityEvent>(`/api/activity/kudos`, {
+      method: "POST",
+      body: JSON.stringify({ recipient_id: recipientId, message }),
+    });
+  }
+
   async getPulseChat(): Promise<PulseChatSettings> {
     return this.request<PulseChatSettings>(`/api/settings/pulse-chat`);
   }
