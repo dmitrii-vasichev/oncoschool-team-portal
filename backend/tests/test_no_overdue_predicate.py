@@ -85,3 +85,29 @@ async def test_member_with_no_month_deadlines_does_not_qualify():
             assert ok is False
         finally:
             await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_member_cancelled_task_is_ignored_but_ontime_qualifies():
+    async with async_session() as session:
+        try:
+            m = await _seed_member(session)
+            await _seed_task(session, assignee=m, status="done", deadline=date(2026, 5, 10),
+                             completed_at=datetime(2026, 5, 9, 9, 0))
+            await _seed_task(session, assignee=m, status="cancelled", deadline=date(2026, 5, 15))
+            ok = await _svc()._member_no_overdue(session, m, date(2026, 5, 1), date(2026, 6, 1))
+            assert ok is True  # cancelled task ignored; the on-time done task qualifies
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_member_with_only_cancelled_does_not_qualify():
+    async with async_session() as session:
+        try:
+            m = await _seed_member(session)
+            await _seed_task(session, assignee=m, status="cancelled", deadline=date(2026, 5, 15))
+            ok = await _svc()._member_no_overdue(session, m, date(2026, 5, 1), date(2026, 6, 1))
+            assert ok is False  # cancelled ignored -> considered == 0
+        finally:
+            await session.rollback()

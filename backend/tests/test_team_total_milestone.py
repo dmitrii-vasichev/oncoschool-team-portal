@@ -60,3 +60,38 @@ async def test_award_is_idempotent_on_repeat():
             assert len(events) == 1
         finally:
             await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_award_multi_threshold_catchup():
+    async with async_session() as session:
+        try:
+            closer = await _seed_member(session)
+            # count between the 2nd and 3rd thresholds => first two thresholds awarded
+            count = TEAM_TOTAL_THRESHOLDS[1]  # 250
+            await service._award_team_total_milestones(session, closer, count)
+            emitted = {
+                e.payload.get("count")
+                for e in (await session.execute(
+                    select(ActivityEvent).where(ActivityEvent.event_type == "milestone_team")
+                )).scalars().all()
+            }
+            assert TEAM_TOTAL_THRESHOLDS[0] in emitted  # 100
+            assert TEAM_TOTAL_THRESHOLDS[1] in emitted  # 250
+            assert TEAM_TOTAL_THRESHOLDS[2] not in emitted  # 500 not reached
+        finally:
+            await session.rollback()
+
+
+@pytest.mark.asyncio
+async def test_award_below_first_threshold_emits_nothing():
+    async with async_session() as session:
+        try:
+            closer = await _seed_member(session)
+            await service._award_team_total_milestones(session, closer, TEAM_TOTAL_THRESHOLDS[0] - 1)  # 99
+            events = (await session.execute(
+                select(ActivityEvent).where(ActivityEvent.event_type == "milestone_team")
+            )).scalars().all()
+            assert len(events) == 0
+        finally:
+            await session.rollback()

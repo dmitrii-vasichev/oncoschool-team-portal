@@ -54,7 +54,7 @@ class TaskService:
         """Return current UTC datetime (timezone-aware)."""
         return datetime.now(timezone.utc)
 
-    async def _award_team_total_milestones(self, session, closer, count: int) -> None:
+    async def _award_team_total_milestones(self, session: AsyncSession, closer: TeamMember, count: int) -> None:
         """Emit a milestone_team(total) for every threshold <= count not yet awarded.
 
         Idempotent via the milestone_awards ledger; catches up if several
@@ -71,7 +71,7 @@ class TaskService:
                     extra={"kind": "total", "count": threshold},
                 )
 
-    async def _maybe_award_team_total(self, session, closer) -> None:
+    async def _maybe_award_team_total(self, session: AsyncSession, closer: TeamMember) -> None:
         count = (await session.execute(
             select(func.count())
             .select_from(ActivityEvent)

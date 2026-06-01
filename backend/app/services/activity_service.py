@@ -54,7 +54,7 @@ class ActivityService:
         return {"counts": counts, "mine": sorted(mine)}
 
     async def claim_milestone(
-        self, session: AsyncSession, key: str, member_id=None
+        self, session: AsyncSession, key: str, member_id: uuid.UUID | None = None
     ) -> bool:
         """Atomically claim a milestone key. Returns True only the first time.
 
