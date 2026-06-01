@@ -490,7 +490,9 @@ class ActivityEvent(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     event_type: Mapped[str] = mapped_column(String(40), nullable=False)
-    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("team_members.id", ondelete="CASCADE"), nullable=False)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=True
+    )
     task_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True)
     department_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
@@ -498,7 +500,7 @@ class ActivityEvent(Base):
     payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    actor: Mapped["TeamMember"] = relationship(foreign_keys=[actor_id])
+    actor: Mapped["TeamMember | None"] = relationship(foreign_keys=[actor_id])
     reactions: Mapped[list["ActivityReaction"]] = relationship(back_populates="event", cascade="all, delete-orphan")
 
 
@@ -516,6 +518,26 @@ class ActivityReaction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     event: Mapped["ActivityEvent"] = relationship(back_populates="reactions")
+
+
+class MilestoneAward(Base):
+    """Idempotency ledger for Pulse milestones (one row per awarded milestone).
+
+    ``milestone_key`` encodes the kind + scope, so a single UNIQUE column makes
+    every award fire exactly once:
+      - personal no-overdue: ``no_overdue:<member_id>:<YYYY-MM>``
+      - team cumulative:     ``team_total:<threshold>``
+      - team monthly:        ``team_month:<YYYY-MM>``
+    """
+
+    __tablename__ = "milestone_awards"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    member_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("team_members.id", ondelete="CASCADE"), nullable=True
+    )
+    milestone_key: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    awarded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Idea(Base):
