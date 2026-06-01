@@ -10,15 +10,21 @@ test("kudosText composes giver, recipient and message", () => {
 });
 
 test("milestoneText handles team total", () => {
-  assert.equal(milestoneText({ milestone_kind: "total", milestone_count: 1000 }), "🎉 Команда закрыла 1000 задач!");
+  assert.equal(milestoneText({ milestone_kind: "total", milestone_count: 1000 }), "Команда закрыла 1000 задач!");
 });
 
 test("milestoneText handles team month", () => {
-  assert.equal(milestoneText({ milestone_kind: "month", milestone_count: 42, period: "2026-05" }), "🎉 За май 2026 команда закрыла 42 задач");
+  assert.equal(milestoneText({ milestone_kind: "month", milestone_count: 42, period: "2026-05" }), "За май 2026 команда закрыла 42 задачи");
 });
 
 test("milestoneText handles personal no_overdue", () => {
-  assert.equal(milestoneText({ milestone_kind: "no_overdue", actor_name: "Анна" }), "🛡️ Анна — месяц без единой просрочки");
+  assert.equal(milestoneText({ milestone_kind: "no_overdue", actor_name: "Анна" }), "Анна — месяц без единой просрочки");
+});
+
+test("milestoneText pluralizes task count", () => {
+  assert.equal(milestoneText({ milestone_kind: "total", milestone_count: 21 }), "Команда закрыла 21 задачу!");
+  assert.equal(milestoneText({ milestone_kind: "total", milestone_count: 3 }), "Команда закрыла 3 задачи!");
+  assert.equal(milestoneText({ milestone_kind: "total", milestone_count: 5 }), "Команда закрыла 5 задач!");
 });
 
 test("isRecognitionEvent flags new types only", () => {

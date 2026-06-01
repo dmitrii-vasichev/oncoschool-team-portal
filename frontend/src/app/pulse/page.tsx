@@ -214,7 +214,7 @@ export default function PulsePage() {
             Пульс команды
           </h1>
           <p className="text-sm text-muted-foreground">
-            Закрытые задачи, блокеры и прогресс команды
+            Закрытые задачи, блокеры, благодарности и вехи команды
           </p>
         </div>
         {currentUserId && (
@@ -243,7 +243,7 @@ export default function PulsePage() {
         <EmptyState
           variant="updates"
           title="Пока тихо"
-          description="Закрытые задачи и блокеры появятся здесь."
+          description="Закрытые задачи, блокеры и благодарности появятся здесь."
         />
       ) : (
         <div className="max-w-2xl space-y-6">

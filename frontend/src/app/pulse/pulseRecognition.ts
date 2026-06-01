@@ -31,6 +31,15 @@ function formatPeriod(period?: string): string {
   return `${RU_MONTHS[m - 1]} ${y}`;
 }
 
+function pluralTasks(n: number): string {
+  const n100 = n % 100;
+  if (n100 >= 11 && n100 <= 14) return "задач";
+  const n10 = n % 10;
+  if (n10 === 1) return "задачу";
+  if (n10 >= 2 && n10 <= 4) return "задачи";
+  return "задач";
+}
+
 export function milestoneText(e: {
   milestone_kind?: "total" | "month" | "no_overdue";
   milestone_count?: number;
@@ -38,10 +47,12 @@ export function milestoneText(e: {
   actor_name?: string | null;
 }): string {
   if (e.milestone_kind === "total") {
-    return `🎉 Команда закрыла ${e.milestone_count} задач!`;
+    const n = e.milestone_count ?? 0;
+    return `Команда закрыла ${n} ${pluralTasks(n)}!`;
   }
   if (e.milestone_kind === "month") {
-    return `🎉 За ${formatPeriod(e.period)} команда закрыла ${e.milestone_count} задач`;
+    const n = e.milestone_count ?? 0;
+    return `За ${formatPeriod(e.period)} команда закрыла ${n} ${pluralTasks(n)}`;
   }
-  return `🛡️ ${e.actor_name ?? "Коллега"} — месяц без единой просрочки`;
+  return `${e.actor_name ?? "Коллега"} — месяц без единой просрочки`;
 }
