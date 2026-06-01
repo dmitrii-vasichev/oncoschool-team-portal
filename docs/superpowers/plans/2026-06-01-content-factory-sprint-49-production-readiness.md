@@ -1,6 +1,6 @@
 # Content Factory Sprint 49 Production Readiness Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Prepare Content Factory for practical rollout with a production-readiness checklist, clearer first-use help, and focused first-use UI blockers fixed.
 
@@ -43,7 +43,7 @@
 - Create: `docs/content-factory-production-readiness.md`
 - Modify: `frontend/src/components/content-factory/contentFactorySourceGuards.test.ts`
 
-- [ ] **Step 1: Write the failing source guard**
+- [x] **Step 1: Write the failing source guard**
 
 Add repo-level document helpers near the existing `srcDir` helper in `frontend/src/components/content-factory/contentFactorySourceGuards.test.ts`:
 
@@ -85,7 +85,7 @@ test("production readiness document maps launch workflow", () => {
 });
 ```
 
-- [ ] **Step 2: Run source guard to verify RED**
+- [x] **Step 2: Run source guard to verify RED**
 
 Run:
 
@@ -95,7 +95,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: FAIL because `docs/content-factory-production-readiness.md` does not exist yet.
 
-- [ ] **Step 3: Create the readiness document**
+- [x] **Step 3: Create the readiness document**
 
 Create `docs/content-factory-production-readiness.md` with this content:
 
@@ -267,7 +267,7 @@ Launch can proceed when:
 - Release blockers are either fixed or documented with an owner.
 ```
 
-- [ ] **Step 4: Run source guard to verify GREEN**
+- [x] **Step 4: Run source guard to verify GREEN**
 
 Run:
 
@@ -277,7 +277,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS with one additional test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/content-factory-production-readiness.md frontend/src/components/content-factory/contentFactorySourceGuards.test.ts
@@ -292,7 +292,7 @@ git commit -m "docs(cf): add production readiness checklist"
 - Modify: `frontend/src/components/content-factory/contentFactorySourceGuards.test.ts`
 - Modify: `frontend/src/app/content-factory/help/page.tsx`
 
-- [ ] **Step 1: Write the failing help guard**
+- [x] **Step 1: Write the failing help guard**
 
 Add this test after `content factory overview help explains operating model and automation boundaries`:
 
@@ -312,7 +312,7 @@ test("content factory help exposes launch first-use guide", () => {
 });
 ```
 
-- [ ] **Step 2: Run source guard to verify RED**
+- [x] **Step 2: Run source guard to verify RED**
 
 Run:
 
@@ -322,7 +322,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: FAIL because the new launch-first phrases are not present.
 
-- [ ] **Step 3: Update help constants**
+- [x] **Step 3: Update help constants**
 
 In `frontend/src/app/content-factory/help/page.tsx`, add `ArrowRight` to the `lucide-react` import list.
 
@@ -348,7 +348,7 @@ const MANUAL_CONFIRMATION_BOUNDARIES = [
 
 Replace the stale `FUTURE_AUTOMATION` section rendering with two sections: current automation and manual confirmation boundaries. Keep `FUTURE_AUTOMATION` only if it is still used for post-release wording; otherwise remove it.
 
-- [ ] **Step 4: Add a first-launch help section**
+- [x] **Step 4: Add a first-launch help section**
 
 Add this section immediately before the existing `Как начать без страха` section:
 
@@ -393,7 +393,7 @@ Update the “already can do now” and automation area so the rendered page inc
 - `VK-метрики`
 - `Telegram-аналитика постов не собирается автоматически ботом`
 
-- [ ] **Step 5: Run source guard to verify GREEN**
+- [x] **Step 5: Run source guard to verify GREEN**
 
 Run:
 
@@ -403,7 +403,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/app/content-factory/help/page.tsx frontend/src/components/content-factory/contentFactorySourceGuards.test.ts
@@ -420,7 +420,7 @@ git commit -m "feat(cf): clarify production readiness help"
 - Modify: `frontend/src/app/content-factory/publications/page.tsx`
 - Modify: `frontend/src/app/content-factory/review/page.tsx`
 
-- [ ] **Step 1: Write the failing empty-state guard**
+- [x] **Step 1: Write the failing empty-state guard**
 
 Add this test near the dashboard/publication/review route tests:
 
@@ -440,7 +440,7 @@ test("content factory critical pages explain first-use next actions", () => {
 });
 ```
 
-- [ ] **Step 2: Run source guard to verify RED**
+- [x] **Step 2: Run source guard to verify RED**
 
 Run:
 
@@ -450,7 +450,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: FAIL because these first-use phrases are not present yet.
 
-- [ ] **Step 3: Add dashboard onboarding empty state**
+- [x] **Step 3: Add dashboard onboarding empty state**
 
 In `frontend/src/app/content-factory/dashboard/page.tsx`, add `FileText` to the `lucide-react` import list.
 
@@ -500,7 +500,7 @@ In the returned JSX, after the page header and before the campaign status sectio
 )}
 ```
 
-- [ ] **Step 4: Improve publications empty state**
+- [x] **Step 4: Improve publications empty state**
 
 In `frontend/src/app/content-factory/publications/page.tsx`, add:
 
@@ -530,7 +530,7 @@ Replace the empty-state heading/body with conditional first-use copy:
 )}
 ```
 
-- [ ] **Step 5: Improve review queue empty state**
+- [x] **Step 5: Improve review queue empty state**
 
 In `frontend/src/app/content-factory/review/page.tsx`, replace the empty-state paragraph with:
 
@@ -554,7 +554,7 @@ In `frontend/src/app/content-factory/review/page.tsx`, replace the empty-state p
 
 Add `FileText` to the `lucide-react` import list for this route.
 
-- [ ] **Step 6: Run source guard to verify GREEN**
+- [x] **Step 6: Run source guard to verify GREEN**
 
 Run:
 
@@ -564,7 +564,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/app/content-factory/dashboard/page.tsx frontend/src/app/content-factory/publications/page.tsx frontend/src/app/content-factory/review/page.tsx frontend/src/components/content-factory/contentFactorySourceGuards.test.ts
@@ -582,7 +582,7 @@ git commit -m "feat(cf): add first-use readiness states"
 - Modify: `docs/BACKLOG.md`
 - Modify: `docs/content-factory-roadmap.md`
 
-- [ ] **Step 1: Update `docs/PLAN.md`**
+- [x] **Step 1: Update `docs/PLAN.md`**
 
 Add a new top section above Sprint 48:
 
@@ -637,7 +637,7 @@ git diff --check
 ---
 ```
 
-- [ ] **Step 2: Update `docs/STATUS.md`**
+- [x] **Step 2: Update `docs/STATUS.md`**
 
 Add a new top section:
 
@@ -663,7 +663,7 @@ Add a new top section:
   - Pending implementation.
 ```
 
-- [ ] **Step 3: Update `docs/TEST_PLAN.md`**
+- [x] **Step 3: Update `docs/TEST_PLAN.md`**
 
 Add a new top section:
 
@@ -690,7 +690,7 @@ Add a new top section:
 6. Record any launch blockers in `docs/BACKLOG.md` before release approval.
 ```
 
-- [ ] **Step 4: Update `docs/BACKLOG.md`**
+- [x] **Step 4: Update `docs/BACKLOG.md`**
 
 Replace `Execute Sprint 49: production readiness, onboarding, and authenticated end-to-end QA.` with:
 
@@ -706,7 +706,7 @@ Under `### Later`, add:
 - Revisit Telegram analytics only when MTProto/admin access is explicitly available and approved.
 ```
 
-- [ ] **Step 5: Update `docs/content-factory-roadmap.md`**
+- [x] **Step 5: Update `docs/content-factory-roadmap.md`**
 
 In Sprint 49, change the section to past-tense implementation criteria:
 
@@ -719,7 +719,7 @@ In Sprint 49, change the section to past-tense implementation criteria:
 - Keep remaining release risks visible in backlog instead of conversation history.
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/PLAN.md docs/STATUS.md docs/TEST_PLAN.md docs/BACKLOG.md docs/content-factory-roadmap.md
@@ -734,7 +734,7 @@ git commit -m "docs(cf): track production readiness sprint"
 - Modify: `docs/PLAN.md`
 - Modify: `docs/STATUS.md`
 
-- [ ] **Step 1: Run focused frontend source guard**
+- [x] **Step 1: Run focused frontend source guard**
 
 Run:
 
@@ -744,7 +744,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full frontend tests**
+- [x] **Step 2: Run full frontend tests**
 
 Run:
 
@@ -754,7 +754,7 @@ cd frontend && npm test
 
 Expected: PASS. Existing Node module-type warnings are acceptable if unchanged.
 
-- [ ] **Step 3: Run TypeScript**
+- [x] **Step 3: Run TypeScript**
 
 Run:
 
@@ -764,7 +764,7 @@ cd frontend && npx tsc --noEmit
 
 Expected: PASS.
 
-- [ ] **Step 4: Run lint**
+- [x] **Step 4: Run lint**
 
 Run:
 
@@ -774,7 +774,7 @@ cd frontend && npm run lint
 
 Expected: PASS with no ESLint warnings or errors.
 
-- [ ] **Step 5: Run frontend build**
+- [x] **Step 5: Run frontend build**
 
 Run:
 
@@ -784,7 +784,7 @@ cd frontend && npm run build
 
 Expected: PASS, including `/content-factory/help`, `/content-factory/dashboard`, `/content-factory/publications`, and `/content-factory/review`.
 
-- [ ] **Step 6: Run focused backend smoke**
+- [x] **Step 6: Run focused backend smoke**
 
 Run:
 
@@ -794,7 +794,7 @@ cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=
 
 Expected: PASS. Existing pytest-asyncio warnings are acceptable if unchanged.
 
-- [ ] **Step 7: Run whitespace check**
+- [x] **Step 7: Run whitespace check**
 
 Run:
 
@@ -804,13 +804,13 @@ git diff --check
 
 Expected: no output and exit code 0.
 
-- [ ] **Step 8: Update final verification docs**
+- [x] **Step 8: Update final verification docs**
 
 In `docs/PLAN.md` and `docs/STATUS.md`, replace `Pending implementation.` in Sprint 49 with the exact commands and pass/fail results from Steps 1-7.
 
 If full DB-dependent backend verification is attempted and fails because local Postgres is unavailable, record the infrastructure limitation explicitly without treating it as a Sprint 49 code failure.
 
-- [ ] **Step 9: Commit final status**
+- [x] **Step 9: Commit final status**
 
 ```bash
 git add docs/PLAN.md docs/STATUS.md

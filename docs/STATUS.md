@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 49 Production Readiness
 
-- Current phase: in progress on branch `codex/content-factory-sprint-49-production-readiness`
+- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-49-production-readiness`
 - Source: Wave E stabilization and onboarding after Sprint 48 VK metric collection.
 - Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-49-production-readiness-design.md`
 - Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`
@@ -13,18 +13,27 @@
   - Added `docs/content-factory-production-readiness.md` as the launch checklist and manual QA map.
   - Expanded `/content-factory/help` with first-use launch path, current automation, manual confirmation boundaries, and Telegram analytics limits.
   - Added first-use next-action copy on overview, publications, and review queue empty states.
+  - Updated durable plan, status, test plan, backlog, and roadmap documents for launch readiness.
+  - Full frontend verification, focused backend smoke verification, and diff checks passed.
 - Key decisions:
   - Sprint 49 is QA-first production readiness, not a new feature subsystem.
   - Keep historical manual QA backlog visible, but do not try to retire every old manual QA item without real users and credentials.
   - Use source guards to protect the release-readiness doc, first-use help, and critical next-action copy.
 - Next actions:
-  - Run full frontend verification and focused backend smoke checks.
-  - Update final verification status.
+  - Merge Sprint 49 to `main` and push after final branch completion checks.
+  - Run authenticated launch decision QA from `docs/content-factory-production-readiness.md` with real or production-like data.
 - Latest verification:
   - RED confirmed: frontend source guard failed before implementation because the production readiness document did not exist.
   - RED confirmed: frontend source guard failed before implementation because the help page did not expose the launch first-use guide.
   - RED confirmed: frontend source guard failed before implementation because critical pages did not expose first-use next-action copy.
   - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed after each task-level implementation: 43 tests, with existing Node module-type warning.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 43 tests, with existing Node module-type warning.
+  - `cd frontend && npm test` passed: 232 tests, with existing Node module-type warnings.
+  - `cd frontend && npx tsc --noEmit` passed when run sequentially after `next build`; the first parallel run hit a transient `.next/types` race while `next build` regenerated generated route types.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed.
+  - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
+  - `git diff --check` passed.
 
 ## Content Factory Sprint 48 VK Metrics Collector
 
