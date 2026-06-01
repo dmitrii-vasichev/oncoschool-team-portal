@@ -1044,6 +1044,28 @@ class ReminderService:
         autocancelled_tasks = list((await session.execute(auto_stmt)).scalars().all())
         return build_moderator_escalation_block(stuck_tasks, autocancelled_tasks, today)
 
+    async def _member_no_overdue(self, session, member, month_start, month_end) -> bool:
+        """True iff the member had >=1 task with a deadline in [month_start, month_end)
+        and none of those tasks went overdue (cancelled tasks are ignored)."""
+        tasks = (await session.execute(
+            select(Task).where(
+                Task.assignee_id == member.id,
+                Task.deadline >= month_start,
+                Task.deadline < month_end,
+            )
+        )).scalars().all()
+        considered = 0
+        for t in tasks:
+            if t.status == "cancelled":
+                continue
+            if t.status == "done":
+                if t.completed_at is not None and t.completed_at.date() > t.deadline:
+                    return False
+                considered += 1
+            else:
+                return False
+        return considered > 0
+
     @staticmethod
     def _task_unique_key(task: Task) -> str:
         task_id = getattr(task, "id", None)
