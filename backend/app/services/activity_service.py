@@ -237,4 +237,12 @@ class ActivityService:
             for k in ("progress_percent", "blocker_text", "reason"):
                 if k in event.payload:
                     row[k] = event.payload[k]
+        if event.event_type == "kudos":
+            row["recipient_name"] = event.payload.get("recipient_name")
+            row["recipient_avatar_url"] = event.payload.get("recipient_avatar_url")
+            row["message"] = event.payload.get("message")
+        elif event.event_type in ("milestone_team", "milestone_personal"):
+            row["milestone_kind"] = event.payload.get("kind")
+            row["milestone_count"] = event.payload.get("count")
+            row["period"] = event.payload.get("period")
         return row
