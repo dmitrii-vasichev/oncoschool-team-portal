@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Clock3,
+  FileText,
   ListChecks,
   RefreshCw,
 } from "lucide-react";
@@ -288,8 +289,21 @@ export default function ContentFactoryReviewPage() {
             Очередь проверки пуста
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Сейчас нет публикаций в статусах проверки или согласования.
+            Когда публикации дойдут до текста, дизайна, фактчека, врачебной
+            проверки или одобрения, они появятся здесь с понятным следующим
+            действием.
           </p>
+          <Button
+            asChild
+            size="sm"
+            variant="outline"
+            className="mt-4 h-8 gap-1.5 rounded-md px-3 text-xs"
+          >
+            <Link href="/content-factory/publications">
+              <FileText className="h-3.5 w-3.5" />
+              Новая публикация
+            </Link>
+          </Button>
         </div>
       ) : (
         <div className="space-y-4">

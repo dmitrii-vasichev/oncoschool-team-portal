@@ -254,6 +254,7 @@ export default function ContentFactoryPublicationsPage() {
       searchQuery,
     ],
   );
+  const hasAnyPublications = publications.length > 0;
 
   if (loading) {
     return <PublicationsLoadingSkeleton />;
@@ -387,11 +388,21 @@ export default function ContentFactoryPublicationsPage() {
         <div className="rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-10 text-center">
           <FileText className="mx-auto h-8 w-8 text-muted-foreground" />
           <h2 className="mt-3 text-sm font-semibold text-foreground">
-            Публикаций по выбранным условиям нет
+            {hasAnyPublications
+              ? "Публикаций по выбранным условиям нет"
+              : "Создайте первую публикацию"}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Измените поиск или фильтры, чтобы увидеть другие материалы.
+            {hasAnyPublications
+              ? "Измените поиск или фильтры, чтобы увидеть другие материалы."
+              : "Добавьте публикацию вручную или импортируйте строки из таблицы, чтобы перенести текущий контент-план в систему."}
           </p>
+          {!hasAnyPublications && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Импортируйте строки из таблицы, если план уже есть в Excel или
+              Google Sheets.
+            </p>
+          )}
         </div>
       ) : (
         <section className="rounded-lg border border-border/70 bg-card shadow-sm">

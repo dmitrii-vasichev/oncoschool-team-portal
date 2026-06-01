@@ -278,6 +278,20 @@ test("dashboard route uses content factory API data and summaries", () => {
   assert.match(source, /href="\/content-factory\/calendar"/);
 });
 
+test("content factory critical pages explain first-use next actions", () => {
+  const dashboardSource = readSource("app/content-factory/dashboard/page.tsx");
+  const publicationsSource = readSource("app/content-factory/publications/page.tsx");
+  const reviewSource = readSource("app/content-factory/review/page.tsx");
+
+  assert.match(dashboardSource, /Создать первую кампанию/);
+  assert.match(dashboardSource, /Импортировать план/);
+  assert.match(dashboardSource, /Открыть справку/);
+  assert.match(publicationsSource, /Создайте первую публикацию/);
+  assert.match(publicationsSource, /Импортируйте строки из таблицы/);
+  assert.match(reviewSource, /Когда публикации дойдут до текста/);
+  assert.match(reviewSource, /Новая публикация/);
+});
+
 test("calendar route uses content factory filters and date grouping", () => {
   const source = readSource("app/content-factory/calendar/page.tsx");
   const utilsSource = readSource("lib/contentFactoryUtils.ts");

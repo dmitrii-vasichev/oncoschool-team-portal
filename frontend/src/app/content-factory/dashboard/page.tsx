@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   Factory,
+  FileText,
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -220,6 +221,7 @@ export default function ContentFactoryDashboardPage() {
     () => summarizeContentFactoryDashboard({ bundles, publications }),
     [bundles, publications],
   );
+  const isFirstUseEmpty = bundles.length === 0 && publications.length === 0;
 
   if (loading) {
     return <DashboardLoadingSkeleton />;
@@ -253,6 +255,54 @@ export default function ContentFactoryDashboardPage() {
           </Link>
         </Button>
       </div>
+
+      {isFirstUseEmpty && (
+        <section className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-4 shadow-sm">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground">
+                Начните с одного полного цикла
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                Создайте первую кампанию, добавьте публикацию или импортируйте
+                план из таблицы. После публикации сюда начнут попадать ближайшие
+                выходы, задержки и результаты.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                asChild
+                size="sm"
+                className="h-8 gap-1.5 rounded-md px-3 text-xs"
+              >
+                <Link href="/content-factory/bundles">
+                  <Factory className="h-3.5 w-3.5" />
+                  Создать первую кампанию
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 rounded-md px-3 text-xs"
+              >
+                <Link href="/content-factory/publications">
+                  <FileText className="h-3.5 w-3.5" />
+                  Импортировать план
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="ghost"
+                className="h-8 gap-1.5 rounded-md px-3 text-xs"
+              >
+                <Link href="/content-factory/help">Открыть справку</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-3 border-y border-border/60 py-2">
