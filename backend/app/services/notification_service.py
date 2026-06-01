@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -227,6 +228,19 @@ class NotificationService:
         what = f"твою задачу «{title}»" if title else "твою активность"
         await self._send_safe(
             actor.telegram_id, f"{symbol} {reactor.full_name} отметил {what}"
+        )
+
+    async def notify_kudos(self, session, event, giver) -> None:
+        """Ping the kudos recipient that a colleague thanked them."""
+        recipient_id = (event.payload or {}).get("recipient_id")
+        if not recipient_id:
+            return
+        recipient = await self.member_repo.get_by_id(session, uuid.UUID(recipient_id))
+        if not recipient or not recipient.telegram_id:
+            return
+        message = (event.payload or {}).get("message") or ""
+        await self._send_safe(
+            recipient.telegram_id, f"🙌 {giver.full_name} поблагодарил(а) тебя: «{message}»"
         )
 
     async def notify_task_assigned(
