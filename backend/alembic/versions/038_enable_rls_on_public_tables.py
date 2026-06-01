@@ -61,6 +61,7 @@ PUBLIC_TABLES: tuple[str, ...] = (
     "meeting_participants",
     "meeting_schedules",
     "meetings",
+    "milestone_awards",
     "notification_subscriptions",
     "project_comments",
     "project_departments",
