@@ -17,7 +17,13 @@ from app.db.models import (
 )
 from app.services.task_visibility_service import resolve_visible_department_ids
 
-COMPANY_EVENT_TYPES = {"task_completed", "task_cancelled"}
+COMPANY_EVENT_TYPES = {
+    "task_completed",
+    "task_cancelled",
+    "kudos",
+    "milestone_team",
+    "milestone_personal",
+}
 EMOJI_SYMBOLS = {
     # celebratory set (completed / blocker / progress)
     "clap": "👏",
@@ -67,7 +73,7 @@ class ActivityService:
         session: AsyncSession,
         *,
         event_type: str,
-        actor: TeamMember,
+        actor: TeamMember | None = None,
         task: Task | None = None,
         extra: dict | None = None,
     ) -> ActivityEvent:
@@ -75,10 +81,10 @@ class ActivityService:
 
         department_id = None
         department_name = None
-        payload: dict = {
-            "actor_name": actor.full_name,
-            "actor_avatar_url": actor.avatar_url,
-        }
+        payload: dict = {}
+        if actor is not None:
+            payload["actor_name"] = actor.full_name
+            payload["actor_avatar_url"] = actor.avatar_url
 
         if task is not None:
             payload["task_title"] = task.title
@@ -96,7 +102,7 @@ class ActivityService:
 
         event = ActivityEvent(
             event_type=event_type,
-            actor_id=actor.id,
+            actor_id=actor.id if actor is not None else None,
             task_id=task.id if task is not None else None,
             department_id=department_id,
             visibility=visibility,
