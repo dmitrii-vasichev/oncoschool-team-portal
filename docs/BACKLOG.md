@@ -4,7 +4,8 @@
 
 ### Next
 
-- Execute Sprint 49: production readiness, onboarding, and authenticated end-to-end QA.
+- Run launch decision QA from `docs/content-factory-production-readiness.md` with authenticated real or production-like data.
+- Record launch blockers from Sprint 49 manual QA with owner and expected fix sprint.
 - Run authenticated manual QA for the Sprint 48 VK metric collector against a real VK community/post, missing-token config, invalid post identity, dedupe behavior, scheduled runs, import-run history, and metric-history provenance.
 - Run authenticated manual QA for the Sprint 47 metrics integration foundation against manual metrics, paste import, metric source config API, import run listing, dedupe, and provenance display.
 - Run authenticated manual QA for the Sprint 46 VK publisher against configured, missing-config, API-error, and media-ref cases.
@@ -40,6 +41,8 @@
 
 ### Later
 
+- Add post-release metric providers only after Sprint 49 launch QA confirms VK metric collection is operational.
+- Revisit Telegram analytics only when MTProto/admin access is explicitly available and approved.
 - Add guest stage-history editing/backfill only if the derived Sprint 17 timeline is not enough for operations.
 - Add guest intake-form imports after the manual guest pipeline is validated.
 - Add consent document storage/signature integration only after the consent metadata workflow is used by the team.

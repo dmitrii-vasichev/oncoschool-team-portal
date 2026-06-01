@@ -1,3 +1,52 @@
+# Active Plan: Content Factory Sprint 49 Production Readiness
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Prepare Content Factory for practical rollout with a production-readiness checklist, clearer first-use help, and focused first-use UI blockers fixed.
+
+**Detailed design:** `docs/superpowers/specs/2026-06-01-content-factory-sprint-49-production-readiness-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`
+
+**Milestones:**
+
+1. Add the production readiness source guard and rollout document.
+2. Clarify first-use help, current automation, and manual boundaries.
+3. Improve first-use empty states on critical Content Factory screens.
+4. Update durable repo docs and backlog for launch readiness.
+5. Run backend/frontend verification.
+
+**Implementation status:**
+
+- In progress on branch `codex/content-factory-sprint-49-production-readiness`.
+- Sprint 1 through Sprint 48 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- `docs/content-factory-production-readiness.md` exists and describes launch decision criteria.
+- `/content-factory/help` explains first use, current automation, manual confirmation boundaries, and Telegram analytics limitations.
+- Dashboard, publications, and review queue first-use states point users to concrete next actions.
+- Source guards cover readiness documentation, help, and critical next-action copy.
+- Remaining launch risks and post-release work are explicit in durable docs.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q
+git diff --check
+```
+
+**Latest verification result:**
+
+- Pending implementation.
+
+---
+
 # Active Plan: Content Factory Sprint 48 VK Metrics Collector
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-05-17-content-factory-sprint-48-vk-metrics-collector.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.

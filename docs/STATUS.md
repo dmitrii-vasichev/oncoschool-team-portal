@@ -1,5 +1,31 @@
 # Status
 
+## Content Factory Sprint 49 Production Readiness
+
+- Current phase: in progress on branch `codex/content-factory-sprint-49-production-readiness`
+- Source: Wave E stabilization and onboarding after Sprint 48 VK metric collection.
+- Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-49-production-readiness-design.md`
+- Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`
+- Scope: production readiness document, first-use help, current automation boundaries, critical empty-state copy, source guards, durable docs, and verification
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-49-production-readiness`.
+  - Wrote Sprint 49 design and implementation plan.
+  - Added `docs/content-factory-production-readiness.md` as the launch checklist and manual QA map.
+  - Expanded `/content-factory/help` with first-use launch path, current automation, manual confirmation boundaries, and Telegram analytics limits.
+  - Added first-use next-action copy on overview, publications, and review queue empty states.
+- Key decisions:
+  - Sprint 49 is QA-first production readiness, not a new feature subsystem.
+  - Keep historical manual QA backlog visible, but do not try to retire every old manual QA item without real users and credentials.
+  - Use source guards to protect the release-readiness doc, first-use help, and critical next-action copy.
+- Next actions:
+  - Run full frontend verification and focused backend smoke checks.
+  - Update final verification status.
+- Latest verification:
+  - RED confirmed: frontend source guard failed before implementation because the production readiness document did not exist.
+  - RED confirmed: frontend source guard failed before implementation because the help page did not expose the launch first-use guide.
+  - RED confirmed: frontend source guard failed before implementation because critical pages did not expose first-use next-action copy.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed after each task-level implementation: 43 tests, with existing Node module-type warning.
+
 ## Content Factory Sprint 48 VK Metrics Collector
 
 - Current phase: implemented, locally verified, merged to `main`, and pushed

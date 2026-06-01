@@ -170,10 +170,10 @@ Goal: prepare Content Factory for everyday use by non-developers.
 
 #### Sprint 49: Production Readiness Pass
 
-- Run authenticated manual QA across the entire Content Factory workflow.
-- Fix naming, empty states, form hints, mobile readability, and slow screens.
-- Ensure the help system links from every section and matches the implemented behavior.
-- Update final release notes and open remaining post-release backlog.
+- Add a tracked production-readiness checklist for rollout decisions.
+- Clarify first-use help, automation boundaries, and evidence flow.
+- Fix focused first-use empty states and next-action copy.
+- Keep remaining release risks visible in backlog instead of conversation history.
 
 ## How Each Future Sprint Should Start
 

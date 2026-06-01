@@ -1,5 +1,26 @@
 # Test Plan
 
+## Content Factory Sprint 49 Production Readiness
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/help` and confirm the first-use path is understandable without developer explanation.
+2. Open `/content-factory/dashboard` with empty data and confirm it points to first campaign, table import, and help.
+3. Open `/content-factory/publications` with empty data and confirm it explains manual creation and table import.
+4. Open `/content-factory/review` with no review items and confirm it explains when the queue becomes useful.
+5. Use `docs/content-factory-production-readiness.md` to run one campaign-to-retrospective workflow.
+6. Record any launch blockers in `docs/BACKLOG.md` before release approval.
+
 ## Content Factory Sprint 48 VK Metrics Collector
 
 ### Automated
