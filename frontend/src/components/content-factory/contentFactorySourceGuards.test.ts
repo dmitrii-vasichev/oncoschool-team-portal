@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 const srcDir = join(process.cwd(), "src");
+const repoDir = join(process.cwd(), "..");
 
 function readSource(path: string): string {
   return readFileSync(join(srcDir, path), "utf8");
@@ -12,6 +13,14 @@ function readSource(path: string): string {
 
 function sourceExists(path: string): boolean {
   return existsSync(join(srcDir, path));
+}
+
+function readRepoSource(path: string): string {
+  return readFileSync(join(repoDir, path), "utf8");
+}
+
+function repoSourceExists(path: string): boolean {
+  return existsSync(join(repoDir, path));
 }
 
 test("sidebar exposes content factory navigation", () => {
@@ -139,6 +148,28 @@ test("content factory overview help explains operating model and automation boun
     source,
     /кампания -> публикации -> адаптации -> проверка -> публикация -> метрики -> выводы/,
   );
+});
+
+test("production readiness document maps launch workflow", () => {
+  assert.equal(
+    repoSourceExists("docs/content-factory-production-readiness.md"),
+    true,
+  );
+
+  const source = readRepoSource("docs/content-factory-production-readiness.md");
+
+  assert.match(source, /Content Factory Production Readiness/);
+  assert.match(source, /Launch Decision/);
+  assert.match(source, /Campaign planning/);
+  assert.match(source, /Publication readiness/);
+  assert.match(source, /Publishing queue/);
+  assert.match(source, /VK metric collection/);
+  assert.match(
+    source,
+    /Telegram post analytics are not collected automatically/,
+  );
+  assert.match(source, /Manual QA/);
+  assert.match(source, /Known limits/);
 });
 
 test("content factory help explains publication planning readiness and adaptations", () => {
