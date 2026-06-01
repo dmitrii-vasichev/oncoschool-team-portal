@@ -172,6 +172,20 @@ test("production readiness document maps launch workflow", () => {
   assert.match(source, /Known limits/);
 });
 
+test("content factory help exposes launch first-use guide", () => {
+  const source = readSource("app/content-factory/help/page.tsx");
+
+  assert.match(source, /Первый запуск/);
+  assert.match(source, /Готовность к запуску/);
+  assert.match(source, /Что уже автоматизировано/);
+  assert.match(source, /Что требует ручной проверки/);
+  assert.match(source, /Telegram и VK/);
+  assert.match(source, /VK-метрики/);
+  assert.match(source, /Telegram.*аналитик.*не собира/i);
+  assert.match(source, /\/content-factory\/publications/);
+  assert.match(source, /\/content-factory\/help/);
+});
+
 test("content factory help explains publication planning readiness and adaptations", () => {
   const source = readSource("app/content-factory/help/page.tsx");
 

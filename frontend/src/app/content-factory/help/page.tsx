@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   AlertTriangle,
+  ArrowRight,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -89,13 +90,27 @@ const CURRENT_CAPABILITIES = [
   "Посмотреть сводку метрик, эффективность, аналитику аудиторий и ретроспективы.",
 ];
 
+const CURRENT_AUTOMATION = [
+  "Импорт публикационного плана из таблицы с предварительной проверкой строк.",
+  "Матрица каналов внутри кампании: видно, какие публикации уже есть, а каких не хватает.",
+  "Очередь публикации с аудитом, повторами, ручным fallback и отправкой сейчас.",
+  "Telegram и VK могут отправлять текстовые публикации через настроенные интеграции.",
+  "VK-метрики собираются автоматически для опубликованных VK-постов, если настроен источник и токен.",
+];
+
+const MANUAL_CONFIRMATION_BOUNDARIES = [
+  "Перед запуском нужно вручную проверить доступы, токены, права каналов и реальные тестовые публикации.",
+  "Факт публикации остается важным evidence: ссылка, дата выхода и внешний ID должны быть видны в карточке.",
+  "Telegram-аналитика постов не собирается автоматически ботом: для нее нужен отдельный MTProto/admin-доступ.",
+  "Медиа-вложения пока не отправляются автоматически: такие публикации должны уходить через ручной fallback.",
+  "Ретроспектива остается ручным решением команды: система помогает собрать evidence, но не делает выводы вместо людей.",
+];
+
 const FUTURE_AUTOMATION = [
-  "Импорт публикационного плана из Excel или табличной вставки с предварительной проверкой строк.",
-  "Матрица планирования внутри кампании: какие каналы уже заведены, а каких публикаций еще не хватает.",
-  "Очередь публикации с аудитом, статусами, повторами и безопасным ручным fallback.",
-  "Первая автопубликация там, где API и доступы достаточно стабильны, вероятно Telegram.",
-  "Следующие интеграции по практической ценности: VK, метрики Telegram/VK, GetCourse-конверсии, email-отчеты.",
-  "Автоматический сбор ссылок, внешних ID и метрик там, где это надежнее ручной фиксации.",
+  "Расширение метрик на новые провайдеры после проверки VK-сбора на реальных публикациях.",
+  "Telegram-аналитика только после отдельного решения по MTProto/admin-доступу.",
+  "Медиа-публикации и вложения после проверки безопасного provider workflow.",
+  "Больше агрегированных отчетов, если браузерная сборка данных станет медленной.",
 ];
 
 const FIRST_SAFE_PATH = [
@@ -433,6 +448,42 @@ export default function ContentFactoryHelpPage() {
           <div className="flex items-center gap-2">
             <Rocket className="h-4 w-4 text-primary" />
             <h2 className="text-sm font-semibold text-foreground">
+              Что уже автоматизировано
+            </h2>
+          </div>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+            {CURRENT_AUTOMATION.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950 shadow-sm sm:px-5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <h2 className="text-sm font-semibold">
+              Что требует ручной проверки
+            </h2>
+          </div>
+          <ul className="mt-3 space-y-2 text-sm leading-6">
+            {MANUAL_CONFIRMATION_BOUNDARIES.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold text-foreground">
               Что будет автоматизировано позже
             </h2>
           </div>
@@ -446,6 +497,41 @@ export default function ContentFactoryHelpPage() {
           </ul>
         </section>
       </div>
+
+      <section className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-4 shadow-sm sm:px-5">
+        <div className="flex items-center gap-2">
+          <Rocket className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">
+            Первый запуск: что открыть по порядку
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Готовность к запуску проверяется не количеством заполненных полей, а
+          тем, прошел ли хотя бы один понятный путь от кампании до вывода.
+          Начните с небольшой реальной кампании и двигайтесь по шагам.
+        </p>
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {[
+            { label: "1. Кампания", href: "/content-factory/bundles" },
+            { label: "2. Публикации", href: "/content-factory/publications" },
+            { label: "3. Очередь проверки", href: "/content-factory/review" },
+            {
+              label: "4. Метрики и выводы",
+              href: "/content-factory/effectiveness",
+            },
+            { label: "5. Справка", href: "/content-factory/help" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <span>{item.label}</span>
+              <ArrowRight className="h-3.5 w-3.5 text-primary" />
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5">
         <div className="flex items-center gap-2">
