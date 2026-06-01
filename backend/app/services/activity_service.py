@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -35,6 +36,7 @@ EMOJI_SYMBOLS = {
     "shrug": "🤷",
 }
 ALLOWED_EMOJI = set(EMOJI_SYMBOLS)
+KUDOS_DEDUP_HOURS = 12
 
 
 class ActivityService:
@@ -67,6 +69,44 @@ class ActivityService:
         )
         result = await session.execute(stmt)
         return result.first() is not None
+
+    async def give_kudos(
+        self, session: AsyncSession, *, giver: TeamMember, recipient_id, message: str
+    ) -> ActivityEvent:
+        """Create a kudos event from ``giver`` to ``recipient_id``.
+
+        Guardrails: no self-thank; recipient must be active; at most one kudos to
+        the same recipient within KUDOS_DEDUP_HOURS.
+        """
+        if recipient_id == giver.id:
+            raise ValueError("Нельзя поблагодарить самого себя")
+        recipient = await session.get(TeamMember, recipient_id)
+        if recipient is None or not recipient.is_active:
+            raise ValueError("Получатель не найден")
+
+        since = datetime.now(timezone.utc) - timedelta(hours=KUDOS_DEDUP_HOURS)
+        dup = (await session.execute(
+            select(ActivityEvent.id).where(
+                ActivityEvent.event_type == "kudos",
+                ActivityEvent.actor_id == giver.id,
+                ActivityEvent.payload["recipient_id"].astext == str(recipient_id),
+                ActivityEvent.created_at >= since,
+            ).limit(1)
+        )).first()
+        if dup is not None:
+            raise ValueError("Вы уже благодарили этого коллегу недавно")
+
+        return await self.record(
+            session,
+            event_type="kudos",
+            actor=giver,
+            extra={
+                "recipient_id": str(recipient_id),
+                "recipient_name": recipient.full_name,
+                "recipient_avatar_url": recipient.avatar_url,
+                "message": message,
+            },
+        )
 
     async def record(
         self,
