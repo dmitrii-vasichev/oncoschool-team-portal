@@ -218,6 +218,12 @@ class NotificationService:
             counterpart_telegram_id, text, _task_callback_markup(task)
         )
 
+    async def notify_milestone(self, member, text: str) -> None:
+        """DM a member about a personal milestone (no DB access)."""
+        if not member or not member.telegram_id:
+            return
+        await self._send_safe(member.telegram_id, text)
+
     async def notify_reaction(self, session, event, reactor, emoji) -> None:
         """Ping the event author that someone reacted."""
         actor = await self.member_repo.get_by_id(session, event.actor_id)
