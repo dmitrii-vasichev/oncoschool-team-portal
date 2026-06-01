@@ -274,7 +274,8 @@ export default function PulsePage() {
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm text-foreground">
-                            <b className="font-semibold">{who}</b> поблагодарил{" "}
+                            <b className="font-semibold">{who}</b>{" "}
+                            поблагодарил(а){" "}
                             <b className="font-semibold">{recipient}</b>
                           </p>
                           {message && (
