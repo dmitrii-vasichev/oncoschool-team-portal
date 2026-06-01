@@ -3,10 +3,18 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import ActivityEvent, ActivityReaction, Department, Task, TeamMember
+from app.db.models import (
+    ActivityEvent,
+    ActivityReaction,
+    Department,
+    MilestoneAward,
+    Task,
+    TeamMember,
+)
 from app.services.task_visibility_service import resolve_visible_department_ids
 
 COMPANY_EVENT_TYPES = {"task_completed", "task_cancelled"}
@@ -36,6 +44,23 @@ class ActivityService:
             if r.member_id == perspective_member_id:
                 mine.add(r.emoji)
         return {"counts": counts, "mine": sorted(mine)}
+
+    async def claim_milestone(
+        self, session: AsyncSession, key: str, member_id=None
+    ) -> bool:
+        """Atomically claim a milestone key. Returns True only the first time.
+
+        Uses Postgres INSERT ... ON CONFLICT DO NOTHING RETURNING so concurrent
+        callers never double-award. Caller emits the event/DM only on True.
+        """
+        stmt = (
+            pg_insert(MilestoneAward)
+            .values(id=uuid.uuid4(), milestone_key=key, member_id=member_id)
+            .on_conflict_do_nothing(index_elements=["milestone_key"])
+            .returning(MilestoneAward.id)
+        )
+        result = await session.execute(stmt)
+        return result.first() is not None
 
     async def record(
         self,
