@@ -75,7 +75,8 @@ async def test_record_without_task_has_minimal_payload():
             assert event.task_id is None
             assert event.department_id is None
             # No task means no task/department snapshot keys are added.
-            assert event.payload == {"actor_name": "Anna"}
+            # (actor_avatar_url is always snapshotted alongside actor_name.)
+            assert event.payload == {"actor_name": "Anna", "actor_avatar_url": None}
         finally:
             await session.rollback()
 

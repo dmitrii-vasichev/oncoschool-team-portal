@@ -1,15 +1,30 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import ActivityEvent, ActivityReaction, Department, Task, TeamMember
+from app.db.models import (
+    ActivityEvent,
+    ActivityReaction,
+    Department,
+    MilestoneAward,
+    Task,
+    TeamMember,
+)
 from app.services.task_visibility_service import resolve_visible_department_ids
 
-COMPANY_EVENT_TYPES = {"task_completed", "task_cancelled"}
+COMPANY_EVENT_TYPES = {
+    "task_completed",
+    "task_cancelled",
+    "kudos",
+    "milestone_team",
+    "milestone_personal",
+}
 EMOJI_SYMBOLS = {
     # celebratory set (completed / blocker / progress)
     "clap": "👏",
@@ -21,6 +36,7 @@ EMOJI_SYMBOLS = {
     "shrug": "🤷",
 }
 ALLOWED_EMOJI = set(EMOJI_SYMBOLS)
+KUDOS_DEDUP_HOURS = 12
 
 
 class ActivityService:
@@ -37,12 +53,67 @@ class ActivityService:
                 mine.add(r.emoji)
         return {"counts": counts, "mine": sorted(mine)}
 
+    async def claim_milestone(
+        self, session: AsyncSession, key: str, member_id: uuid.UUID | None = None
+    ) -> bool:
+        """Atomically claim a milestone key. Returns True only the first time.
+
+        Uses Postgres INSERT ... ON CONFLICT DO NOTHING RETURNING so concurrent
+        callers never double-award. Caller emits the event/DM only on True.
+        """
+        stmt = (
+            pg_insert(MilestoneAward)
+            .values(id=uuid.uuid4(), milestone_key=key, member_id=member_id)
+            .on_conflict_do_nothing(index_elements=["milestone_key"])
+            .returning(MilestoneAward.id)
+        )
+        result = await session.execute(stmt)
+        return result.first() is not None
+
+    async def give_kudos(
+        self, session: AsyncSession, *, giver: TeamMember, recipient_id, message: str
+    ) -> ActivityEvent:
+        """Create a kudos event from ``giver`` to ``recipient_id``.
+
+        Guardrails: no self-thank; recipient must be active; at most one kudos to
+        the same recipient within KUDOS_DEDUP_HOURS.
+        """
+        if recipient_id == giver.id:
+            raise ValueError("Нельзя поблагодарить самого себя")
+        recipient = await session.get(TeamMember, recipient_id)
+        if recipient is None or not recipient.is_active:
+            raise ValueError("Получатель не найден")
+
+        since = datetime.now(timezone.utc) - timedelta(hours=KUDOS_DEDUP_HOURS)
+        dup = (await session.execute(
+            select(ActivityEvent.id).where(
+                ActivityEvent.event_type == "kudos",
+                ActivityEvent.actor_id == giver.id,
+                ActivityEvent.payload["recipient_id"].astext == str(recipient_id),
+                ActivityEvent.created_at >= since,
+            ).limit(1)
+        )).first()
+        if dup is not None:
+            raise ValueError("Вы уже благодарили этого коллегу недавно")
+
+        return await self.record(
+            session,
+            event_type="kudos",
+            actor=giver,
+            extra={
+                "recipient_id": str(recipient_id),
+                "recipient_name": recipient.full_name,
+                "recipient_avatar_url": recipient.avatar_url,
+                "message": message,
+            },
+        )
+
     async def record(
         self,
         session: AsyncSession,
         *,
         event_type: str,
-        actor: TeamMember,
+        actor: TeamMember | None = None,
         task: Task | None = None,
         extra: dict | None = None,
     ) -> ActivityEvent:
@@ -50,10 +121,10 @@ class ActivityService:
 
         department_id = None
         department_name = None
-        payload: dict = {
-            "actor_name": actor.full_name,
-            "actor_avatar_url": actor.avatar_url,
-        }
+        payload: dict = {}
+        if actor is not None:
+            payload["actor_name"] = actor.full_name
+            payload["actor_avatar_url"] = actor.avatar_url
 
         if task is not None:
             payload["task_title"] = task.title
@@ -71,7 +142,7 @@ class ActivityService:
 
         event = ActivityEvent(
             event_type=event_type,
-            actor_id=actor.id,
+            actor_id=actor.id if actor is not None else None,
             task_id=task.id if task is not None else None,
             department_id=department_id,
             visibility=visibility,
@@ -206,4 +277,12 @@ class ActivityService:
             for k in ("progress_percent", "blocker_text", "reason"):
                 if k in event.payload:
                     row[k] = event.payload[k]
+        if event.event_type == "kudos":
+            row["recipient_name"] = event.payload.get("recipient_name")
+            row["recipient_avatar_url"] = event.payload.get("recipient_avatar_url")
+            row["message"] = event.payload.get("message")
+        elif event.event_type in ("milestone_team", "milestone_personal"):
+            row["milestone_kind"] = event.payload.get("kind")
+            row["milestone_count"] = event.payload.get("count")
+            row["period"] = event.payload.get("period")
         return row

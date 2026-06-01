@@ -2,11 +2,11 @@ import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Task, TaskUpdate, TeamMember
+from app.db.models import ActivityEvent, Task, TaskUpdate, TeamMember
 from app.db.repositories import TaskRepository, TaskUpdateRepository, TeamMemberRepository
 from app.services.activity_service import ActivityService
 from app.services.in_app_notification_service import InAppNotificationService
@@ -23,6 +23,9 @@ VALID_UPDATE_TYPES: frozenset[str] = frozenset({
     "completion",
     "cancellation",
 })
+
+# Team-wide cumulative completion milestones (code constant, not settings).
+TEAM_TOTAL_THRESHOLDS = (100, 250, 500, 1000, 2000, 5000)
 
 # Russian labels for cancellation reasons shown in the Team Pulse feed.
 _CANCEL_REASON_LABELS = {
@@ -50,6 +53,31 @@ class TaskService:
     def _now_utc() -> datetime:
         """Return current UTC datetime (timezone-aware)."""
         return datetime.now(timezone.utc)
+
+    async def _award_team_total_milestones(self, session: AsyncSession, closer: TeamMember, count: int) -> None:
+        """Emit a milestone_team(total) for every threshold <= count not yet awarded.
+
+        Idempotent via the milestone_awards ledger; catches up if several
+        thresholds are already passed (e.g. first run after backfill).
+        """
+        for threshold in TEAM_TOTAL_THRESHOLDS:
+            if count < threshold:
+                break
+            if await self.activity_service.claim_milestone(session, f"team_total:{threshold}"):
+                await self.activity_service.record(
+                    session,
+                    event_type="milestone_team",
+                    actor=closer,
+                    extra={"kind": "total", "count": threshold},
+                )
+
+    async def _maybe_award_team_total(self, session: AsyncSession, closer: TeamMember) -> None:
+        count = (await session.execute(
+            select(func.count())
+            .select_from(ActivityEvent)
+            .where(ActivityEvent.event_type == "task_completed")
+        )).scalar_one()
+        await self._award_team_total_milestones(session, closer, count)
 
     # ------------------------------------------------------------------
     # Public API
@@ -214,6 +242,7 @@ class TaskService:
         await self.activity_service.record(
             session, event_type="task_completed", actor=member, task=task
         )
+        await self._maybe_award_team_total(session, member)
         return task
 
     async def update_status(
@@ -266,6 +295,7 @@ class TaskService:
             await self.activity_service.record(
                 session, event_type="task_completed", actor=member, task=task
             )
+            await self._maybe_award_team_total(session, member)
         return task
 
     async def cancel_task(

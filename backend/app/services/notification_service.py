@@ -1,4 +1,5 @@
 import logging
+import uuid
 
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -217,6 +218,12 @@ class NotificationService:
             counterpart_telegram_id, text, _task_callback_markup(task)
         )
 
+    async def notify_milestone(self, member, text: str) -> None:
+        """DM a member about a personal milestone (no DB access)."""
+        if not member or not member.telegram_id:
+            return
+        await self._send_safe(member.telegram_id, text)
+
     async def notify_reaction(self, session, event, reactor, emoji) -> None:
         """Ping the event author that someone reacted."""
         actor = await self.member_repo.get_by_id(session, event.actor_id)
@@ -227,6 +234,19 @@ class NotificationService:
         what = f"твою задачу «{title}»" if title else "твою активность"
         await self._send_safe(
             actor.telegram_id, f"{symbol} {reactor.full_name} отметил {what}"
+        )
+
+    async def notify_kudos(self, session, event, giver) -> None:
+        """Ping the kudos recipient that a colleague thanked them."""
+        recipient_id = (event.payload or {}).get("recipient_id")
+        if not recipient_id:
+            return
+        recipient = await self.member_repo.get_by_id(session, uuid.UUID(recipient_id))
+        if not recipient or not recipient.telegram_id:
+            return
+        message = (event.payload or {}).get("message") or ""
+        await self._send_safe(
+            recipient.telegram_id, f"🙌 {giver.full_name} поблагодарил(а) тебя: «{message}»"
         )
 
     async def notify_task_assigned(

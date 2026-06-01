@@ -34,7 +34,9 @@ from app.db.repositories import (
     ReminderSettingsRepository,
     TaskRepository,
 )
+from app.services.activity_service import ActivityService
 from app.services.in_app_notification_service import InAppNotificationService
+from app.services.notification_service import NotificationService
 from app.services.permission_service import PermissionService
 from app.services.pulse_digest import (
     build_company_digest,
@@ -323,6 +325,7 @@ class ReminderService:
         self.sub_repo = NotificationSubscriptionRepository()
         self.app_settings_repo = AppSettingsRepository()
         self.in_app_notifications = InAppNotificationService()
+        self.activity_service = ActivityService()
         self._task_overdue_interval_hours = DEFAULT_TASK_OVERDUE_INTERVAL_HOURS
         self._task_overdue_daily_time_msk = DEFAULT_TASK_OVERDUE_DAILY_TIME_MSK
         # Track which members got digest today (member_id -> date)
@@ -399,6 +402,14 @@ class ReminderService:
             hour=9,
             minute=5,
             id="pulse_company_digest",
+            replace_existing=True,
+        )
+        # Monthly recognition milestones (1st of month, 09:10).
+        self.scheduler.add_job(
+            self._monthly_milestones_job,
+            "cron",
+            day=1, hour=9, minute=10,
+            id="monthly_milestones",
             replace_existing=True,
         )
         self.scheduler.start()
@@ -1043,6 +1054,98 @@ class ReminderService:
         stuck_tasks = list((await session.execute(stuck_stmt)).scalars().all())
         autocancelled_tasks = list((await session.execute(auto_stmt)).scalars().all())
         return build_moderator_escalation_block(stuck_tasks, autocancelled_tasks, today)
+
+    async def _member_no_overdue(self, session, member, month_start, month_end) -> bool:
+        """True iff the member had >=1 task with a deadline in [month_start, month_end)
+        and none of those tasks went overdue (cancelled tasks are ignored)."""
+        tasks = (await session.execute(
+            select(Task).where(
+                Task.assignee_id == member.id,
+                Task.deadline >= month_start,
+                Task.deadline < month_end,
+            )
+        )).scalars().all()
+        considered = 0
+        for t in tasks:
+            if t.status == "cancelled":
+                continue
+            if t.status == "done":
+                if t.completed_at is not None and t.completed_at.date() > t.deadline:
+                    return False
+                considered += 1
+            else:
+                return False
+        return considered > 0
+
+    async def _run_monthly_milestones(
+        self, session, *, period, start_utc, end_utc, month_start, month_end
+    ) -> list[tuple]:
+        """Award the team monthly recap + per-member no-overdue milestones.
+
+        Returns a list of (member_id, dm_text) to DM after the transaction commits.
+        """
+        dm_targets: list[tuple] = []
+
+        count = (await session.execute(
+            select(func.count())
+            .select_from(ActivityEvent)
+            .where(
+                ActivityEvent.event_type == "task_completed",
+                ActivityEvent.created_at >= start_utc,
+                ActivityEvent.created_at < end_utc,
+            )
+        )).scalar_one()
+        if count > 0 and await self.activity_service.claim_milestone(session, f"team_month:{period}"):
+            await self.activity_service.record(
+                session, event_type="milestone_team", actor=None,
+                extra={"kind": "month", "count": int(count), "period": period},
+            )
+
+        members = (await session.execute(
+            select(TeamMember).where(TeamMember.is_active.is_(True))
+        )).scalars().all()
+        for mem in members:
+            if not await self._member_no_overdue(session, mem, month_start, month_end):
+                continue
+            if await self.activity_service.claim_milestone(session, f"no_overdue:{mem.id}:{period}", member_id=mem.id):
+                await self.activity_service.record(
+                    session, event_type="milestone_personal", actor=mem,
+                    extra={"kind": "no_overdue", "period": period},
+                )
+                dm_targets.append((mem.id, "🛡️ Поздравляем! Месяц без единой просрочки. Так держать!"))
+        return dm_targets
+
+    async def _monthly_milestones_job(self) -> None:
+        """Monthly job (1st of month): team recap + personal no-overdue, then DMs."""
+        try:
+            try:
+                tz = ZoneInfo(settings.TIMEZONE)
+            except Exception:
+                tz = ZoneInfo("Europe/Moscow")
+            today_local = datetime.now(tz).date()
+            first_this = today_local.replace(day=1)
+            month_start = (first_this - timedelta(days=1)).replace(day=1)
+            month_end = first_this
+            period = month_start.strftime("%Y-%m")
+            start_utc = datetime(month_start.year, month_start.month, 1, tzinfo=tz).astimezone(timezone.utc)
+            end_utc = datetime(month_end.year, month_end.month, 1, tzinfo=tz).astimezone(timezone.utc)
+
+            async with self.session_maker() as session:
+                async with session.begin():
+                    dm_targets = await self._run_monthly_milestones(
+                        session, period=period, start_utc=start_utc, end_utc=end_utc,
+                        month_start=month_start, month_end=month_end,
+                    )
+
+            if dm_targets:
+                ns = NotificationService(self.bot)
+                async with self.session_maker() as session:
+                    for member_id, text in dm_targets:
+                        member = await session.get(TeamMember, member_id)
+                        if member:
+                            await ns.notify_milestone(member, text)
+        except Exception as e:
+            logger.error(f"Error in _monthly_milestones_job: {e}")
 
     @staticmethod
     def _task_unique_key(task: Task) -> str:
