@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 49 Production Readiness
 
-- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-49-production-readiness`
+- Current phase: implemented, locally verified, merged to `main`, and pushed
 - Source: Wave E stabilization and onboarding after Sprint 48 VK metric collection.
 - Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-49-production-readiness-design.md`
 - Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`
@@ -15,12 +15,14 @@
   - Added first-use next-action copy on overview, publications, and review queue empty states.
   - Updated durable plan, status, test plan, backlog, and roadmap documents for launch readiness.
   - Full frontend verification, focused backend smoke verification, and diff checks passed.
+  - Fast-forward merged Sprint 49 into local `main`.
+  - Post-merge smoke verification passed on `main`.
+  - Pushed Sprint 49 to `origin/main`.
 - Key decisions:
   - Sprint 49 is QA-first production readiness, not a new feature subsystem.
   - Keep historical manual QA backlog visible, but do not try to retire every old manual QA item without real users and credentials.
   - Use source guards to protect the release-readiness doc, first-use help, and critical next-action copy.
 - Next actions:
-  - Merge Sprint 49 to `main` and push after final branch completion checks.
   - Run authenticated launch decision QA from `docs/content-factory-production-readiness.md` with real or production-like data.
 - Latest verification:
   - RED confirmed: frontend source guard failed before implementation because the production readiness document did not exist.
@@ -34,6 +36,8 @@
   - `cd frontend && npm run build` passed.
   - `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
   - `git diff --check` passed.
+  - Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 43 tests, with existing Node module-type warning.
+  - Post-merge smoke on `main`: `cd backend && env PYTHONPATH=$PWD DEBUG=true BOT_TOKEN=123456:TEST DATABASE_URL=postgresql+asyncpg://cfuser:cfpass@localhost:5434/oncoschool_cf OPENAI_API_KEY=test pytest tests/test_cf_vk_metric_collector_service.py tests/test_cf_metric_import_scheduler_service.py tests/test_content_factory_metric_sources_api.py tests/test_content_factory_metrics_api.py -q` passed: 20 tests, with existing pytest-asyncio warning.
 
 ## Content Factory Sprint 48 VK Metrics Collector
 
