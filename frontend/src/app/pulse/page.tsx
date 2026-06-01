@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Heart } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useToast } from "@/components/shared/Toast";
 import { useActivity } from "@/hooks/useActivity";
+import { useTeam } from "@/hooks/useTeam";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { KudosDialog } from "@/components/pulse/KudosDialog";
+import { isRecognitionEvent, kudosText, milestoneText } from "./pulseRecognition";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ActivityEvent, PulseEmoji } from "@/lib/types";
@@ -137,8 +142,12 @@ function PulseLoadingSkeleton() {
 
 export default function PulsePage() {
   const { items, loading, refetch } = useActivity();
+  const { members } = useTeam();
+  const { user } = useCurrentUser();
   const { toastError } = useToast();
   const [reactingId, setReactingId] = useState<string | null>(null);
+  const [kudosOpen, setKudosOpen] = useState(false);
+  const currentUserId = user?.id ?? "";
 
   async function react(e: ActivityEvent, emoji: PulseEmoji) {
     setReactingId(e.id);
@@ -152,6 +161,43 @@ export default function PulsePage() {
     }
   }
 
+  // Shared reactions row, reused by every card type so reactions work
+  // identically on completed/cancelled/blocker/progress and kudos/milestones.
+  function reactionsRow(e: ActivityEvent) {
+    return (
+      <div className="mt-1 flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">
+          {formatTime(e.created_at)}
+        </span>
+        <div className="flex gap-2">
+          {reactionSet(e).map((em) => {
+            const count = e.reactions.counts[em] ?? 0;
+            const mine = e.reactions.mine.includes(em);
+            return (
+              <button
+                key={em}
+                type="button"
+                onClick={() => react(e, em)}
+                disabled={reactingId === e.id}
+                aria-label={EMOJI_LABEL[em]}
+                title={EMOJI_LABEL[em]}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-sm transition-colors disabled:opacity-50",
+                  mine
+                    ? "border-primary/40 bg-primary/10 text-primary"
+                    : "border-border/70 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                {EMOJI[em]}
+                {count > 0 ? ` ${count}` : ""}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return <PulseLoadingSkeleton />;
   }
@@ -163,7 +209,7 @@ export default function PulsePage() {
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Activity className="h-5 w-5" />
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-xl font-semibold leading-7 text-foreground">
             Пульс команды
           </h1>
@@ -171,7 +217,27 @@ export default function PulsePage() {
             Закрытые задачи, блокеры и прогресс команды
           </p>
         </div>
+        {currentUserId && (
+          <Button
+            size="sm"
+            onClick={() => setKudosOpen(true)}
+            className="h-8 shrink-0 gap-1.5 rounded-xl px-3 text-xs"
+          >
+            <Heart className="h-3.5 w-3.5" />
+            Поблагодарить
+          </Button>
+        )}
       </div>
+
+      {currentUserId && (
+        <KudosDialog
+          open={kudosOpen}
+          onOpenChange={setKudosOpen}
+          currentUserId={currentUserId}
+          members={members}
+          onSent={refetch}
+        />
+      )}
 
       {items.length === 0 ? (
         <EmptyState
@@ -192,6 +258,53 @@ export default function PulsePage() {
               </div>
 
               {group.events.map((e) => {
+                // ── Recognition cards: kudos + milestones ──
+                if (isRecognitionEvent(e.event_type)) {
+                  if (e.event_type === "kudos") {
+                    const { who, recipient, message } = kudosText(e);
+                    return (
+                      <div
+                        key={e.id}
+                        className="flex items-start gap-3 rounded-xl border border-border/70 bg-card p-4"
+                      >
+                        <UserAvatar
+                          name={e.actor_name}
+                          avatarUrl={e.actor_avatar_url}
+                          size="default"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-foreground">
+                            <b className="font-semibold">{who}</b> поблагодарил{" "}
+                            <b className="font-semibold">{recipient}</b>
+                          </p>
+                          {message && (
+                            <p className="text-sm text-muted-foreground">
+                              «{message}»
+                            </p>
+                          )}
+                          {reactionsRow(e)}
+                        </div>
+                      </div>
+                    );
+                  }
+                  // milestone_team / milestone_personal
+                  const badge = e.event_type === "milestone_team" ? "🏆" : "🛡️";
+                  return (
+                    <div
+                      key={e.id}
+                      className="flex items-start gap-3 rounded-xl border border-border/70 bg-card p-4"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg">
+                        {badge}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground">{milestoneText(e)}</p>
+                        {reactionsRow(e)}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const isCancelled = e.event_type === "task_cancelled";
                 const titleLine = eventTitleLine(e);
                 const who = e.actor_name ?? "Кто-то";
@@ -226,36 +339,7 @@ export default function PulsePage() {
                       {titleLine && (
                         <p className="text-sm text-muted-foreground">{titleLine}</p>
                       )}
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {formatTime(e.created_at)}
-                        </span>
-                        <div className="flex gap-2">
-                          {reactionSet(e).map((em) => {
-                            const count = e.reactions.counts[em] ?? 0;
-                            const mine = e.reactions.mine.includes(em);
-                            return (
-                              <button
-                                key={em}
-                                type="button"
-                                onClick={() => react(e, em)}
-                                disabled={reactingId === e.id}
-                                aria-label={EMOJI_LABEL[em]}
-                                title={EMOJI_LABEL[em]}
-                                className={cn(
-                                  "rounded-full border px-2.5 py-0.5 text-sm transition-colors disabled:opacity-50",
-                                  mine
-                                    ? "border-primary/40 bg-primary/10 text-primary"
-                                    : "border-border/70 text-muted-foreground hover:bg-muted"
-                                )}
-                              >
-                                {EMOJI[em]}
-                                {count > 0 ? ` ${count}` : ""}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      {reactionsRow(e)}
                     </div>
                   </div>
                 );
