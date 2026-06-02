@@ -186,6 +186,28 @@ test("content factory help exposes launch first-use guide", () => {
   assert.match(source, /\/content-factory\/help/);
 });
 
+test("content factory help exposes launch QA guide", () => {
+  const source = readSource("app/content-factory/help/page.tsx");
+  const uiSource = readSource("lib/contentFactoryUi.ts");
+
+  assert.match(source, /Проверка перед запуском/);
+  assert.match(source, /LAUNCH_QA_GROUPS/);
+  assert.match(source, /LAUNCH_BLOCKER_POLICY/);
+  assert.match(source, /LAUNCH_QA_PATH/);
+  assert.match(source, /launch blocker/);
+  assert.match(source, /ручной обход/i);
+  assert.match(source, /post-release backlog/i);
+  assert.match(source, /VK-метрики/);
+  assert.match(source, /Telegram/);
+  assert.match(source, /docs\/content-factory-production-readiness\.md/);
+  assert.match(source, /\/content-factory\/bundles/);
+  assert.match(source, /\/content-factory\/publications/);
+  assert.match(source, /\/content-factory\/review/);
+  assert.match(source, /\/content-factory\/effectiveness/);
+  assert.doesNotMatch(source, /\/content-factory\/launch/);
+  assert.doesNotMatch(uiSource, /\/content-factory\/launch/);
+});
+
 test("content factory help explains publication planning readiness and adaptations", () => {
   const source = readSource("app/content-factory/help/page.tsx");
 

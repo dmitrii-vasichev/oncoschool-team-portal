@@ -123,6 +123,91 @@ const FIRST_SAFE_PATH = [
   "Через 24 часа внесите первые метрики и сохраните вывод в ретроспективе.",
 ];
 
+const LAUNCH_QA_GROUPS = [
+  {
+    title: "Доступы и навигация",
+    open: "Откройте Обзор, Календарь, Публикации, Кампании, Очередь проверки, Аудитории, Эффективность и Справку.",
+    evidence:
+      "Администратор входит без дополнительных флагов, обычный участник входит только с доступом к Контент-фабрике.",
+    blocker:
+      "Пользователь с нужной ролью не может открыть раздел или видит системную ошибку вместо понятного ограничения.",
+  },
+  {
+    title: "Кампания и план",
+    open: "Создайте одну реальную кампанию и одну публикацию из кампании или списка публикаций.",
+    evidence:
+      "Видны владелец, цель, дата события, материалы, связанные публикации и понятный следующий шаг.",
+    blocker:
+      "Нельзя создать кампанию, публикация не связывается с кампанией или матрица не показывает пропущенные каналы.",
+  },
+  {
+    title: "Готовность публикации",
+    open: "Заполните площадку, формат, дату, ответственного, текст, UTM, аудиторию и хотя бы одну адаптацию.",
+    evidence:
+      "Чек-лист объясняет, что готово, что отсутствует и какие пункты появятся только после публикации.",
+    blocker:
+      "Пользователь не понимает, что мешает выпуску, или карточка показывает технические названия вместо рабочих подсказок.",
+  },
+  {
+    title: "Проверка и одобрение",
+    open: "Проведите публикацию через текст, дизайн, фактчек, врачебную проверку, одобрение или расписание.",
+    evidence:
+      "Очередь проверки показывает следующий шаг, ответственного, срочность и понятную причину попадания в очередь.",
+    blocker:
+      "Материал пропадает из очереди, статус нельзя изменить или медицинская проверка не отличима от обычного статуса.",
+  },
+  {
+    title: "Очередь публикации",
+    open: "Поставьте одобренную или запланированную публикацию в очередь, попробуйте отправку сейчас и ручной обход.",
+    evidence:
+      "Telegram и VK текстовые публикации отправляются только при корректной настройке; ошибка или ручной обход остаются в журнале.",
+    blocker:
+      "Провайдер падает без понятного сообщения, ручной обход не требует причины или факт публикации не сохраняется.",
+  },
+  {
+    title: "VK-метрики и ограничения Telegram",
+    open: "Для опубликованного VK-поста запустите сбор метрик или проверьте активный источник; отдельно проверьте ручной ввод метрик.",
+    evidence:
+      "VK-метрики попадают в историю с источником и окном замера; Telegram-аналитика честно обозначена как неавтоматическая.",
+    blocker:
+      "VK-сбор не показывает понятную ошибку, дублирует замеры или интерфейс обещает Telegram-аналитику через бота.",
+  },
+  {
+    title: "Выводы и blockers",
+    open: "Создайте ретроспективу и запишите все найденные launch blocker, ручной обход или post-release backlog.",
+    evidence:
+      "Команда понимает, что блокирует запуск, что можно обойти вручную, а что безопасно отложить после релиза.",
+    blocker:
+      "Нельзя записать выводы, blocker теряется вне системы или команда не может отличить ограничение от дефекта.",
+  },
+];
+
+const LAUNCH_BLOCKER_POLICY = [
+  {
+    label: "launch blocker",
+    text: "Запуск нельзя одобрять, если ломается доступ, создание кампании или публикации, очередь, сохранение факта выхода, VK-метрики для проверяемого поста или понятность критического статуса.",
+  },
+  {
+    label: "ручной обход",
+    text: "Запуск возможен, если действие можно надежно выполнить руками, причина обхода записана, а пользователь видит это как временный рабочий процесс.",
+  },
+  {
+    label: "post-release backlog",
+    text: "После запуска можно отложить улучшения, которые не мешают пройти один полный цикл: дополнительные провайдеры, медиа-автопубликацию, Telegram MTProto-аналитику и расширенные отчеты.",
+  },
+];
+
+const LAUNCH_QA_PATH = [
+  { label: "Кампания", href: "/content-factory/bundles" },
+  { label: "Публикации", href: "/content-factory/publications" },
+  { label: "Проверка", href: "/content-factory/review" },
+  { label: "Эффективность", href: "/content-factory/effectiveness" },
+  {
+    label: "Readiness doc",
+    href: "docs/content-factory-production-readiness.md",
+  },
+];
+
 const PUBLICATION_PLANNING_HELP = [
   {
     icon: CalendarDays,
@@ -530,6 +615,93 @@ export default function ContentFactoryHelpPage() {
               <ArrowRight className="h-3.5 w-3.5 text-primary" />
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-5">
+        <div className="flex items-center gap-2">
+          <ClipboardCheck className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold text-foreground">
+            Проверка перед запуском
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+          Launch QA - это не попытка проверить все старые записи. Нужно пройти
+          один реальный или production-like цикл и честно классифицировать
+          найденное: launch blocker, ручной обход или post-release backlog.
+        </p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {LAUNCH_QA_GROUPS.map((group) => (
+            <article
+              key={group.title}
+              className="rounded-lg border border-border/70 bg-background px-4 py-4"
+            >
+              <h3 className="text-sm font-semibold text-foreground">
+                {group.title}
+              </h3>
+              <dl className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+                <div>
+                  <dt className="font-medium text-foreground">Что открыть</dt>
+                  <dd>{group.open}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground">Evidence</dt>
+                  <dd>{group.evidence}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-foreground">Blocker</dt>
+                  <dd>{group.blocker}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+        </div>
+
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 text-amber-950">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            <h3 className="text-sm font-semibold">
+              Как классифицировать найденное
+            </h3>
+          </div>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            {LAUNCH_BLOCKER_POLICY.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-md bg-background/70 px-3 py-3"
+              >
+                <div className="text-sm font-semibold">{item.label}</div>
+                <p className="mt-2 text-xs leading-5">{item.text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+          {LAUNCH_QA_PATH.map((item) => {
+            const isDoc = item.href.startsWith("docs/");
+
+            return isDoc ? (
+              <span
+                key={item.href}
+                className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm font-medium text-muted-foreground"
+              >
+                <span>
+                  {item.label}: {item.href}
+                </span>
+                <FileText className="h-3.5 w-3.5" />
+              </span>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-between gap-3 rounded-md border border-primary/20 bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <span>{item.label}</span>
+                <ArrowRight className="h-3.5 w-3.5 text-primary" />
+              </Link>
+            );
+          })}
         </div>
       </section>
 
