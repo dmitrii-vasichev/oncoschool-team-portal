@@ -4,8 +4,8 @@
 
 ### Next
 
-- Run launch decision QA from `docs/content-factory-production-readiness.md` with authenticated real or production-like data.
-- Record launch blockers from Sprint 49 manual QA with owner and expected fix sprint.
+- Run launch decision QA from `docs/content-factory-production-readiness.md` and `/content-factory/help` with authenticated real or production-like data.
+- Record every launch blocker, accepted manual workaround, and post-release backlog item from Sprint 50 launch QA with owner and expected fix sprint.
 - Run authenticated manual QA for the Sprint 48 VK metric collector against a real VK community/post, missing-token config, invalid post identity, dedupe behavior, scheduled runs, import-run history, and metric-history provenance.
 - Run authenticated manual QA for the Sprint 47 metrics integration foundation against manual metrics, paste import, metric source config API, import run listing, dedupe, and provenance display.
 - Run authenticated manual QA for the Sprint 46 VK publisher against configured, missing-config, API-error, and media-ref cases.

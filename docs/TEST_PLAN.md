@@ -1,5 +1,24 @@
 # Test Plan
 
+## Content Factory Sprint 50 Launch QA Guide
+
+### Automated
+
+- `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts`
+- `cd frontend && npm test`
+- `cd frontend && npx tsc --noEmit`
+- `cd frontend && npm run lint`
+- `cd frontend && npm run build`
+- `git diff --check`
+
+### Manual
+
+1. Open `/content-factory/help` and confirm `Проверка перед запуском` is easy to find after the first-launch section.
+2. Confirm each launch QA group explains what to open, what evidence to confirm, and what counts as a blocker.
+3. Confirm the blocker policy distinguishes `launch blocker`, `ручной обход`, and `post-release backlog`.
+4. Confirm the guide does not create a new Content Factory navigation item.
+5. Run real or production-like launch decision QA from `docs/content-factory-production-readiness.md` and record blockers in `docs/BACKLOG.md`.
+
 ## Content Factory Sprint 49 Production Readiness
 
 ### Automated

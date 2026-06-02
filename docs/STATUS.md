@@ -1,5 +1,27 @@
 # Status
 
+## Content Factory Sprint 50 Launch QA Guide
+
+- Current phase: in progress on branch `codex/content-factory-sprint-50-launch-qa-guide`
+- Source: Sprint 49 production readiness made launch QA the next operator step.
+- Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-50-launch-qa-guide-design.md`
+- Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`
+- Scope: help-page launch QA guide, source guard, durable docs, and frontend verification
+- Latest progress:
+  - Created branch `codex/content-factory-sprint-50-launch-qa-guide`.
+  - Wrote Sprint 50 design and implementation plan.
+  - Added the launch QA guide to `/content-factory/help`.
+  - Added source guard coverage for launch QA content and route non-proliferation.
+- Key decisions:
+  - Do not add a new navigation item; keep launch QA inside the existing help page.
+  - Keep this sprint frontend-only because no backend contracts change.
+  - Treat real authenticated QA as an operator-run follow-up, not an automated local test.
+- Next actions:
+  - Run frontend verification and update final status.
+- Latest verification:
+  - RED confirmed: frontend source guard failed before implementation because the launch QA guide did not exist.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed after implementation: 44 tests, with existing Node module-type warning.
+
 ## Content Factory Sprint 49 Production Readiness
 
 - Current phase: implemented, locally verified, merged to `main`, and pushed

@@ -1,3 +1,50 @@
+# Active Plan: Content Factory Sprint 50 Launch QA Guide
+
+> **For agentic workers:** Execute from `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
+
+**Goal:** Add an operator-facing launch QA guide to the existing Content Factory help page without adding another navigation item.
+
+**Detailed design:** `docs/superpowers/specs/2026-06-01-content-factory-sprint-50-launch-qa-guide-design.md`
+
+**Detailed implementation plan:** `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`
+
+**Milestones:**
+
+1. Add source guard coverage for the launch QA guide.
+2. Add the launch QA guide to `/content-factory/help`.
+3. Update durable docs and backlog for blocker handling.
+4. Run frontend verification.
+
+**Implementation status:**
+
+- In progress on branch `codex/content-factory-sprint-50-launch-qa-guide`.
+- Sprint 1 through Sprint 49 work is merged to `main` and pushed.
+
+**Definition of done:**
+
+- `/content-factory/help` explains launch QA groups, evidence, blockers, manual workarounds, and post-release backlog classification.
+- The guide links users to key Content Factory screens and the readiness document path.
+- No new Content Factory navigation item is added.
+- Source guards cover the launch QA section and route non-proliferation.
+- Remaining authenticated launch decision QA stays visible in the backlog.
+
+**Validation commands:**
+
+```bash
+cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
+cd frontend && npm test
+cd frontend && npx tsc --noEmit
+cd frontend && npm run lint
+cd frontend && npm run build
+git diff --check
+```
+
+**Latest verification result:**
+
+- Pending implementation.
+
+---
+
 # Active Plan: Content Factory Sprint 49 Production Readiness
 
 > **For agentic workers:** Execute from `docs/superpowers/plans/2026-06-01-content-factory-sprint-49-production-readiness.md`. Keep `docs/STATUS.md` current after meaningful implementation or validation steps.
