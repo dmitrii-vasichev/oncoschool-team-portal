@@ -1,6 +1,6 @@
 # Content Factory Sprint 50 Launch QA Guide Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add an operator-facing launch QA guide to the existing Content Factory help page without adding another navigation item.
 
@@ -32,7 +32,7 @@
 **Files:**
 - Modify: `frontend/src/components/content-factory/contentFactorySourceGuards.test.ts`
 
-- [ ] **Step 1: Add the failing launch QA guard**
+- [x] **Step 1: Add the failing launch QA guard**
 
 Add this test immediately after `content factory help exposes launch first-use guide`:
 
@@ -60,7 +60,7 @@ test("content factory help exposes launch QA guide", () => {
 });
 ```
 
-- [ ] **Step 2: Run source guard to verify RED**
+- [x] **Step 2: Run source guard to verify RED**
 
 Run:
 
@@ -70,7 +70,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: FAIL because `LAUNCH_QA_GROUPS`, `LAUNCH_BLOCKER_POLICY`, `LAUNCH_QA_PATH`, and `Проверка перед запуском` do not exist yet.
 
-- [ ] **Step 3: Commit the failing guard**
+- [x] **Step 3: Commit the failing guard**
 
 Do not commit a failing test by itself. Continue to Task 2 and commit the RED/GREEN pair together.
 
@@ -82,7 +82,7 @@ Do not commit a failing test by itself. Continue to Task 2 and commit the RED/GR
 - Modify: `frontend/src/app/content-factory/help/page.tsx`
 - Modify: `frontend/src/components/content-factory/contentFactorySourceGuards.test.ts`
 
-- [ ] **Step 1: Add launch QA constants**
+- [x] **Step 1: Add launch QA constants**
 
 In `frontend/src/app/content-factory/help/page.tsx`, add these constants after `FIRST_SAFE_PATH`:
 
@@ -156,7 +156,7 @@ const LAUNCH_QA_PATH = [
 ];
 ```
 
-- [ ] **Step 2: Render the launch QA section**
+- [x] **Step 2: Render the launch QA section**
 
 Insert this section between `Первый запуск: что открыть по порядку` and `Как начать без страха`:
 
@@ -239,7 +239,7 @@ Insert this section between `Первый запуск: что открыть п
 </section>
 ```
 
-- [ ] **Step 3: Run source guard to verify GREEN**
+- [x] **Step 3: Run source guard to verify GREEN**
 
 Run:
 
@@ -249,7 +249,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS with 44 tests.
 
-- [ ] **Step 4: Commit Task 1-2**
+- [x] **Step 4: Commit Task 1-2**
 
 ```bash
 git add frontend/src/components/content-factory/contentFactorySourceGuards.test.ts frontend/src/app/content-factory/help/page.tsx
@@ -266,7 +266,7 @@ git commit -m "feat(cf): add launch QA guide"
 - Modify: `docs/TEST_PLAN.md`
 - Modify: `docs/BACKLOG.md`
 
-- [ ] **Step 1: Update `docs/PLAN.md`**
+- [x] **Step 1: Update `docs/PLAN.md`**
 
 Add a new top section before Sprint 49:
 
@@ -319,7 +319,7 @@ git diff --check
 ---
 ```
 
-- [ ] **Step 2: Update `docs/STATUS.md`**
+- [x] **Step 2: Update `docs/STATUS.md`**
 
 Add a new section below `# Status`:
 
@@ -344,7 +344,7 @@ Add a new section below `# Status`:
   - Pending implementation.
 ```
 
-- [ ] **Step 3: Update `docs/TEST_PLAN.md`**
+- [x] **Step 3: Update `docs/TEST_PLAN.md`**
 
 Add this top section:
 
@@ -369,7 +369,7 @@ Add this top section:
 5. Run real or production-like launch decision QA from `docs/content-factory-production-readiness.md` and record blockers in `docs/BACKLOG.md`.
 ```
 
-- [ ] **Step 4: Update `docs/BACKLOG.md`**
+- [x] **Step 4: Update `docs/BACKLOG.md`**
 
 Replace the first two `Next` bullets with:
 
@@ -378,7 +378,7 @@ Replace the first two `Next` bullets with:
 - Record every launch blocker, accepted manual workaround, and post-release backlog item from Sprint 50 launch QA with owner and expected fix sprint.
 ```
 
-- [ ] **Step 5: Run whitespace check**
+- [x] **Step 5: Run whitespace check**
 
 Run:
 
@@ -388,7 +388,7 @@ git diff --check
 
 Expected: no output.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add docs/PLAN.md docs/STATUS.md docs/TEST_PLAN.md docs/BACKLOG.md docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md
@@ -404,7 +404,7 @@ git commit -m "docs(cf): track launch QA guide sprint"
 - Modify: `docs/STATUS.md`
 - Modify: `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`
 
-- [ ] **Step 1: Run focused source guard**
+- [x] **Step 1: Run focused source guard**
 
 ```bash
 cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts
@@ -412,7 +412,7 @@ cd frontend && node --test --experimental-strip-types src/components/content-fac
 
 Expected: PASS with 44 tests.
 
-- [ ] **Step 2: Run full frontend tests**
+- [x] **Step 2: Run full frontend tests**
 
 ```bash
 cd frontend && npm test
@@ -420,7 +420,7 @@ cd frontend && npm test
 
 Expected: PASS.
 
-- [ ] **Step 3: Run TypeScript**
+- [x] **Step 3: Run TypeScript**
 
 ```bash
 cd frontend && npx tsc --noEmit
@@ -428,7 +428,7 @@ cd frontend && npx tsc --noEmit
 
 Expected: PASS. If `.next/types` is stale, run `npm run build` first and repeat `npx tsc --noEmit` sequentially.
 
-- [ ] **Step 4: Run lint**
+- [x] **Step 4: Run lint**
 
 ```bash
 cd frontend && npm run lint
@@ -436,7 +436,7 @@ cd frontend && npm run lint
 
 Expected: PASS with no ESLint warnings or errors.
 
-- [ ] **Step 5: Run production build**
+- [x] **Step 5: Run production build**
 
 ```bash
 cd frontend && npm run build
@@ -444,7 +444,7 @@ cd frontend && npm run build
 
 Expected: PASS.
 
-- [ ] **Step 6: Run whitespace check**
+- [x] **Step 6: Run whitespace check**
 
 ```bash
 git diff --check
@@ -452,11 +452,11 @@ git diff --check
 
 Expected: no output.
 
-- [ ] **Step 7: Update verification docs**
+- [x] **Step 7: Update verification docs**
 
 Update Sprint 50 sections in `docs/PLAN.md` and `docs/STATUS.md` with actual command results. Mark all checkboxes in this plan as complete after the commands pass.
 
-- [ ] **Step 8: Commit final status**
+- [x] **Step 8: Commit final status**
 
 ```bash
 git add docs/PLAN.md docs/STATUS.md docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md

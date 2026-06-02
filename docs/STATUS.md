@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 50 Launch QA Guide
 
-- Current phase: in progress on branch `codex/content-factory-sprint-50-launch-qa-guide`
+- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-50-launch-qa-guide`
 - Source: Sprint 49 production readiness made launch QA the next operator step.
 - Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-50-launch-qa-guide-design.md`
 - Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`
@@ -12,15 +12,24 @@
   - Wrote Sprint 50 design and implementation plan.
   - Added the launch QA guide to `/content-factory/help`.
   - Added source guard coverage for launch QA content and route non-proliferation.
+  - Updated durable plan, status, test plan, and backlog documents for Sprint 50.
+  - Full frontend verification and diff checks passed.
 - Key decisions:
   - Do not add a new navigation item; keep launch QA inside the existing help page.
   - Keep this sprint frontend-only because no backend contracts change.
   - Treat real authenticated QA as an operator-run follow-up, not an automated local test.
 - Next actions:
-  - Run frontend verification and update final status.
+  - Merge Sprint 50 to `main` and push after final branch completion checks.
+  - Run authenticated launch decision QA from `docs/content-factory-production-readiness.md` and `/content-factory/help` with real or production-like data.
 - Latest verification:
   - RED confirmed: frontend source guard failed before implementation because the launch QA guide did not exist.
   - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed after implementation: 44 tests, with existing Node module-type warning.
+  - `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 44 tests, with existing Node module-type warning.
+  - `cd frontend && npm test` passed: 233 tests, with existing Node module-type warnings.
+  - `cd frontend && npm run lint` passed with no ESLint warnings or errors.
+  - `cd frontend && npm run build` passed, including `/content-factory/help`.
+  - `cd frontend && npx tsc --noEmit` passed after `next build`.
+  - `git diff --check` passed.
 
 ## Content Factory Sprint 49 Production Readiness
 
