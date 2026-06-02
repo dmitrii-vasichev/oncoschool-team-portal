@@ -17,7 +17,7 @@
 
 **Implementation status:**
 
-- Implemented and locally verified on branch `codex/content-factory-sprint-50-launch-qa-guide`.
+- Implemented, locally verified, merged to `main`, and pushed.
 - Sprint 1 through Sprint 49 work is merged to `main` and pushed.
 
 **Definition of done:**
@@ -48,6 +48,7 @@ git diff --check
 - `cd frontend && npm run build` passed, including `/content-factory/help`.
 - `cd frontend && npx tsc --noEmit` passed after `next build`.
 - `git diff --check` passed.
+- Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 44 tests, with existing Node module-type warning.
 
 ---
 

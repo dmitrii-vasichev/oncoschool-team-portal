@@ -2,7 +2,7 @@
 
 ## Content Factory Sprint 50 Launch QA Guide
 
-- Current phase: implemented and locally verified on branch `codex/content-factory-sprint-50-launch-qa-guide`
+- Current phase: implemented, locally verified, merged to `main`, and pushed
 - Source: Sprint 49 production readiness made launch QA the next operator step.
 - Design: `docs/superpowers/specs/2026-06-01-content-factory-sprint-50-launch-qa-guide-design.md`
 - Plan: `docs/superpowers/plans/2026-06-01-content-factory-sprint-50-launch-qa-guide.md`
@@ -14,12 +14,14 @@
   - Added source guard coverage for launch QA content and route non-proliferation.
   - Updated durable plan, status, test plan, and backlog documents for Sprint 50.
   - Full frontend verification and diff checks passed.
+  - Fast-forward merged Sprint 50 into local `main`.
+  - Post-merge smoke verification passed on `main`.
+  - Pushed Sprint 50 to `origin/main`.
 - Key decisions:
   - Do not add a new navigation item; keep launch QA inside the existing help page.
   - Keep this sprint frontend-only because no backend contracts change.
   - Treat real authenticated QA as an operator-run follow-up, not an automated local test.
 - Next actions:
-  - Merge Sprint 50 to `main` and push after final branch completion checks.
   - Run authenticated launch decision QA from `docs/content-factory-production-readiness.md` and `/content-factory/help` with real or production-like data.
 - Latest verification:
   - RED confirmed: frontend source guard failed before implementation because the launch QA guide did not exist.
@@ -30,6 +32,7 @@
   - `cd frontend && npm run build` passed, including `/content-factory/help`.
   - `cd frontend && npx tsc --noEmit` passed after `next build`.
   - `git diff --check` passed.
+  - Post-merge smoke on `main`: `cd frontend && node --test --experimental-strip-types src/components/content-factory/contentFactorySourceGuards.test.ts` passed: 44 tests, with existing Node module-type warning.
 
 ## Content Factory Sprint 49 Production Readiness
 
