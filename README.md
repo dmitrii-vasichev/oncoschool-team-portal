@@ -2,7 +2,7 @@
 
 > **[Live Demo](https://task-manager-oncoschool.vercel.app)** · *Authentication required — see screenshots below for a full UI walkthrough.*
 
-A team portal for ~20 people with two entry points: **Telegram bot** and **web interface**.
+An operations analytics and workflow automation platform for a 20-person medical education team, combining task management, GetCourse reporting, Zoom/Telegram integrations, PostgreSQL, and AI-assisted processing.
 
 ## Features
 
